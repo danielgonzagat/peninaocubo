@@ -80,6 +80,10 @@ class EthicsCalculator:
     
     def _calculate_ece_numpy(self, predictions: List[float], targets: List[int], n_bins: int):
         """ECE calculation using numpy"""
+        # Convert to numpy arrays
+        predictions_np = np.array(predictions)
+        targets_np = np.array(targets)
+        
         # Create bins
         bin_boundaries = np.linspace(0, 1, n_bins + 1)
         bin_lowers = bin_boundaries[:-1]
@@ -89,12 +93,12 @@ class EthicsCalculator:
         bin_data = []
         
         for bin_lower, bin_upper in zip(bin_lowers, bin_uppers):
-            in_bin = np.logical_and(predictions > bin_lower, predictions <= bin_upper)
+            in_bin = np.logical_and(predictions_np > bin_lower, predictions_np <= bin_upper)
             prop_in_bin = in_bin.mean()
             
             if prop_in_bin > 0:
-                accuracy_in_bin = targets[in_bin].mean()
-                avg_confidence_in_bin = predictions[in_bin].mean()
+                accuracy_in_bin = targets_np[in_bin].mean()
+                avg_confidence_in_bin = predictions_np[in_bin].mean()
                 ece += np.abs(avg_confidence_in_bin - accuracy_in_bin) * prop_in_bin
                 
                 bin_data.append({
