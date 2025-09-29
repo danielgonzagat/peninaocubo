@@ -20,7 +20,6 @@ class GeminiProvider(BaseProvider):
         temperature: float = 0.7,
     ) -> LLMResponse:
         start = time.time()
-        start = time.time()
         # Convert messages to Gemini format
         content_parts = []
         if system:
