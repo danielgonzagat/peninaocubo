@@ -96,10 +96,12 @@ try:
     from penin.providers.anthropic_provider import AnthropicProvider
     from penin.providers.grok_provider import GrokProvider
     from penin.tools.schemas import KAGGLE_SEARCH_TOOL, HF_SEARCH_TOOL
-    from penin.tools.registry import execute_tool as penin_execute_tool
-    HAS_PENIN = True
-except Exception:
+except ImportError as e:
     HAS_PENIN = False
+    print(f"INFO: penin package not available: {e}")
+except Exception as e:
+    HAS_PENIN = False
+    print(f"WARNING: Failed to import penin package: {e}")
 
 # -----------------------------------------------------------------------------
 # Configuration Models (Pydantic)
