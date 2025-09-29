@@ -26,9 +26,9 @@ class MultiLLMRouter:
         tasks = [
             p.chat(messages, tools=tools, system=system, temperature=temperature)
             for p in self.providers
-        ]
         results: List[LLMResponse] = await asyncio.gather(*tasks, return_exceptions=True)
         ok = [r for r in results if isinstance(r, LLMResponse)]
         if not ok:
-            raise RuntimeError("Todos os providers falharam")
+            errors = [str(r) for r in results if isinstance(r, Exception)]
+            raise RuntimeError(f"All providers failed. Errors: {errors}")
         return max(ok, key=self._score)
