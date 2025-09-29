@@ -877,6 +877,7 @@ class PeninOmegaCore:
                                "g":    {"beta": 6.0, "mid": 0.7},
                                "oci":  {"beta": 6.0, "mid": 0.9}
                            }},
+            "monitoring": {"fail_closed_threshold": 0.85},
             # NOTE: run_seed enables deterministic testing but should be managed carefully in production
             "run_seed": 42,
         }
@@ -889,6 +890,18 @@ class PeninOmegaCore:
                 raise ValueError("rho_max out of range")
             if not (0.0 < cfg["thresholds"]["beta_min"] <= 1.0):
                 raise ValueError("beta_min out of range")
+            monitoring_cfg = cfg.get("monitoring", {})
+            if not isinstance(monitoring_cfg, dict):
+                raise ValueError("monitoring config must be a mapping")
+            threshold = monitoring_cfg.get("fail_closed_threshold", 0.85)
+            try:
+                threshold_val = float(threshold)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("fail_closed_threshold must be a number") from exc
+            if not (0.0 <= threshold_val <= 1.0):
+                raise ValueError("fail_closed_threshold must be between 0 and 1 inclusive")
+            monitoring_cfg["fail_closed_threshold"] = threshold_val
+            cfg["monitoring"] = monitoring_cfg
             run_seed = cfg.get("run_seed", 42)
             if isinstance(run_seed, bool):  # bool is subclass of int, reject explicitly
                 raise ValueError("run_seed must be an integer, not boolean")
