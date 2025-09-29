@@ -25,14 +25,13 @@ class OpenAIProvider(BaseProvider):
             msgs.append({"role": "system", "content": system})
         msgs += messages
         resp = await asyncio.to_thread(
-            self.client.responses.create,
+            self.client.chat.completions.create,
             model=self.model,
-            input=None,
             messages=msgs,
             tools=tools or [],
             temperature=temperature,
         )
-        content = getattr(resp, "output_text", "")
+        content = resp.choices[0].message.content if resp.choices and resp.choices[0].message else ""
         usage = getattr(resp, "usage", {}) or {}
         end = time.time()
         return LLMResponse(
