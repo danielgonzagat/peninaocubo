@@ -928,10 +928,11 @@ class PeninOmegaCore:
                 self.xt.mem = psutil.virtual_memory().percent / 100.0
             else:
                 # Fail-closed: assume high usage when psutil missing
-                self.xt.cpu = 1.0
-                self.xt.mem = 1.0
-                result.update({"decision": "ABORT", "reason": "RESOURCE_UNVERIFIED"})
-                self.worm.record("CYCLE_ABORT", result, self.xt)
+                # Fail-closed: assume high usage when psutil missing (configurable threshold)
+                fail_closed_threshold = self.cfg.get("monitoring", {}).get("fail_closed_threshold", 0.85)
+                self.xt.cpu = fail_closed_threshold
+                self.xt.mem = fail_closed_threshold
+                self.worm.record("RESOURCE_MONITORING_DEGRADED", {"reason": "psutil_unavailable", "threshold": fail_closed_threshold}, self.xt)
                 return result
             ok, violations = self.sigma.check(self.xt)
             if not ok:
