@@ -5,7 +5,7 @@ from typing import Dict, Any
 async def kaggle_search_datasets(query: str, max_results: int = 10) -> Dict[str, Any]:
     # Sanitize query to prevent command injection
     import re
-    if not re.match(r'^[a-zA-Z0-9\s\-_]+$', query):
+    if not re.match(r'^[a-zA-Z0-9\s\-\_\.\,\(\)]+$', query):
         return {"error": "Invalid query format", "code": 1}
     
     cmd = [
