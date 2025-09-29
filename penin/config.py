@@ -17,12 +17,12 @@ class Settings(BaseSettings):
     PENIN_MAX_PARALLEL_PROVIDERS: int = 3
     PENIN_MAX_TOKENS_PER_ROUND: int = 30000
     PENIN_BUDGET_DAILY_USD: float = 5.0
-
-    OPENAI_MODEL: str = "gpt-5"
+    OPENAI_MODEL: str = "gpt-4o"
     DEEPSEEK_MODEL: str = "deepseek-chat"
     MISTRAL_MODEL: str = "mistral-large-latest"
-    GEMINI_MODEL: str = "gemini-2.5-pro"
-    ANTHROPIC_MODEL: str = "claude-opus-4-1-20250805"
+    GEMINI_MODEL: str = "gemini-1.5-pro"
+    ANTHROPIC_MODEL: str = "claude-3-5-sonnet-20241022"
+    GROK_MODEL: str = "grok-beta"
     GROK_MODEL: str = "grok-4"
 
     class Config:
