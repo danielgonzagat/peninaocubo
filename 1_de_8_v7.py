@@ -133,7 +133,7 @@ class SRWeights(BaseModel):
     M: float = Field(0.3, ge=0, le=1)
     A: float = Field(0.1, ge=0, le=1)
     
-    @validator('A')
+    @field_validator('A')
     def weights_sum_to_one(cls, v, values):
         total = v + values.get('C', 0) + values.get('E', 0) + values.get('M', 0)
         if abs(total - 1.0) > 0.01:
@@ -148,7 +148,7 @@ class OmegaSigmaConfig(BaseModel):
     weights: List[float] = Field(default_factory=lambda: [1.0/8]*8)
     tau_g: float = Field(0.7, ge=0, le=1, description="Global coherence threshold")
     
-    @validator('weights')
+    @field_validator('weights')
     def weights_valid(cls, v):
         if len(v) != 8:
             raise ValueError("Must have exactly 8 weights")
@@ -160,7 +160,7 @@ class OCIConfig(BaseModel):
     weights: List[float] = Field(default_factory=lambda: [0.25]*4)
     tau_oci: float = Field(0.9, ge=0, le=1, description="OCI gate threshold")
     
-    @validator('weights')
+    @field_validator('weights')
     def weights_valid(cls, v):
         if len(v) != 4:
             raise ValueError("Must have exactly 4 weights")
@@ -176,7 +176,7 @@ class LInfWeights(BaseModel):
     viability: float = Field(0.15, ge=0, le=1)
     cost: float = Field(0.05, ge=0, le=1)
     
-    @validator('cost')
+    @field_validator('cost')
     def weights_sum_to_one(cls, v, values):
         total = v + sum(values.get(k, 0) for k in ['rsi', 'synergy', 'novelty', 'stability', 'viability'])
         if abs(total - 1.0) > 0.01:
@@ -989,7 +989,7 @@ class CAOSPlusEngine:
 
 class SREngine:
     def __init__(self, cfg: SROmegaConfig):
-        self.weights = cfg.weights.dict()
+        self.weights = cfg.weights.model_dump()
         self.tau = cfg.tau_sr
         
     def compute(self, xt: OmegaMEState) -> float:
@@ -1053,7 +1053,7 @@ class OCIEngine:
 
 class LInfinityScore:
     def __init__(self, cfg: LInfPlacarConfig):
-        self.weights = cfg.weights.dict()
+        self.weights = cfg.weights.model_dump()
         self.lambda_c = cfg.lambda_c
         
     def compute(self, xt: OmegaMEState) -> float:
@@ -1151,7 +1151,7 @@ class PeninOmegaCore:
         
         # Compute config hash for attestation
         self.config_hash = hashlib.sha256(
-            json.dumps(self.cfg.dict(), sort_keys=True).encode()
+            json.dumps(self.cfg.model_dump(), sort_keys=True).encode()
         ).hexdigest()[:16]
         
         self.worm = WORMLedger()
@@ -1458,7 +1458,7 @@ class PeninOmegaCore:
                 "ts": datetime.now(timezone.utc).isoformat(), 
                 "state": self.xt.to_dict(), 
                 "metrics": self.metrics, 
-                "config": self.cfg.dict(),
+                "config": self.cfg.model_dump(),
                 "seed": self.rng.seed,
                 "rng_state": self.rng.get_state()
             }, f, indent=2, ensure_ascii=False)
