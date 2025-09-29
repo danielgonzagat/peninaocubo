@@ -102,20 +102,40 @@ except Exception:
     HAS_NUMPY = False
 try:
     from pydantic import BaseModel, ValidationError, Field
-    HAS_PYDANTIC = True
-except Exception:
-    HAS_PYDANTIC = False
-try:
-    from prometheus_client import Counter, Histogram, Gauge, start_http_server, CollectorRegistry
-    HAS_PROMETHEUS = True
-except Exception:
-    HAS_PROMETHEUS = False
-try:
-    import structlog
-    HAS_STRUCTLOG = True
-except Exception:
-    HAS_STRUCTLOG = False
-try:
+def get_pydantic():
+    if not hasattr(get_pydantic, '_module'):
+        try:
+            from pydantic import BaseModel, ValidationError, Field
+            get_pydantic._module = (BaseModel, ValidationError, Field)
+            return get_pydantic._module
+        except ImportError:
+            get_pydantic._module = None
+    return get_pydantic._module
+
+def get_prometheus():
+    if not hasattr(get_prometheus, '_module'):
+        try:
+            from prometheus_client import Counter, Histogram, Gauge, start_http_server, CollectorRegistry
+            get_prometheus._module = (Counter, Histogram, Gauge, start_http_server, CollectorRegistry)
+            return get_prometheus._module
+        except ImportError:
+            get_prometheus._module = None
+    return get_prometheus._module
+
+def get_structlog():
+    if not hasattr(get_structlog, '_module'):
+        try:
+            import structlog
+            get_structlog._module = structlog
+            return get_structlog._module
+        except ImportError:
+            get_structlog._module = None
+    return get_structlog._module
+
+# Use lazy loading
+HAS_PYDANTIC = get_pydantic() is not None
+HAS_PROMETHEUS = get_prometheus() is not None
+HAS_STRUCTLOG = get_structlog() is not None
     import redis
     HAS_REDIS = True
 except Exception:
