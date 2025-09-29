@@ -877,6 +877,7 @@ class PeninOmegaCore:
                                "g":    {"beta": 6.0, "mid": 0.7},
                                "oci":  {"beta": 6.0, "mid": 0.9}
                            }},
+            # NOTE: run_seed enables deterministic testing but should be managed carefully in production
             "run_seed": 42,
         }
         cfg = _deep_merge(default, custom or {})
@@ -888,6 +889,13 @@ class PeninOmegaCore:
                 raise ValueError("rho_max out of range")
             if not (0.0 < cfg["thresholds"]["beta_min"] <= 1.0):
                 raise ValueError("beta_min out of range")
+            run_seed = cfg.get("run_seed", 42)
+            if isinstance(run_seed, bool):  # bool is subclass of int, reject explicitly
+                raise ValueError("run_seed must be an integer, not boolean")
+            run_seed_int = int(run_seed)
+            if run_seed_int < 0 or run_seed_int >= 2 ** 63:
+                raise ValueError("run_seed out of supported range (0 <= seed < 2**63)")
+            cfg["run_seed"] = run_seed_int
         except Exception as e:
             raise RuntimeError(f"Invalid configuration: {e}") from e
         return cfg
@@ -921,13 +929,20 @@ class PeninOmegaCore:
                 self.xt.cpu = psutil.cpu_percent(interval=None) / 100.0
                 self.xt.mem = psutil.virtual_memory().percent / 100.0
             else:
-                # Fail-closed: assume high usage when psutil missing
                 # Fail-closed: assume high usage when psutil missing (configurable threshold)
                 fail_closed_threshold = self.cfg.get("monitoring", {}).get("fail_closed_threshold", 0.85)
                 self.xt.cpu = fail_closed_threshold
                 self.xt.mem = fail_closed_threshold
-                self.worm.record("RESOURCE_MONITORING_DEGRADED", {"reason": "psutil_unavailable", "threshold": fail_closed_threshold}, self.xt)
-                return result
+                log.warning("psutil unavailable, using fail-closed resource monitoring")
+                self.worm.record(
+                    "RESOURCE_MONITORING_DEGRADED",
+                    {"reason": "psutil_unavailable", "threshold": fail_closed_threshold},
+                    self.xt,
+                )
+                if fail_closed_threshold >= 0.95:
+                    result.update({"decision": "ABORT", "reason": "RESOURCE_UNVERIFIED"})
+                    self.worm.record("CYCLE_ABORT", result, self.xt)
+                    return result
             ok, violations = self.sigma.check(self.xt)
             if not ok:
                 result.update({"decision": "ABORT", "reason": "SIGMA_GUARD", "violations": violations})
