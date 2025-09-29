@@ -23,9 +23,9 @@ class OpenAIProvider(BaseProvider):
         msgs = []
         if system:
             msgs.append({"role": "system", "content": system})
+        msgs.extend(messages)
         resp = await asyncio.to_thread(
             self.client.chat.completions.create,
-            model=self.model,
             messages=msgs,
             tools=tools,
             temperature=temperature,
