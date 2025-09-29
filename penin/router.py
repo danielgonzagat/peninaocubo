@@ -9,11 +9,66 @@ from penin.providers.base import BaseProvider, LLMResponse
 class MultiLLMRouter:
     def __init__(self, providers: List[BaseProvider]):
         self.providers = providers[: settings.PENIN_MAX_PARALLEL_PROVIDERS]
+        self._daily_spent = 0.0
+        self._spending_reset_time = time.time()
 
     def _score(self, r: LLMResponse) -> float:
+        """
+        Score response considering content, latency, and cost.
+        Higher score is better.
+        """
+        # Base score for having content
         base = 1.0 if r.content else 0.0
+        
+        # Latency penalty (lower latency = higher score)
         lat = max(0.01, r.latency_s)
-        return base + 1.0 / lat
+        latency_score = 1.0 / lat
+        
+        # Cost penalty (lower cost = higher score)
+        # Normalize cost to [0,1] range assuming max cost of $0.10 per call
+        max_cost = getattr(settings, 'MAX_COST_PER_CALL', 0.10)
+        cost = getattr(r, 'cost_usd', 0.0)
+        cost_penalty = max(0.0, 1.0 - (cost / max_cost)) if max_cost > 0 else 1.0
+        
+        # Token usage efficiency (if available)
+        token_efficiency = 1.0
+        if hasattr(r, 'usage') and r.usage:
+            total_tokens = r.usage.get('total_tokens', 0)
+            if total_tokens > 0:
+                # Prefer responses with fewer tokens (more concise)
+                max_tokens = getattr(settings, 'MAX_TOKENS_EXPECTED', 4096)
+                token_efficiency = max(0.1, 1.0 - (total_tokens / max_tokens))
+        
+        # Combined score with weights
+        w_content = getattr(settings, 'ROUTER_WEIGHT_CONTENT', 0.4)
+        w_latency = getattr(settings, 'ROUTER_WEIGHT_LATENCY', 0.2)
+        w_cost = getattr(settings, 'ROUTER_WEIGHT_COST', 0.3)
+        w_tokens = getattr(settings, 'ROUTER_WEIGHT_TOKENS', 0.1)
+        
+        # Normalize weights
+        w_sum = w_content + w_latency + w_cost + w_tokens
+        if w_sum > 0:
+            w_content /= w_sum
+            w_latency /= w_sum
+            w_cost /= w_sum
+            w_tokens /= w_sum
+        
+        score = (
+            w_content * base +
+            w_latency * latency_score +
+            w_cost * cost_penalty +
+            w_tokens * token_efficiency
+        )
+        
+        # Apply daily budget check if configured
+        daily_budget = getattr(settings, 'DAILY_BUDGET_USD', None)
+        if daily_budget is not None:
+            daily_spent = getattr(self, '_daily_spent', 0.0)
+            if daily_spent + cost > daily_budget:
+                # Heavily penalize if over budget
+                score *= 0.01
+        
+        return score
 
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=0.5))
     async def ask(
@@ -32,4 +87,23 @@ class MultiLLMRouter:
         if not ok:
             errors = [str(r) for r in results if isinstance(r, Exception)]
             raise RuntimeError(f"All providers failed. Errors: {errors}")
-        return max(ok, key=self._score)
+        
+        # Select best response
+        best = max(ok, key=self._score)
+        
+        # Track spending
+        self._update_spending(best)
+        
+        return best
+    
+    def _update_spending(self, response: LLMResponse):
+        """Update daily spending tracker"""
+        # Reset daily counter if new day
+        current_time = time.time()
+        if current_time - self._spending_reset_time > 86400:  # 24 hours
+            self._daily_spent = 0.0
+            self._spending_reset_time = current_time
+        
+        # Add cost if available
+        if hasattr(response, 'cost_usd'):
+            self._daily_spent += response.cost_usd
