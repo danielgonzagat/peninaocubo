@@ -1,3 +1,4 @@
+from __future__ import annotations
 # --- Pydantic v1/v2 compatibility shim (auto-injected) ---
 try:
     from pydantic import field_validator  # Pydantic v2
@@ -36,7 +37,6 @@ projection into the safe/ethical domain. All gates are non‑compensatory.
 Copyright 2025 Daniel Penin and contributors.
 """
 
-from __future__ import annotations
 import os
 import sys
 import json
