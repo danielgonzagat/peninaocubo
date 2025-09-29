@@ -271,16 +271,19 @@ log = logging.getLogger("Ω-1/8-v7")
 # -----------------------------------------------------------------------------
 class DeterministicRandom:
     """Manages deterministic random state with seed tracking"""
-    def __init__(self, seed: Optional[int] = None):
-        self.seed = seed if seed is not None else int(time.time() * 1000) % (2**32)
-        self.rng = random.Random(self.seed)
-        self.call_count = 0
-        
-    def set_seed(self, seed: int):
-        """Set new seed and reset RNG"""
+    def _reset_rng(self, seed: int):
         self.seed = seed
         self.rng = random.Random(seed)
         self.call_count = 0
+
+    def __init__(self, seed: Optional[int] = None):
+        if seed is None:
+            seed = int(time.time() * 1000) % (2**32)
+        self._reset_rng(seed)
+        
+    def set_seed(self, seed: int):
+        """Set new seed and reset RNG"""
+        self._reset_rng(seed)
         
     def get_state(self) -> Dict[str, Any]:
         """Get current RNG state for logging"""
