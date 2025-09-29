@@ -101,19 +101,39 @@ def test_integration_flow():
         # Test if modules can import each other
         sys.path.insert(0, str(Path.cwd()))
         
-        # Test basic imports
+        # Test basic imports with fallback loader for script files
         from importlib import import_module
+        import importlib.util
+        import importlib.machinery
+        
+        def _fallback_load(module_name: str) -> bool:
+            p = Path.cwd() / module_name
+            if not p.exists():
+                return False
+            try:
+                loader = importlib.machinery.SourceFileLoader(module_name, str(p))
+                spec = importlib.util.spec_from_loader(module_name, loader)
+                mod = importlib.util.module_from_spec(spec)
+                loader.exec_module(mod)
+                sys.modules[module_name] = mod
+                return True
+            except Exception:
+                return False
         
         modules = []
-        for i in range(1, 6):
+        for i in range(1, 5 + 1):
+            module_name = f"{i}_de_8"
             try:
-                # Try to import as module
-                module_name = f"{i}_de_8"
-                spec = import_module(module_name)
+                import_module(module_name)
                 modules.append(f"{i}/8")
                 print(f"✅ Module {i}/8 importable")
             except Exception as e:
-                print(f"⚠️ Module {i}/8 import issue: {e}")
+                # Try fallback direct file load (handles files without .py extension)
+                if _fallback_load(module_name):
+                    modules.append(f"{i}/8")
+                    print(f"✅ Module {i}/8 loaded via fallback")
+                else:
+                    print(f"⚠️ Module {i}/8 import issue: {e}")
         
         print(f"✅ Integration flow - {len(modules)}/5 modules working")
         return len(modules) >= 3  # At least 3 modules working
