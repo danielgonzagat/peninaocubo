@@ -44,7 +44,8 @@ from enum import Enum
 from functools import lru_cache
 import warnings
 
-warnings.filterwarnings('ignore')
+# Suppress only DeprecationWarning to avoid hiding important issues
+warnings.filterwarnings('ignore', category=DeprecationWarning)
 
 # =============================================================================
 # IMPORTS OPCIONAIS COM FALLBACKS
