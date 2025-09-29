@@ -116,6 +116,13 @@ try:
 except Exception:
     HAS_PSUTIL = False
 
+# Optional: config validation
+try:
+    from pydantic import BaseModel, Field, ValidationError
+    HAS_PYDANTIC = True
+except Exception:
+    HAS_PYDANTIC = False
+
 # -----------------------------------------------------------------------------
 # Configuration and paths
 # -----------------------------------------------------------------------------
@@ -144,6 +151,15 @@ logging.basicConfig(
     ],
 )
 log = logging.getLogger("Ω-1/8")
+
+# -----------------------------------------------------------------------------
+# Helpers for determinism and hashing
+# -----------------------------------------------------------------------------
+def _hash_json(obj: Any) -> str:
+    try:
+        return hashlib.sha256(json.dumps(obj, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    except Exception:
+        return hashlib.sha256(repr(obj).encode()).hexdigest()
 
 # -----------------------------------------------------------------------------
 # Fibonacci toolkit and Zeckendorf
@@ -341,6 +357,12 @@ class MultiLevelCache:
         self._lock = threading.RLock()
     def _init_l2_db(self):
         cursor = self.l2_db.cursor()
+        try:
+            cursor.execute('PRAGMA journal_mode=WAL')
+            cursor.execute('PRAGMA synchronous=NORMAL')
+            cursor.execute('PRAGMA busy_timeout=3000')
+        except Exception:
+            pass
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS cache (
                 key TEXT PRIMARY KEY,
@@ -497,6 +519,12 @@ class WORMLedger:
         self.tail = self._get_last_hash()
     def _init_db(self):
         cursor = self.db.cursor()
+        try:
+            cursor.execute('PRAGMA journal_mode=WAL')
+            cursor.execute('PRAGMA synchronous=NORMAL')
+            cursor.execute('PRAGMA busy_timeout=3000')
+        except Exception:
+            pass
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS events (
@@ -571,6 +599,7 @@ class OmegaMEState:
     S: float = 0.6
     caos_plus: float = 1.0
     caos_harmony: float = 1.0
+    caos_stable: bool = True
     sr_score: float = 1.0
     C_cal: float = 0.8
     E_ok: float = 1.0
@@ -629,14 +658,10 @@ class IRtoIC:
     def __init__(self, cfg: Dict[str, Any], use_phi: bool = False):
         self.rho_max = cfg.get("iric", {}).get("rho_max", 0.95)
         self.contraction = INV_PHI if use_phi else cfg.get("iric", {}).get("contraction_factor", 0.98)
+        # Keep executor for potential future I/O checks, but safe() will be synchronous
         self.exec = ThreadPoolExecutor(max_workers=4)
     def safe(self, xt: OmegaMEState) -> bool:
-        fs = [
-            self.exec.submit(lambda: xt.rho < self.rho_max),
-            self.exec.submit(lambda: xt.uncertainty < 0.9),
-            self.exec.submit(lambda: xt.cpu < 0.95 and xt.mem < 0.95),
-        ]
-        return all(f.result() for f in as_completed(fs))
+        return (xt.rho < self.rho_max) and (xt.uncertainty < 0.9) and (xt.cpu < 0.95 and xt.mem < 0.95)
     def contract(self, xt: OmegaMEState) -> None:
         xt.rho *= self.contraction
         xt.uncertainty *= self.contraction
@@ -649,6 +674,9 @@ class CAOSPlusEngine:
         self.pmax = c.get("pmax", 2.0)
         self.pchaos = c.get("chaos_probability", 0.01)
         self.fib = fib
+        # EWMA for stability check (for Fibonacci boost gating)
+        self._ewma_alpha = float(c.get("ewma_alpha", 0.2))
+        self._ewma: Optional[float] = None
     def compute(self, xt: OmegaMEState) -> float:
         if random.random() < self.pchaos:
             fac = random.uniform(0.9, 1.1)
@@ -658,7 +686,21 @@ class CAOSPlusEngine:
         exponent = max(self.pmin, min(self.pmax, O * S))
         val = base ** exponent
         patt = self.fib.analyze_fibonacci_patterns([C, A, O, S])
-        val *= (1.0 + 0.1 * patt["pattern_strength"])
+        # Maintain EWMA of delta L∞ as stability proxy
+        try:
+            delta_signal = abs(xt.delta_linf)
+            if self._ewma is None:
+                self._ewma = delta_signal
+            else:
+                self._ewma = self._ewma_alpha * delta_signal + (1 - self._ewma_alpha) * self._ewma
+            xt.caos_stable = self._ewma is not None and self._ewma < 0.05
+        except Exception:
+            xt.caos_stable = False
+        # Clamp Fibonacci boost to max +5% and only if stable
+        boost = 1.0
+        if xt.caos_stable:
+            boost = 1.0 + min(0.05, max(0.0, patt.get("pattern_strength", 0.0)))
+        val *= boost
         xt.pattern_score = patt["pattern_strength"]
         xt.caos_plus = val
         xt.caos_harmony = (C + A) / (O + S if (O + S) > 1e-9 else 1.0)
@@ -780,7 +822,7 @@ class FibonacciManager:
         if not (self.enabled and self.cache_enabled): return
         cache.l1_ttl = int(self.s1.next())
         cache.l2_ttl = int(self.s2.next())
-        self.worm.record(EventType.FIBONACCI_TICK, {
+        self.worm.record("FIBONACCI_TICK", {
             "l1_ttl": cache.l1_ttl,
             "l2_ttl": cache.l2_ttl,
         })
@@ -800,6 +842,52 @@ class FibonacciManager:
 class PeninOmegaCore:
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.cfg = self._load_config(config)
+        # Validate config if Pydantic is available
+        if HAS_PYDANTIC:
+            class FibonacciCfg(BaseModel):
+                enabled: bool = False
+                cache: bool = True
+                trust_region: bool = True
+                l1_ttl_base: int = 1
+                l2_ttl_base: int = 60
+                max_interval_s: float = 300.0
+                trust_growth: Optional[float] = None
+                trust_shrink: Optional[float] = None
+                search_method: str = Field("fibonacci", pattern=r"^(fibonacci|golden)$")
+            class EvolutionCfg(BaseModel):
+                alpha_0: float = 0.1
+                phi_caos: Dict[str, float] = {"beta": 5.0, "mid": 1.0}
+                sr: Dict[str, float] = {"beta": 5.0, "mid": 0.8}
+                g: Dict[str, float] = {"beta": 5.0, "mid": 0.7}
+                oci: Dict[str, float] = {"beta": 5.0, "mid": 0.9}
+            class ThresholdsCfg(BaseModel):
+                tau_caos: float = 0.7
+                beta_min: float = 0.02
+            class IRICCfg(BaseModel):
+                rho_max: float = 0.95
+                contraction_factor: float = 0.98
+            class ConfigModel(BaseModel):
+                fibonacci: FibonacciCfg
+                evolution: EvolutionCfg
+                thresholds: ThresholdsCfg
+                iric: IRICCfg
+            try:
+                _ = ConfigModel(
+                    fibonacci=self.cfg.get("fibonacci", {}),
+                    evolution=self.cfg.get("evolution", {}),
+                    thresholds=self.cfg.get("thresholds", {}),
+                    iric=self.cfg.get("iric", {}),
+                )
+            except ValidationError as ve:
+                raise RuntimeError(f"Invalid configuration: {ve}")
+        # Deterministic seed per boot, can be overridden per cycle
+        self._boot_seed = int.from_bytes(hashlib.sha256(str(time.time()).encode()).digest()[:8], 'big')
+        random.seed(self._boot_seed)
+        try:
+            import numpy as _np
+            _np.random.seed(self._boot_seed & 0xFFFFFFFF)
+        except Exception:
+            pass
         self.worm = WORMLedger()
         self.cache = MultiLevelCache()
         self.fibR = FibonacciResearch()
@@ -843,27 +931,45 @@ class PeninOmegaCore:
             "phi": PHI,
             "inv_phi": INV_PHI,
             "fibonacci_enabled": self.fib.enabled,
+            "seed": self._boot_seed,
         }, self.xt)
     async def master_equation_cycle(self, external_metrics: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
         result = {"success": False, "decision": None, "metrics": {}}
         t0 = time.time()
         try:
+            # Deterministic seed per cycle, derived from boot seed and cycle
+            cycle_seed = (self._boot_seed ^ (self.xt.cycle + 1)) & 0xFFFFFFFFFFFFFFFF
+            random.seed(cycle_seed)
+            try:
+                if HAS_NUMPY:
+                    np.random.seed(cycle_seed & 0xFFFFFFFF)
+            except Exception:
+                pass
             if external_metrics:
                 for k, v in external_metrics.items():
                     if hasattr(self.xt, k): setattr(self.xt, k, float(v))
             if HAS_PSUTIL:
                 self.xt.cpu = psutil.cpu_percent(interval=None) / 100.0
                 self.xt.mem = psutil.virtual_memory().percent / 100.0
+            else:
+                # Fail-closed if psutil not present
+                result.update({"decision": "ABORT", "reason": "NO_PSUTIL", "gate_result": {"gate": "RESOURCE", "metric": "psutil", "value": 0, "threshold": 1}})
+                self.worm.record("CYCLE_ABORT", result, self.xt)
+                return result
             ok, violations = self.sigma.check(self.xt)
             if not ok:
-                result.update({"decision": "ABORT", "reason": "SIGMA_GUARD", "violations": violations})
+                result.update({"decision": "ABORT", "reason": "SIGMA_GUARD", "violations": violations,
+                               "gate_result": {"gate": "SIGMA_GUARD", "details": violations}})
                 self.worm.record("CYCLE_ABORT", result, self.xt)
                 return result
             if not self.iric.safe(self.xt):
                 self.iric.contract(self.xt)
-                result.update({"decision": "ABORT", "reason": "IRIC_CONTRACT"})
+                result.update({"decision": "ABORT", "reason": "IRIC_CONTRACT",
+                               "gate_result": {"gate": "IRIC", "metric": "cpu/mem/rho", "value": {"cpu": self.xt.cpu, "mem": self.xt.mem, "rho": self.xt.rho}, "threshold": {"cpu": 0.95, "mem": 0.95, "rho": self.cfg.get("iric", {}).get("rho_max", 0.95)}}})
                 self.worm.record("CYCLE_ABORT", result, self.xt)
                 return result
+            # Log seed/randstate for replay determinism
+            self.worm.record("CYCLE_SEED", {"seed": cycle_seed}, self.xt)
             l_score = self.linf.compute(self.xt)
             result["metrics"]["L∞"] = l_score
             result["metrics"]["ΔL∞"] = self.xt.delta_linf
@@ -879,13 +985,19 @@ class PeninOmegaCore:
             alpha = self._compute_alpha()
             result["metrics"]["α_t^Ω"] = alpha
             gates = []
-            if not self.sr.gate(self.xt): gates.append("SR_GATE")
-            if not self.gc.gate(self.xt): gates.append("G_GATE")
-            if not self.oci.gate(self.xt): gates.append("OCI_GATE")
-            if self.xt.delta_linf < self.cfg["thresholds"]["beta_min"]: gates.append("ΔL∞_GATE")
-            if self.xt.caos_plus < self.cfg["thresholds"]["tau_caos"]: gates.append("CAOS⁺_GATE")
+            gate_trace: List[Dict[str, Any]] = []
+            if not self.sr.gate(self.xt):
+                gates.append("SR_GATE"); gate_trace.append({"gate": "SR", "value": self.xt.sr_score, "threshold": self.sr.tau})
+            if not self.gc.gate(self.xt):
+                gates.append("G_GATE"); gate_trace.append({"gate": "G", "value": self.xt.g_score, "threshold": self.gc.tau})
+            if not self.oci.gate(self.xt):
+                gates.append("OCI_GATE"); gate_trace.append({"gate": "OCI", "value": self.xt.oci_score, "threshold": self.oci.tau})
+            if self.xt.delta_linf < self.cfg["thresholds"]["beta_min"]:
+                gates.append("ΔL∞_GATE"); gate_trace.append({"gate": "ΔL∞", "value": self.xt.delta_linf, "threshold": self.cfg["thresholds"]["beta_min"]})
+            if self.xt.caos_plus < self.cfg["thresholds"]["tau_caos"]:
+                gates.append("CAOS⁺_GATE"); gate_trace.append({"gate": "CAOS⁺", "value": self.xt.caos_plus, "threshold": self.cfg["thresholds"]["tau_caos"]})
             if gates:
-                result.update({"decision": "ROLLBACK", "reason": "GATES_FAILED", "failed_gates": gates})
+                result.update({"decision": "ROLLBACK", "reason": "GATES_FAILED", "failed_gates": gates, "gate_trace": gate_trace})
                 self.metrics["rollbacks"] += 1
                 self.worm.record("ROLLBACK", result, self.xt)
                 return result
@@ -916,7 +1028,19 @@ class PeninOmegaCore:
             if step_opt > 0:
                 result.update({"success": True, "decision": "PROMOTE", "evolution_step": step_opt})
                 self.metrics["promotions"] += 1
+                # PROMOTE + PROMOTE_ATTEST (atomic attest event with hashes)
+                pre_hash = _hash_json({"state": self.xt.to_dict(), "metrics": result["metrics"]})
+                config_hash = _hash_json(self.cfg)
                 self.worm.record("PROMOTE", {"step": step_opt, "alpha": alpha, "ΔL∞": self.xt.delta_linf}, self.xt)
+                post_hash = _hash_json({"state": self.xt.to_dict(), "metrics": result["metrics"]})
+                self.worm.record("PROMOTE_ATTEST", {
+                    "pre_hash": pre_hash,
+                    "post_hash": post_hash,
+                    "config_hash": config_hash,
+                    "seed": cycle_seed,
+                    "gate_trace": gate_trace,
+                    "Δmetrics": {"L∞": result["metrics"].get("L∞", 0), "ΔL∞": result["metrics"].get("ΔL∞", 0), "CAOS⁺": result["metrics"].get("CAOS⁺", 0), "SR": result["metrics"].get("SR", 0), "OCI": result["metrics"].get("OCI", 0), "G": result["metrics"].get("G", 0)}
+                }, self.xt)
             else:
                 result.update({"decision": "ROLLBACK", "reason": "NEGATIVE_STEP"})
                 self.metrics["rollbacks"] += 1
@@ -935,13 +1059,24 @@ class PeninOmegaCore:
             self.worm.record("CYCLE_ABORT", result, self.xt)
             return result
     def _compute_alpha(self) -> float:
-        alpha_0 = self.cfg["evolution"]["alpha_0"]
-        phi_caos = min(1.0, self.xt.caos_plus / 2.0)
-        sr_comp = min(2.0, max(0.1, self.xt.sr_score))
-        g_comp  = min(2.0, max(0.1, self.xt.g_score))
-        oci_comp= min(2.0, max(0.1, self.xt.oci_score))
+        # Parametric sigmoid funnels with midpoints and slopes from config
+        econf = self.cfg.get("evolution", {})
+        alpha_0 = float(econf.get("alpha_0", 0.1))
+        def sigmoid(x: float, beta: float, mid: float) -> float:
+            try:
+                return 1.0 / (1.0 + math.exp(-beta * (x - mid)))
+            except OverflowError:
+                return 0.0 if (-beta * (x - mid)) > 0 else 1.0
+        caos_params = econf.get("phi_caos", {"beta": 5.0, "mid": 1.0})
+        sr_params   = econf.get("sr",        {"beta": 5.0, "mid": 0.8})
+        g_params    = econf.get("g",         {"beta": 5.0, "mid": 0.7})
+        oci_params  = econf.get("oci",       {"beta": 5.0, "mid": 0.9})
+        phi_caos = sigmoid(self.xt.caos_plus, caos_params["beta"], caos_params["mid"])
+        sr_comp  = sigmoid(self.xt.sr_score,  sr_params["beta"],  sr_params["mid"])
+        g_comp   = sigmoid(self.xt.g_score,   g_params["beta"],   g_params["mid"])
+        oci_comp = sigmoid(self.xt.oci_score, oci_params["beta"], oci_params["mid"])
         self.xt.alpha_omega = alpha_0 * phi_caos * sr_comp * g_comp * oci_comp
-        return min(1.0, max(0.0, self.xt.alpha_omega))
+        return max(0.0, min(1.0, self.xt.alpha_omega))
     def verify_integrity(self) -> Dict[str, Any]:
         ok, err = self.worm.verify_chain()
         return {"worm_valid": ok, "worm_error": err, "metrics": dict(self.metrics), "state": self.xt.to_dict(), "cache": dict(self.cache.stats)}
