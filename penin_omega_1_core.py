@@ -88,7 +88,7 @@ import logging
 import signal
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Optional, Tuple, Callable
+from typing import Any, Dict, List, Optional, Tuple, Callable, Literal
 from datetime import datetime, timezone
 from collections import deque, defaultdict, OrderedDict
 from functools import lru_cache
@@ -159,7 +159,7 @@ if HAS_PYDANTIC:
         l1_ttl_base: float = Field(default=1.0, ge=0.1, le=3600.0)
         l2_ttl_base: float = Field(default=60.0, ge=1.0, le=86400.0)
         max_interval_s: float = Field(default=300.0, ge=10.0, le=86400.0)
-        search_method: str = Field(default="fibonacci", regex="^(fibonacci|golden)$")
+        search_method: Literal["fibonacci", "golden"] = "fibonacci"
 
     class PeninOmegaConfig(BaseModel):
         ethics: EthicsConfig = Field(default_factory=EthicsConfig)
