@@ -1,0 +1,8 @@
+poetry.lock merge=ours
+yarn.lock merge=ours
+pnpm-lock.yaml merge=ours
+package-lock.json merge=ours
+*.min.js merge=ours
+*.generated.* merge=ours
+dist/** merge=ours
+build/** merge=ours
