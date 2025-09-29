@@ -1,2 +1,11 @@
 __pycache__/
 *.py[cod]
+
+# --- PENIN hygiene ---
+__pycache__/
+*.pyc
+.venv/
+.env
+.DS_Store
+dist/
+build/
