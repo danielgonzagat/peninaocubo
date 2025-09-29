@@ -130,7 +130,10 @@ try:
     HAS_PSUTIL = True
 except Exception:
     HAS_PSUTIL = False
-    print("WARNING: psutil is required for safe operation. Install with: pip install psutil")
+    print(
+        "WARNING: psutil is recommended for safe operation. Some features may be disabled if not installed. "
+        "Install with: pip install psutil"
+    )
 
 # -----------------------------------------------------------------------------
 # Configuration validation schema

@@ -1,16 +1,32 @@
 import math
 import sys
+from importlib import util
 from pathlib import Path
 
 import pytest
 
-sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from penin_omega_1_core import (
-    FibonacciResearch,
-    ZeckendorfEncoder,
-    HAS_PYDANTIC,
-)
+def _load_core_module():
+    try:
+        import penin_omega_1_core as core_module
+        return core_module
+    except ModuleNotFoundError:
+        module_path = Path(__file__).resolve().parents[1] / "penin_omega_1_core.py"
+        spec = util.spec_from_file_location("penin_omega_1_core", module_path)
+        if spec is None or spec.loader is None:  # pragma: no cover - defensive
+            raise ImportError("Unable to load penin_omega_1_core module")
+
+        core_module = util.module_from_spec(spec)
+        sys.modules.setdefault("penin_omega_1_core", core_module)
+        spec.loader.exec_module(core_module)
+        return core_module
+
+
+core = _load_core_module()
+
+FibonacciResearch = core.FibonacciResearch
+ZeckendorfEncoder = core.ZeckendorfEncoder
+HAS_PYDANTIC = getattr(core, "HAS_PYDANTIC", False)
 
 
 def test_fibonacci_retracement_levels_compute_expected_values():
@@ -50,7 +66,8 @@ def test_zeckendorf_encoder_representation_and_string():
 
 
 if HAS_PYDANTIC:  # pragma: no cover - only executed when dependency is installed
-    from penin_omega_1_core import FibonacciConfig, ValidationError
+    FibonacciConfig = core.FibonacciConfig
+    ValidationError = core.ValidationError
 
     def test_fibonacci_config_validates_search_method():
         FibonacciConfig(search_method="golden")

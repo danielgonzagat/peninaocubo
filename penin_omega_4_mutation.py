@@ -40,7 +40,6 @@ import os
 import random
 import re
 import shutil
-import signal
 import sqlite3
 import tempfile
 import time
@@ -56,6 +55,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union, Callable
 from datetime import datetime, timezone
 from collections import defaultdict, Counter, deque
 from enum import Enum
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 import warnings
 # Suppress only DeprecationWarning and UserWarning to avoid hiding important issues
 warnings.filterwarnings('ignore', category=DeprecationWarning)
@@ -608,12 +608,12 @@ def sanitize_python_source(src: str) -> Tuple[bool, List[str]]:
 
 def run_in_sandbox(code_text: str, timeout_s: int = 5, mem_limit_mb: int = 512) -> Tuple[bool, Dict[str, Any]]:
     """Execução em sandbox com múltiplas camadas de segurança."""
-    
+
     # Sanitização primeiro
     ok, issues = sanitize_python_source(code_text)
     if not ok:
         return False, {"errors": issues, "phase": "sanitization"}
-    
+
     # Prepare sandboxed namespace
     safe_builtins = {
         "abs": abs, "all": all, "any": any, "bool": bool,
@@ -625,56 +625,43 @@ def run_in_sandbox(code_text: str, timeout_s: int = 5, mem_limit_mb: int = 512) 
         "__name__": "__main__",
         "__doc__": None,
     }
-    
-    # Setup timeout handler
-    def timeout_handler(signum, frame):
-        raise TimeoutError("sandbox_timeout")
-    
-    old_handler = signal.signal(signal.SIGALRM, timeout_handler)
-    signal.alarm(timeout_s)
-    
-    try:
-        # Create temporary directory for sandbox
-        with tempfile.TemporaryDirectory() as tmpdir:
-            # Compile code
-            bytecode = compile(code_text, "<sandbox>", "exec")
-            
-            # Create isolated namespace
-            ns = {"__builtins__": safe_builtins, "__tmpdir__": tmpdir}
-            
-            # Track resource usage
-            t0 = time.perf_counter()
-            mem_before = 0
-            if HAS_PSUTIL:
-                proc = psutil.Process()
-                mem_before = proc.memory_info().rss / (1024 * 1024)
-            
-            # Execute
-            exec(bytecode, ns, ns)
-            
-            # Calculate metrics
-            latency_ms = (time.perf_counter() - t0) * 1000
-            mem_after = mem_before
-            if HAS_PSUTIL:
-                mem_after = proc.memory_info().rss / (1024 * 1024)
-                mem_delta = mem_after - mem_before
-                
-                if mem_delta > mem_limit_mb:
-                    return False, {"errors": ["memory_exceeded"], "mem_delta_mb": mem_delta}
-            
-            return True, {
-                "latency_ms": latency_ms,
-                "mem_delta_mb": mem_after - mem_before if HAS_PSUTIL else 0,
-                "phase": "execution"
-            }
-    
-    except TimeoutError:
-        return False, {"errors": ["timeout"], "phase": "execution"}
-    except Exception as e:
-        return False, {"errors": [f"exec_error:{e}"], "phase": "execution"}
-    finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, old_handler)
+
+    def _execute_safely() -> Tuple[bool, Dict[str, Any]]:
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                bytecode = compile(code_text, "<sandbox>", "exec")
+                ns = {"__builtins__": safe_builtins, "__tmpdir__": tmpdir}
+
+                t0 = time.perf_counter()
+                mem_before = 0
+                mem_after = 0
+                if HAS_PSUTIL:
+                    proc = psutil.Process()
+                    mem_before = proc.memory_info().rss / (1024 * 1024)
+
+                exec(bytecode, ns, ns)
+
+                latency_ms = (time.perf_counter() - t0) * 1000
+                if HAS_PSUTIL:
+                    mem_after = proc.memory_info().rss / (1024 * 1024)
+                    mem_delta = mem_after - mem_before
+                    if mem_delta > mem_limit_mb:
+                        return False, {"errors": ["memory_exceeded"], "mem_delta_mb": mem_delta}
+
+                return True, {
+                    "latency_ms": latency_ms,
+                    "mem_delta_mb": (mem_after - mem_before) if HAS_PSUTIL else 0,
+                    "phase": "execution",
+                }
+        except Exception as exc:  # pragma: no cover - defensive
+            return False, {"errors": [f"exec_error:{exc}"], "phase": "execution"}
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(_execute_safely)
+        try:
+            return future.result(timeout=timeout_s)
+        except FuturesTimeoutError:
+            return False, {"errors": ["timeout"], "phase": "execution"}
 
 # =============================================================================
 # DNA-FABRIC (CODIFICAÇÃO GENÉTICA)
