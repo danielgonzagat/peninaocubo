@@ -761,11 +761,13 @@ class WORMLedger:
         
     def _init_db(self):
         cursor = self.db.cursor()
-        # Configure WAL mode and timeouts for better concurrency
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.execute("PRAGMA busy_timeout=5000")  # 5s timeout
-        cursor.execute("PRAGMA wal_autocheckpoint=10000")  # Less frequent checkpoints
+        # Enable WAL mode and set busy timeout for better concurrency
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA busy_timeout=3000")
+        except Exception:
+            pass
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS events (

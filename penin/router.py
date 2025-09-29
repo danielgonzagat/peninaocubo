@@ -141,28 +141,12 @@ class MultiLLMRouter:
         
         # Latency component (higher is better for lower latency)
         lat = max(0.01, r.latency_s)
-        latency_score = 1.0 / lat
-        
-        # Cost component (lower cost is better)
-        # Normalize cost to [0,1] range, assuming max $1 per request
-        cost_normalized = min(1.0, max(0.0, getattr(r, 'cost_usd', 0.0)))
-        cost_score = 1.0 - cost_normalized  # Invert so lower cost = higher score
-        
-        # Budget penalty - heavily penalize if over budget
-        budget_penalty = 1.0
-        if hasattr(r, 'cost_usd') and r.cost_usd > 0:
-            if not self._check_budget(r.cost_usd):
-                budget_penalty = 0.1  # Severe penalty for budget violation
-                
-        # Combined score
-        content_weight = 0.4
-        latency_weight = 1.0 - self.cost_weight - content_weight
-        
-        score = (content_weight * base + 
-                latency_weight * latency_score + 
-                self.cost_weight * cost_score) * budget_penalty
-                
-        return score
+        # Penalize higher cost and long latency; favor non-empty content
+        cost = max(0.0, r.cost_usd)
+        # Budget-aware soft penalty
+        budget = max(0.01, settings.PENIN_BUDGET_DAILY_USD)
+        cost_penalty = 1.0 / (1.0 + cost / budget)
+        return base + (1.0 / lat) * cost_penalty
 
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=0.5))
     async def ask(
