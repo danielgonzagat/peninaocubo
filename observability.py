@@ -101,33 +101,41 @@ class StructuredLogger:
         finally:
             self.trace_id = old_trace
     
+    def _build_log_dict(self, msg: str, **kwargs):
+        """Helper to build log dict with trace_id"""
+        log_dict = {"msg": msg}
+        if self.trace_id:
+            log_dict["trace_id"] = self.trace_id
+        log_dict.update(kwargs)
+        return log_dict
+
     def info(self, msg: str, **kwargs):
         """Log info with structured data"""
         if HAS_STRUCTLOG:
             self.logger.info(msg, **kwargs)
         else:
-            self.logger.info(json.dumps({"msg": msg, "trace_id": self.trace_id, **kwargs}))
+            self.logger.info(json.dumps(self._build_log_dict(msg, **kwargs)))
     
     def warning(self, msg: str, **kwargs):
         """Log warning with structured data"""
         if HAS_STRUCTLOG:
             self.logger.warning(msg, **kwargs)
         else:
-            self.logger.warning(json.dumps({"msg": msg, "trace_id": self.trace_id, **kwargs}))
+            self.logger.warning(json.dumps(self._build_log_dict(msg, **kwargs)))
     
     def error(self, msg: str, **kwargs):
         """Log error with structured data"""
         if HAS_STRUCTLOG:
             self.logger.error(msg, **kwargs)
         else:
-            self.logger.error(json.dumps({"msg": msg, "trace_id": self.trace_id, **kwargs}))
+            self.logger.error(json.dumps(self._build_log_dict(msg, **kwargs)))
     
     def debug(self, msg: str, **kwargs):
         """Log debug with structured data"""
         if HAS_STRUCTLOG:
             self.logger.debug(msg, **kwargs)
         else:
-            self.logger.debug(json.dumps({"msg": msg, "trace_id": self.trace_id, **kwargs}))
+            self.logger.debug(json.dumps(self._build_log_dict(msg, **kwargs)))
 
 class JSONFormatter(logging.Formatter):
     """JSON formatter for standard logging"""
