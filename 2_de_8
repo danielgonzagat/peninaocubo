@@ -221,8 +221,8 @@ OMEGA_META_CONFIG: Dict[str, Any] = {
     },
     
     "llm": {
-        "enabled": False,
-        "model": "gpt-4",
+        "enabled": True,
+        "model": "router",
         "max_tokens": 100,
         "temperature": 0.3,
         "timeout_ms": 200,
@@ -2378,12 +2378,30 @@ class StrategyModuleFusion:
     ) -> str:
         """Gera rationale explicativo do plano."""
         # Tentar LLM se configurado e disponível
-        if self.cfg["llm"]["enabled"] and context and "llm_client" in context:
+        if self.cfg["llm"]["enabled"]:
             try:
-                return self._generate_llm_rationale(intent, goals, sr_score, context)
-            except:
-                pass  # Fallback para determinístico
-        
+                # Optional orchestrator via penin.bridge
+                from penin.bridge import llm_orchestrate
+                from penin.tools.schemas import HF_SEARCH_TOOL, KAGGLE_SEARCH_TOOL
+                prompt = (
+                    f"Gere uma rationale curta e objetiva para o plano dado o SR={sr_score:.3f}. "
+                    f"Objetivos: {self._summarize_goals(goals)}"
+                )
+                res = asyncio.run(
+                    llm_orchestrate(
+                        messages=[{"role": "user", "content": prompt}],
+                        system="Você é um estrategista do PENIN. Responda em 3 bullets.",
+                        tools=[HF_SEARCH_TOOL, KAGGLE_SEARCH_TOOL],
+                        temperature=0.3,
+                    )
+                )
+                if res and res.get("content"):
+                    return res["content"][:500]
+            except ImportError as exc:
+                print(f"INFO: penin integration unavailable: {exc}")
+            except Exception as exc:
+                print(f"WARNING: penin orchestration failed: {exc}")
+
         # Rationale determinístico estruturado
         goal_summary = self._summarize_goals(goals)
         strategy = self._describe_strategy(goals)

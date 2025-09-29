@@ -10,4 +10,3 @@ async def hf_search(query: str, limit: int = 10) -> Dict[str, Any]:
     models = api.list_models(search=query, limit=limit)
     data = [{"id": m.id, "likes": m.likes, "downloads": m.downloads} for m in models]
     return {"results": data}
-

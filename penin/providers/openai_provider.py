@@ -1,9 +1,12 @@
-import time
 import asyncio
-from typing import List, Optional
+import time
+from typing import Any, Dict, List, Optional
+
 from openai import OpenAI
-from .base import BaseProvider, LLMResponse, Message, Tool
+
 from penin.config import settings
+
+from .base import BaseProvider, LLMResponse, Message, Tool
 
 
 class OpenAIProvider(BaseProvider):
@@ -20,29 +23,45 @@ class OpenAIProvider(BaseProvider):
         temperature: float = 0.7,
     ) -> LLMResponse:
         start = time.time()
-        msgs = []
+        msgs: List[Message] = []
         if system:
             msgs.append({"role": "system", "content": system})
-        msgs += messages
-        resp = await asyncio.to_thread(
-            self.client.responses.create,
-            model=self.model,
-            input=None,
-            messages=msgs,
-            tools=tools or [],
-            temperature=temperature,
-        )
-        content = getattr(resp, "output_text", "")
-        usage = getattr(resp, "usage", None) or {}
+        msgs.extend(messages)
+
+        kwargs: Dict[str, Any] = {
+            "model": self.model,
+            "messages": msgs,
+            "temperature": temperature,
+        }
+        if tools:
+            kwargs["tools"] = tools
+
+        resp = await asyncio.to_thread(self.client.chat.completions.create, **kwargs)
+        choice = resp.choices[0]
+        message = getattr(choice, "message", None)
+        content = getattr(message, "content", "") if message else ""
+        raw_tool_calls = getattr(message, "tool_calls", None) if message else None
+
+        tool_calls: List[Dict[str, Any]] = []
+        if raw_tool_calls:
+            for call in raw_tool_calls:
+                if isinstance(call, dict):
+                    tool_calls.append(call)
+                elif hasattr(call, "to_dict"):
+                    tool_calls.append(call.to_dict())
+                elif hasattr(call, "model_dump"):
+                    tool_calls.append(call.model_dump())
+
+        usage = getattr(resp, "usage", None)
+        tokens_in = getattr(usage, "prompt_tokens", 0) if usage else 0
+        tokens_out = getattr(usage, "completion_tokens", 0) if usage else 0
         end = time.time()
         return LLMResponse(
             content=content,
             model=self.model,
-            tokens_in=usage.get("input_tokens", 0),
-            tokens_out=usage.get("output_tokens", 0),
-            tool_calls=[],
-            cost_usd=0.0,
-            latency_s=end - start,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            tool_calls=tool_calls,
             provider=self.name,
+            latency_s=end - start,
         )
-
