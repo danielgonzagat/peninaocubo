@@ -16,4 +16,3 @@ async def kaggle_search_datasets(query: str, max_results: int = 10) -> Dict[str,
     )
     out, err = await proc.communicate()
     return {"stdout": out.decode(), "stderr": err.decode(), "code": proc.returncode}
-

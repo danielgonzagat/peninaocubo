@@ -38,18 +38,16 @@ class DeepSeekProvider(BaseProvider):
             **kwargs,
         )
         choice = resp.choices[0]
-        message = getattr(choice, "message", {})
-        content = message.get("content", "") if isinstance(message, dict) else getattr(message, "content", "")
-        tool_calls = message.get("tool_calls", []) if isinstance(message, dict) else getattr(message, "tool_calls", [])
-        usage = getattr(resp, "usage", None) or {}
+        content = getattr(choice.message, "content", "") if hasattr(choice, "message") else ""
+        tool_calls = getattr(choice.message, "tool_calls", []) if hasattr(choice, "message") else []
+        usage = getattr(resp, "usage", {}) or {}
         end = time.time()
         return LLMResponse(
             content=content,
             model=self.model,
             tokens_in=usage.get("prompt_tokens", 0),
             tokens_out=usage.get("completion_tokens", 0),
-            tool_calls=tool_calls or [],
+            tool_calls=tool_calls,
             provider=self.name,
             latency_s=end - start,
         )
-

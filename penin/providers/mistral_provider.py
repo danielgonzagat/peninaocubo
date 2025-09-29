@@ -28,4 +28,3 @@ class MistralProvider(BaseProvider):
         content = resp.choices[0].message.content
         end = time.time()
         return LLMResponse(content=content, model=self.model, provider=self.name, latency_s=end - start)
-

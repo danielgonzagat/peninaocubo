@@ -1,10 +1,8 @@
 from pydantic_settings import BaseSettings
-from pydantic import Field
 from typing import Optional
 
 
 class Settings(BaseSettings):
-    # API keys (optional; if absent, provider is skipped)
     OPENAI_API_KEY: Optional[str] = None
     DEEPSEEK_API_KEY: Optional[str] = None
     MISTRAL_API_KEY: Optional[str] = None
@@ -16,12 +14,10 @@ class Settings(BaseSettings):
     KAGGLE_USERNAME: Optional[str] = None
     KAGGLE_KEY: Optional[str] = None
 
-    # Orchestration limits
     PENIN_MAX_PARALLEL_PROVIDERS: int = 3
     PENIN_MAX_TOKENS_PER_ROUND: int = 30000
     PENIN_BUDGET_DAILY_USD: float = 5.0
 
-    # Default models
     OPENAI_MODEL: str = "gpt-5"
     DEEPSEEK_MODEL: str = "deepseek-chat"
     MISTRAL_MODEL: str = "mistral-large-latest"
@@ -35,4 +31,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-

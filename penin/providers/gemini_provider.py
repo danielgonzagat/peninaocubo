@@ -27,4 +27,3 @@ class GeminiProvider(BaseProvider):
         text = getattr(resp, "text", "")
         end = time.time()
         return LLMResponse(content=text, model=self.model, provider=self.name, latency_s=end - start)
-

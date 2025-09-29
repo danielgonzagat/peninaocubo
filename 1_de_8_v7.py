@@ -84,6 +84,24 @@ except ImportError:
     print("WARNING: psutil not found. System will assume HIGH resource usage (fail-closed).")
 
 # -----------------------------------------------------------------------------
+# Optional Multi-API Orchestrator (penin package)
+# -----------------------------------------------------------------------------
+try:
+    from penin.config import settings as PENIN_SETTINGS
+    from penin.router import MultiLLMRouter
+    from penin.providers.openai_provider import OpenAIProvider
+    from penin.providers.deepseek_provider import DeepSeekProvider
+    from penin.providers.mistral_provider import MistralProvider
+    from penin.providers.gemini_provider import GeminiProvider
+    from penin.providers.anthropic_provider import AnthropicProvider
+    from penin.providers.grok_provider import GrokProvider
+    from penin.tools.schemas import KAGGLE_SEARCH_TOOL, HF_SEARCH_TOOL
+    from penin.tools.registry import execute_tool as penin_execute_tool
+    HAS_PENIN = True
+except Exception:
+    HAS_PENIN = False
+
+# -----------------------------------------------------------------------------
 # Configuration Models (Pydantic)
 # -----------------------------------------------------------------------------
 class EthicsConfig(BaseModel):
@@ -1222,6 +1240,50 @@ class PeninOmegaCore:
                 self.worm.record(EventType.CYCLE_ABORT, result, self.xt, seed_state=self.rng.get_state())
                 return result
                 
+            # Optional: Pre-cycle multi-API orchestration to enrich context
+            if HAS_PENIN:
+                try:
+                    providers = []
+                    if PENIN_SETTINGS.OPENAI_API_KEY:
+                        providers.append(OpenAIProvider())
+                    if PENIN_SETTINGS.DEEPSEEK_API_KEY:
+                        providers.append(DeepSeekProvider())
+                    if PENIN_SETTINGS.MISTRAL_API_KEY:
+                        providers.append(MistralProvider())
+                    if PENIN_SETTINGS.GEMINI_API_KEY:
+                        providers.append(GeminiProvider())
+                    if PENIN_SETTINGS.ANTHROPIC_API_KEY:
+                        providers.append(AnthropicProvider())
+                    if PENIN_SETTINGS.XAI_API_KEY:
+                        providers.append(GrokProvider())
+                    if providers:
+                        router = MultiLLMRouter(providers)
+                        sys_msg = (
+                            "Você é o orquestrador do PENIN. Use ferramentas quando necessário. "
+                            "Responda curto, com bullets das próximas ações de aquisição."
+                        )
+                        user_msg = (
+                            f"Estado: ΔL∞={self.xt.delta_linf:.4f}, SR={self.xt.sr_score:.3f}, "
+                            f"G={self.xt.g_score:.3f}, OCI={self.xt.oci_score:.3f}. "
+                            "Que datasets/papers buscar agora?"
+                        )
+                        tools = [KAGGLE_SEARCH_TOOL, HF_SEARCH_TOOL]
+                        r = await router.ask(
+                            messages=[{"role": "user", "content": user_msg}],
+                            system=sys_msg,
+                            tools=tools,
+                            temperature=0.3,
+                        )
+                        # Basic record of orchestrator result
+                        self.worm.record(
+                            EventType.LLM_QUERY,
+                            {"provider": r.provider, "model": r.model, "latency": r.latency_s},
+                            self.xt,
+                        )
+                except Exception as _e:
+                    # Non-fatal
+                    pass
+
             # Compute L∞ and components
             l_score = self.linf.compute(self.xt)
             result["metrics"]["L∞"] = l_score

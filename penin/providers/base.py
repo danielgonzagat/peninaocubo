@@ -41,4 +41,3 @@ class BaseProvider(ABC):
         temperature: float = 0.7,
     ) -> LLMResponse:
         ...
-

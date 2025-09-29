@@ -33,7 +33,7 @@ class OpenAIProvider(BaseProvider):
             temperature=temperature,
         )
         content = getattr(resp, "output_text", "")
-        usage = getattr(resp, "usage", None) or {}
+        usage = getattr(resp, "usage", {}) or {}
         end = time.time()
         return LLMResponse(
             content=content,
@@ -41,8 +41,6 @@ class OpenAIProvider(BaseProvider):
             tokens_in=usage.get("input_tokens", 0),
             tokens_out=usage.get("output_tokens", 0),
             tool_calls=[],
-            cost_usd=0.0,
-            latency_s=end - start,
             provider=self.name,
+            latency_s=end - start,
         )
-
