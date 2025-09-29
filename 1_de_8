@@ -4,29 +4,88 @@
 PENIN-Ω — 1/8 (Core) · v6.2-ME (Master Equation, Fibonacci-Ready, Fail-Closed)
 ==============================================================================
 
-NÚCLEO: Σ-Guard · IR→IC · CAOS⁺ · SR-Ω∞ · Ω-ΣEA (G) · OCI · L∞ · WORM · Cache MLN
-OBJETIVO: I_{t+1} = Π_{H∩S}[ I_t + α_t^Ω · ΔL_∞ · V_t ]  (Equação Mestra Completa)
+This module implements the core of the PENIN-Ω organism, encapsulating
+eight integrated engines: Σ-Guard, IR→IC, CAOS⁺, SR-Ω∞, Ω-ΣEA (G), OCI, L∞,
+and the WORM ledger with Zeckendorf hashing.  It implements the master
+evolution equation:
 
-α_t^Ω = α_0 · φ(CAOS⁺) · SR · G · OCI
-ΔL_∞  = L_∞(t) − L_∞(t−1) (placar anti-Goodhart com média harmônica não-compensatória)
-V_t   = Σ-Guard (binário, fail-closed)
-Π_{H∩S} = Projeção segura (Ética ∩ Segurança)
+    I_{t+1} = Π_{H∩S} [ I_t + α_t^Ω · ΔL_∞ · V_t ]
 
-NOVIDADES (preservando tecnologias):
-- FibonacciResearch (iterativo com cache, matriz O(log n), Binet, espiral, busca áurea, busca Fibonacci,
-  análise de padrões, retrações; contador de otimizações).
-- FibonacciManager (TTL cache em escada, trust-region suave por φ, otimização LR via Fibonacci/Golden).
-- CAOS⁺ com análise de padrões Fibonacci (boost moderado por consistência das razões).
-- WORM (Merkle simplificado) + Zeckendorf hash.
-- Cache L1/L2/L3 com FibHeapLite (lazy decrease-key, sem full scan).
-- Equação Mestra conectada: L∞ → ΔL∞ → CAOS⁺ → SR → G → OCI → α_t^Ω → passo evolutivo → gates lexicográficos.
-- Interface LLMEvolutionInterface (auto-evolução para qualquer LLM open-source).
+where α_t^Ω is a product of the base learning rate and normalized scores
+from CAOS⁺, SR, G and OCI; ΔL_∞ is the change in the L∞ score between
+cycles; V_t is the Σ‑Guard gate (fail‑closed); and Π_{H∩S} denotes
+projection into the safe/ethical domain.  All gates are non‑compensatory.
 
-CPU-first, dependências opcionais: numpy, redis, torch, psutil (usa fallback se ausente).
+Features and capabilities include:
+
+  • Full Fibonacci research toolkit: iterative and matrix Fibonacci, closed
+    form (Binet), Fibonacci and golden section searches, pattern analysis,
+    spiral generation and retracement levels.  These are used to modulate
+    cache TTLs, trust regions, learning rates and CAOS⁺ pattern boosts.
+
+  • Multi‑level cache with L1 (memory), L2 (SQLite) and optional L3
+    (Redis), using a lazy Fibonacci heap for eviction.  Cache TTLs can be
+    scheduled via Fibonacci schedules.
+
+  • WORM ledger with Merkle‑style hashing and optional Zeckendorf hashes
+    of state snapshots for auditability.  All events (boot, promote,
+    rollback, etc.) are recorded.
+
+  • State classes representing the master evolution state with metrics
+    (CAOS components, SR components, module scores, OCI components,
+    performance and resource measures).  Metrics are updated per cycle.
+
+  • Engines for Σ‑Guard (ethics), IR→IC (risk contraction), CAOS⁺ (chaos
+    engineering), SR‑Ω∞ (self‑reflexivity), G (global coherence), OCI
+    (organizational closure), and L∞ (anti‑Goodhart scoreboard).
+
+  • Fibonacci manager for TTL scheduling, trust region modulation and
+    one‑dimensional learning rate optimization using Fibonacci or golden
+    section search.
+
+  • Master equation cycle implementing the evolution step with all gates
+    and updates.  Supports injection of external metrics from an LLM
+    evaluation and produces a decision (PROMOTE or ROLLBACK).
+
+  • LLM evolution interface to query a local model, evaluate responses
+    against ground truth (optional) and feed metrics into the evolution
+    cycle.  This enables automatic self‑tuning for any open‑source LLM.
+
+The code is designed to run on CPUs without heavy dependencies by
+default; optional modules (NumPy, Redis, Torch, psutil) provide
+additional functionality when available.
+
+Usage example (CLI):
+
+    python penin_omega_1of8_updated.py
+
+To enable Fibonacci‑driven cache TTLs, trust region modulation and
+learning rate search, instantiate the core with a custom config:
+
+    cfg = {"fibonacci": {"enabled": True, "cache": True,
+                          "trust_region": True,
+                          "search_method": "fibonacci"}}
+    core = PeninOmegaCore(cfg)
+
+Copyright 2025 Daniel Penin and contributors.
 """
 
 from __future__ import annotations
-import os, sys, json, time, uuid, math, random, hashlib, asyncio, threading, multiprocessing, pickle, sqlite3, logging, signal
+import os
+import sys
+import json
+import time
+import uuid
+import math
+import random
+import hashlib
+import asyncio
+import threading
+import multiprocessing
+import pickle
+import sqlite3
+import logging
+import signal
 from pathlib import Path
 from dataclasses import dataclass, field, asdict
 from typing import Any, Dict, List, Optional, Tuple, Callable
@@ -34,45 +93,36 @@ from datetime import datetime, timezone
 from collections import deque, defaultdict, OrderedDict
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
-import warnings
-warnings.filterwarnings("ignore")
 
-# -------------------- Dependências opcionais --------------------
+# Optional dependencies
 try:
     import numpy as np
     HAS_NUMPY = True
 except Exception:
     HAS_NUMPY = False
-
 try:
     import redis
     HAS_REDIS = True
 except Exception:
     HAS_REDIS = False
-
 try:
     import torch
     HAS_TORCH = True
 except Exception:
     HAS_TORCH = False
-
 try:
     import psutil
     HAS_PSUTIL = True
 except Exception:
     HAS_PSUTIL = False
 
-
-# =============================================================================
-# CONFIG & PATHS
-# =============================================================================
-
-PKG_NAME = "penin_omega_core_1of8"
+# -----------------------------------------------------------------------------
+# Configuration and paths
+# -----------------------------------------------------------------------------
 PKG_VERSION = "6.2.0"
 ROOT = Path(os.getenv("PENIN_ROOT", "/opt/penin_omega"))
 if not ROOT.exists():
     ROOT = Path.home() / ".penin_omega"
-
 DIRS = {
     "LOG": ROOT / "logs",
     "STATE": ROOT / "state",
@@ -81,781 +131,935 @@ DIRS = {
     "SNAPSHOTS": ROOT / "snapshots",
     "MODELS": ROOT / "models",
 }
-for d in DIRS.values(): d.mkdir(parents=True, exist_ok=True)
+for d in DIRS.values():
+    d.mkdir(parents=True, exist_ok=True)
 
+# Logging
 logging.basicConfig(
     level=logging.INFO,
     format="[%(asctime)s][Ω-1/8][%(levelname)s] %(message)s",
-    handlers=[logging.FileHandler(DIRS["LOG"] / "omega_core_1of8.log", encoding="utf-8"),
-              logging.StreamHandler(sys.stdout)]
+    handlers=[
+        logging.FileHandler(DIRS["LOG"] / "omega_core_1of8.log", encoding="utf-8"),
+        logging.StreamHandler(sys.stdout),
+    ],
 )
 log = logging.getLogger("Ω-1/8")
 
-
-# =============================================================================
-# FIBONACCI TOOLKIT & ZECKENDORF
-# =============================================================================
-
-PHI     = (1.0 + 5 ** 0.5) / 2.0
+# -----------------------------------------------------------------------------
+# Fibonacci toolkit and Zeckendorf
+# -----------------------------------------------------------------------------
+PHI = (1.0 + math.sqrt(5)) / 2.0
 INV_PHI = 1.0 / PHI
 
+
 class FibonacciResearch:
-    """Kit completo de Fibonacci:
-       - fib_iterative, fib_matrix, binet_formula
-       - generate_spiral
-       - golden_section_search, fibonacci_search
-       - analyze_fibonacci_patterns, fibonacci_retracement_levels
-       - optimization counter
-    """
+    """Full Fibonacci research and optimization toolkit."""
     def __init__(self):
         self.fib_cache = {0: 0, 1: 1}
         self.optimization_count = 0
         self.pattern_scores: Dict[str, float] = {}
-
-    # --- Sequência ---
     def fib_iterative(self, n: int) -> int:
-        if n in self.fib_cache: return self.fib_cache[n]
+        if n in self.fib_cache:
+            return self.fib_cache[n]
         a, b = 0, 1
-        for i in range(2, n+1):
-            a, b = b, a+b
+        for i in range(2, n + 1):
+            a, b = b, a + b
             self.fib_cache[i] = b
         return self.fib_cache[n]
-
     def fib_matrix(self, n: int) -> int:
-        if n <= 1: return n
-        def mm(A,B): 
-            return [[A[0][0]*B[0][0]+A[0][1]*B[1][0], A[0][0]*B[0][1]+A[0][1]*B[1][1]],
-                    [A[1][0]*B[0][0]+A[1][1]*B[1][0], A[1][0]*B[0][1]+A[1][1]*B[1][1]]]
-        def mp(M,p):
-            R=[[1,0],[0,1]]
-            while p>0:
-                if p&1: R=mm(R,M)
-                M=mm(M,M); p>>=1
+        if n <= 1:
+            return n
+        def mm(A, B):
+            return [
+                [A[0][0] * B[0][0] + A[0][1] * B[1][0], A[0][0] * B[0][1] + A[0][1] * B[1][1]],
+                [A[1][0] * B[0][0] + A[1][1] * B[1][0], A[1][0] * B[0][1] + A[1][1] * B[1][1]],
+            ]
+        def mp(M, p):
+            R = [[1, 0], [0, 1]]
+            while p > 0:
+                if p & 1:
+                    R = mm(R, M)
+                M = mm(M, M)
+                p >>= 1
             return R
-        base=[[1,1],[1,0]]
-        return mp(base,n)[0][1]
-
+        base = [[1, 1], [1, 0]]
+        return mp(base, n)[0][1]
     def binet_formula(self, n: int) -> float:
-        return (PHI**n - (-INV_PHI)**n)/math.sqrt(5)
-
-    def generate_spiral(self, n_terms: int) -> List[Tuple[float,float]]:
-        out=[]; ang=0.0
-        for i in range(n_terms):
-            r=self.fib_iterative(i)
-            out.append((r*math.cos(ang), r*math.sin(ang)))
-            ang += math.radians(137.5)
-        return out
-
-    # --- Otimização ---
-    def golden_section_search(self, f: Callable[[float],float], a: float, b: float, tol:float=1e-6, maximize=True)->float:
-        invphi=INV_PHI; invphi2=1.0-invphi
-        h=b-a
-        if h<=tol: return (a+b)/2.0
-        n=int(math.ceil(math.log(tol/h)/math.log(invphi)))
-        c=a+invphi2*h; d=a+invphi*h
-        fc,fd=f(c),f(d)
-        if not maximize: fc,fd=-fc,-fd
-        for _ in range(n-1):
-            if fc<fd:
-                a=c; c,fc=d,fd; h*=invphi; d=a+invphi*h; fd=f(d); fd=-fd if not maximize else fd
+        return (PHI ** n - (-INV_PHI) ** n) / math.sqrt(5)
+    def golden_section_search(self, f: Callable[[float], float], a: float, b: float,
+                              tol: float = 1e-6, maximize: bool = True) -> float:
+        invphi = INV_PHI
+        invphi2 = 1.0 - invphi
+        h = b - a
+        if h <= tol:
+            return (a + b) / 2.0
+        n = int(math.ceil(math.log(tol / h) / math.log(invphi)))
+        c = a + invphi2 * h
+        d = a + invphi * h
+        fc = f(c)
+        fd = f(d)
+        if not maximize:
+            fc, fd = -fc, -fd
+        for _ in range(n - 1):
+            if fc < fd:
+                a = c
+                c, fc = d, fd
+                h *= invphi
+                d = a + invphi * h
+                fd = f(d)
+                if not maximize:
+                    fd = -fd
             else:
-                b=d; d,fd=c,fc; h*=invphi; c=a+invphi2*h; fc=f(c); fc=-fc if not maximize else fc
+                b = d
+                d, fd = c, fc
+                h *= invphi
+                c = a + invphi2 * h
+                fc = f(c)
+                if not maximize:
+                    fc = -fc
         self.optimization_count += 1
-        return (a+b)/2.0
-
-    def fibonacci_search(self, f: Callable[[float],float], a: float, b: float, tol:float=1e-6, maximize=True)->float:
-        fib=[0,1]
-        while fib[-1] < (b-a)/tol: fib.append(fib[-1]+fib[-2])
-        n=len(fib)-1
-        x1=a+(fib[n-2]/fib[n])*(b-a); x2=a+(fib[n-1]/fib[n])*(b-a)
-        f1,f2=f(x1),f(x2)
-        if not maximize: f1,f2=-f1,-f2
-        for k in range(n-2,0,-1):
-            if f1<f2:
-                a=x1; x1,f1=x2,f2; x2=a+(fib[k]/fib[k+1])*(b-a); f2=f(x2); f2=-f2 if not maximize else f2
+        return (a + b) / 2.0
+    def fibonacci_search(self, f: Callable[[float], float], a: float, b: float,
+                          tol: float = 1e-6, maximize: bool = True) -> float:
+        fib = [0, 1]
+        while fib[-1] < (b - a) / tol:
+            fib.append(fib[-1] + fib[-2])
+        n = len(fib) - 1
+        x1 = a + (fib[n - 2] / fib[n]) * (b - a)
+        x2 = a + (fib[n - 1] / fib[n]) * (b - a)
+        f1, f2 = f(x1), f(x2)
+        if not maximize:
+            f1, f2 = -f1, -f2
+        for k in range(n - 2, 0, -1):
+            if f1 < f2:
+                a = x1
+                x1, f1 = x2, f2
+                x2 = a + (fib[k] / fib[k + 1]) * (b - a)
+                f2 = f(x2)
+                if not maximize:
+                    f2 = -f2
             else:
-                b=x2; x2,f2=x1,f1; x1=a+(fib[k-1]/fib[k+1])*(b-a); f1=f(x1); f1=-f1 if not maximize else f1
+                b = x2
+                x2, f2 = x1, f1
+                x1 = a + (fib[k - 1] / fib[k + 1]) * (b - a)
+                f1 = f(x1)
+                if not maximize:
+                    f1 = -f1
         self.optimization_count += 1
-        return (a+b)/2.0
-
-    # --- Padrões e retrações ---
-    def analyze_fibonacci_patterns(self, seq: List[float]) -> Dict[str,float]:
-        if len(seq)<3: return {"ratio_score":0.0,"pattern_strength":0.0,"avg_ratio":0.0}
-        ratios=[]
-        for i in range(1,len(seq)):
-            if seq[i-1]!=0: ratios.append(seq[i]/seq[i-1])
-        if not ratios: return {"ratio_score":0.0,"pattern_strength":0.0,"avg_ratio":0.0}
-        phi_dist=[abs(r-PHI) for r in ratios]
-        ratio_score = 1.0 - (sum(phi_dist)/len(phi_dist))/PHI
-        if HAS_NUMPY: std = float(np.std(ratios))
+        return (a + b) / 2.0
+    def analyze_fibonacci_patterns(self, seq: List[float]) -> Dict[str, float]:
+        if len(seq) < 3:
+            return {"ratio_score": 0.0, "pattern_strength": 0.0, "avg_ratio": 0.0}
+        ratios = []
+        for i in range(1, len(seq)):
+            if seq[i - 1] != 0:
+                ratios.append(seq[i] / seq[i - 1])
+        if not ratios:
+            return {"ratio_score": 0.0, "pattern_strength": 0.0, "avg_ratio": 0.0}
+        phi_dists = [abs(r - PHI) for r in ratios]
+        ratio_score = 1.0 - (sum(phi_dists) / len(phi_dists)) / PHI
+        if HAS_NUMPY:
+            std_dev = float(np.std(ratios))
         else:
-            m=sum(ratios)/len(ratios)
-            std=math.sqrt(sum((r-m)**2 for r in ratios)/len(ratios))
-        strength = 1.0/(1.0+std)
-        return {"ratio_score":max(0.0,ratio_score),"pattern_strength":max(0.0,strength),"avg_ratio":sum(ratios)/len(ratios)}
+            mean = sum(ratios) / len(ratios)
+            std_dev = math.sqrt(sum((r - mean) ** 2 for r in ratios) / len(ratios))
+        pattern_strength = 1.0 / (1.0 + std_dev)
+        return {
+            "ratio_score": max(0.0, ratio_score),
+            "pattern_strength": max(0.0, pattern_strength),
+            "avg_ratio": sum(ratios) / len(ratios) if ratios else 0.0,
+        }
+    def fibonacci_retracement_levels(self, high: float, low: float) -> Dict[str, float]:
+        diff = high - low
+        return {
+            "0.0%": high,
+            "23.6%": high - 0.236 * diff,
+            "38.2%": high - 0.382 * diff,
+            "50.0%": high - 0.5 * diff,
+            "61.8%": high - 0.618 * diff,
+            "78.6%": high - 0.786 * diff,
+            "100.0%": low,
+        }
 
-    def fibonacci_retracement_levels(self, high: float, low: float) -> Dict[str,float]:
-        diff=high-low
-        return {"0.0%":high,"23.6%":high-0.236*diff,"38.2%":high-0.382*diff,"50.0%":high-0.5*diff,
-                "61.8%":high-0.618*diff,"78.6%":high-0.786*diff,"100.0%":low}
 
 class ZeckendorfEncoder:
+    """Encode integers uniquely as sums of non‑consecutive Fibonacci numbers."""
     @staticmethod
-    def _fib_upto(n:int)->List[int]:
-        fib=[1,2]
-        while fib[-1]<n: fib.append(fib[-1]+fib[-2])
+    def _fib_upto(n: int) -> List[int]:
+        fib = [1, 2]
+        while fib[-1] < n:
+            fib.append(fib[-1] + fib[-2])
         return fib
     @staticmethod
-    def encode(n:int)->List[int]:
-        if n<0: raise ValueError("Zeckendorf exige n>=0")
-        if n==0: return [0]
-        fib=ZeckendorfEncoder._fib_upto(n); rep=[]; i=len(fib)-1
-        while n>0 and i>=0:
-            if fib[i]<=n:
-                rep.append(fib[i]); n-=fib[i]; i-=2
-            else: i-=1
+    def encode(n: int) -> List[int]:
+        if n < 0:
+            raise ValueError("Zeckendorf representation is defined for n >= 0")
+        if n == 0:
+            return [0]
+        fib = ZeckendorfEncoder._fib_upto(n)
+        rep: List[int] = []
+        i = len(fib) - 1
+        while n > 0 and i >= 0:
+            if fib[i] <= n:
+                rep.append(fib[i])
+                n -= fib[i]
+                i -= 2
+            else:
+                i -= 1
         return rep
     @staticmethod
-    def encode_as_string(n:int)->str:
-        if n==0: return "0"
-        return "Z{"+"+".join(map(str,ZeckendorfEncoder.encode(n)))+"}"
+    def encode_as_string(n: int) -> str:
+        if n == 0:
+            return "0"
+        return "Z{" + "+".join(map(str, ZeckendorfEncoder.encode(n))) + "}"
 
 
-# =============================================================================
-# CACHE (L1/L2/L3) com FibHeapLite (lazy)
-# =============================================================================
-
-class FibHeapLite:
-    """Min-queue 'estilo Fibonacci heap' (lazy). decrease_key = push novo + tombstone."""
-    def __init__(self):
-        import heapq
-        self.h=[]; self.map={}; self.dead=set(); self._heapq=heapq; self._id=0
-    def insert(self, key: float, value: str):
-        self._id+=1; ent=(key,self._id,value); self.map[value]=ent; self._heapq.heappush(self.h,ent); return ent
-    def decrease_key(self, value:str, new_key:float):
-        old=self.map.get(value); 
-        if old: self.dead.add(old)
-        return self.insert(new_key,value)
-    def extract_min(self)->Optional[Tuple[float,str]]:
-        while self.h:
-            k,i,v=self._heapq.heappop(self.h); ent=(k,i,v)
-            if ent in self.dead: self.dead.remove(ent); continue
-            if self.map.get(v)==ent:
-                del self.map[v]; return (k,v)
-        return None
-
+# -----------------------------------------------------------------------------
+# Cache (Multi‑level with FibHeap)
+# -----------------------------------------------------------------------------
 class MultiLevelCache:
-    """Cache multi-nível (L1: memória; L2: SQLite + FibHeapLite; L3: Redis opcional)."""
-    def __init__(self, l1_size:int=1000, l2_size:int=10000, ttl_l1:int=1, ttl_l2:int=60):
-        self.l1=OrderedDict(); self.l1_size=l1_size; self.l1_ttl=ttl_l1
-        self.l2=sqlite3.connect(str(DIRS["CACHE"]/ "l2_cache.db"), check_same_thread=False)
-        self._init_l2(); self.l2_size=l2_size; self.l2_ttl=ttl_l2
-        self.q=FibHeapLite(); self.nodes: Dict[str,Tuple]= {}
-        self.l3=None
+    """Three‑level cache with TTL and eviction via lazy min‑heap."""
+    def __init__(self, l1_size: int = 1000, l2_size: int = 10000, ttl_l1: int = 1, ttl_l2: int = 60):
+        self.l1_cache: OrderedDict[str, Dict[str, Any]] = OrderedDict()
+        self.l1_size = l1_size
+        self.l1_ttl = ttl_l1
+        self.l2_db_path = DIRS["CACHE"] / "l2_cache.db"
+        self.l2_db = sqlite3.connect(str(self.l2_db_path), check_same_thread=False)
+        self._init_l2_db()
+        self.l2_size = l2_size
+        self.l2_ttl = ttl_l2
+        self.l2_heap = FibHeapLite()
+        self.l2_nodes: Dict[str, Tuple] = {}
+        self.l3_redis = None
         if HAS_REDIS:
-            try: self.l3=redis.Redis(host="localhost",port=6379,db=0,decode_responses=False); self.l3.ping()
-            except Exception: self.l3=None
-        self.stats=defaultdict(lambda:{"hits":0,"misses":0,"evictions":0})
-        self._lock=threading.RLock()
-
-    def _init_l2(self):
-        c=self.l2.cursor()
-        c.execute("""CREATE TABLE IF NOT EXISTS cache(k TEXT PRIMARY KEY, v BLOB, ts REAL, access INTEGER DEFAULT 0)""")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_ts ON cache(ts)")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_access ON cache(access)")
-        self.l2.commit()
-
-    def _ser(self,obj:Any)->bytes: return pickle.dumps(obj)
-    def _des(self,b:bytes)->Any: return pickle.loads(b)
-
-    def _l1_put(self,k:str,v:Any):
-        if len(self.l1)>=self.l1_size:
-            evk,_=self.l1.popitem(last=False); self.stats[evk]["evictions"]+=1
-        self.l1[k]={"v":v,"ts":time.time()}; self.l1.move_to_end(k)
-
-    def _l2_put(self,k:str,v:Any):
-        c=self.l2.cursor(); now=time.time()
-        # eviction
-        c.execute("SELECT COUNT(*) FROM cache"); count=c.fetchone()[0]
-        if count>=self.l2_size:
-            m=self.q.extract_min()
-            if m:
-                _,evk=m; c.execute("DELETE FROM cache WHERE k=?", (evk,)); self.stats[evk]["evictions"]+=1; self.nodes.pop(evk,None)
-        c.execute("INSERT OR REPLACE INTO cache(k,v,ts,access) VALUES (?,?,?,COALESCE((SELECT access FROM cache WHERE k=?),0))",
-                  (k,self._ser(v),now,k))
-        self.l2.commit()
-        self.nodes[k]=self.q.insert(now,k)
-
-    def get(self,k:str,default:Any=None)->Any:
+            try:
+                self.l3_redis = redis.Redis(host='localhost', port=6379, db=0, decode_responses=False)
+                self.l3_redis.ping()
+            except Exception:
+                self.l3_redis = None
+        self.stats = defaultdict(lambda: {"hits": 0, "misses": 0, "evictions": 0})
+        self._lock = threading.RLock()
+    def _init_l2_db(self):
+        cursor = self.l2_db.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS cache (
+                key TEXT PRIMARY KEY,
+                value BLOB,
+                timestamp REAL,
+                access_count INTEGER DEFAULT 0,
+                last_access REAL
+            )
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_timestamp ON cache(timestamp)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_access ON cache(access_count)')
+        self.l2_db.commit()
+    def _serialize(self, obj: Any) -> bytes: return pickle.dumps(obj)
+    def _deserialize(self, b: bytes) -> Any: return pickle.loads(b)
+    def _promote_to_l1(self, key: str, value: Any):
+        if len(self.l1_cache) >= self.l1_size:
+            evicted_key, _ = self.l1_cache.popitem(last=False)
+            self.stats[evicted_key]["evictions"] += 1
+        self.l1_cache[key] = {"value": value, "timestamp": time.time()}
+        self.l1_cache.move_to_end(key)
+    def _promote_to_l2(self, key: str, value: Any):
+        value_bytes = self._serialize(value)
+        cursor = self.l2_db.cursor()
+        now = time.time()
+        cursor.execute("SELECT COUNT(*) FROM cache")
+        count = cursor.fetchone()[0]
+        if count >= self.l2_size:
+            for _ in range(max(1, self.l2_size // 10)):
+                evicted = self.l2_heap.extract_min()
+                if evicted:
+                    _, evicted_key = evicted
+                    cursor.execute("DELETE FROM cache WHERE key = ?", (evicted_key,))
+                    self.stats[evicted_key]["evictions"] += 1
+                    self.l2_nodes.pop(evicted_key, None)
+        cursor.execute(
+            "INSERT OR REPLACE INTO cache (key, value, timestamp, last_access) VALUES (?, ?, ?, ?)",
+            (key, value_bytes, now, now)
+        )
+        self.l2_db.commit()
+        prio = now
+        if key in self.l2_nodes:
+            self.l2_heap.decrease_key(key, prio)
+        else:
+            self.l2_nodes[key] = self.l2_heap.insert(prio, key)
+    def get(self, key: str, default: Any = None) -> Any:
         with self._lock:
-            if k in self.l1:
-                ent=self.l1[k]
-                if time.time()-ent["ts"]<self.l1_ttl:
-                    self.stats[k]["hits"]+=1; self.l1.move_to_end(k); return ent["v"]
-                else: del self.l1[k]
-            c=self.l2.cursor(); c.execute("SELECT v,ts,access FROM cache WHERE k=?",(k,)); row=c.fetchone()
+            if key in self.l1_cache:
+                entry = self.l1_cache[key]
+                if time.time() - entry["timestamp"] < self.l1_ttl:
+                    self.stats[key]["hits"] += 1
+                    self.l1_cache.move_to_end(key)
+                    return entry["value"]
+                else:
+                    del self.l1_cache[key]
+            cursor = self.l2_db.cursor()
+            cursor.execute("SELECT value, timestamp FROM cache WHERE key = ?", (key,))
+            row = cursor.fetchone()
             if row:
-                vb,ts,acc=row
-                if time.time()-ts<self.l2_ttl:
-                    val=self._des(vb); self._l1_put(k,val)
-                    acc+=1; c.execute("UPDATE cache SET access=?, ts=? WHERE k=?", (acc,time.time(),k)); self.l2.commit()
-                    if k in self.nodes: self.q.decrease_key(k,time.time())
-                    self.stats[k]["hits"]+=1; return val
-            if self.l3:
+                value_bytes, timestamp = row
+                if time.time() - timestamp < self.l2_ttl:
+                    value = self._deserialize(value_bytes)
+                    self._promote_to_l1(key, value)
+                    cursor.execute(
+                        "UPDATE cache SET access_count = access_count + 1, last_access = ? WHERE key = ?",
+                        (time.time(), key)
+                    )
+                    self.l2_db.commit()
+                    if key in self.l2_nodes:
+                        self.l2_heap.decrease_key(key, time.time())
+                    self.stats[key]["hits"] += 1
+                    return value
+            if self.l3_redis:
                 try:
-                    b=self.l3.get(f"penin:{k}")
-                    if b:
-                        val=self._des(b); self._l1_put(k,val); self._l2_put(k,val); self.stats[k]["hits"]+=1; return val
-                except Exception: pass
-            self.stats[k]["misses"]+=1; return default
-
-    def set(self,k:str,v:Any,ttl_l3:Optional[int]=None):
+                    value_bytes = self.l3_redis.get(f"penin:{key}")
+                    if value_bytes:
+                        value = self._deserialize(value_bytes)
+                        self._promote_to_l1(key, value)
+                        self._promote_to_l2(key, value)
+                        self.stats[key]["hits"] += 1
+                        return value
+                except Exception:
+                    pass
+            self.stats[key]["misses"] += 1
+            return default
+    def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
         with self._lock:
-            self._l1_put(k,v); self._l2_put(k,v)
-            if self.l3:
-                try: self.l3.setex(f"penin:{k}", ttl_l3 or self.l2_ttl, self._ser(v))
-                except Exception: pass
-
+            self._promote_to_l1(key, value)
+            self._promote_to_l2(key, value)
+            if self.l3_redis:
+                try:
+                    value_bytes = self._serialize(value)
+                    self.l3_redis.setex(
+                        f"penin:{key}", ttl or self.l2_ttl, value_bytes
+                    )
+                except Exception:
+                    pass
     def clear(self):
         with self._lock:
-            self.l1.clear(); self.l2.execute("DELETE FROM cache"); self.l2.commit(); self.q=FibHeapLite(); self.nodes.clear()
-            if self.l3:
+            self.l1_cache.clear()
+            self.l2_db.execute("DELETE FROM cache")
+            self.l2_db.commit()
+            self.l2_heap = FibHeapLite()
+            self.l2_nodes.clear()
+            if self.l3_redis:
                 try:
-                    for key in self.l3.scan_iter("penin:*"): self.l3.delete(key)
-                except Exception: pass
+                    for key in self.l3_redis.scan_iter("penin:*"):
+                        self.l3_redis.delete(key)
+                except Exception:
+                    pass
 
 
-# =============================================================================
-# WORM LEDGER
-# =============================================================================
+class FibHeapLite:
+    """Lazy min‑heap with tombstones for decrease_key support."""
+    def __init__(self):
+        import heapq
+        self.heap: List[Tuple[float, int, str]] = []
+        self.entry_fresh: Dict[str, Tuple[float, int, str]] = {}
+        self.invalid: set = set()
+        self._heapq = heapq
+        self._counter = 0
+    def insert(self, key: float, value: str):
+        self._counter += 1
+        token = (key, self._counter, value)
+        self.entry_fresh[value] = token
+        self._heapq.heappush(self.heap, token)
+        return token
+    def decrease_key(self, value: str, new_key: float):
+        old = self.entry_fresh.get(value)
+        if old:
+            self.invalid.add(old)
+        return self.insert(new_key, value)
+    def extract_min(self) -> Optional[Tuple[float, str]]:
+        while self.heap:
+            key, _, val = self._heapq.heappop(self.heap)
+            token = (key, _, val)
+            if token in self.invalid:
+                self.invalid.remove(token)
+                continue
+            if self.entry_fresh.get(val) == token:
+                del self.entry_fresh[val]
+                return key, val
+        return None
 
-class EventType:
-    BOOT="BOOT"; SHUTDOWN="SHUTDOWN"; SNAP="SNAPSHOT"; CYCLE_ABORT="CYCLE_ABORT"
-    PROMOTE="PROMOTE"; ROLLBACK="ROLLBACK"; EXTINCTION="EXTINCTION"; LLM_QUERY="LLM_QUERY"
-    FIBONACCI_TICK="FIBONACCI_TICK"; FIBONACCI_OPT="FIBONACCI_OPTIMIZATION"; MASTER_EQ="MASTER_EQUATION_CYCLE"
 
+# -----------------------------------------------------------------------------
+# WORM Ledger
+# -----------------------------------------------------------------------------
 class WORMLedger:
-    """WORM com cadeia hash e Zeckendorf opcional."""
-    def __init__(self, path: Path = DIRS["WORM"]/ "omega_core_1of8.db"):
-        self.db=sqlite3.connect(str(path), check_same_thread=False)
-        self._init(); self._lock=threading.Lock(); self.tail=self._tail()
-    def _init(self):
-        c=self.db.cursor()
-        c.execute("""CREATE TABLE IF NOT EXISTS worm(id INTEGER PRIMARY KEY AUTOINCREMENT,
-                 etype TEXT, data TEXT, ts TEXT, prev TEXT, hash TEXT, zeck TEXT)""")
-        c.execute("CREATE INDEX IF NOT EXISTS idx_ts ON worm(ts)")
+    """Write‑once, read‑many ledger with hash chain and optional Zeckendorf."""
+    def __init__(self, path: Path = DIRS["WORM"] / "omega_core_1of8.db"):
+        self.db = sqlite3.connect(str(path), check_same_thread=False)
+        self._init_db()
+        self._lock = threading.Lock()
+        self.tail = self._get_last_hash()
+    def _init_db(self):
+        cursor = self.db.cursor()
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                etype TEXT,
+                data TEXT,
+                ts TEXT,
+                prev TEXT,
+                hash TEXT,
+                zeck TEXT
+            )
+            """
+        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_ts ON events(ts)")
         self.db.commit()
-    def _tail(self)->str:
-        c=self.db.cursor(); c.execute("SELECT hash FROM worm ORDER BY id DESC LIMIT 1"); r=c.fetchone()
-        return r[0] if r else "genesis"
-    def record(self, etype:str, data:Dict[str,Any], state_for_zeck: Optional['OmegaMEState']=None)->str:
+    def _get_last_hash(self) -> str:
+        c = self.db.cursor()
+        c.execute("SELECT hash FROM events ORDER BY id DESC LIMIT 1")
+        row = c.fetchone()
+        return row[0] if row else "genesis"
+    def record(self, etype: str, data: Dict[str, Any], state_for_zeck: Optional[OmegaMEState] = None) -> str:
         with self._lock:
-            ts=datetime.now(timezone.utc).isoformat(); zeck=None
+            ts = datetime.now(timezone.utc).isoformat()
+            zeck = None
             if state_for_zeck:
-                mix=int(round(abs(state_for_zeck.delta_linf)*1e6)) + int(round(state_for_zeck.caos_plus*1e6)) + state_for_zeck.cycle
-                zeck=ZeckendorfEncoder.encode_as_string(abs(mix))
-            payload={"etype":etype,"data":data,"ts":ts,"prev":self.tail}
-            h=hashlib.sha256(json.dumps(payload,sort_keys=True,ensure_ascii=False).encode()).hexdigest()
-            c=self.db.cursor()
-            c.execute("INSERT INTO worm(etype,data,ts,prev,hash,zeck) VALUES(?,?,?,?,?,?)",
-                      (etype,json.dumps(data,ensure_ascii=False),ts,self.tail,h,zeck))
-            self.db.commit(); self.tail=h; return h
-    def verify_chain(self)->Tuple[bool, Optional[str]]:
-        prev="genesis"; c=self.db.cursor(); c.execute("SELECT etype,data,ts,prev,hash FROM worm ORDER BY id")
-        for i,(etype,data,ts,p,h) in enumerate(c.fetchall(),1):
-            if p!=prev: return False,f"break at {i}"
-            calc=hashlib.sha256(json.dumps({"etype":etype,"data":json.loads(data),"ts":ts,"prev":p},sort_keys=True,ensure_ascii=False).encode()).hexdigest()
-            if calc!=h: return False,f"mismatch at {i}"
-            prev=h
+                mix = int(abs(state_for_zeck.delta_linf) * 1e6) + int(state_for_zeck.caos_plus * 1e6) + state_for_zeck.cycle
+                zeck = ZeckendorfEncoder.encode_as_string(abs(mix))
+            payload = {"etype": etype, "data": data, "ts": ts, "prev": self.tail}
+            event_hash = hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+            cursor = self.db.cursor()
+            cursor.execute(
+                "INSERT INTO events (etype, data, ts, prev, hash, zeck) VALUES (?, ?, ?, ?, ?, ?)",
+                (etype, json.dumps(data, ensure_ascii=False), ts, self.tail, event_hash, zeck),
+            )
+            self.db.commit()
+            self.tail = event_hash
+            return event_hash
+    def verify_chain(self) -> Tuple[bool, Optional[str]]:
+        c = self.db.cursor()
+        c.execute("SELECT etype, data, ts, prev, hash FROM events ORDER BY id")
+        prev = "genesis"
+        for i, (etype, data, ts, stored_prev, stored_hash) in enumerate(c.fetchall(), 1):
+            if stored_prev != prev:
+                return False, f"Chain break at row {i}"
+            payload = {"etype": etype, "data": json.loads(data), "ts": ts, "prev": stored_prev}
+            calc = hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+            if calc != stored_hash:
+                return False, f"Hash mismatch at row {i}"
+            prev = stored_hash
         return True, None
 
 
-# =============================================================================
-# STATE (Equação Mestra)
-# =============================================================================
-
+# -----------------------------------------------------------------------------
+# State class
+# -----------------------------------------------------------------------------
 @dataclass
 class OmegaMEState:
-    # Identificação
     cycle: int = 0
     ts: float = field(default_factory=time.time)
-
-    # L∞ e ΔL∞
     l_inf: float = 0.0
     l_inf_prev: float = 0.0
     delta_linf: float = 0.0
-
-    # Métricas L∞
     rsi: float = 0.6
     synergy: float = 0.6
     novelty: float = 0.5
     stability: float = 0.7
     viability: float = 0.8
     cost: float = 0.2
-
-    # CAOS+
-    C: float = 0.6; A: float = 0.6; O: float = 0.6; S: float = 0.6
+    C: float = 0.6
+    A: float = 0.6
+    O: float = 0.6
+    S: float = 0.6
     caos_plus: float = 1.0
     caos_harmony: float = 1.0
-
-    # SR
     sr_score: float = 1.0
-    C_cal: float = 0.8; E_ok: float = 1.0; M: float = 0.7; A_eff: float = 0.6
-
-    # G
+    C_cal: float = 0.8
+    E_ok: float = 1.0
+    M: float = 0.7
+    A_eff: float = 0.6
     g_score: float = 1.0
-    modules: List[float] = field(default_factory=lambda:[0.7]*8)
-
-    # OCI
+    modules: List[float] = field(default_factory=lambda: [0.7] * 8)
     oci_score: float = 1.0
-    memory: float = 0.8; flow: float = 0.7; policy: float = 0.9; feedback: float = 0.6
-
-    # Σ-Guard / IR→IC
+    memory: float = 0.8
+    flow: float = 0.7
+    policy: float = 0.9
+    feedback: float = 0.6
     sigma_ok: bool = True
-    ece: float = 0.0; bias: float = 1.0; consent: bool = True; eco: bool = True
-    rho: float = 0.5; uncertainty: float = 0.3
-
-    # Performance
-    throughput: float = 0.0; latency_ms: float = 0.0
-    cpu: float = 0.0; mem: float = 0.0
-
-    # Controle
+    ece: float = 0.0
+    bias: float = 1.0
+    consent: bool = True
+    eco: bool = True
+    rho: float = 0.5
+    uncertainty: float = 0.3
+    throughput: float = 0.0
+    latency_ms: float = 0.0
+    cpu: float = 0.0
+    mem: float = 0.0
     alpha_0: float = 0.1
     alpha_omega: float = 0.0
-    trust_radius: float = 0.10
+    trust_radius: float = 0.1
     kill_switch: bool = False
-
-    # Fibonacci / auditoria
     fib_optimizations: int = 0
     pattern_score: float = 0.0
     zeckendorf_hash: str = "0"
+    def to_dict(self) -> Dict[str, Any]: return asdict(self)
 
-    def to_dict(self): return asdict(self)
 
-
-# =============================================================================
-# ENGINES (Σ-Guard / IR→IC / CAOS⁺ / SR / G / OCI / L∞)
-# =============================================================================
-
+# -----------------------------------------------------------------------------
+# Engines
+# -----------------------------------------------------------------------------
 class SigmaGuard:
-    def __init__(self, cfg: Dict[str,Any]):
-        e=cfg.get("ethics",{})
-        self.ece_max=e.get("ece_max",0.01); self.bias_max=e.get("rho_bias_max",1.05)
-        self.need_consent=e.get("consent_required",True); self.need_eco=e.get("eco_ok_required",True)
-        self.rho_max=cfg.get("iric",{}).get("rho_max",0.95)
-
-    def check(self, xt: OmegaMEState)->Tuple[bool,List[str]]:
-        v=[]
-        if xt.ece > self.ece_max: v.append(f"ECE {xt.ece:.4f} > {self.ece_max}")
-        if xt.bias> self.bias_max: v.append(f"Bias {xt.bias:.3f} > {self.bias_max}")
-        if self.need_consent and not xt.consent: v.append("Consent=False")
-        if self.need_eco and not xt.eco: v.append("Eco=False")
-        if xt.rho >= self.rho_max: v.append(f"Risk {xt.rho:.3f} >= {self.rho_max}")
-        xt.sigma_ok=(len(v)==0); return xt.sigma_ok, v
+    def __init__(self, cfg: Dict[str, Any]):
+        e = cfg.get("ethics", {})
+        self.ece_max = e.get("ece_max", 0.01)
+        self.bias_max = e.get("rho_bias_max", 1.05)
+        self.require_consent = e.get("consent_required", True)
+        self.require_eco = e.get("eco_ok_required", True)
+        self.rho_max = cfg.get("iric", {}).get("rho_max", 0.95)
+    def check(self, xt: OmegaMEState) -> Tuple[bool, List[str]]:
+        violations = []
+        if xt.ece > self.ece_max: violations.append(f"ECE {xt.ece:.4f} > {self.ece_max}")
+        if xt.bias > self.bias_max: violations.append(f"Bias {xt.bias:.3f} > {self.bias_max}")
+        if self.require_consent and not xt.consent: violations.append("Consent=False")
+        if self.require_eco and not xt.eco: violations.append("Eco=False")
+        if xt.rho >= self.rho_max: violations.append(f"Risk {xt.rho:.3f} >= {self.rho_max}")
+        xt.sigma_ok = len(violations) == 0
+        return xt.sigma_ok, violations
 
 class IRtoIC:
-    def __init__(self, cfg: Dict[str,Any], use_phi: bool=False):
-        self.rho_max=cfg.get("iric",{}).get("rho_max",0.95)
-        self.contraction = (INV_PHI if use_phi else cfg.get("iric",{}).get("contraction_factor",0.98))
-        self.exec=ThreadPoolExecutor(max_workers=4)
-    def safe(self, xt: OmegaMEState)->bool:
-        f=[]
-        f.append(self.exec.submit(lambda: xt.rho < self.rho_max))
-        f.append(self.exec.submit(lambda: xt.uncertainty < 0.9))
-        f.append(self.exec.submit(lambda: xt.cpu < 0.95 and xt.mem < 0.95))
-        return all(fu.result() for fu in as_completed(f))
-    def contract(self, xt: OmegaMEState):
-        xt.rho *= self.contraction; xt.uncertainty *= self.contraction
+    def __init__(self, cfg: Dict[str, Any], use_phi: bool = False):
+        self.rho_max = cfg.get("iric", {}).get("rho_max", 0.95)
+        self.contraction = INV_PHI if use_phi else cfg.get("iric", {}).get("contraction_factor", 0.98)
+        self.exec = ThreadPoolExecutor(max_workers=4)
+    def safe(self, xt: OmegaMEState) -> bool:
+        fs = [
+            self.exec.submit(lambda: xt.rho < self.rho_max),
+            self.exec.submit(lambda: xt.uncertainty < 0.9),
+            self.exec.submit(lambda: xt.cpu < 0.95 and xt.mem < 0.95),
+        ]
+        return all(f.result() for f in as_completed(fs))
+    def contract(self, xt: OmegaMEState) -> None:
+        xt.rho *= self.contraction
+        xt.uncertainty *= self.contraction
 
 class CAOSPlusEngine:
-    def __init__(self, cfg: Dict[str,Any], fib: FibonacciResearch):
-        c=cfg.get("caos_plus",{})
-        self.kappa=c.get("kappa",2.0); self.pmin=c.get("pmin",0.05); self.pmax=c.get("pmax",2.0)
-        self.pchaos=c.get("chaos_probability",0.01); self.fib=fib
-    def compute(self, xt: OmegaMEState)->float:
-        if random.random()<self.pchaos:
-            fac=random.uniform(0.9,1.1); xt.C*=fac; xt.A*=fac; xt.O*=fac; xt.S*=fac
-        C,A,O,S = max(0,xt.C),max(0,xt.A),max(0,xt.O),max(0,xt.S)
-        base=1.0 + self.kappa*C*A; exp=max(self.pmin, min(self.pmax, O*S))
-        val = base ** exp
-        # Padrões Fibonacci: boost moderado
-        patt=self.fib.analyze_fibonacci_patterns([C,A,O,S])
-        val *= (1.0 + 0.1*patt["pattern_strength"])
+    def __init__(self, cfg: Dict[str, Any], fib: FibonacciResearch):
+        c = cfg.get("caos_plus", {})
+        self.kappa = c.get("kappa", 2.0)
+        self.pmin = c.get("pmin", 0.05)
+        self.pmax = c.get("pmax", 2.0)
+        self.pchaos = c.get("chaos_probability", 0.01)
+        self.fib = fib
+    def compute(self, xt: OmegaMEState) -> float:
+        if random.random() < self.pchaos:
+            fac = random.uniform(0.9, 1.1)
+            xt.C *= fac; xt.A *= fac; xt.O *= fac; xt.S *= fac
+        C, A, O, S = max(0.0, xt.C), max(0.0, xt.A), max(0.0, xt.O), max(0.0, xt.S)
+        base = 1.0 + self.kappa * C * A
+        exponent = max(self.pmin, min(self.pmax, O * S))
+        val = base ** exponent
+        patt = self.fib.analyze_fibonacci_patterns([C, A, O, S])
+        val *= (1.0 + 0.1 * patt["pattern_strength"])
         xt.pattern_score = patt["pattern_strength"]
-        xt.caos_plus = val; xt.caos_harmony = (C+A)/ (O+S if O+S>1e-9 else 1.0)
+        xt.caos_plus = val
+        xt.caos_harmony = (C + A) / (O + S if (O + S) > 1e-9 else 1.0)
         return val
 
 class SREngine:
-    def __init__(self, cfg: Dict[str,Any]):
-        s=cfg.get("sr_omega",{}); self.w=s.get("weights",{"C":0.2,"E":0.4,"M":0.3,"A":0.1}); self.tau=s.get("tau_sr",0.8)
-    def compute(self, xt: OmegaMEState)->float:
-        comp=[(max(1e-6,xt.C_cal),self.w["C"]),
-              (max(1e-6,xt.E_ok),self.w["E"]),
-              (max(1e-6,xt.M   ),self.w["M"]),
-              (max(1e-6,xt.A_eff),self.w["A"])]
-        denom=sum(w/v for v,w in comp); xt.sr_score=1.0/max(1e-6,denom); return xt.sr_score
-    def gate(self, xt: OmegaMEState)->bool: return xt.sr_score>=self.tau
+    def __init__(self, cfg: Dict[str, Any]):
+        s = cfg.get("sr_omega", {})
+        self.weights = s.get("weights", {"C": 0.2, "E": 0.4, "M": 0.3, "A": 0.1})
+        self.tau = s.get("tau_sr", 0.8)
+    def compute(self, xt: OmegaMEState) -> float:
+        comps = [
+            (max(1e-6, xt.C_cal), self.weights["C"]),
+            (max(1e-6, xt.E_ok), self.weights["E"]),
+            (max(1e-6, xt.M), self.weights["M"]),
+            (max(1e-6, xt.A_eff), self.weights["A"]),
+        ]
+        denom = sum(w / v for v, w in comps)
+        xt.sr_score = 1.0 / max(1e-6, denom)
+        return xt.sr_score
+    def gate(self, xt: OmegaMEState) -> bool:
+        return xt.sr_score >= self.tau
 
 class GlobalCoherence:
-    def __init__(self, cfg: Dict[str,Any]): self.w=cfg.get("omega_sigma",{}).get("weights",[1/8]*8); self.tau=cfg.get("omega_sigma",{}).get("tau_g",0.7)
-    def compute(self, xt: OmegaMEState)->float:
-        if len(xt.modules)!=8: xt.modules=[0.7]*8
-        denom=0.0
-        for w,s in zip(self.w, xt.modules):
-            if s<=0: xt.g_score=0.0; return 0.0
-            denom += w/s
-        xt.g_score=1.0/max(1e-6,denom); return xt.g_score
-    def gate(self, xt: OmegaMEState)->bool: return xt.g_score>=self.tau
+    def __init__(self, cfg: Dict[str, Any]):
+        g = cfg.get("omega_sigma", {})
+        self.weights = g.get("weights", [1.0 / 8] * 8)
+        self.tau = g.get("tau_g", 0.7)
+    def compute(self, xt: OmegaMEState) -> float:
+        if len(xt.modules) != 8:
+            xt.modules = [0.7] * 8
+        denom = 0.0
+        for w, s in zip(self.weights, xt.modules):
+            if s <= 0:
+                xt.g_score = 0.0
+                return 0.0
+            denom += w / s
+        xt.g_score = 1.0 / max(1e-6, denom)
+        return xt.g_score
+    def gate(self, xt: OmegaMEState) -> bool:
+        return xt.g_score >= self.tau
 
 class OCIEngine:
-    def __init__(self, cfg: Dict[str,Any]): o=cfg.get("oci",{}); self.w=o.get("weights",[0.25]*4); self.tau=o.get("tau_oci",0.9)
-    def compute(self, xt: OmegaMEState)->float:
-        comp=[(max(1e-6,xt.memory),self.w[0]),(max(1e-6,xt.flow),self.w[1]),(max(1e-6,xt.policy),self.w[2]),(max(1e-6,xt.feedback),self.w[3])]
-        denom=sum(w/v for v,w in comp); xt.oci_score=1.0/max(1e-6,denom); return xt.oci_score
-    def gate(self, xt: OmegaMEState)->bool: return xt.oci_score>=self.tau
+    def __init__(self, cfg: Dict[str, Any]):
+        o = cfg.get("oci", {})
+        self.weights = o.get("weights", [0.25, 0.25, 0.25, 0.25])
+        self.tau = o.get("tau_oci", 0.9)
+    def compute(self, xt: OmegaMEState) -> float:
+        comps = [
+            (max(1e-6, xt.memory), self.weights[0]),
+            (max(1e-6, xt.flow), self.weights[1]),
+            (max(1e-6, xt.policy), self.weights[2]),
+            (max(1e-6, xt.feedback), self.weights[3]),
+        ]
+        denom = sum(w / v for v, w in comps)
+        xt.oci_score = 1.0 / max(1e-6, denom)
+        return xt.oci_score
+    def gate(self, xt: OmegaMEState) -> bool:
+        return xt.oci_score >= self.tau
 
 class LInfinityScore:
-    def __init__(self, cfg: Dict[str,Any]):
-        ln=cfg.get("linf_placar",{}); self.w=ln.get("weights",{"rsi":0.2,"synergy":0.2,"novelty":0.2,"stability":0.2,"viability":0.15,"cost":0.05})
-        self.lambda_c=ln.get("lambda_c",0.1)
-    def compute(self, xt: OmegaMEState)->float:
-        mets=[(max(1e-6,xt.rsi),self.w["rsi"]),
-              (max(1e-6,xt.synergy),self.w["synergy"]),
-              (max(1e-6,xt.novelty),self.w["novelty"]),
-              (max(1e-6,xt.stability),self.w["stability"]),
-              (max(1e-6,xt.viability),self.w["viability"]),
-              (max(1e-6,1.0-xt.cost),self.w["cost"])]
-        denom=sum(w/v for v,w in mets)
-        base=1.0/max(1e-6,denom); penalty=math.exp(-self.lambda_c*xt.cost)
-        eth=1.0 if xt.sigma_ok else 0.0
-        risk=1.0 if xt.rho<0.95 else 0.0
-        xt.l_inf_prev=xt.l_inf; xt.l_inf=base*penalty*eth*risk; xt.delta_linf=xt.l_inf-xt.l_inf_prev
+    def __init__(self, cfg: Dict[str, Any]):
+        l = cfg.get("linf_placar", {})
+        self.weights = l.get("weights", {"rsi": 0.2, "synergy": 0.2, "novelty": 0.2,
+                                            "stability": 0.2, "viability": 0.15, "cost": 0.05})
+        self.lambda_c = l.get("lambda_c", 0.1)
+    def compute(self, xt: OmegaMEState) -> float:
+        metrics = [
+            (max(1e-6, xt.rsi), self.weights["rsi"]),
+            (max(1e-6, xt.synergy), self.weights["synergy"]),
+            (max(1e-6, xt.novelty), self.weights["novelty"]),
+            (max(1e-6, xt.stability), self.weights["stability"]),
+            (max(1e-6, xt.viability), self.weights["viability"]),
+            (max(1e-6, 1.0 - xt.cost), self.weights["cost"]),
+        ]
+        denom = sum(w / v for v, w in metrics)
+        base = 1.0 / max(1e-6, denom)
+        penalty = math.exp(-self.lambda_c * xt.cost)
+        eth_gate = 1.0 if xt.sigma_ok else 0.0
+        risk_gate = 1.0 if xt.rho < 0.95 else 0.0
+        xt.l_inf_prev = xt.l_inf
+        xt.l_inf = base * penalty * eth_gate * risk_gate
+        xt.delta_linf = xt.l_inf - xt.l_inf_prev
         return xt.l_inf
 
 
-# =============================================================================
-# Fibonacci Manager (TTL / Trust / LR)
-# =============================================================================
-
+# -----------------------------------------------------------------------------
+# Fibonacci manager for TTL, trust region and LR search
+# -----------------------------------------------------------------------------
 class FibonacciSchedule:
     def __init__(self, base: float, max_interval: float):
-        self.base=float(base); self.max=float(max_interval); self.i=1; self.f=FibonacciResearch()
-    def next(self)->float:
-        val=min(self.max,self.base*float(self.f.fib_iterative(self.i))); self.i+=1; return max(self.base,val)
-    def reset(self): self.i=1
+        self.base = float(base)
+        self.max = float(max_interval)
+        self.i = 1
+        self.fr = FibonacciResearch()
+    def next(self) -> float:
+        val = min(self.max, self.base * float(self.fr.fib_iterative(self.i)))
+        self.i += 1
+        return max(self.base, val)
+    def reset(self):
+        self.i = 1
 
 class FibonacciManager:
-    def __init__(self, cfg: Dict[str,Any], worm: WORMLedger, fib: FibonacciResearch):
-        self.enabled=bool(cfg.get("enabled",False))
-        self.cache_enabled=bool(cfg.get("cache",True)); self.trust_enabled=bool(cfg.get("trust_region",True))
-        self.l1b=float(cfg.get("l1_ttl_base",1.0)); self.l2b=float(cfg.get("l2_ttl_base",60.0)); self.maxi=float(cfg.get("max_interval_s",300.0))
-        self.grow=float(cfg.get("trust_growth", PHI**0.125)); self.shrk=float(cfg.get("trust_shrink", INV_PHI**0.125))
-        self.method=str(cfg.get("search_method", "fibonacci")).lower()
-        self.s1=FibonacciSchedule(self.l1b, self.maxi); self.s2=FibonacciSchedule(self.l2b, self.maxi)
-        self.worm=worm; self.fib=fib
-
+    def __init__(self, cfg: Dict[str, Any], worm: WORMLedger, fib: FibonacciResearch):
+        self.enabled = bool(cfg.get("enabled", False))
+        self.cache_enabled = bool(cfg.get("cache", True))
+        self.trust_enabled = bool(cfg.get("trust_region", True))
+        self.l1b = float(cfg.get("l1_ttl_base", 1.0))
+        self.l2b = float(cfg.get("l2_ttl_base", 60.0))
+        self.maxi = float(cfg.get("max_interval_s", 300.0))
+        self.grow = float(cfg.get("trust_growth", PHI ** 0.125))
+        self.shrk = float(cfg.get("trust_shrink", INV_PHI ** 0.125))
+        self.method = str(cfg.get("search_method", "fibonacci")).lower()
+        self.s1 = FibonacciSchedule(self.l1b, self.maxi)
+        self.s2 = FibonacciSchedule(self.l2b, self.maxi)
+        self.worm = worm
+        self.fib = fib
     def apply_cache(self, cache: MultiLevelCache):
         if not (self.enabled and self.cache_enabled): return
-        cache.l1_ttl=int(self.s1.next()); cache.l2_ttl=int(self.s2.next())
-        self.worm.record(EventType.FIBONACCI_TICK, {"l1_ttl":cache.l1_ttl, "l2_ttl":cache.l2_ttl})
-
+        cache.l1_ttl = int(self.s1.next())
+        cache.l2_ttl = int(self.s2.next())
+        self.worm.record(EventType.FIBONACCI_TICK, {
+            "l1_ttl": cache.l1_ttl,
+            "l2_ttl": cache.l2_ttl,
+        })
     def modulate_trust(self, xt: OmegaMEState):
         if not (self.enabled and self.trust_enabled): return
-        if xt.delta_linf>0.02: xt.trust_radius=min(0.5, xt.trust_radius*self.grow)
-        else: xt.trust_radius=max(0.01, xt.trust_radius*self.shrk)
+        if xt.delta_linf > 0.02:
+            xt.trust_radius = min(0.5, xt.trust_radius * self.grow)
+        else:
+            xt.trust_radius = max(0.01, xt.trust_radius * self.shrk)
+    def optimize_lr(self, f: Callable[[float], float], a: float = 0.01, b: float = 1.0) -> float:
+        return self.fib.fibonacci_search(f, a, b, maximize=True) if self.method == "fibonacci" else self.fib.golden_section_search(f, a, b, maximize=True)
 
-    def optimize_lr(self, f: Callable[[float],float], a:float=0.01, b:float=1.0)->float:
-        if self.method=="golden": return self.fib.golden_section_search(f,a,b,maximize=True)
-        return self.fib.fibonacci_search(f,a,b,maximize=True)
 
-
-# =============================================================================
-# CORE (Equação Mestra) — 1/8
-# =============================================================================
-
+# -----------------------------------------------------------------------------
+# PeninOmegaCore
+# -----------------------------------------------------------------------------
 class PeninOmegaCore:
-    def __init__(self, config: Optional[Dict[str,Any]]=None):
-        self.cfg=self._load_config(config)
-        self.worm=WORMLedger()
-        self.cache=MultiLevelCache()
-        self.fibR=FibonacciResearch()
-        self.fib=FibonacciManager(self.cfg.get("fibonacci",{}), self.worm, self.fibR)
-        use_phi=self.fib.enabled
+    def __init__(self, config: Optional[Dict[str, Any]] = None):
+        self.cfg = self._load_config(config)
+        self.worm = WORMLedger()
+        self.cache = MultiLevelCache()
+        self.fibR = FibonacciResearch()
+        self.fib = FibonacciManager(self.cfg.get("fibonacci", {}), self.worm, self.fibR)
+        use_phi = self.fib.enabled
         self.sigma = SigmaGuard(self.cfg)
-        self.iric  = IRtoIC(self.cfg, use_phi=use_phi)
-        self.caos  = CAOSPlusEngine(self.cfg, self.fibR)
-        self.sr    = SREngine(self.cfg)
-        self.gc    = GlobalCoherence(self.cfg)
-        self.oci   = OCIEngine(self.cfg)
-        self.linf  = LInfinityScore(self.cfg)
-        self.xt    = OmegaMEState()
-        self.metrics={"cycles":0,"promotions":0,"rollbacks":0,"extinctions":0}
-        self._boot()
-        if self.fib.enabled and self.fib.cache_enabled: self.fib.apply_cache(self.cache)
+        self.iric = IRtoIC(self.cfg, use_phi=use_phi)
+        self.caos = CAOSPlusEngine(self.cfg, self.fibR)
+        self.sr = SREngine(self.cfg)
+        self.gc = GlobalCoherence(self.cfg)
+        self.oci = OCIEngine(self.cfg)
+        self.linf = LInfinityScore(self.cfg)
+        self.xt = OmegaMEState()
+        self.metrics = {"cycles": 0, "promotions": 0, "rollbacks": 0, "extinctions": 0}
+        self._register_boot()
+        if self.fib.enabled and self.fib.cache_enabled:
+            self.fib.apply_cache(self.cache)
         self.pool = ThreadPoolExecutor(max_workers=8)
-        self.ppool= ProcessPoolExecutor(max_workers=4)
-
-    def _load_config(self, custom: Optional[Dict[str,Any]])->Dict[str,Any]:
+        self.ppool = ProcessPoolExecutor(max_workers=4)
+    def _load_config(self, custom: Optional[Dict[str, Any]]) -> Dict[str, Any]:
         default = {
-            "ethics":{"ece_max":0.01,"rho_bias_max":1.05,"consent_required":True,"eco_ok_required":True},
-            "iric":{"rho_max":0.95,"contraction_factor":0.98},
-            "caos_plus":{"kappa":2.0,"pmin":0.05,"pmax":2.0,"chaos_probability":0.01},
-            "sr_omega":{"weights":{"C":0.2,"E":0.4,"M":0.3,"A":0.1},"tau_sr":0.8},
-            "omega_sigma":{"weights":[1/8]*8,"tau_g":0.7},
-            "oci":{"weights":[0.25,0.25,0.25,0.25],"tau_oci":0.9},
-            "linf_placar":{"weights":{"rsi":0.2,"synergy":0.2,"novelty":0.2,"stability":0.2,"viability":0.15,"cost":0.05},"lambda_c":0.1},
-            "fibonacci":{"enabled":False,"cache":True,"trust_region":True,"l1_ttl_base":1,"l2_ttl_base":60,
-                         "max_interval_s":300,"trust_growth":None,"trust_shrink":None,"search_method":"fibonacci"},
-            "thresholds":{"tau_caos":0.7,"beta_min":0.02},
-            "evolution":{"alpha_0":0.1}
+            "ethics": {"ece_max": 0.01, "rho_bias_max": 1.05, "consent_required": True, "eco_ok_required": True},
+            "iric": {"rho_max": 0.95, "contraction_factor": 0.98},
+            "caos_plus": {"kappa": 2.0, "pmin": 0.05, "pmax": 2.0, "chaos_probability": 0.01},
+            "sr_omega": {"weights": {"C": 0.2, "E": 0.4, "M": 0.3, "A": 0.1}, "tau_sr": 0.8},
+            "omega_sigma": {"weights": [1.0 / 8] * 8, "tau_g": 0.7},
+            "oci": {"weights": [0.25, 0.25, 0.25, 0.25], "tau_oci": 0.9},
+            "linf_placar": {"weights": {"rsi": 0.2, "synergy": 0.2, "novelty": 0.2,
+                                           "stability": 0.2, "viability": 0.15, "cost": 0.05},
+                              "lambda_c": 0.1},
+            "fibonacci": {"enabled": False, "cache": True, "trust_region": True,
+                           "l1_ttl_base": 1, "l2_ttl_base": 60, "max_interval_s": 300,
+                           "trust_growth": None, "trust_shrink": None, "search_method": "fibonacci"},
+            "thresholds": {"tau_caos": 0.7, "beta_min": 0.02},
+            "evolution": {"alpha_0": 0.1},
         }
         return _deep_merge(default, custom or {})
-
-    def _boot(self):
-        self.worm.record(EventType.BOOT, {
-            "version":PKG_VERSION,"phi":PHI,"inv_phi":INV_PHI,"fibonacci_enabled":self.fib.enabled
+    def _register_boot(self):
+        self.worm.record("BOOT", {
+            "version": PKG_VERSION,
+            "phi": PHI,
+            "inv_phi": INV_PHI,
+            "fibonacci_enabled": self.fib.enabled,
         }, self.xt)
-
-    # ---------- Equação Mestra ----------
-    def _compute_alpha(self)->float:
-        # α_t^Ω = α_0 · φ(CAOS⁺) · SR · G · OCI
-        alpha_0=self.cfg["evolution"]["alpha_0"]
-        phi_caos=min(1.0, self.xt.caos_plus/2.0)
-        factors=[phi_caos, max(0.1,min(2.0,self.xt.sr_score)), max(0.1,min(2.0,self.xt.g_score)), max(0.1,min(2.0,self.xt.oci_score))]
-        self.xt.alpha_omega = max(0.0, min(1.0, alpha_0*math.prod(factors)))
-        return self.xt.alpha_omega
-
-    def _gates(self)->List[str]:
-        fails=[]
-        if not self.sr.gate(self.xt): fails.append("SR")
-        if not self.gc.gate(self.xt): fails.append("G")
-        if not self.oci.gate(self.xt): fails.append("OCI")
-        if self.xt.delta_linf < self.cfg["thresholds"]["beta_min"]: fails.append("ΔL∞")
-        if self.xt.caos_plus < self.cfg["thresholds"]["tau_caos"]: fails.append("CAOS⁺")
-        return fails
-
-    async def master_equation_cycle(self, external_metrics: Optional[Dict[str,float]]=None)->Dict[str,Any]:
-        res={"success":False,"decision":"HALT","metrics":{}}
-        t0=time.time()
+    async def master_equation_cycle(self, external_metrics: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
+        result = {"success": False, "decision": None, "metrics": {}}
+        t0 = time.time()
         try:
-            # Ingest externa (RSI, synergy, novelty, stability, viability, cost)
             if external_metrics:
-                for k,v in external_metrics.items():
-                    if hasattr(self.xt,k): setattr(self.xt,k,float(v))
-
-            # Recursos reais
+                for k, v in external_metrics.items():
+                    if hasattr(self.xt, k): setattr(self.xt, k, float(v))
             if HAS_PSUTIL:
-                self.xt.cpu = psutil.cpu_percent(interval=None)/100.0
-                self.xt.mem = psutil.virtual_memory().percent/100.0
-
-            # Σ-GUARD
-            ok,viol=self.sigma.check(self.xt)
+                self.xt.cpu = psutil.cpu_percent(interval=None) / 100.0
+                self.xt.mem = psutil.virtual_memory().percent / 100.0
+            ok, violations = self.sigma.check(self.xt)
             if not ok:
-                res["reason"]="SIGMA_GUARD"; res["violations"]=viol
-                self.worm.record(EventType.CYCLE_ABORT, res, self.xt); return res
-
-            # IR→IC
+                result.update({"decision": "ABORT", "reason": "SIGMA_GUARD", "violations": violations})
+                self.worm.record("CYCLE_ABORT", result, self.xt)
+                return result
             if not self.iric.safe(self.xt):
                 self.iric.contract(self.xt)
-                res["reason"]="IRIC_CONTRACT"; self.worm.record(EventType.CYCLE_ABORT, res, self.xt); return res
-
-            # L∞ → ΔL∞
-            lscore=self.linf.compute(self.xt); res["metrics"]["L∞"]=lscore; res["metrics"]["ΔL∞"]=self.xt.delta_linf
-
-            # CAOS⁺, SR, G, OCI
-            caos=self.caos.compute(self.xt);    res["metrics"]["CAOS⁺"]=caos; res["metrics"]["harmony"]=self.xt.caos_harmony
-            sr  =self.sr.compute(self.xt);      res["metrics"]["SR"]=sr
-            g   =self.gc.compute(self.xt);      res["metrics"]["G"]=g
-            oci =self.oci.compute(self.xt);     res["metrics"]["OCI"]=oci
-
-            # α_t^Ω
-            alpha=self._compute_alpha(); res["metrics"]["α_t^Ω"]=alpha
-
-            # Gates lexicográficos não-compensatórios
-            fails=self._gates()
-            if fails:
-                res["reason"]="GATES_FAILED"; res["failed"]=fails
-                self.worm.record(EventType.CYCLE_ABORT, res, self.xt); return res
-
-            # I_{t+1} = I_t + α_t^Ω · ΔL∞ · V_t (V_t=1)
+                result.update({"decision": "ABORT", "reason": "IRIC_CONTRACT"})
+                self.worm.record("CYCLE_ABORT", result, self.xt)
+                return result
+            l_score = self.linf.compute(self.xt)
+            result["metrics"]["L∞"] = l_score
+            result["metrics"]["ΔL∞"] = self.xt.delta_linf
+            caos_val = self.caos.compute(self.xt)
+            result["metrics"]["CAOS⁺"] = caos_val
+            result["metrics"]["harmony"] = self.xt.caos_harmony
+            sr_val = self.sr.compute(self.xt)
+            result["metrics"]["SR"] = sr_val
+            g_val = self.gc.compute(self.xt)
+            result["metrics"]["G"] = g_val
+            oci_val = self.oci.compute(self.xt)
+            result["metrics"]["OCI"] = oci_val
+            alpha = self._compute_alpha()
+            result["metrics"]["α_t^Ω"] = alpha
+            gates = []
+            if not self.sr.gate(self.xt): gates.append("SR_GATE")
+            if not self.gc.gate(self.xt): gates.append("G_GATE")
+            if not self.oci.gate(self.xt): gates.append("OCI_GATE")
+            if self.xt.delta_linf < self.cfg["thresholds"]["beta_min"]: gates.append("ΔL∞_GATE")
+            if self.xt.caos_plus < self.cfg["thresholds"]["tau_caos"]: gates.append("CAOS⁺_GATE")
+            if gates:
+                result.update({"decision": "ROLLBACK", "reason": "GATES_FAILED", "failed_gates": gates})
+                self.metrics["rollbacks"] += 1
+                self.worm.record("ROLLBACK", result, self.xt)
+                return result
             step = alpha * self.xt.delta_linf
-
-            # Aplicação do passo com otimização de LR via Fibonacci/Golden (se habilitado)
-            lr_opt=1.0
+            lr_opt = 1.0
             if self.fib.enabled:
-                def score_lr(lr:float)->float:
-                    # favorece proximidade de PHI e ganho positivo
-                    harm_bonus = 1.0 - min(1.0, abs(self.xt.caos_harmony-PHI)/PHI)
-                    return step*lr*(1.0 + 0.1*harm_bonus)
-                lr_opt = self.fib.optimize_lr(score_lr, 0.5, 2.0)
-                self.worm.record(EventType.FIBONACCI_OPT, {"lr_opt":lr_opt,"count":self.fibR.optimization_count}, self.xt)
+                def lr_score(lr: float) -> float:
+                    harm_bonus = 1.0 - min(1.0, abs(self.xt.caos_harmony - PHI) / PHI)
+                    return step * lr * (1.0 + 0.1 * harm_bonus)
+                lr_opt = self.fib.optimize_lr(lr_score, 0.5, 2.0)
+                self.worm.record("FIBONACCI_OPT", {"lr_opt": lr_opt, "opt_count": self.fibR.optimization_count}, self.xt)
             step_opt = step * lr_opt
-
-            # Atualiza L∞’s componentes (anti-Goodhart)
-            self.xt.rsi       += step_opt*0.08
-            self.xt.synergy   += step_opt*0.07
-            self.xt.novelty   += step_opt*0.05
-            self.xt.stability += step_opt*0.06
-            self.xt.viability += step_opt*0.05
-            self.xt.cost       = max(0.0, self.xt.cost - step_opt*0.03)
-
-            # Atualiza CAOS
-            self.xt.C = min(1.0, self.xt.C + step_opt*0.04)
-            self.xt.A = min(1.0, self.xt.A + step_opt*0.05)
-            self.xt.O = min(1.0, self.xt.O + step_opt*0.03)
-            self.xt.S = min(1.0, self.xt.S + step_opt*0.02)
-
-            # Atualiza SR
-            self.xt.C_cal = min(1.0, self.xt.C_cal + step_opt*0.03)
-            self.xt.M     = min(1.0, self.xt.M     + step_opt*0.04)
-            self.xt.A_eff = min(1.0, self.xt.A_eff + step_opt*0.05)
-
-            # Trust-Region (Fibonacci)
-            if self.fib.enabled: self.fib.modulate_trust(self.xt)
-
-            # Decisão
-            if step_opt>0:
-                res["success"]=True; res["decision"]="PROMOTE"; res["evolution_step"]=float(step_opt)
-                self.metrics["promotions"]+=1
-                self.worm.record(EventType.PROMOTE, {"step":step_opt,"α":alpha,"ΔL∞":self.xt.delta_linf}, self.xt)
+            self.xt.rsi       += step_opt * 0.08
+            self.xt.synergy   += step_opt * 0.07
+            self.xt.novelty   += step_opt * 0.05
+            self.xt.stability += step_opt * 0.06
+            self.xt.viability += step_opt * 0.05
+            self.xt.cost       = max(0.0, self.xt.cost - step_opt * 0.03)
+            self.xt.C = min(1.0, self.xt.C + step_opt * 0.04)
+            self.xt.A = min(1.0, self.xt.A + step_opt * 0.05)
+            self.xt.O = min(1.0, self.xt.O + step_opt * 0.03)
+            self.xt.S = min(1.0, self.xt.S + step_opt * 0.02)
+            self.xt.C_cal = min(1.0, self.xt.C_cal + step_opt * 0.03)
+            self.xt.M     = min(1.0, self.xt.M     + step_opt * 0.04)
+            self.xt.A_eff = min(1.0, self.xt.A_eff + step_opt * 0.05)
+            if self.fib.enabled:
+                self.fib.modulate_trust(self.xt)
+            if step_opt > 0:
+                result.update({"success": True, "decision": "PROMOTE", "evolution_step": step_opt})
+                self.metrics["promotions"] += 1
+                self.worm.record("PROMOTE", {"step": step_opt, "alpha": alpha, "ΔL∞": self.xt.delta_linf}, self.xt)
             else:
-                res["decision"]="ROLLBACK"; self.metrics["rollbacks"]+=1
-                self.worm.record(EventType.ROLLBACK, {"step":step_opt,"α":alpha,"ΔL∞":self.xt.delta_linf}, self.xt)
-
-            # ciclo & telemetria
-            self.xt.cycle += 1; self.metrics["cycles"] += 1
-            elapsed=max(1e-6, time.time()-t0); self.xt.latency_ms=elapsed*1000.0; self.xt.throughput=1.0/elapsed
-            # hook fibonacci TTL
-            if self.fib.enabled: self.fib.apply_cache(self.cache)
-
-            # registrar ciclo completo
-            self.worm.record(EventType.MASTER_EQ, {
-                "cycle": self.xt.cycle, "metrics": res["metrics"], "step": step_opt
-            }, self.xt)
-
-            return res
+                result.update({"decision": "ROLLBACK", "reason": "NEGATIVE_STEP"})
+                self.metrics["rollbacks"] += 1
+                self.worm.record("ROLLBACK", {"step": step_opt, "alpha": alpha, "ΔL∞": self.xt.delta_linf}, self.xt)
+            self.xt.cycle += 1
+            self.metrics["cycles"] += 1
+            elapsed = max(1e-6, time.time() - t0)
+            self.xt.latency_ms = elapsed * 1000.0
+            self.xt.throughput = 1.0 / elapsed
+            if self.fib.enabled:
+                self.fib.apply_cache(self.cache)
+            self.worm.record("MASTER_EQ", {"cycle": self.xt.cycle, "metrics": result["metrics"], "step": step_opt}, self.xt)
+            return result
         except Exception as e:
-            res["reason"]="EXCEPTION"; res["error"]=str(e)
-            self.worm.record(EventType.CYCLE_ABORT, res, self.xt); return res
-
-    # ---------- Utilitários ----------
-    def verify_integrity(self)->Dict[str,Any]:
-        ok,err=self.worm.verify_chain()
-        return {"worm_valid":ok,"worm_error":err,"metrics":dict(self.metrics),"state":self.xt.to_dict(),"cache":dict(self.cache.stats)}
-
-    def save_snapshot(self, tag: Optional[str]=None)->str:
-        sid=str(uuid.uuid4()); p=DIRS["SNAPSHOTS"]/f"snapshot_{sid}.json"
-        with open(p,"w",encoding="utf-8") as f:
-            json.dump({"id":sid,"tag":tag,"ts":datetime.now(timezone.utc).isoformat(),
-                       "state":self.xt.to_dict(),"metrics":self.metrics,"config":self.cfg},
-                      f, ensure_ascii=False, indent=2)
-        self.worm.record(EventType.SNAP, {"id":sid,"path":str(p)}, self.xt); return sid
-
-    def load_snapshot(self, sid:str)->bool:
-        p=DIRS["SNAPSHOTS"]/f"snapshot_{sid}.json"
-        if not p.exists(): return False
+            result.update({"decision": "ABORT", "error": str(e)})
+            self.worm.record("CYCLE_ABORT", result, self.xt)
+            return result
+    def _compute_alpha(self) -> float:
+        alpha_0 = self.cfg["evolution"]["alpha_0"]
+        phi_caos = min(1.0, self.xt.caos_plus / 2.0)
+        sr_comp = min(2.0, max(0.1, self.xt.sr_score))
+        g_comp  = min(2.0, max(0.1, self.xt.g_score))
+        oci_comp= min(2.0, max(0.1, self.xt.oci_score))
+        self.xt.alpha_omega = alpha_0 * phi_caos * sr_comp * g_comp * oci_comp
+        return min(1.0, max(0.0, self.xt.alpha_omega))
+    def verify_integrity(self) -> Dict[str, Any]:
+        ok, err = self.worm.verify_chain()
+        return {"worm_valid": ok, "worm_error": err, "metrics": dict(self.metrics), "state": self.xt.to_dict(), "cache": dict(self.cache.stats)}
+    def save_snapshot(self, tag: Optional[str] = None) -> str:
+        snap_id = str(uuid.uuid4())
+        path = DIRS["SNAPSHOTS"] / f"snapshot_{snap_id}.json"
+        with open(path, "w") as f:
+            json.dump({"id": snap_id, "tag": tag, "ts": datetime.now(timezone.utc).isoformat(), "state": self.xt.to_dict(), "metrics": self.metrics, "config": self.cfg}, f, indent=2, ensure_ascii=False)
+        self.worm.record("SNAPSHOT", {"id": snap_id, "path": str(path)}, self.xt)
+        return snap_id
+    def load_snapshot(self, snap_id: str) -> bool:
+        path = DIRS["SNAPSHOTS"] / f"snapshot_{snap_id}.json"
+        if not path.exists(): return False
         try:
-            data=json.loads(p.read_text(encoding="utf-8"))
-            self.xt = OmegaMEState(**data["state"]); self.metrics=data["metrics"]; return True
+            with open(path) as f:
+                data = json.load(f)
+            self.xt = OmegaMEState(**data["state"])
+            self.metrics = data["metrics"]
+            return True
         except Exception as e:
-            log.error(f"load_snapshot error: {e}"); return False
-
+            log.error(f"load_snapshot error: {e}")
+            return False
     def shutdown(self):
-        log.info("🛑 Shutdown...")
-        snap=self.save_snapshot("shutdown")
-        self.worm.record(EventType.SHUTDOWN, {"snapshot":snap,"metrics":self.metrics}, self.xt)
+        log.info("🛑 Shutting down core...")
+        snap = self.save_snapshot("shutdown")
+        self.worm.record("SHUTDOWN", {"snapshot": snap, "metrics": self.metrics}, self.xt)
         self.cache.clear()
-        self.pool.shutdown(wait=True); self.ppool.shutdown(wait=True)
+        self.pool.shutdown(wait=True)
+        self.ppool.shutdown(wait=True)
 
-# =============================================================================
-# LLMEvolutionInterface (opcional)
-# =============================================================================
 
+# -----------------------------------------------------------------------------
+# LLM evolution interface
+# -----------------------------------------------------------------------------
 class LocalLLMProvider:
-    def __init__(self, model_path: Optional[str]=None):
-        self.model_path = model_path or str(DIRS["MODELS"]/"falcon-mamba-7b")
-        self.model=None; self.tokenizer=None
+    def __init__(self, model_path: Optional[str] = None):
+        self.model_path = model_path or str(DIRS["MODELS"] / "falcon-mamba-7b")
+        self.model = None
+        self.tokenizer = None
+        self.device = "cpu"
         if HAS_TORCH:
             try:
                 from transformers import AutoTokenizer, AutoModelForCausalLM
-                self.tokenizer=AutoTokenizer.from_pretrained(self.model_path)
-                self.model=AutoModelForCausalLM.from_pretrained(self.model_path)
+                self.tokenizer = AutoTokenizer.from_pretrained(self.model_path)
+                self.model = AutoModelForCausalLM.from_pretrained(self.model_path)
                 self.model.eval()
             except Exception as e:
-                log.warning(f"LLM local fallback: {e}")
-
-    def generate(self, prompt:str, max_tokens:int=256)->str:
+                log.warning(f"LLM load failure: {e}")
+    def generate(self, prompt: str, max_tokens: int = 256) -> str:
         if self.model and self.tokenizer:
             import torch
+            inputs = self.tokenizer(prompt, return_tensors="pt")
             with torch.no_grad():
-                inp=self.tokenizer(prompt, return_tensors="pt")
-                out=self.model.generate(**inp, max_new_tokens=max_tokens)
-                return self.tokenizer.decode(out[0], skip_special_tokens=True)
+                outputs = self.model.generate(**inputs, max_new_tokens=max_tokens)
+            return self.tokenizer.decode(outputs[0], skip_special_tokens=True)
         return "Fallback: " + prompt
 
 class LLMEvolutionInterface:
     def __init__(self, core: PeninOmegaCore):
-        self.core=core; self.provider=LocalLLMProvider()
-    async def query_llm(self, prompt:str, **kw)->str:
-        resp=self.provider.generate(prompt, **kw)
-        self.core.worm.record(EventType.LLM_QUERY, {"prompt_len":len(prompt),"resp_len":len(resp)}, self.core.xt)
+        self.core = core
+        self.llm = LocalLLMProvider()
+    async def query_llm(self, prompt: str, **kw) -> str:
+        resp = self.llm.generate(prompt, **kw)
+        self.core.worm.record("LLM_QUERY", {"prompt_len": len(prompt), "resp_len": len(resp)}, self.core.xt)
         return resp
-    async def evaluate_llm_output(self, prompt:str, response:str, ground_truth:Optional[str]=None)->Dict[str,float]:
-        m={}
-        m["rsi"]=min(1.0, len(response)/max(1,len(prompt)))
-        uniq=len(set(response.split())); tot=max(1,len(response.split()))
-        m["novelty"]=uniq/tot; m["stability"]=0.7+random.uniform(-0.1,0.1); m["viability"]=0.8 if len(response)>10 else 0.3
-        m["cost"]=min(1.0, len(response)/1000)
+    async def evaluate_llm_output(self, prompt: str, response: str, ground_truth: Optional[str] = None) -> Dict[str, float]:
+        m: Dict[str, float] = {}
+        m["rsi"] = min(1.0, len(response) / max(len(prompt), 1))
+        m["novelty"] = len(set(response.split())) / max(1, len(response.split()))
+        m["stability"] = 0.7 + random.uniform(-0.1, 0.1)
+        m["viability"] = 0.8 if len(response) > 10 else 0.3
+        m["cost"] = min(1.0, len(response) / 1000)
         if ground_truth:
-            common=set(response.split()) & set(ground_truth.split())
-            union =set(response.split()) | set(ground_truth.split())
-            m["synergy"]=len(common)/max(1,len(union))
-        else: m["synergy"]=0.6
+            common = set(response.split()) & set(ground_truth.split())
+            union = set(response.split()) | set(ground_truth.split())
+            m["synergy"] = len(common) / max(1, len(union))
+        else:
+            m["synergy"] = 0.6
         return m
-    async def evolve_step(self, llm_metrics:Dict[str,float])->Dict[str,Any]:
-        res=await self.core.master_equation_cycle(llm_metrics)
-        return res
+    async def evolve_step(self, llm_metrics: Dict[str, float]) -> Dict[str, Any]:
+        return await self.core.master_equation_cycle(llm_metrics)
 
 
-# =============================================================================
+# -----------------------------------------------------------------------------
 # Helpers
-# =============================================================================
+# -----------------------------------------------------------------------------
+def _deep_merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
+    out = dict(a)
+    for k, v in b.items():
+        if k in out and isinstance(out[k], dict) and isinstance(v, dict):
+            out[k] = _deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
 
-def _deep_merge(a:Dict,b:Dict)->Dict:
-    o=dict(a)
-    for k,v in b.items():
-        if k in o and isinstance(o[k],dict) and isinstance(v,dict): o[k]=_deep_merge(o[k],v)
-        else: o[k]=v
-    return o
 
-
-# =============================================================================
-# CLI Demo
-# =============================================================================
-
-async def main():
-    # Para ativar Fibonacci, passe config adequada (exemplo comentado abaixo)
-    # cfg={"fibonacci":{"enabled":True,"cache":True,"trust_region":True,"search_method":"fibonacci"}}
-    core=PeninOmegaCore()  # ou PeninOmegaCore(cfg)
-
-    def _sig(*_): core.shutdown(); sys.exit(0)
-    for s in (signal.SIGINT, signal.SIGTERM): signal.signal(s, _sig)
-
-    log.info("🚀 Rodando 3 ciclos (Equação Mestra)...")
+# -----------------------------------------------------------------------------
+# CLI demonstration
+# -----------------------------------------------------------------------------
+async def main_demo():
+    core = PeninOmegaCore()
+    def handler(*_): core.shutdown(); sys.exit(0)
+    signal.signal(signal.SIGINT, handler); signal.signal(signal.SIGTERM, handler)
+    log.info("Starting 3 demo cycles...")
     for i in range(3):
-        r=await core.master_equation_cycle()
-        log.info(f" ciclo {i+1}: decision={r['decision']} success={r['success']}")
-        await asyncio.sleep(0.2)
-
-    integ=core.verify_integrity()
-    log.info(f"WORM válido: {integ['worm_valid']}; ciclos={integ['metrics']['cycles']}")
+        res = await core.master_equation_cycle()
+        log.info(f"Cycle {i+1}: decision={res['decision']}, success={res['success']}")
+        await asyncio.sleep(0.3)
+    integ = core.verify_integrity()
+    log.info(f"WORM valid: {integ['worm_valid']}, cycles: {integ['metrics']['cycles']}")
     core.shutdown()
 
-if __name__=="__main__":
+if __name__ == "__main__":
     if HAS_TORCH:
         try:
             torch.set_num_threads(multiprocessing.cpu_count())
-            if hasattr(torch,'set_float32_matmul_precision'):
+            if hasattr(torch, 'set_float32_matmul_precision'):
                 torch.set_float32_matmul_precision('high')
-        except Exception: pass
-    asyncio.run(main())
+        except Exception:
+            pass
+    asyncio.run(main_demo())
