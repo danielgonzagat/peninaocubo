@@ -57,7 +57,9 @@ from datetime import datetime, timezone
 from collections import defaultdict, Counter, deque
 from enum import Enum
 import warnings
-warnings.filterwarnings('ignore')
+# Suppress only DeprecationWarning and UserWarning to avoid hiding important issues
+warnings.filterwarnings('ignore', category=DeprecationWarning)
+warnings.filterwarnings('ignore', category=UserWarning)
 
 # =============================================================================
 # IMPORTS OPCIONAIS COM FALLBACKS
