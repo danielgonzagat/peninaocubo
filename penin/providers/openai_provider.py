@@ -30,16 +30,17 @@ class OpenAIProvider(BaseProvider):
             tools=tools,
             temperature=temperature,
         )
-        )
-        content = resp.choices[0].message.content if resp.choices and resp.choices[0].message else ""
-        usage = getattr(resp, "usage", {}) or {}
+        choice = resp.choices[0]
+        content = choice.message.content or ""
+        tool_calls = choice.message.tool_calls or []
+        usage = resp.usage
         end = time.time()
         return LLMResponse(
             content=content,
             model=self.model,
-            tokens_in=usage.get("input_tokens", 0),
-            tokens_out=usage.get("output_tokens", 0),
-            tool_calls=[],
+            tokens_in=usage.prompt_tokens if usage else 0,
+            tokens_out=usage.completion_tokens if usage else 0,
+            tool_calls=[tc.dict() for tc in tool_calls] if tool_calls else [],
             provider=self.name,
             latency_s=end - start,
         )
