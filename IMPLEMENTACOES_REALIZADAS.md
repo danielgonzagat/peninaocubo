@@ -92,6 +92,27 @@ Foram implementadas com sucesso **todas as correções P0 (bloqueadores)** e **t
 python3 penin_omega_1_core.py --test
 ```
 
+### Nota de Migração de Arquivos
+
+Para facilitar a transição de scripts antigos, os módulos originais sem
+extensão foram renomeados seguindo o padrão descritivo
+`penin_omega_<n>_<função>.py`. A tabela abaixo resume os novos nomes:
+
+| Nome antigo | Novo nome |
+| ----------- | --------- |
+| `1_de_8`    | `penin_omega_1_core.py` |
+| `2_de_8`    | `penin_omega_2_strategy.py` |
+| `3_de_8`    | `penin_omega_3_acquisition.py` |
+| `4_de_8`    | `penin_omega_4_mutation.py` |
+| `5_de_8`    | `penin_omega_5_crucible.py` |
+| `6_de_8`    | `penin_omega_6_autorewrite.py` |
+| `7_de_8`    | `penin_omega_7_scheduler.py` |
+| `8_de_8`    | `penin_omega_8_bridge.py` |
+
+> **Compatibilidade:** Os arquivos antigos continuam disponíveis como
+> *wrappers* que importam os novos módulos e emitem um `DeprecationWarning`,
+> permitindo atualizar gradualmente automatizações e pipelines existentes.
+
 ## 🔧 Arquitetura Implementada
 
 ### Componentes Principais
