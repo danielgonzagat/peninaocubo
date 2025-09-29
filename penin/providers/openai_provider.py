@@ -41,10 +41,18 @@ class OpenAIProvider(BaseProvider):
         message = getattr(choice, "message", None)
         content = getattr(message, "content", "") if message else ""
         raw_tool_calls = getattr(message, "tool_calls", None) if message else None
-
         tool_calls: List[Dict[str, Any]] = []
         if raw_tool_calls:
             for call in raw_tool_calls:
+                try:
+                    if isinstance(call, dict):
+                        tool_calls.append(call)
+                    elif hasattr(call, "to_dict"):
+                        tool_calls.append(call.to_dict())
+                    elif hasattr(call, "model_dump"):
+                        tool_calls.append(call.model_dump())
+                except Exception as e:
+                    print(f"WARNING: Failed to serialize tool call: {e}")
                 if isinstance(call, dict):
                     tool_calls.append(call)
                 elif hasattr(call, "to_dict"):
