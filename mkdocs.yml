@@ -1,0 +1,11 @@
+site_name: PeninaOcubo
+repo_name: danielgonzagat/peninaocubo
+repo_url: https://github.com/danielgonzagat/peninaocubo
+theme:
+  name: material
+nav:
+  - Home: index.md
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
