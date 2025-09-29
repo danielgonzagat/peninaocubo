@@ -1,20 +1,18 @@
 from typing import Optional
-
-from pydantic import Field
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    OPENAI_API_KEY: Optional[str] = Field(None, min_length=1)
-    DEEPSEEK_API_KEY: Optional[str] = Field(None, min_length=1)
-    MISTRAL_API_KEY: Optional[str] = Field(None, min_length=1)
-    GEMINI_API_KEY: Optional[str] = Field(None, min_length=1)
-    ANTHROPIC_API_KEY: Optional[str] = Field(None, min_length=1)
-    XAI_API_KEY: Optional[str] = Field(None, min_length=1)
-    HUGGINGFACE_TOKEN: Optional[str] = Field(None, min_length=1)
-    GITHUB_TOKEN: Optional[str] = Field(None, min_length=1)
-    KAGGLE_USERNAME: Optional[str] = Field(None, min_length=1)
-    KAGGLE_KEY: Optional[str] = Field(None, min_length=1)
+    OPENAI_API_KEY: Optional[str] = None
+    DEEPSEEK_API_KEY: Optional[str] = None
+    MISTRAL_API_KEY: Optional[str] = None
+    GEMINI_API_KEY: Optional[str] = None
+    ANTHROPIC_API_KEY: Optional[str] = None
+    XAI_API_KEY: Optional[str] = None
+    HUGGINGFACE_TOKEN: Optional[str] = None
+    GITHUB_TOKEN: Optional[str] = None
+    KAGGLE_USERNAME: Optional[str] = None
+    KAGGLE_KEY: Optional[str] = None
 
     PENIN_MAX_PARALLEL_PROVIDERS: int = 3
     PENIN_MAX_TOKENS_PER_ROUND: int = 30000

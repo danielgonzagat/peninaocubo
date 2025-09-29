@@ -13,7 +13,11 @@ class GeminiProvider(BaseProvider):
     def __init__(self, model: Optional[str] = None):
         self.name = "gemini"
         self.model = model or settings.GEMINI_MODEL
-        genai.configure(api_key=settings.GEMINI_API_KEY)
+        api_key = settings.GEMINI_API_KEY
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY is not configured")
+
+        genai.configure(api_key=api_key)
         self.client = genai.GenerativeModel(self.model)
 
     async def chat(
