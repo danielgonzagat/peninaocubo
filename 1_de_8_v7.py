@@ -735,6 +735,9 @@ class WORMLedger:
     """Write‑once, read‑many ledger with hash chain and atomic promotion attestation."""
     def __init__(self, path: Path = DIRS["WORM"] / "omega_core_1of8_v7.db"):
         self.db = sqlite3.connect(str(path), check_same_thread=False)
+        # P0-3: Enable WAL mode and busy_timeout for better concurrency
+        self.db.execute("PRAGMA journal_mode=WAL")
+        self.db.execute("PRAGMA busy_timeout=3000")
         self._init_db()
         self._lock = threading.Lock()
         self.tail = self._get_last_hash()

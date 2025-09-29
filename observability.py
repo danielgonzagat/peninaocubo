@@ -33,6 +33,8 @@ try:
     HAS_PROMETHEUS = True
 except ImportError:
     HAS_PROMETHEUS = False
+    # Mock types for when prometheus_client is not available
+    CollectorRegistry = type('CollectorRegistry', (), {})
     print("WARNING: prometheus_client not installed. Metrics export disabled.")
 
 try:
@@ -347,9 +349,10 @@ class MetricsCollector:
 class MetricsServer:
     """Simple HTTP server for Prometheus metrics"""
     
-    def __init__(self, collector: MetricsCollector, port: int = 8000):
+    def __init__(self, collector: MetricsCollector, port: int = 8000, bind_host: str = "127.0.0.1"):
         self.collector = collector
         self.port = port
+        self.bind_host = bind_host  # P0-2: Security - bind to localhost by default
         self.server = None
         self.thread = None
     
@@ -374,7 +377,8 @@ class MetricsServer:
             def log_message(self, format, *args):
                 pass  # Suppress request logs
         
-        self.server = HTTPServer(('', self.port), MetricsHandler)
+        # P0-2: Bind to specific host (default 127.0.0.1 for security)
+        self.server = HTTPServer((self.bind_host, self.port), MetricsHandler)
         self.thread = threading.Thread(target=self.server.serve_forever)
         self.thread.daemon = True
         self.thread.start()
@@ -394,6 +398,7 @@ class ObservabilityConfig:
     """Configuration for observability"""
     enable_metrics: bool = True
     metrics_port: int = 8000
+    metrics_bind_host: str = "127.0.0.1"  # P0-2: Secure default (localhost only)
     enable_json_logs: bool = True
     log_file: Optional[Path] = None
     log_level: str = "INFO"
@@ -418,7 +423,8 @@ class ObservabilityManager:
         if self.config.enable_metrics and HAS_PROMETHEUS:
             self.metrics_server = MetricsServer(
                 self.metrics,
-                port=self.config.metrics_port
+                port=self.config.metrics_port,
+                bind_host=self.config.metrics_bind_host  # P0-2: Pass secure bind host
             )
     
     def start(self):
