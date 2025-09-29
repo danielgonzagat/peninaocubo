@@ -63,7 +63,7 @@ from enum import Enum
 
 # Pydantic for config validation
 try:
-    from pydantic import BaseModel, Field, ValidationError, validator
+    from pydantic import BaseModel, Field, ValidationInfo, ValidationError, validator
     HAS_PYDANTIC = True
 except ImportError:
     print("ERROR: pydantic is required. Install with: pip install pydantic")
@@ -147,11 +147,14 @@ class SRWeights(BaseModel):
     A: float = Field(0.1, ge=0, le=1)
     
     @field_validator('A')
-    def weights_sum_to_one(cls, v, values):
-        total = v + values.get('C', 0) + values.get('E', 0) + values.get('M', 0)
-        if abs(total - 1.0) > 0.01:
-            raise ValueError(f"SR weights must sum to 1.0, got {total}")
-        return v
+def weights_sum_to_one(cls, v, info: ValidationInfo):
+    """No Pydantic v2, info.data contém os demais campos já validados.
+    Valida que C+E+M+A == 1.0 (com tolerância numérica pequena)."""
+    data = dict(info.data) if hasattr(info, 'data') and info.data is not None else {}
+    total = float(data.get('C', 0)) + float(data.get('E', 0)) + float(data.get('M', 0)) + float(v)
+    if abs(total - 1.0) > 1e-9:
+        raise ValueError('SR weights must sum to 1.0 (C+E+M+A).')
+    return v
 
 class SROmegaConfig(BaseModel):
     weights: SRWeights = Field(default_factory=SRWeights)
