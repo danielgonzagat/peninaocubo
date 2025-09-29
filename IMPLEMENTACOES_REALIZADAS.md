@@ -89,7 +89,7 @@ Foram implementadas com sucesso **todas as correções P0 (bloqueadores)** e **t
 
 ### Comando de Teste
 ```bash
-python3 1_de_8 --test
+python3 penin_omega_1_core.py --test
 ```
 
 ## 🔧 Arquitetura Implementada
