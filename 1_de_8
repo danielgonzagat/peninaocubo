@@ -899,10 +899,13 @@ class PeninOmegaCore:
         result = {"success": False, "decision": None, "metrics": {}}
         t0 = time.time()
         try:
-            # Deterministic seeding per cycle
-            seed_material = _hash_obj({"cycle": self.xt.cycle, "l_inf": self.xt.l_inf, "ts": int(time.time()*1000)})
+            # Secure deterministic seeding per cycle using cryptographically secure entropy
+            import secrets
+            cycle_entropy = secrets.randbits(64)
+            seed_material = _hash_obj({"cycle": self.xt.cycle, "l_inf": self.xt.l_inf, "entropy": cycle_entropy})
             seed_int = int(seed_material[:16], 16)
             random.seed(seed_int)
+            self.worm.record("CYCLE_SEED", {"seed_hash": seed_material[:8], "cycle": self.xt.cycle}, self.xt)
             self.worm.record("CYCLE_SEED", {"seed": seed_int, "seed_material": seed_material}, self.xt)
             if external_metrics:
                 for k, v in external_metrics.items():
