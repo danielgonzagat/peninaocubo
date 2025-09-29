@@ -9,7 +9,7 @@ This module implements the core of the PENIN-Ω organism with P0 corrections:
 - psutil mandatory with fail-closed fallback  
 - PROMOTE_ATTEST event with atomic promotion verification
 - Fibonacci boost clamped to ≤5% with EWMA stability window
-- Pydantic config validation
+- Strict config validation without external dependencies
 
 The master evolution equation remains:
 
@@ -40,21 +40,302 @@ import sqlite3
 import logging
 import signal
 from pathlib import Path
-from dataclasses import dataclass, field, asdict
-from typing import Any, Dict, List, Optional, Tuple, Callable, Union
+from dataclasses import dataclass, field, asdict, fields, MISSING
+from typing import Any, Dict, List, Optional, Tuple, Callable, Union, get_type_hints, get_origin, get_args
 from datetime import datetime, timezone
 from collections import deque, defaultdict, OrderedDict
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from enum import Enum
 
-# Pydantic for config validation
-try:
-    from pydantic import BaseModel, Field, ValidationError, validator
-    HAS_PYDANTIC = True
-except ImportError:
-    print("ERROR: pydantic is required. Install with: pip install pydantic")
-    sys.exit(1)
+# -----------------------------------------------------------------------------
+# Lightweight configuration system (replaces Pydantic dependency)
+# -----------------------------------------------------------------------------
+class ConfigValidationError(ValueError):
+    """Raised when configuration validation fails."""
+
+
+class ConfigBase:
+    """Base helper providing dataclass-style parsing/validation."""
+
+    def __post_init__(self):
+        self.validate()
+
+    def validate(self) -> None:
+        """Subclasses implement validation rules."""
+
+    @classmethod
+    def _convert_value(cls, field_type: Any, value: Any, name: str):
+        origin = get_origin(field_type)
+
+        if isinstance(value, ConfigBase):
+            return value
+
+        if origin is Union:
+            args = [arg for arg in get_args(field_type) if arg is not type(None)]
+            if args:
+                return cls._convert_value(args[0], value, name)
+            return value
+
+        if isinstance(field_type, type) and issubclass(field_type, ConfigBase):
+            if isinstance(value, dict):
+                return field_type.from_dict(value)
+            if isinstance(value, field_type):
+                return value
+            raise ConfigValidationError(f"Field '{name}' expects {field_type.__name__}")
+
+        if origin in (list, List, tuple, Tuple):
+            return list(value)
+
+        return value
+
+    @classmethod
+    def from_dict(cls, data: Optional[Dict[str, Any]] = None):
+        payload = data or {}
+        module_globals = sys.modules[cls.__module__].__dict__
+        type_hints = get_type_hints(cls, module_globals, module_globals)
+        kwargs = {}
+        for f in fields(cls):
+            field_name = f.name
+            field_type = type_hints.get(field_name, Any)
+            if field_name in payload:
+                raw_value = payload[field_name]
+            elif f.default is not MISSING:
+                raw_value = f.default
+            elif f.default_factory is not MISSING:  # type: ignore[attr-defined]
+                raw_value = f.default_factory()
+            else:
+                raise ConfigValidationError(f"Missing required configuration key '{field_name}'")
+
+            kwargs[field_name] = cls._convert_value(field_type, raw_value, field_name)
+
+        return cls(**kwargs)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+
+def _ensure_range(name: str, value: float, minimum: float, maximum: float) -> None:
+    if not (minimum <= value <= maximum):
+        raise ConfigValidationError(f"{name} must be between {minimum} and {maximum}, got {value}")
+
+
+def _ensure_iterable(name: str, values: List[float], expected_len: int) -> None:
+    if len(values) != expected_len:
+        raise ConfigValidationError(f"{name} must have {expected_len} entries, got {len(values)}")
+
+
+def _ensure_probability(name: str, value: float) -> None:
+    _ensure_range(name, value, 0.0, 1.0)
+
+
+def _ensure_sum_to_one(name: str, values: List[float]) -> None:
+    total = sum(values)
+    if abs(total - 1.0) > 0.01:
+        raise ConfigValidationError(f"{name} must sum to 1.0, got {total}")
+
+
+@dataclass
+class EthicsConfig(ConfigBase):
+    ece_max: float = 0.01
+    rho_bias_max: float = 1.05
+    consent_required: bool = True
+    eco_ok_required: bool = True
+
+    def validate(self) -> None:
+        _ensure_probability("ethics.ece_max", self.ece_max)
+        _ensure_range("ethics.rho_bias_max", self.rho_bias_max, 1.0, 2.0)
+
+
+@dataclass
+class IRICConfig(ConfigBase):
+    rho_max: float = 0.95
+    contraction_factor: float = 0.98
+
+    def validate(self) -> None:
+        _ensure_probability("iric.rho_max", self.rho_max)
+        _ensure_range("iric.contraction_factor", self.contraction_factor, 0.5, 1.0)
+
+
+@dataclass
+class CAOSPlusConfig(ConfigBase):
+    kappa: float = 2.0
+    pmin: float = 0.05
+    pmax: float = 2.0
+    chaos_probability: float = 0.01
+    max_boost: float = 0.05
+    ewma_alpha: float = 0.2
+    min_stability_cycles: int = 5
+
+    def validate(self) -> None:
+        _ensure_range("caos_plus.kappa", self.kappa, 0.0, 10.0)
+        _ensure_probability("caos_plus.pmin", self.pmin)
+        _ensure_range("caos_plus.pmax", self.pmax, 1.0, 10.0)
+        if self.pmin > self.pmax:
+            raise ConfigValidationError("caos_plus.pmin cannot exceed caos_plus.pmax")
+        _ensure_range("caos_plus.chaos_probability", self.chaos_probability, 0.0, 0.1)
+        _ensure_range("caos_plus.max_boost", self.max_boost, 0.0, 0.1)
+        _ensure_range("caos_plus.ewma_alpha", self.ewma_alpha, 0.1, 0.5)
+        if not (3 <= int(self.min_stability_cycles) <= 20):
+            raise ConfigValidationError("caos_plus.min_stability_cycles must be between 3 and 20")
+        self.min_stability_cycles = int(self.min_stability_cycles)
+
+
+@dataclass
+class SRWeights(ConfigBase):
+    C: float = 0.2
+    E: float = 0.4
+    M: float = 0.3
+    A: float = 0.1
+
+    def validate(self) -> None:
+        for name, value in {"C": self.C, "E": self.E, "M": self.M, "A": self.A}.items():
+            _ensure_probability(f"sr_omega.weights.{name}", value)
+        _ensure_sum_to_one("sr_omega.weights", [self.C, self.E, self.M, self.A])
+
+    def to_dict(self) -> Dict[str, float]:
+        return {"C": self.C, "E": self.E, "M": self.M, "A": self.A}
+
+
+@dataclass
+class SROmegaConfig(ConfigBase):
+    weights: SRWeights = field(default_factory=SRWeights)
+    tau_sr: float = 0.8
+
+    def validate(self) -> None:
+        if not isinstance(self.weights, SRWeights):
+            self.weights = SRWeights.from_dict(self.weights)
+        _ensure_probability("sr_omega.tau_sr", self.tau_sr)
+
+
+@dataclass
+class OmegaSigmaConfig(ConfigBase):
+    weights: List[float] = field(default_factory=lambda: [1.0 / 8] * 8)
+    tau_g: float = 0.7
+
+    def validate(self) -> None:
+        self.weights = list(self.weights)
+        _ensure_iterable("omega_sigma.weights", self.weights, 8)
+        for idx, val in enumerate(self.weights):
+            _ensure_probability(f"omega_sigma.weights[{idx}]", float(val))
+        _ensure_sum_to_one("omega_sigma.weights", self.weights)
+        _ensure_probability("omega_sigma.tau_g", self.tau_g)
+
+
+@dataclass
+class OCIConfig(ConfigBase):
+    weights: List[float] = field(default_factory=lambda: [0.25] * 4)
+    tau_oci: float = 0.9
+
+    def validate(self) -> None:
+        self.weights = list(self.weights)
+        _ensure_iterable("oci.weights", self.weights, 4)
+        for idx, val in enumerate(self.weights):
+            _ensure_probability(f"oci.weights[{idx}]", float(val))
+        _ensure_sum_to_one("oci.weights", self.weights)
+        _ensure_probability("oci.tau_oci", self.tau_oci)
+
+
+@dataclass
+class LInfWeights(ConfigBase):
+    rsi: float = 0.2
+    synergy: float = 0.2
+    novelty: float = 0.2
+    stability: float = 0.2
+    viability: float = 0.15
+    cost: float = 0.05
+
+    def validate(self) -> None:
+        values = {
+            "rsi": self.rsi,
+            "synergy": self.synergy,
+            "novelty": self.novelty,
+            "stability": self.stability,
+            "viability": self.viability,
+            "cost": self.cost,
+        }
+        for name, value in values.items():
+            _ensure_probability(f"linf_placar.weights.{name}", value)
+        _ensure_sum_to_one("linf_placar.weights", list(values.values()))
+
+    def to_dict(self) -> Dict[str, float]:
+        return dict(rsi=self.rsi, synergy=self.synergy, novelty=self.novelty,
+                    stability=self.stability, viability=self.viability, cost=self.cost)
+
+
+@dataclass
+class LInfPlacarConfig(ConfigBase):
+    weights: LInfWeights = field(default_factory=LInfWeights)
+    lambda_c: float = 0.1
+
+    def validate(self) -> None:
+        if not isinstance(self.weights, LInfWeights):
+            self.weights = LInfWeights.from_dict(self.weights)
+        _ensure_probability("linf_placar.lambda_c", self.lambda_c)
+
+
+@dataclass
+class FibonacciConfig(ConfigBase):
+    enabled: bool = False
+    cache: bool = True
+    trust_region: bool = True
+    l1_ttl_base: float = 1.0
+    l2_ttl_base: float = 60.0
+    max_interval_s: float = 300.0
+    trust_growth: Optional[float] = None
+    trust_shrink: Optional[float] = None
+    search_method: str = "fibonacci"
+
+    def validate(self) -> None:
+        _ensure_range("fibonacci.l1_ttl_base", float(self.l1_ttl_base), 0.1, 60.0)
+        _ensure_range("fibonacci.l2_ttl_base", float(self.l2_ttl_base), 1.0, 3600.0)
+        _ensure_range("fibonacci.max_interval_s", float(self.max_interval_s), 60.0, 3600.0)
+        if self.trust_growth is not None:
+            _ensure_range("fibonacci.trust_growth", float(self.trust_growth), 1.0, 2.0)
+        if self.trust_shrink is not None:
+            _ensure_range("fibonacci.trust_shrink", float(self.trust_shrink), 0.5, 1.0)
+        if self.search_method not in {"fibonacci", "golden"}:
+            raise ConfigValidationError("fibonacci.search_method must be 'fibonacci' or 'golden'")
+
+
+@dataclass
+class ThresholdsConfig(ConfigBase):
+    tau_caos: float = 0.7
+    beta_min: float = 0.02
+
+    def validate(self) -> None:
+        _ensure_probability("thresholds.tau_caos", self.tau_caos)
+        _ensure_range("thresholds.beta_min", self.beta_min, 0.0, 0.1)
+
+
+@dataclass
+class EvolutionConfig(ConfigBase):
+    alpha_0: float = 0.1
+    seed: Optional[int] = None
+
+    def validate(self) -> None:
+        _ensure_range("evolution.alpha_0", float(self.alpha_0), 0.01, 1.0)
+        if self.seed is not None and not isinstance(self.seed, int):
+            raise ConfigValidationError("evolution.seed must be an integer or None")
+
+
+@dataclass
+class PeninConfig(ConfigBase):
+    ethics: EthicsConfig = field(default_factory=EthicsConfig)
+    iric: IRICConfig = field(default_factory=IRICConfig)
+    caos_plus: CAOSPlusConfig = field(default_factory=CAOSPlusConfig)
+    sr_omega: SROmegaConfig = field(default_factory=SROmegaConfig)
+    omega_sigma: OmegaSigmaConfig = field(default_factory=OmegaSigmaConfig)
+    oci: OCIConfig = field(default_factory=OCIConfig)
+    linf_placar: LInfPlacarConfig = field(default_factory=LInfPlacarConfig)
+    fibonacci: FibonacciConfig = field(default_factory=FibonacciConfig)
+    thresholds: ThresholdsConfig = field(default_factory=ThresholdsConfig)
+    evolution: EvolutionConfig = field(default_factory=EvolutionConfig)
+
+    def validate(self) -> None:
+        # Nested dataclasses validate themselves during initialization
+        pass
+
 
 # Optional dependencies
 try:
@@ -82,120 +363,6 @@ try:
 except ImportError:
     HAS_PSUTIL = False
     print("WARNING: psutil not found. System will assume HIGH resource usage (fail-closed).")
-
-# -----------------------------------------------------------------------------
-# Configuration Models (Pydantic)
-# -----------------------------------------------------------------------------
-class EthicsConfig(BaseModel):
-    ece_max: float = Field(0.01, ge=0, le=1, description="Maximum ECE threshold")
-    rho_bias_max: float = Field(1.05, ge=1, le=2, description="Maximum bias threshold")
-    consent_required: bool = Field(True, description="Require consent")
-    eco_ok_required: bool = Field(True, description="Require eco compliance")
-
-class IRICConfig(BaseModel):
-    rho_max: float = Field(0.95, ge=0, le=1, description="Maximum risk threshold")
-    contraction_factor: float = Field(0.98, ge=0.5, le=1, description="Risk contraction factor")
-
-class CAOSPlusConfig(BaseModel):
-    kappa: float = Field(2.0, ge=0, le=10, description="CAOS amplification factor")
-    pmin: float = Field(0.05, ge=0, le=1, description="Minimum power")
-    pmax: float = Field(2.0, ge=1, le=10, description="Maximum power")
-    chaos_probability: float = Field(0.01, ge=0, le=0.1, description="Chaos injection probability")
-    max_boost: float = Field(0.05, ge=0, le=0.1, description="Maximum Fibonacci boost (5%)")
-    ewma_alpha: float = Field(0.2, ge=0.1, le=0.5, description="EWMA smoothing factor")
-    min_stability_cycles: int = Field(5, ge=3, le=20, description="Minimum cycles for stability")
-
-class SRWeights(BaseModel):
-    C: float = Field(0.2, ge=0, le=1)
-    E: float = Field(0.4, ge=0, le=1)
-    M: float = Field(0.3, ge=0, le=1)
-    A: float = Field(0.1, ge=0, le=1)
-    
-    @validator('A')
-    def weights_sum_to_one(cls, v, values):
-        total = v + values.get('C', 0) + values.get('E', 0) + values.get('M', 0)
-        if abs(total - 1.0) > 0.01:
-            raise ValueError(f"SR weights must sum to 1.0, got {total}")
-        return v
-
-class SROmegaConfig(BaseModel):
-    weights: SRWeights = Field(default_factory=SRWeights)
-    tau_sr: float = Field(0.8, ge=0, le=1, description="SR gate threshold")
-
-class OmegaSigmaConfig(BaseModel):
-    weights: List[float] = Field(default_factory=lambda: [1.0/8]*8)
-    tau_g: float = Field(0.7, ge=0, le=1, description="Global coherence threshold")
-    
-    @validator('weights')
-    def weights_valid(cls, v):
-        if len(v) != 8:
-            raise ValueError("Must have exactly 8 weights")
-        if abs(sum(v) - 1.0) > 0.01:
-            raise ValueError(f"Weights must sum to 1.0, got {sum(v)}")
-        return v
-
-class OCIConfig(BaseModel):
-    weights: List[float] = Field(default_factory=lambda: [0.25]*4)
-    tau_oci: float = Field(0.9, ge=0, le=1, description="OCI gate threshold")
-    
-    @validator('weights')
-    def weights_valid(cls, v):
-        if len(v) != 4:
-            raise ValueError("Must have exactly 4 weights")
-        if abs(sum(v) - 1.0) > 0.01:
-            raise ValueError(f"Weights must sum to 1.0, got {sum(v)}")
-        return v
-
-class LInfWeights(BaseModel):
-    rsi: float = Field(0.2, ge=0, le=1)
-    synergy: float = Field(0.2, ge=0, le=1)
-    novelty: float = Field(0.2, ge=0, le=1)
-    stability: float = Field(0.2, ge=0, le=1)
-    viability: float = Field(0.15, ge=0, le=1)
-    cost: float = Field(0.05, ge=0, le=1)
-    
-    @validator('cost')
-    def weights_sum_to_one(cls, v, values):
-        total = v + sum(values.get(k, 0) for k in ['rsi', 'synergy', 'novelty', 'stability', 'viability'])
-        if abs(total - 1.0) > 0.01:
-            raise ValueError(f"L∞ weights must sum to 1.0, got {total}")
-        return v
-
-class LInfPlacarConfig(BaseModel):
-    weights: LInfWeights = Field(default_factory=LInfWeights)
-    lambda_c: float = Field(0.1, ge=0, le=1, description="Cost penalty factor")
-
-class FibonacciConfig(BaseModel):
-    enabled: bool = Field(False, description="Enable Fibonacci features")
-    cache: bool = Field(True, description="Apply Fibonacci to cache TTLs")
-    trust_region: bool = Field(True, description="Apply Fibonacci to trust region")
-    l1_ttl_base: float = Field(1.0, ge=0.1, le=60)
-    l2_ttl_base: float = Field(60.0, ge=1, le=3600)
-    max_interval_s: float = Field(300.0, ge=60, le=3600)
-    trust_growth: Optional[float] = Field(None, ge=1, le=2)
-    trust_shrink: Optional[float] = Field(None, ge=0.5, le=1)
-    search_method: str = Field("fibonacci", pattern="^(fibonacci|golden)$")
-
-class ThresholdsConfig(BaseModel):
-    tau_caos: float = Field(0.7, ge=0, le=1, description="CAOS gate threshold")
-    beta_min: float = Field(0.02, ge=0, le=0.1, description="Minimum ΔL∞ for promotion")
-
-class EvolutionConfig(BaseModel):
-    alpha_0: float = Field(0.1, ge=0.01, le=1, description="Base learning rate")
-    seed: Optional[int] = Field(None, description="Random seed for determinism")
-
-class PeninConfig(BaseModel):
-    """Main configuration with validation"""
-    ethics: EthicsConfig = Field(default_factory=EthicsConfig)
-    iric: IRICConfig = Field(default_factory=IRICConfig)
-    caos_plus: CAOSPlusConfig = Field(default_factory=CAOSPlusConfig)
-    sr_omega: SROmegaConfig = Field(default_factory=SROmegaConfig)
-    omega_sigma: OmegaSigmaConfig = Field(default_factory=OmegaSigmaConfig)
-    oci: OCIConfig = Field(default_factory=OCIConfig)
-    linf_placar: LInfPlacarConfig = Field(default_factory=LInfPlacarConfig)
-    fibonacci: FibonacciConfig = Field(default_factory=FibonacciConfig)
-    thresholds: ThresholdsConfig = Field(default_factory=ThresholdsConfig)
-    evolution: EvolutionConfig = Field(default_factory=EvolutionConfig)
 
 # -----------------------------------------------------------------------------
 # Event Types
@@ -967,7 +1134,7 @@ class CAOSPlusEngine:
 
 class SREngine:
     def __init__(self, cfg: SROmegaConfig):
-        self.weights = cfg.weights.dict()
+        self.weights = cfg.weights.to_dict()
         self.tau = cfg.tau_sr
         
     def compute(self, xt: OmegaMEState) -> float:
@@ -1031,7 +1198,7 @@ class OCIEngine:
 
 class LInfinityScore:
     def __init__(self, cfg: LInfPlacarConfig):
-        self.weights = cfg.weights.dict()
+        self.weights = cfg.weights.to_dict()
         self.lambda_c = cfg.lambda_c
         
     def compute(self, xt: OmegaMEState) -> float:
@@ -1116,10 +1283,10 @@ class FibonacciManager:
 # -----------------------------------------------------------------------------
 class PeninOmegaCore:
     def __init__(self, config: Optional[Dict[str, Any]] = None):
-        # Validate config with Pydantic
+        # Validate configuration input
         try:
-            self.cfg = PeninConfig(**config) if config else PeninConfig()
-        except ValidationError as e:
+            self.cfg = PeninConfig.from_dict(config) if config else PeninConfig()
+        except ConfigValidationError as e:
             log.error(f"Configuration validation failed: {e}")
             raise SystemExit(f"Invalid configuration: {e}")
             
@@ -1129,7 +1296,7 @@ class PeninOmegaCore:
         
         # Compute config hash for attestation
         self.config_hash = hashlib.sha256(
-            json.dumps(self.cfg.dict(), sort_keys=True).encode()
+            json.dumps(self.cfg.to_dict(), sort_keys=True).encode()
         ).hexdigest()[:16]
         
         self.worm = WORMLedger()
@@ -1392,7 +1559,7 @@ class PeninOmegaCore:
                 "ts": datetime.now(timezone.utc).isoformat(), 
                 "state": self.xt.to_dict(), 
                 "metrics": self.metrics, 
-                "config": self.cfg.dict(),
+                "config": self.cfg.to_dict(),
                 "seed": self.rng.seed,
                 "rng_state": self.rng.get_state()
             }, f, indent=2, ensure_ascii=False)
