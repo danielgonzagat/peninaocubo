@@ -1,16 +1,20 @@
-import time
 import asyncio
+import time
 from typing import List, Optional
-from google import genai
-from .base import BaseProvider, LLMResponse, Message, Tool
+
+import google.generativeai as genai
+
 from penin.config import settings
+
+from .base import BaseProvider, LLMResponse, Message, Tool
 
 
 class GeminiProvider(BaseProvider):
     def __init__(self, model: Optional[str] = None):
         self.name = "gemini"
         self.model = model or settings.GEMINI_MODEL
-        self.client = genai.Client()
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        self.client = genai.GenerativeModel(self.model)
 
     async def chat(
         self,
@@ -20,20 +24,32 @@ class GeminiProvider(BaseProvider):
         temperature: float = 0.7,
     ) -> LLMResponse:
         start = time.time()
-        # Convert messages to Gemini format
-        content_parts = []
+        content_parts: List[str] = []
         if system:
             content_parts.append(f"System: {system}")
         for msg in messages:
-            if msg.get("role") == "user":
-                content_parts.append(f"User: {msg.get('content', '')}")
-        
-        full_content = "\n".join(content_parts)
-        resp = await asyncio.to_thread(
-            self.client.models.generate_content, 
-            model=self.model, 
-            contents=[{"parts": [{"text": full_content}]}]
-        )
-        text = resp.text if hasattr(resp, 'text') else ""
+            role = msg.get("role", "user").capitalize()
+            content_parts.append(f"{role}: {msg.get('content', '')}")
+
+        prompt = "\n".join(content_parts)
+
+        def _generate():
+            return self.client.generate_content(
+                prompt,
+                generation_config={"temperature": temperature},
+            )
+
+        resp = await asyncio.to_thread(_generate)
+        text = getattr(resp, "text", "") or ""
+        usage = getattr(resp, "usage_metadata", None)
+        tokens_in = getattr(usage, "prompt_token_count", 0) if usage else 0
+        tokens_out = getattr(usage, "candidates_token_count", 0) if usage else 0
         end = time.time()
-        return LLMResponse(content=text, model=self.model, provider=self.name, latency_s=end - start)
+        return LLMResponse(
+            content=text,
+            model=self.model,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            provider=self.name,
+            latency_s=end - start,
+        )

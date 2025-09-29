@@ -86,6 +86,7 @@ except ImportError:
 # -----------------------------------------------------------------------------
 # Optional Multi-API Orchestrator (penin package)
 # -----------------------------------------------------------------------------
+HAS_PENIN = False
 try:
     from penin.config import settings as PENIN_SETTINGS
     from penin.router import MultiLLMRouter
@@ -96,6 +97,7 @@ try:
     from penin.providers.anthropic_provider import AnthropicProvider
     from penin.providers.grok_provider import GrokProvider
     from penin.tools.schemas import KAGGLE_SEARCH_TOOL, HF_SEARCH_TOOL
+    HAS_PENIN = True
 except ImportError as e:
     HAS_PENIN = False
     print(f"INFO: penin package not available: {e}")
