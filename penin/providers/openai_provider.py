@@ -23,13 +23,13 @@ class OpenAIProvider(BaseProvider):
         msgs = []
         if system:
             msgs.append({"role": "system", "content": system})
-        msgs += messages
         resp = await asyncio.to_thread(
             self.client.chat.completions.create,
             model=self.model,
             messages=msgs,
-            tools=tools or [],
+            tools=tools,
             temperature=temperature,
+        )
         )
         content = resp.choices[0].message.content if resp.choices and resp.choices[0].message else ""
         usage = getattr(resp, "usage", {}) or {}
