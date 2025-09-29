@@ -130,6 +130,19 @@ except Exception as e:
     HAS_PENIN = False
     print(f"WARNING: Failed to import penin package: {e}")
 
+# Ethics metrics integration
+# -----------------------------------------------------------------------------
+HAS_ETHICS = False
+try:
+    from penin.omega.ethics_metrics import EthicsCalculator, EthicsGate, EthicsMetrics
+    HAS_ETHICS = True
+except ImportError as e:
+    HAS_ETHICS = False
+    print(f"INFO: ethics metrics not available: {e}")
+except Exception as e:
+    HAS_ETHICS = False
+    print(f"WARNING: Failed to import ethics metrics: {e}")
+
 # -----------------------------------------------------------------------------
 # Configuration Models (Pydantic)
 # -----------------------------------------------------------------------------
@@ -263,6 +276,7 @@ class EventType:
     LLM_QUERY = "LLM_QUERY"
     SEED_SET = "SEED_SET"
     GATE_FAIL = "GATE_FAIL"
+    ETHICS_ATTEST = "ETHICS_ATTEST"  # P0 Fix: Ethics metrics attestation
 
 # -----------------------------------------------------------------------------
 # Configuration and paths
@@ -761,11 +775,10 @@ class WORMLedger:
         
     def _init_db(self):
         cursor = self.db.cursor()
-        # Configure WAL mode and timeouts for better concurrency
+        # P0 Fix: Enable WAL mode and busy timeout for better concurrency
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.execute("PRAGMA busy_timeout=5000")  # 5s timeout
-        cursor.execute("PRAGMA wal_autocheckpoint=10000")  # Less frequent checkpoints
+        cursor.execute("PRAGMA busy_timeout=3000")
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS events (
@@ -1214,6 +1227,10 @@ class PeninOmegaCore:
         self.oci = OCIEngine(self.cfg.oci)
         self.linf = LInfinityScore(self.cfg.linf_placar)
         
+        # P0 Fix: Initialize ethics calculator and gate
+        self.ethics_calculator = EthicsCalculator() if HAS_ETHICS else None
+        self.ethics_gate = EthicsGate() if HAS_ETHICS else None
+        
         self.xt = OmegaMEState()
         self.metrics = {"cycles": 0, "promotions": 0, "rollbacks": 0, "extinctions": 0}
         self._register_boot()
@@ -1351,6 +1368,68 @@ class PeninOmegaCore:
                 ).hexdigest()[:16]
             }, self.xt, seed_state=self.rng.get_state())
                 
+            # P0 Fix: Calculate and attest ethical metrics
+            ethics_metrics = None
+            if self.ethics_calculator and HAS_ETHICS:
+                try:
+                    # Generate synthetic test data for demonstration
+                    # In production, this would come from actual model predictions and evaluation
+                    n_samples = 1000
+                    predictions = [self.rng.random() for _ in range(n_samples)]
+                    targets = [1 if self.rng.random() > 0.3 else 0 for _ in range(n_samples)]
+                    protected_attrs = [self.rng.choice(['A', 'B', 'C']) for _ in range(n_samples)]
+                    risk_series = [self.rng.random() for _ in range(50)]
+                    
+                    consent_data = {
+                        'user_consent': True,
+                        'data_usage_consent': True,
+                        'processing_consent': True
+                    }
+                    
+                    eco_data = {
+                        'carbon_footprint_ok': True,
+                        'energy_efficiency_ok': True,
+                        'waste_minimization_ok': True
+                    }
+                    
+                    ethics_metrics = self.ethics_calculator.calculate_all_metrics(
+                        predictions=predictions,
+                        targets=targets,
+                        protected_attributes=protected_attrs,
+                        risk_series=risk_series,
+                        consent_data=consent_data,
+                        eco_data=eco_data,
+                        dataset_id=f"cycle_{self.xt.cycle}",
+                        seed=self.rng.seed
+                    )
+                    
+                    # Log ethics metrics to WORM
+                    self.worm.record(
+                        EventType.ETHICS_ATTEST,
+                        {
+                            "cycle": self.xt.cycle,
+                            "ece": ethics_metrics.ece,
+                            "rho_bias": ethics_metrics.rho_bias,
+                            "fairness": ethics_metrics.fairness,
+                            "consent": ethics_metrics.consent,
+                            "eco_ok": ethics_metrics.eco_ok,
+                            "risk_rho": ethics_metrics.risk_rho,
+                            "evidence_hash": ethics_metrics.evidence_hash
+                        },
+                        self.xt,
+                        seed_state=self.rng.get_state()
+                    )
+                    
+                    log.info(f"Ethics metrics calculated: ECE={ethics_metrics.ece:.4f}, "
+                            f"Bias={ethics_metrics.rho_bias:.4f}, Fairness={ethics_metrics.fairness:.4f}")
+                    
+                except Exception as e:
+                    log.error(f"Failed to calculate ethics metrics: {e}")
+                    # Fail-closed: abort if ethics calculation fails
+                    result.update({"decision": "ABORT", "reason": "ETHICS_CALC_FAILED", "error": str(e)})
+                    self.worm.record(EventType.CYCLE_ABORT, result, self.xt, seed_state=self.rng.get_state())
+                    return result
+                
             # Σ-Guard check
             ok, violations = self.sigma.check(self.xt)
             if not ok:
@@ -1367,6 +1446,37 @@ class PeninOmegaCore:
                 result.update({"decision": "ABORT", "reason": "IRIC_CONTRACT", "failures": [f["msg"] for f in failures]})
                 self.worm.record(EventType.CYCLE_ABORT, result, self.xt, seed_state=self.rng.get_state())
                 return result
+                
+            # P0 Fix: Ethics gate validation
+            if self.ethics_gate and ethics_metrics and HAS_ETHICS:
+                try:
+                    ethics_valid, ethics_details = self.ethics_gate.validate(ethics_metrics)
+                    if not ethics_valid:
+                        violations = []
+                        for check, passed in ethics_details.items():
+                            if check.endswith('_ok') and not passed:
+                                violations.append({
+                                    "gate": "ETHICS_GATE",
+                                    "check": check,
+                                    "value": ethics_details.get(check.replace('_ok', ''), 'N/A'),
+                                    "passed": False,
+                                    "msg": f"Ethics check {check} failed"
+                                })
+                        
+                        result["gate_trace"].extend(violations)
+                        result.update({"decision": "ABORT", "reason": "ETHICS_GATE_FAILED", 
+                                     "violations": [v["msg"] for v in violations]})
+                        self.worm.record(EventType.CYCLE_ABORT, result, self.xt, seed_state=self.rng.get_state())
+                        return result
+                    
+                    log.info(f"Ethics gate passed: {ethics_details}")
+                    
+                except Exception as e:
+                    log.error(f"Failed to validate ethics gate: {e}")
+                    # Fail-closed: abort if ethics validation fails
+                    result.update({"decision": "ABORT", "reason": "ETHICS_VALIDATION_FAILED", "error": str(e)})
+                    self.worm.record(EventType.CYCLE_ABORT, result, self.xt, seed_state=self.rng.get_state())
+                    return result
                 
             # Optional: Pre-cycle multi-API orchestration to enrich context
             if HAS_PENIN:

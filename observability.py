@@ -33,8 +33,24 @@ try:
     HAS_PROMETHEUS = True
 except ImportError:
     HAS_PROMETHEUS = False
-    # Mock types for when prometheus_client is not available
-    CollectorRegistry = type('CollectorRegistry', (), {})
+    # Create dummy classes for when prometheus_client is not available
+    class Counter:
+        def __init__(self, *args, **kwargs): pass
+        def labels(self, **kwargs): return self
+        def inc(self, amount=1): pass
+    class Gauge:
+        def __init__(self, *args, **kwargs): pass
+        def set(self, value): pass
+    class Histogram:
+        def __init__(self, *args, **kwargs): pass
+        def observe(self, value): pass
+    class Summary:
+        def __init__(self, *args, **kwargs): pass
+        def observe(self, value): pass
+    class CollectorRegistry:
+        def __init__(self): pass
+    def generate_latest(registry): return b""
+    CONTENT_TYPE_LATEST = "text/plain"
     print("WARNING: prometheus_client not installed. Metrics export disabled.")
 
 try:
@@ -401,6 +417,7 @@ class MetricsServer:
             def log_message(self, format, *args):
                 pass  # Suppress request logs
         
+        # P0 Fix: Bind to localhost only for security
         self.server = HTTPServer(('127.0.0.1', self.port), MetricsHandler)
         self.thread = threading.Thread(target=self.server.serve_forever)
         self.thread.daemon = True
