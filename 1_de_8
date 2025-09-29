@@ -1,32 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Compatibility wrapper for the renamed PENIN-Ω core module.
-
-This module was previously known as ``1_de_8`` and was renamed to
-:mod:`penin_omega_1_core`.  It is kept to ease migrations for users that still
-import the legacy name or execute ``python3 1_de_8`` directly.
-
-The module re-exports the public API from :mod:`penin_omega_1_core` and emits a
-``DeprecationWarning`` so callers can update their references.
-"""
+"""Compatibility wrapper for the renamed PENIN-Ω core module."""
 from __future__ import annotations
 
-import importlib
 import runpy
 import warnings
 
-_impl = importlib.import_module("penin_omega_1_core")
+try:
+    from penin_omega_1_core import *  # type: ignore
+except ImportError as exc:  # pragma: no cover - surfaced at import time
+    raise ImportError("Failed to import penin_omega_1_core") from exc
 
-_names = getattr(_impl, "__all__", None)
-if _names is None:
-    _names = [name for name in dir(_impl) if not name.startswith("_")]
+try:
+    from penin_omega_1_core import __all__ as __all__  # type: ignore
+except ImportError:
+    import penin_omega_1_core as _impl
 
-__all__ = list(_names)
-globals().update({name: getattr(_impl, name) for name in __all__})
+    __all__ = tuple(name for name in vars(_impl) if not name.startswith("_"))
+    del _impl
 
 warnings.warn(
-    "Module '1_de_8' has been renamed to 'penin_omega_1_core'. "
-    "Please update your imports.",
+    "Module '1_de_8' has been renamed to 'penin_omega_1_core'. Please update your imports.",
     DeprecationWarning,
     stacklevel=2,
 )
