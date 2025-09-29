@@ -148,8 +148,8 @@ class SRWeights(BaseModel):
     
     @field_validator('A')
     def weights_sum_to_one(cls, v, info: ValidationInfo):
-        \"\"\"Pydantic v2: usa info.data para ler C,E,M já validados e garantir C+E+M+A=1.0.\"\"\"
-        data = dict(info.data) if getattr(info, 'data', None) is not None else {}
+        """Pydantic v2: usa info.data para ler C,E,M já validados e garantir C+E+M+A=1.0."""
+        data = dict(getattr(info, 'data', {})) if getattr(info, 'data', None) is not None else {}
         total = float(data.get('C', 0.0)) + float(data.get('E', 0.0)) + float(data.get('M', 0.0)) + float(v)
         if abs(total - 1.0) > 1e-9:
             raise ValueError('SR weights must sum to 1.0 (C+E+M+A).')
