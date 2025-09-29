@@ -1,0 +1,32 @@
+# Core dependencies (REQUIRED)
+pydantic>=2.0.0      # Configuration validation (P0 requirement)
+psutil>=5.9.0        # Resource monitoring (P0 requirement - fail-closed)
+
+# Optional but recommended
+numpy>=1.24.0        # Numerical operations
+redis>=4.5.0         # L3 cache support
+torch>=2.0.0         # LLM support
+transformers>=4.30.0 # LLM models
+
+# P1 dependencies (observability)
+prometheus-client>=0.16.0  # Metrics export
+structlog>=23.1.0         # Structured logging
+python-json-logger>=2.0.7 # JSON logging
+
+# P2 dependencies (policies and bridge)
+opa-python-client>=1.3.0  # OPA integration
+httpx>=0.24.0            # HTTP client for APIs
+tenacity>=8.2.0          # Retry logic
+cachetools>=5.3.0        # Advanced caching
+
+# Development and testing
+pytest>=7.3.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+black>=23.0.0
+mypy>=1.3.0
+ruff>=0.0.270
+
+# Documentation
+mkdocs>=1.4.0
+mkdocs-material>=9.1.0
