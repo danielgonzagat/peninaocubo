@@ -3,6 +3,8 @@ import re
 from typing import Any, Dict
 
 
+# Allow common dataset queries that include spaces, slashes, commas, periods and dashes
+# while continuing to block attempts to traverse directories (".." sequences).
 SAFE_QUERY_PATTERN = re.compile(r"^(?!.*\.\.)[a-zA-Z0-9\s./,-]+$")
 
 
