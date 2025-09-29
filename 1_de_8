@@ -155,9 +155,13 @@ def _hash_obj(obj: Any) -> str:
         return hashlib.sha256(str(obj).encode()).hexdigest()
 
 def _sigmoid(x: float, beta: float, mid: float) -> float:
+def _sigmoid(x: float, beta: float, mid: float) -> float:
+    if beta == 0.0:
+        return 0.5  # Neutral value when beta is zero
     try:
         return 1.0 / (1.0 + math.exp(-beta * (x - mid)))
     except OverflowError:
+        return 0.0 if (-beta * (x - mid)) > 0 else 1.0
         return 0.0 if (-beta * (x - mid)) > 0 else 1.0
 
 # -----------------------------------------------------------------------------
