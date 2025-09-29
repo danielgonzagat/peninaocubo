@@ -81,37 +81,9 @@ class MultiLLMRouter:
         
         # Latency: inverse latency (faster is better)
         lat = max(0.01, r.latency_s)
-        latency_score = 1.0 / lat
-        # Normalize to [0,1] assuming max 10s latency
-        latency_score = min(1.0, latency_score / (1.0 / 0.1))
-        
-        # Cost: lower is better
-        # Normalize assuming max $0.10 per request
-        cost_score = max(0.0, 1.0 - (r.cost_usd / 0.10))
-        
-        # Weighted combination
-        score = (
-            self.quality_weight * quality
-            + self.latency_weight * latency_score
-            + self.cost_weight * cost_score
-        )
-        
-        return score
-    
-    def _check_budget(self, estimated_cost: float = 0.01) -> bool:
-        """
-        Check if we have budget remaining for this request.
-        
-        P0-4: Fail-closed budget enforcement.
-        """
-        self._reset_daily_budget_if_needed()
-        return (self._daily_spend + estimated_cost) <= self.daily_budget_usd
-    
-    def _record_spend(self, response: LLMResponse):
-        """Record spending from response"""
-        self._daily_spend += response.cost_usd
-        self._total_tokens += response.tokens_in + response.tokens_out
-        self._request_count += 1
+        # Penalize higher cost; small epsilon to avoid div by zero
+        cost_penalty = 1.0 / (1.0 + max(0.0, r.cost_usd))
+        return base + (1.0 / lat) * cost_penalty
 
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=0.5))
     async def ask(

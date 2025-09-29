@@ -761,12 +761,13 @@ class WORMLedger:
         
     def _init_db(self):
         cursor = self.db.cursor()
-        
-        # Enable WAL mode and busy timeout for better concurrency
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.execute("PRAGMA busy_timeout=3000")
-        
+        # Enable WAL mode and set busy timeout for better concurrency
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA busy_timeout=3000")
+        except Exception:
+            pass
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS events (
@@ -1417,7 +1418,18 @@ class PeninOmegaCore:
             l_score = self.linf.compute(self.xt)
             result["metrics"]["L∞"] = l_score
             result["metrics"]["ΔL∞"] = self.xt.delta_linf
-            
+            # Optional informational score gate from penin.omega.scoring (does not affect decision yet)
+            import importlib.util as _il
+            if _il.find_spec("penin.omega.scoring") is not None:
+                from penin.omega.scoring import score_gate
+                u = max(0.0, min(1.0, self.xt.rsi))
+                s = max(0.0, min(1.0, 1.0 - self.xt.ece))
+                c = max(0.0, min(1.0, self.xt.cost))
+                l = max(0.0, min(1.0, self.xt.novelty))
+                verdict, score = score_gate(u, s, c, l, {"U": 0.35, "S": 0.35, "C": 0.2, "L": 0.1}, tau=0.6)
+                result["metrics"]["USCL_score"] = score
+                result["metrics"]["USCL_verdict"] = verdict
+
             caos_val = self.caos.compute(self.xt)
             result["metrics"]["CAOS⁺"] = caos_val
             result["metrics"]["harmony"] = self.xt.caos_harmony
