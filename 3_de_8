@@ -130,23 +130,73 @@ except ImportError:
                 return event_id
 
     class LLMBridge:
+        def __init__(self):
+            # Lazy init of multi-API router; fallback to local mock if imports/keys missing
+            self._router = None
+            try:
+                from penin.config import settings as _settings
+                from penin.router import MultiLLMRouter
+                from penin.providers.openai_provider import OpenAIProvider
+                from penin.providers.deepseek_provider import DeepSeekProvider
+                from penin.providers.mistral_provider import MistralProvider
+                from penin.providers.gemini_provider import GeminiProvider
+                from penin.providers.anthropic_provider import AnthropicProvider
+                from penin.providers.grok_provider import GrokProvider
+
+                providers = []
+                if _settings.OPENAI_API_KEY:
+                    providers.append(OpenAIProvider())
+                if _settings.DEEPSEEK_API_KEY:
+                    providers.append(DeepSeekProvider())
+                if _settings.MISTRAL_API_KEY:
+                    providers.append(MistralProvider())
+                if _settings.GEMINI_API_KEY:
+                    providers.append(GeminiProvider())
+                if _settings.ANTHROPIC_API_KEY:
+                    providers.append(AnthropicProvider())
+                if _settings.XAI_API_KEY:
+                    providers.append(GrokProvider())
+
+                if providers:
+                    self._router = MultiLLMRouter(providers)
+            except Exception:
+                self._router = None
+
         async def call_best(self, prompt: str, system_prompt: str = "", **kwargs):
+            if self._router is not None:
+                try:
+                    r = await self._router.ask(
+                        messages=[{"role": "user", "content": prompt}],
+                        system=system_prompt or "Você é um assistente técnico. Responda de forma concisa.",
+                        tools=None,
+                        temperature=float(kwargs.get("temperature", 0.3)),
+                    )
+
+                    class Resp:
+                        status = "COMPLETED"
+                        content = r.content
+                        latency = r.latency_s
+
+                    return Resp(), r.provider
+                except Exception:
+                    pass
+
             class MockResponse:
                 status = "COMPLETED"
                 content = f"Resposta simulada para: {prompt[:100]}..."
                 latency = 0.1
             return MockResponse(), "local"
-        
+
         async def call_many(self, prompt: str, providers: List[str], **kwargs):
+            # Fan-out best-effort using single best call (router already parallelizes)
             responses = {}
-            for p in providers[:2]:
-                resp, _ = await self.call_best(prompt, **kwargs)
-                responses[p] = resp
+            resp, prov = await self.call_best(prompt, **kwargs)
+            responses[prov] = resp
             return responses
-        
+
         async def ensemble(self, responses: Dict[str, Any], **kwargs) -> str:
-            contents = [r.content for r in responses.values() if hasattr(r, 'content')]
-            return "\n".join(contents[:3]) if contents else "Fusão falhou."
+            contents = [getattr(r, "content", "") for r in responses.values()]
+            return "\n".join([c for c in contents if c][:3]) if contents else "Fusão falhou."
 
     class MultiLevelCache:
         def __init__(self, **kwargs):

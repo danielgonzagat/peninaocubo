@@ -1521,7 +1521,51 @@ class LLMEvolutionInterface:
     def __init__(self, core: PeninOmegaCore):
         self.core = core
         self.llm = LocalLLMProvider()
+        # Optional Multi-API router (falls back to local if unavailable)
+        self._router = None
+        try:
+            from penin.router import MultiLLMRouter
+            from penin.config import settings as _settings
+            from penin.providers.openai_provider import OpenAIProvider
+            from penin.providers.deepseek_provider import DeepSeekProvider
+            from penin.providers.mistral_provider import MistralProvider
+            from penin.providers.gemini_provider import GeminiProvider
+            from penin.providers.anthropic_provider import AnthropicProvider
+            from penin.providers.grok_provider import GrokProvider
+
+            providers = []
+            if getattr(_settings, 'OPENAI_API_KEY', None):
+                providers.append(OpenAIProvider())
+            if getattr(_settings, 'DEEPSEEK_API_KEY', None):
+                providers.append(DeepSeekProvider())
+            if getattr(_settings, 'MISTRAL_API_KEY', None):
+                providers.append(MistralProvider())
+            if getattr(_settings, 'GEMINI_API_KEY', None):
+                providers.append(GeminiProvider())
+            if getattr(_settings, 'ANTHROPIC_API_KEY', None):
+                providers.append(AnthropicProvider())
+            if getattr(_settings, 'XAI_API_KEY', None):
+                providers.append(GrokProvider())
+            if providers:
+                self._router = MultiLLMRouter(providers)
+        except Exception:
+            self._router = None
     async def query_llm(self, prompt: str, **kw) -> str:
+        # Prefer multi-API router if available
+        if self._router is not None:
+            try:
+                r = await self._router.ask(
+                    messages=[{"role": "user", "content": prompt}],
+                    system=kw.get("system_prompt") or "Você é um orquestrador técnico. Responda breve.",
+                    tools=None,
+                    temperature=float(kw.get("temperature", 0.3))
+                )
+                content = r.content or ""
+                self.core.worm.record("LLM_QUERY", {"provider": r.provider, "model": r.model, "latency_s": r.latency_s, "prompt_len": len(prompt), "resp_len": len(content)}, self.core.xt)
+                return content
+            except Exception:
+                pass
+        # Fallback local model
         resp = self.llm.generate(prompt, **kw)
         self.core.worm.record("LLM_QUERY", {"prompt_len": len(prompt), "resp_len": len(resp)}, self.core.xt)
         return resp

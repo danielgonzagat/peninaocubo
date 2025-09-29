@@ -30,3 +30,13 @@ ruff>=0.0.270
 # Documentation
 mkdocs>=1.4.0
 mkdocs-material>=9.1.0
+
+# PENIN multi-API adapters
+openai>=1.37.0
+anthropic>=0.34.0
+mistralai>=1.2.2
+google-genai>=0.3.0
+xai-sdk>=0.2.1
+huggingface_hub>=0.24.0
+kaggle>=1.6.14
+pydantic-settings>=2.4.0
