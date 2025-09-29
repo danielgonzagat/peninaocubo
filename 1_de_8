@@ -117,6 +117,12 @@ except Exception:
     HAS_PSUTIL = False
 
 # -----------------------------------------------------------------------------
+# Defaults
+# -----------------------------------------------------------------------------
+DEFAULT_FAIL_CLOSED_THRESHOLD = 0.85
+DEFAULT_RUN_SEED = 42
+
+# -----------------------------------------------------------------------------
 # Configuration and paths
 # -----------------------------------------------------------------------------
 PKG_VERSION = "6.2.0"
@@ -150,9 +156,39 @@ log = logging.getLogger("Ω-1/8")
 # -----------------------------------------------------------------------------
 def _hash_obj(obj: Any) -> str:
     try:
-        return hashlib.sha256(json.dumps(obj, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+        encoded = json.dumps(obj, sort_keys=True, ensure_ascii=False).encode()
     except Exception:
-        return hashlib.sha256(str(obj).encode()).hexdigest()
+        encoded = str(obj).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _ensure_unit_fraction(value: Any, name: str, *, zero_allowed: bool = False) -> float:
+    """Validate that a value is within the unit interval."""
+
+    if isinstance(value, bool):
+        raise ValueError(f"{name} must be numeric")
+    try:
+        fraction = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be a number") from exc
+
+    lower_ok = fraction >= 0.0 if zero_allowed else fraction > 0.0
+    if not (lower_ok and fraction <= 1.0):
+        bounds = "[0, 1]" if zero_allowed else "(0, 1]"
+        raise ValueError(f"{name} must be within {bounds}")
+    return fraction
+
+
+def _coerce_run_seed(value: Any) -> int:
+    if isinstance(value, bool):
+        raise ValueError("run_seed must be an integer, not boolean")
+    try:
+        seed_int = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("run_seed must be an integer") from exc
+    if seed_int < 0 or seed_int >= 2 ** 63:
+        raise ValueError("run_seed out of supported range (0 <= seed < 2**63)")
+    return seed_int
 
 def _sigmoid(x: float, beta: float, mid: float) -> float:
     if beta == 0.0:
@@ -877,41 +913,37 @@ class PeninOmegaCore:
                                "g":    {"beta": 6.0, "mid": 0.7},
                                "oci":  {"beta": 6.0, "mid": 0.9}
                            }},
-            "monitoring": {"fail_closed_threshold": 0.85},
+            "monitoring": {"fail_closed_threshold": DEFAULT_FAIL_CLOSED_THRESHOLD},
             # NOTE: run_seed enables deterministic testing but should be managed carefully in production
-            "run_seed": 42,
+            "run_seed": DEFAULT_RUN_SEED,
         }
         cfg = _deep_merge(default, custom or {})
         # Minimal validation fallback (pydantic optional)
         try:
-            if not (0.0 < cfg["ethics"]["ece_max"] <= 1.0):
-                raise ValueError("ece_max out of range")
-            if not (0.0 < cfg["iric"]["rho_max"] <= 1.0):
-                raise ValueError("rho_max out of range")
-            if not (0.0 < cfg["thresholds"]["beta_min"] <= 1.0):
-                raise ValueError("beta_min out of range")
+            cfg["ethics"]["ece_max"] = _ensure_unit_fraction(cfg["ethics"]["ece_max"], "ece_max")
+            cfg["iric"]["rho_max"] = _ensure_unit_fraction(cfg["iric"]["rho_max"], "rho_max")
+            cfg["thresholds"]["beta_min"] = _ensure_unit_fraction(cfg["thresholds"]["beta_min"], "beta_min")
             monitoring_cfg = cfg.get("monitoring", {})
             if not isinstance(monitoring_cfg, dict):
                 raise ValueError("monitoring config must be a mapping")
-            threshold = monitoring_cfg.get("fail_closed_threshold", 0.85)
-            try:
-                threshold_val = float(threshold)
-            except (TypeError, ValueError) as exc:
-                raise ValueError("fail_closed_threshold must be a number") from exc
-            if not (0.0 <= threshold_val <= 1.0):
-                raise ValueError("fail_closed_threshold must be between 0 and 1 inclusive")
-            monitoring_cfg["fail_closed_threshold"] = threshold_val
+            threshold = monitoring_cfg.get("fail_closed_threshold", DEFAULT_FAIL_CLOSED_THRESHOLD)
+            monitoring_cfg["fail_closed_threshold"] = _ensure_unit_fraction(
+                threshold,
+                "fail_closed_threshold",
+                zero_allowed=True,
+            )
             cfg["monitoring"] = monitoring_cfg
-            run_seed = cfg.get("run_seed", 42)
-            if isinstance(run_seed, bool):  # bool is subclass of int, reject explicitly
-                raise ValueError("run_seed must be an integer, not boolean")
-            run_seed_int = int(run_seed)
-            if run_seed_int < 0 or run_seed_int >= 2 ** 63:
-                raise ValueError("run_seed out of supported range (0 <= seed < 2**63)")
-            cfg["run_seed"] = run_seed_int
+            cfg["run_seed"] = _coerce_run_seed(cfg.get("run_seed", DEFAULT_RUN_SEED))
         except Exception as e:
             raise RuntimeError(f"Invalid configuration: {e}") from e
         return cfg
+    def _abort_cycle(self, result: Dict[str, Any], reason: str, details: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        payload = {"decision": "ABORT", "reason": reason}
+        if details:
+            payload.update(details)
+        result.update(payload)
+        self.worm.record("CYCLE_ABORT", result, self.xt)
+        return result
     def _register_boot(self):
         self.worm.record("BOOT", {
             "version": PKG_VERSION,
@@ -925,7 +957,7 @@ class PeninOmegaCore:
         try:
             # Secure deterministic seeding per cycle using cryptographically secure entropy
             import secrets
-            run_seed = int(self.cfg.get("run_seed", 42))
+            run_seed = int(self.cfg.get("run_seed", DEFAULT_RUN_SEED))
             cycle_entropy = secrets.randbits(64)
             seed_material = _hash_obj({"cycle": self.xt.cycle, "run_seed": run_seed, "entropy": cycle_entropy})
             seed_int = int(seed_material[:16], 16)
@@ -943,7 +975,9 @@ class PeninOmegaCore:
                 self.xt.mem = psutil.virtual_memory().percent / 100.0
             else:
                 # Fail-closed: assume high usage when psutil missing (configurable threshold)
-                fail_closed_threshold = self.cfg.get("monitoring", {}).get("fail_closed_threshold", 0.85)
+                fail_closed_threshold = self.cfg.get("monitoring", {}).get(
+                    "fail_closed_threshold", DEFAULT_FAIL_CLOSED_THRESHOLD
+                )
                 self.xt.cpu = fail_closed_threshold
                 self.xt.mem = fail_closed_threshold
                 log.warning("psutil unavailable, using fail-closed resource monitoring")
@@ -953,19 +987,13 @@ class PeninOmegaCore:
                     self.xt,
                 )
                 if fail_closed_threshold >= 0.95:
-                    result.update({"decision": "ABORT", "reason": "RESOURCE_UNVERIFIED"})
-                    self.worm.record("CYCLE_ABORT", result, self.xt)
-                    return result
+                    return self._abort_cycle(result, "RESOURCE_UNVERIFIED")
             ok, violations = self.sigma.check(self.xt)
             if not ok:
-                result.update({"decision": "ABORT", "reason": "SIGMA_GUARD", "violations": violations})
-                self.worm.record("CYCLE_ABORT", result, self.xt)
-                return result
+                return self._abort_cycle(result, "SIGMA_GUARD", {"violations": violations})
             if not self.iric.safe(self.xt):
                 self.iric.contract(self.xt)
-                result.update({"decision": "ABORT", "reason": "IRIC_CONTRACT"})
-                self.worm.record("CYCLE_ABORT", result, self.xt)
-                return result
+                return self._abort_cycle(result, "IRIC_CONTRACT")
             l_score = self.linf.compute(self.xt)
             result["metrics"]["L∞"] = l_score
             result["metrics"]["ΔL∞"] = self.xt.delta_linf
@@ -1048,9 +1076,7 @@ class PeninOmegaCore:
             self.worm.record("MASTER_EQ", {"cycle": self.xt.cycle, "metrics": result["metrics"], "step": step_opt}, self.xt)
             return result
         except Exception as e:
-            result.update({"decision": "ABORT", "error": str(e)})
-            self.worm.record("CYCLE_ABORT", result, self.xt)
-            return result
+            return self._abort_cycle(result, "EXCEPTION", {"error": str(e)})
     def _compute_alpha(self) -> float:
         e = self.cfg["evolution"]
         alpha_0 = e["alpha_0"]
