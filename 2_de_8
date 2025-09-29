@@ -2397,9 +2397,11 @@ class StrategyModuleFusion:
                 )
                 if res and res.get("content"):
                     return res["content"][:500]
-            except Exception:
-                pass  # Fallback para determinístico
-        
+            except ImportError as exc:
+                print(f"INFO: penin integration unavailable: {exc}")
+            except Exception as exc:
+                print(f"WARNING: penin orchestration failed: {exc}")
+
         # Rationale determinístico estruturado
         goal_summary = self._summarize_goals(goals)
         strategy = self._describe_strategy(goals)

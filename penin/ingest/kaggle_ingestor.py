@@ -1,13 +1,21 @@
 import asyncio
-from typing import Dict, Any
+import re
+from typing import Any, Dict
+
+
+SAFE_QUERY_PATTERN = re.compile(r"^[\w\s-]+$")
 
 
 async def kaggle_search_datasets(query: str, max_results: int = 10) -> Dict[str, Any]:
-    # Sanitize query to prevent command injection
-    import re
-    if not re.match(r'^[a-zA-Z0-9\s\-\_\.\,\(\)]+$', query):
+    if not query or not SAFE_QUERY_PATTERN.fullmatch(query):
         return {"error": "Invalid query format", "code": 1}
-    
+
+    try:
+        limit = int(max_results)
+    except (TypeError, ValueError):
+        limit = 10
+    limit = max(1, min(limit, 50))
+
     cmd = [
         "kaggle",
         "datasets",
@@ -15,6 +23,8 @@ async def kaggle_search_datasets(query: str, max_results: int = 10) -> Dict[str,
         "-s",
         query,
         "-v",
+        "--page-size",
+        str(limit),
     ]
     try:
         proc = await asyncio.create_subprocess_exec(
