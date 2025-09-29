@@ -922,10 +922,13 @@ class IRtoIC:
     def __init__(self, cfg: Dict[str, Any], use_phi: bool = False):
         self.rho_max = cfg.get("iric", {}).get("rho_max", 0.95)
         self.contraction = INV_PHI if use_phi else cfg.get("iric", {}).get("contraction_factor", 0.98)
-        # Keep executor for potential future I/O checks, but safe() will be synchronous
-        self.exec = ThreadPoolExecutor(max_workers=4)
+        # Removed ThreadPoolExecutor: checks are synchronous and cheap
     def safe(self, xt: OmegaMEState) -> bool:
-        return (xt.rho < self.rho_max) and (xt.uncertainty < 0.9) and (xt.cpu < 0.95 and xt.mem < 0.95)
+        return (
+            (xt.rho < self.rho_max)
+            and (xt.uncertainty < 0.9)
+            and (xt.cpu < 0.95 and xt.mem < 0.95)
+        )
     def contract(self, xt: OmegaMEState) -> None:
         xt.rho *= self.contraction
         xt.uncertainty *= self.contraction
@@ -1550,6 +1553,15 @@ def _hash_data(data: Any) -> str:
     else:
         data_str = str(data)
     return hashlib.sha256(data_str.encode('utf-8')).hexdigest()
+
+def _sigmoid(x: float, beta: float, mid: float) -> float:
+    """Parametric sigmoid function for alpha computation."""
+    if beta == 0.0:
+        return 0.5  # Neutral value when beta is zero
+    try:
+        return 1.0 / (1.0 + math.exp(-beta * (x - mid)))
+    except OverflowError:
+        return 0.0 if (-beta * (x - mid)) > 0 else 1.0
 
 def _deep_merge(a: Dict[str, Any], b: Dict[str, Any]) -> Dict[str, Any]:
     out = dict(a)
