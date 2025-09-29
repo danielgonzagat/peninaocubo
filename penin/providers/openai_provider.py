@@ -53,12 +53,6 @@ class OpenAIProvider(BaseProvider):
                         tool_calls.append(call.model_dump())
                 except Exception as e:
                     print(f"WARNING: Failed to serialize tool call: {e}")
-                if isinstance(call, dict):
-                    tool_calls.append(call)
-                elif hasattr(call, "to_dict"):
-                    tool_calls.append(call.to_dict())
-                elif hasattr(call, "model_dump"):
-                    tool_calls.append(call.model_dump())
 
         usage = getattr(resp, "usage", None)
         tokens_in = getattr(usage, "prompt_tokens", 0) if usage else 0
