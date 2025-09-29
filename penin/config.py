@@ -23,7 +23,6 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-1.5-pro"
     ANTHROPIC_MODEL: str = "claude-3-5-sonnet-20241022"
     GROK_MODEL: str = "grok-beta"
-    GROK_MODEL: str = "grok-4"
 
     class Config:
         env_file = ".env"
