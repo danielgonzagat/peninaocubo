@@ -23,7 +23,8 @@ class GeminiProvider(BaseProvider):
         sys_txt = f"[SYSTEM]: {system}\n" if system else ""
         user_txt = "\n".join([m["content"] for m in messages if m.get("role") == "user"])
         content = sys_txt + user_txt
-        resp = await asyncio.to_thread(self.client.models.generate_content, model=self.model, contents=content)
+        model_instance = self.client.get_model(self.model)
+        resp = await asyncio.to_thread(model_instance.generate_content, content=content)
         text = getattr(resp, "text", "")
         end = time.time()
         return LLMResponse(content=text, model=self.model, provider=self.name, latency_s=end - start)
