@@ -22,8 +22,8 @@ HF_SEARCH_TOOL = {
         "parameters": {
             "type": "object",
             "properties": {
-                "query": {"type": "string"},
-                "limit": {"type": "integer"},
+                "query": {"type": "string", "description": "search phrase"},
+                "limit": {"type": "integer", "description": "max number of results"},
             },
             "required": ["query"],
         },
