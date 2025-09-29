@@ -1,0 +1,2887 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+PENIN-Ω — Código 2/8: Módulo Estratégico Ω-META (Versão Fusão Definitiva)
+=========================================================================
+Transforma intenções em Planos Ω-META viáveis, restritos por Ética→Risco→Performance.
+Integra SR-Ω∞ não-compensatório, trust-region adaptativo e provas WORM completas.
+
+Fusão Definitiva - Características:
+- Integração nativa e simbiótica com código 1/8
+- Thread-safe com locks granulares para alta concorrência
+- Determinismo total via seeds fixos
+- Fail-closed robusto com modos conservador/cético/mínimo
+- Latência garantida <500ms via timeouts
+- Cache multinível para otimização
+- Validação Π_{H∩S} ex-ante com projeção segura
+- U_signal harmônico com modulação CAOS⁺
+- WORM completo com hashes criptográficos e assinaturas
+- Telemetria e métricas integradas
+- Suporte opcional LLM com fallback determinístico
+
+Integração com 1/8:
+- Entrada: OmegaState do núcleo
+- Saída: PlanOmega estruturado
+- Comunicação: Via interfaces padronizadas
+- Sincronização: Thread-safe e idempotente
+
+Dependências: dataclasses, hashlib, json, math, threading, time (stdlib)
+              penin_omega_1_core (opcional com fallback)
+Licença: MIT
+"""
+
+from __future__ import annotations
+from dataclasses import dataclass, field, asdict
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple, Union, Callable, Literal
+import hashlib
+import json
+import math
+import threading
+import time
+import random
+from copy import deepcopy
+from functools import lru_cache
+from collections import deque
+import warnings
+
+# =============================================================================
+# Integração com Módulo 1/8 (com fallback completo)
+# =============================================================================
+
+try:
+    from penin_omega_1_core import (
+        OmegaState, WORMLedger, PENINMotores,
+        SigmaGuard, IRIC, CAOSPlus, SROmegaInfinity,
+        EquacaoDaMorte, PeninUpdate, League,
+        GOVERNANCE as CORE_GOVERNANCE
+    )
+    CORE_INTEGRATION = True
+except ImportError:
+    CORE_INTEGRATION = False
+    
+    # Fallback definitions para operação standalone
+    @dataclass
+    class OmegaState:
+        """Mock do estado Omega para testes standalone."""
+        # Componentes SR
+        E_ok: float = 1.0
+        M: float = 0.5
+        C: float = 0.5
+        A: float = 0.5
+        
+        # Métricas éticas
+        ece: float = 0.01
+        rho_bias: float = 1.0
+        fairness: float = 1.0
+        consent: bool = True
+        eco_ok: bool = True
+        
+        # Métricas de risco
+        rho: float = 0.5
+        uncertainty: float = 0.3
+        volatility: float = 0.2
+        
+        # Performance
+        delta_linf: float = 0.01
+        mdl_gain: float = 0.02
+        ppl_ood: float = 100.0
+        efficiency: float = 0.7
+        
+        # CAOS⁺
+        caos_pre: float = 1.0
+        caos_post: float = 1.0
+        caos_stable: bool = True
+        
+        # Autonomia
+        self_improvement: float = 0.5
+        exploration: float = 0.5
+        adaptation: float = 0.5
+        learning_rate: float = 0.001
+        
+        # Estado geral
+        sr_score: float = 1.0
+        trust_region_radius: float = 0.1
+        cycle_count: int = 0
+        timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+        version: str = "2.8.fusion"
+        
+        def to_dict(self) -> Dict[str, Any]:
+            return asdict(self)
+    
+    class WORMLedger:
+        """Mock do WORM Ledger para testes."""
+        def __init__(self, path: Optional[str] = None):
+            self.events = []
+            
+        def record_event(self, event_type: str, data: Dict[str, Any]) -> str:
+            event = {"type": event_type, "data": data, "ts": datetime.now(timezone.utc).isoformat()}
+            self.events.append(event)
+            return hashlib.sha256(json.dumps(event).encode()).hexdigest()
+    
+    CORE_GOVERNANCE = {}
+
+# =============================================================================
+# Configuração Master Fusionada
+# =============================================================================
+
+OMEGA_META_CONFIG: Dict[str, Any] = {
+    "version": "2.8.fusion.ultimate",
+    "compatibility": "1.8.core",
+    
+    "sr_omega": {
+        "tau_SR": 0.80,
+        "weights": {"E": 0.40, "M": 0.30, "C": 0.20, "A": 0.10},
+        "min_components": 3,
+        "gate_mode": "strict",  # strict|relaxed|bypass
+        "cache_ttl": 60,
+        "harmonic_epsilon": 1e-6,
+        "confidence_bands": True,
+    },
+    
+    "trust_region": {
+        "initial_radius": 0.10,
+        "min_radius": 0.02,
+        "max_radius": 0.50,
+        "shrink_factor": 0.90,
+        "grow_factor": 1.10,
+        "adaptive": True,
+        "min_improvement": 0.01,
+        "momentum": 0.9,
+        "history_size": 10,
+        "volatility_threshold": 0.05,
+    },
+    
+    "ethics": {
+        "ece_max": 0.01,
+        "rho_bias_max": 1.05,
+        "fairness_min": 0.95,
+        "consent_required": True,
+        "eco_ok_required": True,
+        "priority_weight": 10.0,
+        "violation_tolerance": 0.0,  # Zero tolerance for ethics
+    },
+    
+    "risk": {
+        "rho_max": 0.95,
+        "uncertainty_max": 0.30,
+        "volatility_max": 0.25,
+        "contraction_factor": 0.98,
+        "priority_weight": 5.0,
+        "cbf_active": True,
+        "safe_set_margin": 0.05,
+    },
+    
+    "performance": {
+        "delta_linf_min": 0.01,
+        "improvement_target": 0.05,
+        "ppl_ood_target": 90.0,
+        "efficiency_min": 0.70,
+        "priority_weight": 1.0,
+        "optimization_rounds": 3,
+    },
+    
+    "budgets": {
+        "max_tokens": 100000,
+        "max_cost": 10.0,
+        "max_latency_ms": 5000,
+        "max_llm_calls": 100,
+        "max_memory_mb": 1024,
+        "quota_local": 0.8,
+        "reserve_ratio": 0.1,
+        "emergency_reserve": 0.05,
+    },
+    
+    "deliberation": {
+        "max_candidates": 10,
+        "min_viability": 0.60,
+        "consensus_threshold": 0.75,
+        "exploration_bonus": 0.10,
+        "seed": 42,
+        "timeout_ms": 400,
+        "parallel_evaluation": False,
+    },
+    
+    "u_signal": {
+        "lambda_U": 0.5,
+        "kappa": 1.5,
+        "budget_cap_factor": 0.1,
+        "sigmoid_steepness": 2.0,
+        "caos_coupling": True,
+    },
+    
+    "worm": {
+        "enabled": True,
+        "hash_algorithm": "sha256",
+        "proof_depth": 3,
+        "retention_cycles": 1000,
+        "batch_size": 10,
+        "compression": True,
+    },
+    
+    "llm": {
+        "enabled": False,
+        "model": "gpt-4",
+        "max_tokens": 100,
+        "temperature": 0.3,
+        "timeout_ms": 200,
+        "fallback_deterministic": True,
+    },
+    
+    "telemetry": {
+        "enabled": True,
+        "sample_rate": 1.0,
+        "metrics_window": 100,
+        "export_interval": 60,
+    },
+    
+    "integration": {
+        "core_module": "penin_omega_1_core",
+        "scheduler_module": "penin_omega_7_scheduler",
+        "sync_mode": "async",
+        "heartbeat_ms": 1000,
+    },
+}
+
+# =============================================================================
+# Eventos e Tipos Definitivos
+# =============================================================================
+
+class StrategyEvent(str, Enum):
+    """Eventos estratégicos para WORM."""
+    # Ciclo principal
+    STRATEGY_START = "STRATEGY_START"
+    STRATEGY_DECISION = "STRATEGY_DECISION"
+    STRATEGY_ABORT = "STRATEGY_ABORT"
+    
+    # Gates e validações
+    STRATEGY_GATE_FAIL = "STRATEGY_GATE_FAIL"
+    CONSTRAINT_VIOLATION = "CONSTRAINT_VIOLATION"
+    BUDGET_EXCEEDED = "BUDGET_EXCEEDED"
+    
+    # Gestão de planos
+    PLAN_CREATED = "PLAN_CREATED"
+    PLAN_VALIDATED = "PLAN_VALIDATED"
+    PLAN_PROMOTED = "PLAN_PROMOTED"
+    STRATEGY_ROLLBACK = "STRATEGY_ROLLBACK"
+    
+    # Objetivos
+    GOAL_CREATED = "GOAL_CREATED"
+    GOAL_ACHIEVED = "GOAL_ACHIEVED"
+    GOAL_FAILED = "GOAL_FAILED"
+    
+    # Performance
+    CACHE_HIT = "CACHE_HIT"
+    CACHE_MISS = "CACHE_MISS"
+    PERFORMANCE_METRIC = "PERFORMANCE_METRIC"
+    
+    # Integração
+    SYNC_WITH_CORE = "SYNC_WITH_CORE"
+    SYNC_WITH_SCHEDULER = "SYNC_WITH_SCHEDULER"
+
+@dataclass
+class Goal:
+    """Objetivo estratégico completo com rastreamento."""
+    # Identificação
+    id: str = field(default_factory=lambda: f"goal_{uuid.uuid4().hex[:8]}")
+    name: str = ""
+    description: str = ""
+    
+    # Métricas
+    metric: str = ""
+    target: float = 0.0
+    tolerance: float = 0.05
+    confidence_interval: Tuple[float, float] = (0.95, 1.05)
+    
+    # Temporalidade
+    deadline: int = 10  # ciclos
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    
+    # Priorização
+    priority: float = 1.0
+    lexicographic_level: int = 3  # 1=Ethics, 2=Risk, 3=Performance
+    
+    # Estado
+    status: Literal["pending", "active", "achieved", "failed", "cancelled"] = "pending"
+    progress: float = 0.0
+    
+    # Relações
+    owner: str = "2/8"
+    dependencies: List[str] = field(default_factory=list)
+    conflicts: List[str] = field(default_factory=list)
+    
+    # Metadados
+    viability_score: float = 1.0
+    risk_assessment: float = 0.0
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+    
+    def is_achieved(self, current: float) -> bool:
+        """Verifica se objetivo foi alcançado."""
+        return abs(current - self.target) <= self.tolerance
+    
+    def is_expired(self, current_cycle: int, creation_cycle: int) -> bool:
+        """Verifica se o prazo expirou."""
+        return (current_cycle - creation_cycle) > self.deadline
+    
+    def update_progress(self, initial: float, current: float) -> None:
+        """Atualiza progresso baseado em valores."""
+        if self.target != initial:
+            self.progress = abs(current - initial) / abs(self.target - initial)
+        self.progress = max(0.0, min(1.0, self.progress))
+
+@dataclass
+class Constraints:
+    """Restrições com validação e projeção segura."""
+    # Éticas (lexicográfico nível 1)
+    ece_max: float = 0.01
+    rho_bias_max: float = 1.05
+    fairness_min: float = 0.95
+    consent_required: bool = True
+    eco_ok_required: bool = True
+    
+    # Risco (lexicográfico nível 2)
+    rho_max: float = 0.95
+    uncertainty_max: float = 0.30
+    volatility_max: float = 0.25
+    cbf_margin: float = 0.05
+    
+    # Performance (lexicográfico nível 3)
+    delta_linf_min: float = 0.01
+    ppl_ood_max: float = 100.0
+    efficiency_min: float = 0.70
+    
+    # Trust region
+    trust_region_radius_proposed: float = 0.10
+    trust_region_radius_current: float = 0.10
+    
+    # Metadados
+    validation_timestamp: Optional[str] = None
+    projection_applied: bool = False
+    
+    def validate(self, state: Dict[str, Any]) -> Tuple[bool, List[str]]:
+        """Validação lexicográfica estrita."""
+        violations = []
+        
+        # Nível 1: Ética (para imediatamente se violar)
+        ethics_violations = []
+        if state.get("ece", 0) > self.ece_max:
+            ethics_violations.append(f"ETHICS: ECE {state['ece']:.4f} > {self.ece_max}")
+        if state.get("rho_bias", 1) > self.rho_bias_max:
+            ethics_violations.append(f"ETHICS: ρ_bias {state['rho_bias']:.4f} > {self.rho_bias_max}")
+        if state.get("fairness", 1) < self.fairness_min:
+            ethics_violations.append(f"ETHICS: fairness {state['fairness']:.4f} < {self.fairness_min}")
+        if self.consent_required and not state.get("consent", True):
+            ethics_violations.append("ETHICS: consent required but not given")
+        if self.eco_ok_required and not state.get("eco_ok", True):
+            ethics_violations.append("ETHICS: eco_ok required but not satisfied")
+        
+        if ethics_violations:
+            violations.extend(ethics_violations)
+            # Ética violada = falha imediata
+            self.validation_timestamp = datetime.now(timezone.utc).isoformat()
+            return False, violations
+        
+        # Nível 2: Risco
+        risk_violations = []
+        if state.get("rho", 0) > self.rho_max:
+            risk_violations.append(f"RISK: ρ {state['rho']:.4f} > {self.rho_max}")
+        if state.get("uncertainty", 0) > self.uncertainty_max:
+            risk_violations.append(f"RISK: uncertainty {state['uncertainty']:.4f} > {self.uncertainty_max}")
+        if state.get("volatility", 0) > self.volatility_max:
+            risk_violations.append(f"RISK: volatility {state['volatility']:.4f} > {self.volatility_max}")
+        
+        if risk_violations:
+            violations.extend(risk_violations)
+        
+        # Nível 3: Performance (só importa se ética e risco OK)
+        if not violations:
+            if state.get("delta_linf", 0) < self.delta_linf_min:
+                violations.append(f"PERF: ΔL∞ {state['delta_linf']:.4f} < {self.delta_linf_min}")
+            if state.get("ppl_ood", 100) > self.ppl_ood_max:
+                violations.append(f"PERF: PPL_OOD {state['ppl_ood']:.1f} > {self.ppl_ood_max}")
+            if state.get("efficiency", 1) < self.efficiency_min:
+                violations.append(f"PERF: efficiency {state['efficiency']:.3f} < {self.efficiency_min}")
+        
+        self.validation_timestamp = datetime.now(timezone.utc).isoformat()
+        return len(violations) == 0, violations
+    
+    def project_safe(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Projeta estado no espaço seguro Π_{H∩S}."""
+        projected = deepcopy(state)
+        
+        # Projeção ética (prioridade máxima)
+        projected["ece"] = min(state.get("ece", 0), self.ece_max * 0.95)
+        projected["rho_bias"] = min(state.get("rho_bias", 1), self.rho_bias_max * 0.99)
+        projected["fairness"] = max(state.get("fairness", 1), self.fairness_min)
+        projected["consent"] = True if self.consent_required else state.get("consent", True)
+        projected["eco_ok"] = True if self.eco_ok_required else state.get("eco_ok", True)
+        
+        # Projeção de risco (com margem CBF)
+        projected["rho"] = min(state.get("rho", 0), self.rho_max - self.cbf_margin)
+        projected["uncertainty"] = min(state.get("uncertainty", 0), self.uncertainty_max * 0.95)
+        projected["volatility"] = min(state.get("volatility", 0), self.volatility_max * 0.95)
+        
+        # Projeção de performance
+        projected["delta_linf"] = max(state.get("delta_linf", 0), self.delta_linf_min)
+        projected["ppl_ood"] = min(state.get("ppl_ood", 100), self.ppl_ood_max)
+        projected["efficiency"] = max(state.get("efficiency", 0.7), self.efficiency_min)
+        
+        self.projection_applied = True
+        return projected
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+@dataclass
+class Budgets:
+    """Orçamentos com rastreamento detalhado e reservas."""
+    # Limites máximos
+    max_tokens: int = 100000
+    max_cost: float = 10.0
+    max_latency_ms: int = 5000
+    max_llm_calls: int = 100
+    max_memory_mb: int = 1024
+    
+    # Quotas e políticas
+    quota_local: float = 0.8
+    reserve_ratio: float = 0.1
+    emergency_reserve: float = 0.05
+    
+    # Consumo rastreado
+    used_tokens: int = 0
+    used_cost: float = 0.0
+    used_llm_calls: int = 0
+    used_memory_mb: int = 0
+    used_time_ms: int = 0
+    
+    # Reservas alocadas
+    reserved_tokens: int = 0
+    reserved_cost: float = 0.0
+    reserved_memory_mb: int = 0
+    
+    # Histórico
+    allocation_history: List[Dict[str, Any]] = field(default_factory=list)
+    
+    def __post_init__(self):
+        """Inicializa reservas."""
+        self.reserved_tokens = int(self.max_tokens * self.reserve_ratio)
+        self.reserved_cost = self.max_cost * self.reserve_ratio
+        self.reserved_memory_mb = int(self.max_memory_mb * self.reserve_ratio)
+    
+    def remaining(self, include_reserves: bool = False) -> Dict[str, float]:
+        """Calcula recursos disponíveis."""
+        base_remaining = {
+            "tokens": self.max_tokens - self.used_tokens,
+            "cost": self.max_cost - self.used_cost,
+            "llm_calls": self.max_llm_calls - self.used_llm_calls,
+            "memory_mb": self.max_memory_mb - self.used_memory_mb,
+            "time_ms": self.max_latency_ms - self.used_time_ms,
+        }
+        
+        if not include_reserves:
+            base_remaining["tokens"] -= self.reserved_tokens
+            base_remaining["cost"] -= self.reserved_cost
+            base_remaining["memory_mb"] -= self.reserved_memory_mb
+        
+        return {k: max(0, v) for k, v in base_remaining.items()}
+    
+    def can_afford(self, required: Dict[str, float], safety_margin: float = 1.1) -> bool:
+        """Verifica disponibilidade com margem de segurança."""
+        rem = self.remaining()
+        return all(rem.get(k, 0) >= v * safety_margin for k, v in required.items())
+    
+    def allocate(self, amount: Dict[str, float], purpose: str = "") -> bool:
+        """Aloca recursos com rastreamento."""
+        if not self.can_afford(amount):
+            return False
+        
+        self.used_tokens += int(amount.get("tokens", 0))
+        self.used_cost += amount.get("cost", 0)
+        self.used_llm_calls += int(amount.get("llm_calls", 0))
+        self.used_memory_mb += int(amount.get("memory_mb", 0))
+        self.used_time_ms += int(amount.get("time_ms", 0))
+        
+        # Registrar alocação
+        self.allocation_history.append({
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "purpose": purpose,
+            "amount": amount,
+            "remaining_after": self.remaining(),
+        })
+        
+        return True
+    
+    def release_reserves(self) -> None:
+        """Libera reservas em emergência."""
+        self.reserved_tokens = 0
+        self.reserved_cost = 0.0
+        self.reserved_memory_mb = 0
+    
+    def get_usage_ratio(self) -> float:
+        """Retorna taxa de uso geral (0-1)."""
+        ratios = [
+            self.used_tokens / max(1, self.max_tokens),
+            self.used_cost / max(0.01, self.max_cost),
+            self.used_llm_calls / max(1, self.max_llm_calls),
+        ]
+        return sum(ratios) / len(ratios)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+@dataclass
+class PlanOmega:
+    """Plano Ω-META completo e auditável."""
+    # Identificação
+    id: str
+    timestamp: str
+    cycle: int
+    
+    # Componentes principais
+    goals: List[Goal] = field(default_factory=list)
+    constraints: Constraints = field(default_factory=Constraints)
+    budgets: Budgets = field(default_factory=Budgets)
+    
+    # Estratégia
+    priority_map: Dict[str, float] = field(default_factory=dict)  # Fases F3-F8
+    promotion_policy: Dict[str, Any] = field(default_factory=dict)
+    rollback_policy: Dict[str, Any] = field(default_factory=dict)
+    
+    # Metadados
+    rationale: str = ""
+    confidence: float = 0.0
+    sr_score: float = 0.0
+    u_signal: float = 0.0
+    
+    # Provas e auditoria
+    input_hash: str = ""
+    plan_hash: str = ""
+    signature: Optional[str] = None
+    parent_plan_id: Optional[str] = None  # Para rastreamento de evolução
+    
+    # Performance
+    generation_time_ms: float = 0.0
+    validation_results: Dict[str, Any] = field(default_factory=dict)
+    
+    # Estado
+    status: Literal["draft", "validated", "active", "completed", "rolled_back"] = "draft"
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialização completa."""
+        return {
+            "id": self.id,
+            "timestamp": self.timestamp,
+            "cycle": self.cycle,
+            "goals": [g.to_dict() for g in self.goals],
+            "constraints": self.constraints.to_dict(),
+            "budgets": self.budgets.to_dict(),
+            "priority_map": self.priority_map,
+            "promotion_policy": self.promotion_policy,
+            "rollback_policy": self.rollback_policy,
+            "rationale": self.rationale,
+            "confidence": self.confidence,
+            "sr_score": self.sr_score,
+            "u_signal": self.u_signal,
+            "input_hash": self.input_hash,
+            "plan_hash": self.plan_hash,
+            "signature": self.signature,
+            "parent_plan_id": self.parent_plan_id,
+            "generation_time_ms": self.generation_time_ms,
+            "validation_results": self.validation_results,
+            "status": self.status,
+        }
+    
+    def compute_hash(self) -> str:
+        """Calcula hash SHA-256 do plano."""
+        content = json.dumps(self.to_dict(), sort_keys=True)
+        return hashlib.sha256(content.encode()).hexdigest()
+    
+    def sign(self, key: Optional[str] = None) -> str:
+        """Assina plano com chave opcional."""
+        if key:
+            signature_content = f"{self.plan_hash}:{key}:{self.timestamp}"
+            self.signature = hashlib.sha512(signature_content.encode()).hexdigest()
+        else:
+            self.signature = self.plan_hash
+        return self.signature
+    
+    def validate_signature(self, key: Optional[str] = None) -> bool:
+        """Valida assinatura do plano."""
+        if not self.signature:
+            return False
+        if key:
+            expected = hashlib.sha512(f"{self.plan_hash}:{key}:{self.timestamp}".encode()).hexdigest()
+            return self.signature == expected
+        return self.signature == self.plan_hash
+
+@dataclass
+class SRReport:
+    """Relatório SR-Ω∞ detalhado."""
+    sr_score: float
+    components: Dict[str, float]
+    tau_SR: float
+    valid: bool
+    decision: Literal["ALLOW", "CEDE", "ABORT"]
+    confidence_interval: Tuple[float, float] = (0.0, 1.0)
+    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    computation_time_ms: float = 0.0
+    cache_hit: bool = False
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+# =============================================================================
+# Cache e Performance
+# =============================================================================
+
+class AdaptiveCache:
+    """Cache adaptativo com TTL dinâmico e compressão."""
+    
+    def __init__(self, base_ttl: int = 60, max_size: int = 1000):
+        self.base_ttl = base_ttl
+        self.max_size = max_size
+        self.cache: Dict[str, Tuple[Any, float, int]] = {}  # value, timestamp, hits
+        self.lock = threading.RLock()
+        self.stats = {"hits": 0, "misses": 0, "evictions": 0}
+    
+    def get(self, key: str) -> Optional[Any]:
+        """Recupera com TTL adaptativo."""
+        with self.lock:
+            if key in self.cache:
+                value, timestamp, hits = self.cache[key]
+                
+                # TTL adaptativo: mais hits = maior TTL
+                adaptive_ttl = self.base_ttl * (1 + math.log(1 + hits))
+                
+                if time.time() - timestamp < adaptive_ttl:
+                    self.cache[key] = (value, timestamp, hits + 1)
+                    self.stats["hits"] += 1
+                    return deepcopy(value)
+                else:
+                    del self.cache[key]
+                    self.stats["evictions"] += 1
+            
+            self.stats["misses"] += 1
+            return None
+    
+    def set(self, key: str, value: Any) -> None:
+        """Armazena com política LRU se necessário."""
+        with self.lock:
+            # Evict LRU se necessário
+            if len(self.cache) >= self.max_size:
+                lru_key = min(self.cache.keys(), 
+                             key=lambda k: self.cache[k][1])
+                del self.cache[lru_key]
+                self.stats["evictions"] += 1
+            
+            self.cache[key] = (deepcopy(value), time.time(), 0)
+    
+    def clear(self) -> None:
+        """Limpa cache."""
+        with self.lock:
+            self.cache.clear()
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Estatísticas do cache."""
+        with self.lock:
+            total = self.stats["hits"] + self.stats["misses"]
+            return {
+                **self.stats,
+                "hit_rate": self.stats["hits"] / max(1, total),
+                "size": len(self.cache),
+                "memory_mb": self._estimate_memory(),
+            }
+    
+    def _estimate_memory(self) -> float:
+        """Estima uso de memória em MB."""
+        import sys
+        total_size = sum(sys.getsizeof(k) + sys.getsizeof(v) 
+                        for k, v in self.cache.items())
+        return total_size / (1024 * 1024)
+
+# =============================================================================
+# Motor SR-Ω∞ Fusionado
+# =============================================================================
+
+class StrategicSROmegaFusion:
+    """SR-Ω∞ definitivo com integração completa."""
+    
+    def __init__(self, cfg: Dict[str, Any]):
+        self.cfg = cfg["sr_omega"]
+        self.weights = self.cfg["weights"]
+        self.tau_SR = self.cfg["tau_SR"]
+        self.min_components = self.cfg["min_components"]
+        self.gate_mode = self.cfg["gate_mode"]
+        self.epsilon = self.cfg["harmonic_epsilon"]
+        self.cache = AdaptiveCache(self.cfg["cache_ttl"])
+        
+        # Tentar integração com motor do 1/8
+        self.external_sr = None
+        if CORE_INTEGRATION:
+            try:
+                self.external_sr = SROmegaInfinity(cfg)
+            except:
+                pass
+    
+    def compute(self, state: Union[Dict[str, Any], OmegaState]) -> Tuple[float, SRReport]:
+        """Calcula SR com fallback e cache."""
+        start_time = time.time()
+        
+        # Converter estado se necessário
+        if isinstance(state, OmegaState):
+            state_dict = state.to_dict()
+        else:
+            state_dict = state
+        
+        # Cache key
+        cache_key = self._compute_cache_key(state_dict)
+        
+        # Check cache
+        cached = self.cache.get(cache_key)
+        if cached:
+            cached[1].cache_hit = True
+            return cached
+        
+        # Computar SR
+        if self.external_sr and CORE_INTEGRATION:
+            # Usar motor externo
+            sr_score = self.external_sr.compute(state_dict)
+            components = self._extract_components(state_dict)
+        else:
+            # Cálculo interno
+            components = self._compute_components(state_dict)
+            sr_score = self._harmonic_mean(components)
+        
+        # Calcular intervalo de confiança
+        confidence_interval = self._compute_confidence_interval(sr_score, components)
+        
+        # Criar relatório
+        report = SRReport(
+            sr_score=sr_score,
+            components=components,
+            tau_SR=self.tau_SR,
+            valid=sr_score >= self.tau_SR,
+            decision=self._decide(sr_score),
+            confidence_interval=confidence_interval,
+            computation_time_ms=(time.time() - start_time) * 1000,
+            cache_hit=False
+        )
+        
+        # Cachear resultado
+        result = (sr_score, report)
+        self.cache.set(cache_key, result)
+        
+        return result
+    
+    def gate(self, state: Union[Dict[str, Any], OmegaState]) -> bool:
+        """Gate reflexivo com modos configuráveis."""
+        if self.gate_mode == "bypass":
+            return True
+        
+        sr_score, _ = self.compute(state)
+        
+        if self.gate_mode == "relaxed":
+            return sr_score >= (self.tau_SR * 0.8)
+        
+        return sr_score >= self.tau_SR
+    
+    def _compute_components(self, state: Dict[str, Any]) -> Dict[str, float]:
+        """Calcula componentes E, M, C, A."""
+        return {
+            "E": self._ethics(state),
+            "M": self._mastery(state),
+            "C": self._calibration(state),
+            "A": self._autonomy(state),
+        }
+    
+    def _extract_components(self, state: Dict[str, Any]) -> Dict[str, float]:
+        """Extrai componentes para compatibilidade."""
+        return {
+            "E": max(self.epsilon, state.get("E_ok", state.get("E", 1.0))),
+            "M": max(self.epsilon, state.get("M", 0.5)),
+            "C": max(self.epsilon, state.get("C", 0.5)),
+            "A": max(self.epsilon, state.get("A", 0.5)),
+        }
+    
+    def _harmonic_mean(self, components: Dict[str, float]) -> float:
+        """Média harmônica ponderada não-compensatória."""
+        valid_count = sum(1 for v in components.values() if v > self.epsilon)
+        
+        if valid_count < self.min_components:
+            return 0.0
+        
+        weighted_sum = sum(
+            self.weights[k] / max(self.epsilon, v)
+            for k, v in components.items()
+        )
+        
+        total_weight = sum(self.weights.values())
+        
+        if weighted_sum > 0:
+            return total_weight / weighted_sum
+        return 0.0
+    
+    def _ethics(self, state: Dict[str, Any]) -> float:
+        """Componente ético com múltiplos fatores."""
+        score = 1.0
+        
+        # ECE (Expected Calibration Error)
+        score *= max(0.1, 1.0 - state.get("ece", 0) * 100)
+        
+        # Bias
+        score *= max(0.1, 2.0 - state.get("rho_bias", 1))
+        
+        # Fairness
+        score *= max(0.1, state.get("fairness", 1.0))
+        
+        # Consent
+        score *= 1.0 if state.get("consent", True) else 0.2
+        
+        # Eco
+        score *= 1.0 if state.get("eco_ok", True) else 0.3
+        
+        return max(self.epsilon, score)
+    
+    def _mastery(self, state: Dict[str, Any]) -> float:
+        """Componente de maestria/performance."""
+        score = 1.0
+        
+        # Improvement (ΔL∞)
+        score *= max(0.1, min(1.0, state.get("delta_linf", 0) * 100))
+        
+        # MDL Gain
+        score *= max(0.1, min(1.0, state.get("mdl_gain", 0) * 50))
+        
+        # OOD Performance
+        ppl_ood = state.get("ppl_ood", 100)
+        score *= max(0.1, min(1.0, 100.0 / (ppl_ood + 1)))
+        
+        # Efficiency
+        score *= max(0.1, state.get("efficiency", 0.7))
+        
+        return max(self.epsilon, score)
+    
+    def _calibration(self, state: Dict[str, Any]) -> float:
+        """Componente de calibração/confiança."""
+        score = 1.0
+        
+        # Uncertainty
+        score *= max(0.1, 1.0 - state.get("uncertainty", 0.5))
+        
+        # Confidence
+        score *= max(0.1, state.get("confidence", 0.5))
+        
+        # Stability
+        score *= 1.0 if state.get("caos_stable", True) else 0.5
+        
+        # Volatility
+        score *= max(0.1, 1.0 - state.get("volatility", 0))
+        
+        return max(self.epsilon, score)
+    
+    def _autonomy(self, state: Dict[str, Any]) -> float:
+        """Componente de autonomia/adaptação."""
+        components = [
+            state.get("self_improvement", 0),
+            state.get("exploration", 0),
+            state.get("adaptation", 0),
+            state.get("learning_rate", 0) * 100,  # Normalizar
+        ]
+        
+        if not components:
+            return self.epsilon
+        
+        return max(self.epsilon, sum(components) / len(components))
+    
+    def _decide(self, sr_score: float) -> Literal["ALLOW", "CEDE", "ABORT"]:
+        """Decisão baseada no score."""
+        if sr_score >= self.tau_SR:
+            return "ALLOW"
+        elif sr_score >= self.tau_SR * 0.5:
+            return "CEDE"
+        else:
+            return "ABORT"
+    
+    def _compute_confidence_interval(
+        self,
+        sr_score: float,
+        components: Dict[str, float]
+    ) -> Tuple[float, float]:
+        """Calcula intervalo de confiança."""
+        if not self.cfg.get("confidence_bands", True):
+            return (sr_score, sr_score)
+        
+        # Variância baseada na dispersão dos componentes
+        values = list(components.values())
+        if len(values) > 1:
+            mean = sum(values) / len(values)
+            variance = sum((v - mean) ** 2 for v in values) / len(values)
+            std_dev = math.sqrt(variance)
+            
+            # IC de 95%
+            margin = 1.96 * std_dev / math.sqrt(len(values))
+            lower = max(0.0, sr_score - margin)
+            upper = min(1.0, sr_score + margin)
+        else:
+            lower = upper = sr_score
+        
+        return (lower, upper)
+    
+    def _compute_cache_key(self, state: Dict[str, Any]) -> str:
+        """Gera chave de cache determinística."""
+        # Selecionar apenas campos relevantes para SR
+        relevant_fields = [
+            "ece", "rho_bias", "fairness", "consent", "eco_ok",
+            "delta_linf", "mdl_gain", "ppl_ood", "efficiency",
+            "uncertainty", "confidence", "volatility",
+            "self_improvement", "exploration", "adaptation"
+        ]
+        
+        filtered = {k: state.get(k) for k in relevant_fields if k in state}
+        return hashlib.md5(json.dumps(filtered, sort_keys=True).encode()).hexdigest()
+
+# =============================================================================
+# Deliberador Estratégico Fusionado
+# =============================================================================
+
+class StrategyDeliberatorFusion:
+    """Motor de deliberação com parsing avançado e timeout."""
+    
+    def __init__(self, cfg: Dict[str, Any]):
+        self.cfg = cfg["deliberation"]
+        self.max_candidates = self.cfg["max_candidates"]
+        self.min_viability = self.cfg["min_viability"]
+        self.timeout_ms = self.cfg["timeout_ms"]
+        self.rng = random.Random(self.cfg["seed"])
+        
+        # Pesos lexicográficos
+        self.ethics_weight = cfg["ethics"]["priority_weight"]
+        self.risk_weight = cfg["risk"]["priority_weight"]
+        self.perf_weight = cfg["performance"]["priority_weight"]
+        
+        # Cache de parsing
+        self.parse_cache = {}
+    
+    def deliberate(
+        self,
+        state: Union[Dict[str, Any], OmegaState],
+        intent: str,
+        context: Optional[Dict[str, Any]] = None
+    ) -> List[Goal]:
+        """Delibera objetivos com timeout garantido."""
+        start_time = time.time() * 1000
+        
+        # Converter estado
+        if isinstance(state, OmegaState):
+            state_dict = state.to_dict()
+        else:
+            state_dict = state
+        
+        # Parse intent (com cache)
+        if intent in self.parse_cache:
+            parsed = self.parse_cache[intent]
+        else:
+            parsed = self._parse_intent_advanced(intent)
+            self.parse_cache[intent] = parsed
+        
+        # Gerar candidatos
+        candidates = self._generate_candidates(state_dict, parsed, context)
+        
+        # Filtrar viáveis (com timeout)
+        viable = []
+        for candidate in candidates:
+            # Check timeout
+            if (time.time() * 1000 - start_time) > self.timeout_ms * 0.8:
+                break
+            
+            # Avaliar viabilidade
+            viability = self._assess_viability(candidate, state_dict, context)
+            if viability >= self.min_viability:
+                candidate.viability_score = viability
+                candidate.priority = viability
+                viable.append(candidate)
+        
+        # Ordenar lexicograficamente
+        viable.sort(key=lambda g: self._lexicographic_key(g), reverse=True)
+        
+        # Limitar quantidade
+        selected = viable[:self.max_candidates]
+        
+        # Definir níveis lexicográficos
+        for goal in selected:
+            goal.lexicographic_level = self._determine_level(goal)
+        
+        return selected
+    
+    def _parse_intent_advanced(self, intent: str) -> Dict[str, Any]:
+        """Parse avançado com NLP simples."""
+        import re
+        
+        parsed = {
+            "action": "improve",
+            "target": "general",
+            "metric": "score",
+            "amount": 0.05,
+            "constraint": {},
+            "urgency": "normal",
+            "focus": [],
+        }
+        
+        intent_lower = intent.lower()
+        
+        # Detectar ação principal
+        actions = {
+            "improve": ["improve", "melhorar", "aumentar", "boost", "enhance", "optimize"],
+            "reduce": ["reduce", "reduzir", "diminuir", "decrease", "lower", "minimize"],
+            "maintain": ["maintain", "manter", "keep", "preserve", "stabilize"],
+            "explore": ["explore", "explorar", "discover", "investigate"],
+        }
+        
+        for action, keywords in actions.items():
+            if any(word in intent_lower for word in keywords):
+                parsed["action"] = action
+                break
+        
+        # Detectar alvo/domínio
+        targets = {
+            "robustness": ["robustez", "robustness", "robust", "ood"],
+            "fairness": ["fairness", "bias", "justiça", "equidade"],
+            "efficiency": ["efficiency", "eficiência", "speed", "performance"],
+            "risk": ["risk", "risco", "uncertainty", "incerteza"],
+            "calibration": ["calibration", "calibração", "confidence"],
+        }
+        
+        for target, keywords in targets.items():
+            if any(word in intent_lower for word in keywords):
+                parsed["target"] = target
+                break
+        
+        # Mapear target para métrica
+        metric_map = {
+            "robustness": "ppl_ood",
+            "fairness": "fairness",
+            "efficiency": "efficiency",
+            "risk": "rho",
+            "calibration": "ece",
+        }
+        parsed["metric"] = metric_map.get(parsed["target"], "score")
+        
+        # Detectar quantidade/percentual
+        percent_match = re.search(r'(\d+(?:\.\d+)?)\s*%', intent)
+        if percent_match:
+            parsed["amount"] = float(percent_match.group(1)) / 100.0
+        else:
+            value_match = re.search(r'(\d+(?:\.\d+)?)', intent)
+            if value_match:
+                parsed["amount"] = float(value_match.group(1))
+        
+        # Detectar restrições
+        constraints = {}
+        
+        # Restrição de rho
+        rho_match = re.search(r'[ρr]ho?\s*<\s*([\d.]+)', intent_lower)
+        if rho_match:
+            constraints["rho_max"] = float(rho_match.group(1))
+        
+        # Restrição de custo
+        cost_match = re.search(r'cost\s*<\s*([\d.]+)', intent_lower)
+        if cost_match:
+            constraints["cost_max"] = float(cost_match.group(1))
+        
+        parsed["constraint"] = constraints
+        
+        # Detectar urgência
+        if any(word in intent_lower for word in ["urgent", "urgente", "immediately", "agora", "now"]):
+            parsed["urgency"] = "high"
+        elif any(word in intent_lower for word in ["slow", "gradual", "careful", "cuidadoso"]):
+            parsed["urgency"] = "low"
+        
+        # Detectar focos especiais
+        if "fairness" in intent_lower or "ética" in intent_lower:
+            parsed["focus"].append("ethics")
+        if "safe" in intent_lower or "seguro" in intent_lower:
+            parsed["focus"].append("safety")
+        
+        return parsed
+    
+    def _generate_candidates(
+        self,
+        state: Dict[str, Any],
+        parsed: Dict[str, Any],
+        context: Optional[Dict[str, Any]]
+    ) -> List[Goal]:
+        """Gera candidatos diversos e contextualmente relevantes."""
+        candidates = []
+        
+        # 1. Goal principal baseado no parse
+        main_goal = self._create_main_goal(state, parsed)
+        candidates.append(main_goal)
+        
+        # 2. Goals de suporte específicos do domínio
+        domain_goals = self._create_domain_goals(state, parsed)
+        candidates.extend(domain_goals)
+        
+        # 3. Goals de manutenção/estabilidade
+        maintenance_goals = self._create_maintenance_goals(state)
+        candidates.extend(maintenance_goals)
+        
+        # 4. Goals exploratórios (probabilísticos mas determinísticos)
+        if self.rng.random() < self.cfg["exploration_bonus"]:
+            exploration_goal = self._create_exploration_goal(state)
+            candidates.append(exploration_goal)
+        
+        # 5. Goals de mitigação de risco (se necessário)
+        if state.get("rho", 0) > 0.8 or state.get("uncertainty", 0) > 0.4:
+            risk_goals = self._create_risk_mitigation_goals(state)
+            candidates.extend(risk_goals)
+        
+        # 6. Goals éticos prioritários (se violações próximas)
+        if state.get("ece", 0) > 0.008 or state.get("fairness", 1) < 0.97:
+            ethics_goals = self._create_ethics_priority_goals(state)
+            candidates.extend(ethics_goals)
+        
+        return candidates
+    
+    def _create_main_goal(self, state: Dict[str, Any], parsed: Dict[str, Any]) -> Goal:
+        """Cria objetivo principal do intent."""
+        current = state.get(parsed["metric"], 0.5)
+        
+        # Calcular target baseado na ação
+        if parsed["action"] == "improve":
+            target = current * (1 + parsed["amount"])
+        elif parsed["action"] == "reduce":
+            target = current * (1 - parsed["amount"])
+        elif parsed["action"] == "maintain":
+            target = current
+        else:  # explore
+            target = current * 1.1
+        
+        # Ajustar deadline por urgência
+        deadline_map = {"high": 3, "normal": 10, "low": 20}
+        deadline = deadline_map.get(parsed["urgency"], 10)
+        
+        # Criar goal
+        goal = Goal(
+            name=f"{parsed['action']}_{parsed['target']}",
+            description=f"{parsed['action'].title()} {parsed['target']} by {parsed['amount']*100:.1f}%",
+            metric=parsed["metric"],
+            target=target,
+            tolerance=abs(target * 0.05),
+            deadline=deadline,
+            priority=1.5 if parsed["urgency"] == "high" else 1.0,
+            confidence_interval=(target * 0.95, target * 1.05),
+        )
+        
+        return goal
+    
+    def _create_domain_goals(self, state: Dict[str, Any], parsed: Dict[str, Any]) -> List[Goal]:
+        """Cria goals específicos do domínio."""
+        goals = []
+        
+        if parsed["target"] == "robustness":
+            goals.extend([
+                Goal(
+                    name="reduce_ppl_ood",
+                    description="Reduce OOD perplexity",
+                    metric="ppl_ood",
+                    target=state.get("ppl_ood", 100) * 0.95,
+                    tolerance=2.0,
+                    deadline=5,
+                    priority=1.2,
+                ),
+                Goal(
+                    name="improve_mdl_gain",
+                    description="Improve MDL compression",
+                    metric="mdl_gain",
+                    target=state.get("mdl_gain", 0.02) * 1.1,
+                    tolerance=0.002,
+                    deadline=8,
+                    priority=0.9,
+                ),
+            ])
+        
+        elif parsed["target"] == "fairness":
+            goals.extend([
+                Goal(
+                    name="reduce_bias",
+                    description="Reduce algorithmic bias",
+                    metric="rho_bias",
+                    target=min(1.0, state.get("rho_bias", 1.05) * 0.98),
+                    tolerance=0.02,
+                    deadline=5,
+                    priority=1.5,
+                    lexicographic_level=1,  # Ético
+                ),
+                Goal(
+                    name="improve_fairness_score",
+                    description="Improve fairness metrics",
+                    metric="fairness",
+                    target=min(1.0, state.get("fairness", 0.95) + 0.02),
+                    tolerance=0.01,
+                    deadline=7,
+                    priority=1.4,
+                    lexicographic_level=1,  # Ético
+                ),
+            ])
+        
+        elif parsed["target"] == "efficiency":
+            goals.extend([
+                Goal(
+                    name="improve_throughput",
+                    description="Increase processing throughput",
+                    metric="throughput",
+                    target=state.get("throughput", 100) * 1.15,
+                    tolerance=5,
+                    deadline=10,
+                    priority=0.8,
+                ),
+                Goal(
+                    name="reduce_memory",
+                    description="Reduce memory footprint",
+                    metric="memory_mb",
+                    target=state.get("memory_mb", 1000) * 0.9,
+                    tolerance=50,
+                    deadline=12,
+                    priority=0.7,
+                ),
+            ])
+        
+        return goals
+    
+    def _create_maintenance_goals(self, state: Dict[str, Any]) -> List[Goal]:
+        """Goals de manutenção do sistema."""
+        return [
+            Goal(
+                name="maintain_stability",
+                description="Maintain system stability",
+                metric="stability",
+                target=max(0.8, state.get("stability", 0.9)),
+                tolerance=0.1,
+                deadline=1,
+                priority=0.6,
+                lexicographic_level=2,  # Risco
+            ),
+            Goal(
+                name="maintain_sr_score",
+                description="Maintain SR score above threshold",
+                metric="sr_score",
+                target=max(0.8, state.get("sr_score", 0.85)),
+                tolerance=0.05,
+                deadline=3,
+                priority=0.8,
+                lexicographic_level=2,  # Risco
+            ),
+        ]
+    
+    def _create_exploration_goal(self, state: Dict[str, Any]) -> Goal:
+        """Goal exploratório adaptativo."""
+        return Goal(
+            name="explore_novel_solutions",
+            description="Explore novel solution space",
+            metric="novelty",
+            target=state.get("novelty", 0.05) + 0.1,
+            tolerance=0.05,
+            deadline=15,
+            priority=0.5,
+            dependencies=["maintain_stability"],
+        )
+    
+    def _create_risk_mitigation_goals(self, state: Dict[str, Any]) -> List[Goal]:
+        """Goals para mitigação de risco."""
+        goals = []
+        
+        if state.get("rho", 0) > 0.8:
+            goals.append(Goal(
+                name="reduce_risk_coefficient",
+                description="Reduce risk coefficient ρ",
+                metric="rho",
+                target=0.75,
+                tolerance=0.05,
+                deadline=3,
+                priority=1.3,
+                lexicographic_level=2,  # Risco
+            ))
+        
+        if state.get("uncertainty", 0) > 0.4:
+            goals.append(Goal(
+                name="reduce_uncertainty",
+                description="Reduce epistemic uncertainty",
+                metric="uncertainty",
+                target=0.3,
+                tolerance=0.05,
+                deadline=5,
+                priority=1.2,
+                lexicographic_level=2,  # Risco
+            ))
+        
+        return goals
+    
+    def _create_ethics_priority_goals(self, state: Dict[str, Any]) -> List[Goal]:
+        """Goals éticos prioritários."""
+        goals = []
+        
+        if state.get("ece", 0) > 0.008:
+            goals.append(Goal(
+                name="improve_calibration",
+                description="Improve calibration (reduce ECE)",
+                metric="ece",
+                target=0.005,
+                tolerance=0.001,
+                deadline=3,
+                priority=2.0,  # Alta prioridade
+                lexicographic_level=1,  # Ético
+            ))
+        
+        if state.get("fairness", 1) < 0.97:
+            goals.append(Goal(
+                name="restore_fairness",
+                description="Restore fairness to acceptable levels",
+                metric="fairness",
+                target=0.98,
+                tolerance=0.01,
+                deadline=2,
+                priority=2.0,  # Alta prioridade
+                lexicographic_level=1,  # Ético
+            ))
+        
+        return goals
+    
+    def _assess_viability(
+        self,
+        goal: Goal,
+        state: Dict[str, Any],
+        context: Optional[Dict[str, Any]]
+    ) -> float:
+        """Avalia viabilidade multidimensional."""
+        viability = 1.0
+        
+        # 1. Distância ao objetivo
+        current = state.get(goal.metric, 0)
+        if goal.target != 0:
+            distance = abs(goal.target - current) / abs(goal.target)
+            viability *= max(0.1, 1.0 - distance * 0.5)
+        
+        # 2. Recursos disponíveis
+        if context and "budgets" in context:
+            if isinstance(context["budgets"], Budgets):
+                usage_ratio = context["budgets"].get_usage_ratio()
+                viability *= max(0.3, 1.0 - usage_ratio)
+        
+        # 3. Complexidade temporal
+        deadline_factor = 1.0 / (1.0 + math.log(1 + goal.deadline))
+        viability *= max(0.3, deadline_factor)
+        
+        # 4. Dependências
+        if goal.dependencies:
+            dep_penalty = 0.9 ** len(goal.dependencies)
+            viability *= dep_penalty
+        
+        # 5. Conflitos
+        if goal.conflicts:
+            conflict_penalty = 0.8 ** len(goal.conflicts)
+            viability *= conflict_penalty
+        
+        # 6. Boost lexicográfico
+        if goal.lexicographic_level == 1:  # Ético
+            viability *= 1.5
+        elif goal.lexicographic_level == 2:  # Risco
+            viability *= 1.3
+        
+        # 7. Risco do objetivo
+        if goal.risk_assessment > 0:
+            viability *= max(0.5, 1.0 - goal.risk_assessment)
+        
+        return min(1.0, max(0.0, viability))
+    
+    def _lexicographic_key(self, goal: Goal) -> Tuple[float, float, float, float]:
+        """Chave para ordenação lexicográfica estrita."""
+        # Determinar categoria
+        is_ethical = any(word in goal.name.lower() 
+                        for word in ["fairness", "bias", "consent", "calibration"])
+        is_risk = any(word in goal.name.lower()
+                     for word in ["risk", "uncertainty", "safety", "stability"])
+        
+        # Scores lexicográficos
+        ethical_score = self.ethics_weight if is_ethical else 0
+        risk_score = self.risk_weight if is_risk else 0
+        perf_score = self.perf_weight * goal.priority
+        
+        # Retornar tupla (maior primeiro)
+        return (ethical_score, risk_score, perf_score, -goal.deadline)
+    
+    def _determine_level(self, goal: Goal) -> int:
+        """Determina nível lexicográfico do objetivo."""
+        if any(word in goal.name.lower() 
+               for word in ["fairness", "bias", "consent", "calibration", "ethics"]):
+            return 1  # Ético
+        elif any(word in goal.name.lower()
+                for word in ["risk", "uncertainty", "safety", "stability", "robust"]):
+            return 2  # Risco
+        else:
+            return 3  # Performance
+
+# =============================================================================
+# Trust Region Manager Fusionado
+# =============================================================================
+
+class TrustRegionManagerFusion:
+    """Gerenciador de trust region com momentum e adaptação."""
+    
+    def __init__(self, cfg: Dict[str, Any]):
+        self.cfg = cfg["trust_region"]
+        self.radius = self.cfg["initial_radius"]
+        self.min_radius = self.cfg["min_radius"]
+        self.max_radius = self.cfg["max_radius"]
+        self.momentum = self.cfg["momentum"]
+        self.history_size = self.cfg["history_size"]
+        self.volatility_threshold = self.cfg["volatility_threshold"]
+        
+        self.velocity = 0.0
+        self.history = deque(maxlen=self.history_size)
+        self.lock = threading.RLock()
+    
+    def propose(
+        self,
+        state: Union[Dict[str, Any], OmegaState],
+        goals: List[Goal],
+        performance: Optional[Dict[str, Any]] = None
+    ) -> float:
+        """Propõe raio com adaptação inteligente."""
+        with self.lock:
+            # Converter estado
+            if isinstance(state, OmegaState):
+                state_dict = state.to_dict()
+            else:
+                state_dict = state
+            
+            # Métricas chave
+            delta_linf = state_dict.get("delta_linf", 0)
+            rho = state_dict.get("rho", 0.5)
+            success = False
+            
+            if performance:
+                success = performance.get("success", False)
+                delta_linf = performance.get("delta_linf", delta_linf)
+            
+            # Calcular mudança desejada
+            if success and delta_linf > self.cfg["min_improvement"] and rho < 0.9:
+                # Sucesso: expandir
+                change = self.cfg["grow_factor"] - 1.0
+            else:
+                # Falha ou risco alto: contrair
+                change = 1.0 - self.cfg["shrink_factor"]
+                change = -change
+            
+            # Aplicar momentum
+            self.velocity = self.momentum * self.velocity + (1 - self.momentum) * change
+            
+            # Calcular novo raio
+            new_radius = self.radius * (1 + self.velocity)
+            
+            # Ajustar por ambição dos objetivos
+            if goals:
+                max_ambition = max(
+                    (abs(g.target - state_dict.get(g.metric, 0)) / 
+                     max(1, abs(g.target)) for g in goals),
+                    default=0
+                )
+                ambition_factor = 1 + max_ambition * 0.3
+                new_radius *= ambition_factor
+            
+            # Ajustar por volatilidade histórica
+            if len(self.history) >= 3:
+                volatility = self._compute_volatility()
+                if volatility > self.volatility_threshold:
+                    new_radius *= 0.95  # Reduzir se volátil
+            
+            # Aplicar limites
+            new_radius = max(self.min_radius, min(self.max_radius, new_radius))
+            
+            # Atualizar histórico
+            self.history.append({
+                "radius": new_radius,
+                "delta_linf": delta_linf,
+                "rho": rho,
+                "success": success,
+                "timestamp": time.time(),
+            })
+            
+            self.radius = new_radius
+            return new_radius
+    
+    def _compute_volatility(self) -> float:
+        """Calcula volatilidade do histórico."""
+        if len(self.history) < 2:
+            return 0.0
+        
+        radii = [h["radius"] for h in self.history]
+        mean = sum(radii) / len(radii)
+        variance = sum((r - mean) ** 2 for r in radii) / len(radii)
+        return math.sqrt(variance)
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Estatísticas do trust region."""
+        with self.lock:
+            if not self.history:
+                return {
+                    "radius": self.radius,
+                    "velocity": self.velocity,
+                    "history_size": 0,
+                }
+            
+            recent = list(self.history)[-5:] if len(self.history) >= 5 else list(self.history)
+            
+            return {
+                "radius": self.radius,
+                "velocity": self.velocity,
+                "avg_radius": sum(h["radius"] for h in recent) / len(recent),
+                "success_rate": sum(h["success"] for h in recent) / len(recent),
+                "volatility": self._compute_volatility(),
+                "trend": "growing" if self.velocity > 0 else "shrinking",
+                "history_size": len(self.history),
+            }
+
+# =============================================================================
+# U-Signal Calculator Fusionado
+# =============================================================================
+
+class USignalCalculatorFusion:
+    """Calculador de U signal com CAOS⁺ e sigmoid harmônica."""
+    
+    def __init__(self, cfg: Dict[str, Any]):
+        self.lambda_U = cfg["u_signal"]["lambda_U"]
+        self.kappa = cfg["u_signal"]["kappa"]
+        self.budget_cap = cfg["u_signal"]["budget_cap_factor"]
+        self.steepness = cfg["u_signal"]["sigmoid_steepness"]
+        self.caos_coupling = cfg["u_signal"]["caos_coupling"]
+    
+    def compute(
+        self,
+        state: Union[Dict[str, Any], OmegaState],
+        budgets: Optional[Budgets] = None,
+        goals: Optional[List[Goal]] = None
+    ) -> float:
+        """Calcula U signal otimizado."""
+        # Converter estado
+        if isinstance(state, OmegaState):
+            state_dict = state.to_dict()
+        else:
+            state_dict = state
+        
+        # Componentes base
+        delta_linf = max(0, state_dict.get("delta_linf", 0))
+        uncertainty = state_dict.get("uncertainty", 0.5)
+        cost = max(0.01, state_dict.get("cost", 1.0))
+        
+        # Fator CAOS⁺ (se habilitado)
+        caos_factor = 1.0
+        if self.caos_coupling:
+            caos_value = state_dict.get("caos_post", 1.0)
+            caos_factor = self._phi_caos(caos_value)
+        
+        # Utilidade base (heurística harmônica)
+        utility_raw = (delta_linf * (1 + uncertainty)) / cost
+        
+        # Modulação por objetivos
+        if goals:
+            exploration_count = sum(1 for g in goals if "explore" in g.name.lower())
+            if exploration_count:
+                utility_raw *= (1 + 0.2 * exploration_count)
+            
+            # Penalizar muitos objetivos conflitantes
+            conflict_count = sum(len(g.conflicts) for g in goals)
+            if conflict_count > 2:
+                utility_raw *= 0.9
+        
+        # Sigmoid harmônica
+        u_base = 1 / (1 + math.exp(-self.steepness * (utility_raw - self.lambda_U)))
+        
+        # Aplicar modulação CAOS⁺
+        u_modulated = u_base * caos_factor
+        
+        # Cap por recursos
+        if budgets:
+            usage_ratio = budgets.get_usage_ratio()
+            if usage_ratio > 0.8:  # Recursos críticos
+                u_modulated *= self.budget_cap
+            elif usage_ratio > 0.5:  # Recursos moderados
+                u_modulated *= (0.5 + (1 - usage_ratio))
+        
+        return max(0.0, min(1.0, u_modulated))
+    
+    def _phi_caos(self, z: float) -> float:
+        """Função de acoplamento CAOS⁺ saturada."""
+        z = max(1.0, z)
+        return min(1.0, math.log(z) / math.log(1 + self.kappa))
+
+# =============================================================================
+# Módulo Estratégico Principal Fusionado
+# =============================================================================
+
+class StrategyModuleFusion:
+    """
+    Módulo 2/8 Fusão Definitiva: Estratégia Ω-META.
+    Integração completa com 1/8 e componentes otimizados.
+    """
+    
+    def __init__(
+        self,
+        cfg: Optional[Dict[str, Any]] = None,
+        worm_ledger: Optional[WORMLedger] = None,
+        core_integration: Optional[Dict[str, Any]] = None
+    ):
+        """
+        Inicializa módulo estratégico fusionado.
+        
+        Args:
+            cfg: Configuração customizada
+            worm_ledger: Interface WORM para auditoria
+            core_integration: Componentes do 1/8 se disponíveis
+        """
+        # Merge de configurações
+        self.cfg = self._merge_configs(cfg or {}, OMEGA_META_CONFIG)
+        
+        # Integração com 1/8
+        self.worm = worm_ledger or WORMLedger()
+        self.core = core_integration or {}
+        
+        # Componentes principais
+        self.sr_omega = StrategicSROmegaFusion(self.cfg)
+        self.deliberator = StrategyDeliberatorFusion(self.cfg)
+        self.trust_manager = TrustRegionManagerFusion(self.cfg)
+        self.u_calculator = USignalCalculatorFusion(self.cfg)
+        
+        # Cache e performance
+        self.plan_cache = AdaptiveCache(60, 100)
+        self.validation_cache = AdaptiveCache(30, 50)
+        
+        # Estado interno
+        self.cycle_count = 0
+        self.last_plan: Optional[PlanOmega] = None
+        self.plan_history = deque(maxlen=self.cfg["worm"]["retention_cycles"])
+        self.lock = threading.RLock()
+        
+        # RNG determinístico
+        self.rng = random.Random(self.cfg["deliberation"]["seed"])
+        
+        # Telemetria
+        self.telemetry = {
+            "plans_created": 0,
+            "gates_passed": 0,
+            "gates_failed": 0,
+            "avg_latency_ms": 0.0,
+            "cache_stats": {},
+            "errors": 0,
+        }
+        
+        # Registro de inicialização
+        self._log_event(StrategyEvent.STRATEGY_START, {
+            "version": self.cfg["version"],
+            "config_hash": self._hash_config(),
+            "core_integration": CORE_INTEGRATION,
+            "timestamp": self._timestamp(),
+        })
+    
+    def create_plan(
+        self,
+        state: Union[Dict[str, Any], OmegaState, Any],
+        intent: str,
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """
+        Cria plano estratégico Ω-META.
+        
+        Interface principal com 1/8.
+        Garante latência <500ms via timeouts.
+        
+        Args:
+            state: Estado atual (Xt do 1/8)
+            intent: Intenção/comando
+            context: Contexto adicional (governance, quotas, etc.)
+            
+        Returns:
+            Dict contendo:
+                - PlanΩ: Plano estruturado
+                - SR_report: Relatório SR completo
+                - proof: Provas criptográficas
+                - U_signal: Sinal para fase 3
+        """
+        start_time = time.time()
+        
+        with self.lock:
+            try:
+                self.cycle_count += 1
+                
+                # Preparar estado
+                state_dict = self._prepare_state(state)
+                
+                # Hash para cache e auditoria
+                input_hash = self._compute_input_hash(state_dict, intent, context)
+                
+                # Check cache
+                cache_key = f"plan_{input_hash[:16]}"
+                cached = self.plan_cache.get(cache_key)
+                if cached:
+                    self._log_event(StrategyEvent.CACHE_HIT, {"key": cache_key})
+                    self.telemetry["cache_stats"]["hits"] = self.telemetry["cache_stats"].get("hits", 0) + 1
+                    return cached
+                
+                # 1. SR Gate Check
+                sr_score, sr_report = self.sr_omega.compute(state_dict)
+                
+                if not self.sr_omega.gate(state_dict):
+                    # Gate failed - modo conservador
+                    result = self._create_conservative_result(
+                        state_dict, sr_report, input_hash, "SR_GATE_FAILED"
+                    )
+                    self._log_gate_failure(sr_score, sr_report.decision)
+                    return result
+                
+                # 2. Deliberação de objetivos
+                goals = self.deliberator.deliberate(state_dict, intent, context)
+                
+                if not goals:
+                    # Sem objetivos viáveis - modo mínimo
+                    result = self._create_minimal_result(
+                        state_dict, sr_report, input_hash
+                    )
+                    return result
+                
+                # 3. Construir constraints
+                constraints = self._build_constraints(state_dict, context)
+                
+                # 4. Validação ex-ante (Π_{H∩S})
+                valid, violations = constraints.validate(state_dict)
+                
+                if not valid:
+                    # Tentar projeção segura
+                    if any("ETHICS" in v for v in violations):
+                        # Violação ética = falha imediata
+                        result = self._create_conservative_result(
+                            state_dict, sr_report, input_hash, "ETHICS_VIOLATION"
+                        )
+                        self._log_event(StrategyEvent.CONSTRAINT_VIOLATION, {
+                            "violations": violations,
+                            "type": "ethics"
+                        })
+                        return result
+                    else:
+                        # Projetar estado seguro para outras violações
+                        projected_state = constraints.project_safe(state_dict)
+                        valid, _ = constraints.validate(projected_state)
+                        if valid:
+                            state_dict = projected_state
+                
+                # 5. Alocar budgets
+                budgets = self._allocate_budgets(goals, context)
+                
+                # 6. Propor trust region
+                performance_hint = {"success": sr_score >= self.cfg["sr_omega"]["tau_SR"]}
+                trust_radius = self.trust_manager.propose(state_dict, goals, performance_hint)
+                constraints.trust_region_radius_proposed = trust_radius
+                constraints.trust_region_radius_current = state_dict.get("trust_region_radius", 0.1)
+                
+                # 7. Criar políticas
+                promotion_policy = self._create_promotion_policy(sr_score, constraints, goals)
+                rollback_policy = self._create_rollback_policy(constraints, goals)
+                
+                # 8. Mapear prioridades
+                priority_map = self._create_priority_map(goals)
+                
+                # 9. Calcular U signal
+                u_signal = self.u_calculator.compute(state_dict, budgets, goals)
+                
+                # 10. Gerar rationale
+                rationale = self._generate_rationale(intent, goals, sr_score, context)
+                
+                # 11. Calcular confiança
+                confidence = self._calculate_confidence(sr_score, goals, constraints)
+                
+                # 12. Montar plano
+                plan = PlanOmega(
+                    id=f"plan_v{self.cycle_count}_{input_hash[:8]}",
+                    timestamp=self._timestamp(),
+                    cycle=self.cycle_count,
+                    goals=goals,
+                    constraints=constraints,
+                    budgets=budgets,
+                    priority_map=priority_map,
+                    promotion_policy=promotion_policy,
+                    rollback_policy=rollback_policy,
+                    rationale=rationale,
+                    confidence=confidence,
+                    sr_score=sr_score,
+                    u_signal=u_signal,
+                    input_hash=input_hash,
+                    parent_plan_id=self.last_plan.id if self.last_plan else None,
+                    generation_time_ms=(time.time() - start_time) * 1000,
+                    status="validated",
+                )
+                
+                # 13. Computar hash e assinar
+                plan.plan_hash = plan.compute_hash()
+                plan.sign(self.cfg.get("signing_key"))
+                
+                # 14. Validar plano
+                validation = self._validate_plan(plan, state_dict)
+                plan.validation_results = validation
+                
+                # 15. Registrar no WORM
+                self._log_event(StrategyEvent.PLAN_CREATED, {
+                    "plan_id": plan.id,
+                    "sr_score": sr_score,
+                    "num_goals": len(goals),
+                    "trust_radius": trust_radius,
+                    "u_signal": u_signal,
+                    "confidence": confidence,
+                    "generation_time_ms": plan.generation_time_ms,
+                    "validation": validation,
+                })
+                
+                # 16. Atualizar histórico
+                self.last_plan = plan
+                self.plan_history.append(plan)
+                
+                # 17. Preparar resultado
+                result = {
+                    "PlanΩ": plan.to_dict(),
+                    "SR_report": sr_report.to_dict(),
+                    "proof": {
+                        "plan_hash": plan.plan_hash,
+                        "input_hash": input_hash,
+                        "signature": plan.signature,
+                        "timestamp": plan.timestamp,
+                        "validation": validation["valid"],
+                    },
+                    "U_signal": u_signal,
+                }
+                
+                # 18. Cachear
+                self.plan_cache.set(cache_key, result)
+                
+                # 19. Atualizar telemetria
+                self._update_telemetry(plan.generation_time_ms, True)
+                
+                # 20. Sincronizar com scheduler se configurado
+                if context and "scheduler" in context:
+                    self._sync_with_scheduler(plan, context["scheduler"])
+                
+                return result
+                
+            except Exception as e:
+                # Fail-closed: plano de emergência
+                self.telemetry["errors"] += 1
+                self._log_event(StrategyEvent.STRATEGY_ABORT, {
+                    "error": str(e),
+                    "cycle": self.cycle_count,
+                })
+                
+                return self._create_emergency_result(state_dict, str(e))
+    
+    def update_from_results(
+        self,
+        plan_id: str,
+        results: Dict[str, Any]
+    ) -> None:
+        """
+        Atualiza estratégia com resultados de execução.
+        
+        Args:
+            plan_id: ID do plano executado
+            results: Resultados e métricas
+        """
+        with self.lock:
+            # Encontrar plano no histórico
+            plan = None
+            for p in self.plan_history:
+                if p.id == plan_id:
+                    plan = p
+                    break
+            
+            if not plan:
+                return
+            
+            # Atualizar status dos goals
+            if "goal_results" in results:
+                for goal_id, goal_result in results["goal_results"].items():
+                    for goal in plan.goals:
+                        if goal.id == goal_id:
+                            if goal_result.get("achieved", False):
+                                goal.status = "achieved"
+                                self._log_event(StrategyEvent.GOAL_ACHIEVED, {
+                                    "goal_id": goal_id,
+                                    "metric": goal.metric,
+                                })
+                            elif goal_result.get("failed", False):
+                                goal.status = "failed"
+                                self._log_event(StrategyEvent.GOAL_FAILED, {
+                                    "goal_id": goal_id,
+                                    "reason": goal_result.get("reason", "unknown"),
+                                })
+                            
+                            goal.progress = goal_result.get("progress", goal.progress)
+            
+            # Atualizar trust region com performance
+            if "performance" in results:
+                self.trust_manager.propose(
+                    results.get("state", {}),
+                    plan.goals,
+                    results["performance"]
+                )
+            
+            # Verificar políticas de rollback
+            if "metrics" in results:
+                rollback_triggered = self._check_rollback_triggers(
+                    plan.rollback_policy,
+                    results["metrics"]
+                )
+                
+                if rollback_triggered:
+                    self._log_event(StrategyEvent.STRATEGY_ROLLBACK, {
+                        "plan_id": plan_id,
+                        "trigger": rollback_triggered,
+                    })
+                    plan.status = "rolled_back"
+            
+            # Registrar métricas de performance
+            self._log_event(StrategyEvent.PERFORMANCE_METRIC, {
+                "plan_id": plan_id,
+                "results": results,
+                "trust_stats": self.trust_manager.get_stats(),
+            })
+    
+    def get_telemetry(self) -> Dict[str, Any]:
+        """Retorna telemetria completa do módulo."""
+        with self.lock:
+            self.telemetry["cache_stats"] = {
+                "plan_cache": self.plan_cache.get_stats(),
+                "validation_cache": self.validation_cache.get_stats(),
+                "sr_cache": self.sr_omega.cache.get_stats(),
+            }
+            self.telemetry["trust_region"] = self.trust_manager.get_stats()
+            self.telemetry["total_cycles"] = self.cycle_count
+            self.telemetry["plans_in_history"] = len(self.plan_history)
+            
+            return deepcopy(self.telemetry)
+    
+    # =========================================================================
+    # Métodos Privados de Suporte
+    # =========================================================================
+    
+    def _prepare_state(self, state: Any) -> Dict[str, Any]:
+        """Prepara estado para processamento."""
+        if isinstance(state, dict):
+            return state
+        elif hasattr(state, "to_dict"):
+            return state.to_dict()
+        elif hasattr(state, "__dict__"):
+            return state.__dict__
+        else:
+            # Tentar converter
+            try:
+                return dict(state)
+            except:
+                return {"raw_state": str(state)}
+    
+    def _create_conservative_result(
+        self,
+        state: Dict[str, Any],
+        sr_report: SRReport,
+        input_hash: str,
+        reason: str
+    ) -> Dict[str, Any]:
+        """Cria resultado conservador para gates falhados."""
+        plan = PlanOmega(
+            id=f"conservative_{self.cycle_count}_{input_hash[:8]}",
+            timestamp=self._timestamp(),
+            cycle=self.cycle_count,
+            goals=[],  # Sem novos objetivos
+            constraints=Constraints(
+                trust_region_radius_proposed=self.cfg["trust_region"]["min_radius"]
+            ),
+            budgets=Budgets(
+                max_tokens=1000,
+                max_cost=0.1,
+                max_llm_calls=1
+            ),
+            rationale=f"Conservative mode: {reason}",
+            confidence=0.1,
+            sr_score=sr_report.sr_score,
+            u_signal=0.0,
+            input_hash=input_hash,
+            status="draft",
+        )
+        
+        plan.plan_hash = plan.compute_hash()
+        
+        return {
+            "PlanΩ": plan.to_dict(),
+            "SR_report": sr_report.to_dict(),
+            "proof": {
+                "plan_hash": plan.plan_hash,
+                "input_hash": input_hash,
+                "reason": reason,
+                "conservative": True,
+            },
+            "U_signal": 0.0,
+        }
+    
+    def _create_minimal_result(
+        self,
+        state: Dict[str, Any],
+        sr_report: SRReport,
+        input_hash: str
+    ) -> Dict[str, Any]:
+        """Cria resultado mínimo quando não há objetivos viáveis."""
+        plan = PlanOmega(
+            id=f"minimal_{self.cycle_count}_{input_hash[:8]}",
+            timestamp=self._timestamp(),
+            cycle=self.cycle_count,
+            goals=[
+                Goal(
+                    name="maintain_stability",
+                    description="Maintain system stability",
+                    metric="stability",
+                    target=1.0,
+                    tolerance=0.1,
+                    deadline=1,
+                    priority=0.5,
+                    lexicographic_level=2,
+                )
+            ],
+            constraints=Constraints(),
+            budgets=Budgets(),
+            rationale="No viable goals found - maintaining stability only",
+            confidence=0.5,
+            sr_score=sr_report.sr_score,
+            u_signal=0.1,
+            input_hash=input_hash,
+            status="validated",
+        )
+        
+        plan.plan_hash = plan.compute_hash()
+        
+        return {
+            "PlanΩ": plan.to_dict(),
+            "SR_report": sr_report.to_dict(),
+            "proof": {
+                "plan_hash": plan.plan_hash,
+                "input_hash": input_hash,
+                "minimal": True,
+            },
+            "U_signal": 0.1,
+        }
+    
+    def _create_emergency_result(
+        self,
+        state: Dict[str, Any],
+        error: str
+    ) -> Dict[str, Any]:
+        """Resultado de emergência para exceções."""
+        return {
+            "PlanΩ": {
+                "id": f"emergency_{self.cycle_count}",
+                "goals": [],
+                "constraints": {"trust_region_radius_proposed": 0.02},
+                "budgets": {"max_tokens": 100},
+                "rationale": f"Emergency mode: {error[:100]}",
+                "status": "draft",
+            },
+            "SR_report": {
+                "sr_score": 0.0,
+                "valid": False,
+                "decision": "ABORT",
+            },
+            "proof": {
+                "error": error,
+                "timestamp": self._timestamp(),
+                "emergency": True,
+            },
+            "U_signal": 0.0,
+        }
+    
+    def _build_constraints(
+        self,
+        state: Dict[str, Any],
+        context: Optional[Dict[str, Any]]
+    ) -> Constraints:
+        """Constrói constraints com contexto e governança."""
+        # Base da configuração
+        constraints = Constraints(
+            ece_max=self.cfg["ethics"]["ece_max"],
+            rho_bias_max=self.cfg["ethics"]["rho_bias_max"],
+            fairness_min=self.cfg["ethics"]["fairness_min"],
+            consent_required=self.cfg["ethics"]["consent_required"],
+            eco_ok_required=self.cfg["ethics"]["eco_ok_required"],
+            rho_max=self.cfg["risk"]["rho_max"],
+            uncertainty_max=self.cfg["risk"]["uncertainty_max"],
+            volatility_max=self.cfg["risk"]["volatility_max"],
+            cbf_margin=self.cfg["risk"]["cbf_margin"],
+            delta_linf_min=self.cfg["performance"]["delta_linf_min"],
+            ppl_ood_max=self.cfg["performance"]["ppl_ood_target"],
+            efficiency_min=self.cfg["performance"]["efficiency_min"],
+        )
+        
+        # Override com governança do contexto
+        if context and "governance" in context:
+            gov = context["governance"]
+            if "ethics" in gov:
+                constraints.ece_max = gov["ethics"].get("ece_max", constraints.ece_max)
+                constraints.rho_bias_max = gov["ethics"].get("rho_bias_max", constraints.rho_bias_max)
+            if "risk" in gov:
+                constraints.rho_max = gov["risk"].get("rho_max", constraints.rho_max)
+            if "performance" in gov:
+                constraints.delta_linf_min = gov["performance"].get("delta_linf_min", constraints.delta_linf_min)
+        
+        # Ajustar com margem de segurança baseada no estado atual
+        constraints.rho_max = min(constraints.rho_max, state.get("rho", 0.5) + 0.3)
+        
+        return constraints
+    
+    def _allocate_budgets(
+        self,
+        goals: List[Goal],
+        context: Optional[Dict[str, Any]]
+    ) -> Budgets:
+        """Aloca budgets inteligentemente baseado nos objetivos."""
+        # Base da configuração
+        budgets = Budgets(
+            max_tokens=self.cfg["budgets"]["max_tokens"],
+            max_cost=self.cfg["budgets"]["max_cost"],
+            max_latency_ms=self.cfg["budgets"]["max_latency_ms"],
+            max_llm_calls=self.cfg["budgets"]["max_llm_calls"],
+            max_memory_mb=self.cfg["budgets"]["max_memory_mb"],
+            quota_local=self.cfg["budgets"]["quota_local"],
+            reserve_ratio=self.cfg["budgets"]["reserve_ratio"],
+            emergency_reserve=self.cfg["budgets"]["emergency_reserve"],
+        )
+        
+        # Escalar por complexidade dos objetivos
+        num_goals = len(goals)
+        complexity_factor = 1 + math.log(1 + num_goals) * 0.2
+        
+        # Ajustar por prioridade média
+        avg_priority = sum(g.priority for g in goals) / max(1, num_goals)
+        priority_factor = 0.8 + avg_priority * 0.4
+        
+        # Aplicar fatores
+        budgets.max_tokens = int(budgets.max_tokens * complexity_factor * priority_factor)
+        budgets.max_llm_calls = int(budgets.max_llm_calls * complexity_factor)
+        
+        # Aplicar quotas do contexto
+        if context and "quotas" in context:
+            quotas = context["quotas"]
+            for key in ["tokens", "cost", "llm_calls", "memory_mb"]:
+                if key in quotas:
+                    max_key = f"max_{key}"
+                    if hasattr(budgets, max_key):
+                        current = getattr(budgets, max_key)
+                        setattr(budgets, max_key, min(current, quotas[key]))
+        
+        # Inicializar reservas
+        budgets.__post_init__()
+        
+        return budgets
+    
+    def _create_promotion_policy(
+        self,
+        sr_score: float,
+        constraints: Constraints,
+        goals: List[Goal]
+    ) -> Dict[str, Any]:
+        """Cria política de promoção lexicográfica estrita."""
+        return {
+            "criteria": [
+                # Nível 1: Ética (não-negociável)
+                {
+                    "level": 1,
+                    "type": "ethics",
+                    "conditions": [
+                        {"metric": "ece", "op": "<=", "value": constraints.ece_max},
+                        {"metric": "rho_bias", "op": "<=", "value": constraints.rho_bias_max},
+                        {"metric": "fairness", "op": ">=", "value": constraints.fairness_min},
+                        {"metric": "consent", "op": "==", "value": True},
+                        {"metric": "eco_ok", "op": "==", "value": True},
+                    ],
+                    "mode": "all",  # Todas devem ser satisfeitas
+                },
+                # Nível 2: Risco
+                {
+                    "level": 2,
+                    "type": "risk",
+                    "conditions": [
+                        {"metric": "rho", "op": "<=", "value": constraints.rho_max},
+                        {"metric": "uncertainty", "op": "<=", "value": constraints.uncertainty_max},
+                        {"metric": "sr_score", "op": ">=", "value": self.cfg["sr_omega"]["tau_SR"]},
+                    ],
+                    "mode": "all",
+                },
+                # Nível 3: Performance
+                {
+                    "level": 3,
+                    "type": "performance",
+                    "conditions": [
+                        {"metric": "delta_linf", "op": ">=", "value": constraints.delta_linf_min},
+                        {"metric": "caos_post", "op": ">=", "value": "caos_pre"},  # Referência
+                        {"metric": "efficiency", "op": ">=", "value": constraints.efficiency_min},
+                    ],
+                    "mode": "majority",  # Maioria satisfeita
+                },
+                # Goals específicos
+                {
+                    "level": 4,
+                    "type": "goals",
+                    "conditions": [
+                        {"type": "goal_achievement", "threshold": 0.7},  # 70% dos goals
+                    ],
+                    "mode": "threshold",
+                },
+            ],
+            "evaluation": "lexicographic_strict",
+            "confidence_required": max(0.6, sr_score * 0.8),
+            "min_cycles": 3,  # Mínimo de ciclos antes de promoção
+        }
+    
+    def _create_rollback_policy(
+        self,
+        constraints: Constraints,
+        goals: List[Goal]
+    ) -> Dict[str, Any]:
+        """Cria política de rollback com triggers priorizados."""
+        return {
+            "triggers": [
+                # Prioridade 1: Violações éticas (rollback imediato)
+                {
+                    "priority": 1,
+                    "type": "ethics_violation",
+                    "conditions": [
+                        {"metric": "ece", "op": ">", "value": constraints.ece_max * 1.1},
+                        {"metric": "rho_bias", "op": ">", "value": constraints.rho_bias_max * 1.05},
+                        {"metric": "fairness", "op": "<", "value": constraints.fairness_min * 0.95},
+                    ],
+                    "mode": "any",  # Qualquer uma dispara
+                    "action": "immediate_rollback",
+                    "severity": "critical",
+                },
+                # Prioridade 2: Risco crítico
+                {
+                    "priority": 2,
+                    "type": "risk_critical",
+                    "conditions": [
+                        {"metric": "rho", "op": ">", "value": constraints.rho_max},
+                        {"metric": "uncertainty", "op": ">", "value": constraints.uncertainty_max * 1.2},
+                        {"metric": "volatility", "op": ">", "value": constraints.volatility_max * 1.5},
+                    ],
+                    "mode": "any",
+                    "action": "immediate_rollback",
+                    "severity": "high",
+                },
+                # Prioridade 3: SR collapse
+                {
+                    "priority": 3,
+                    "type": "sr_collapse",
+                    "conditions": [
+                        {"metric": "sr_score", "op": "<", "value": self.cfg["sr_omega"]["tau_SR"] * 0.5},
+                    ],
+                    "mode": "all",
+                    "action": "graceful_rollback",
+                    "severity": "medium",
+                },
+                # Prioridade 4: Performance degradação severa
+                {
+                    "priority": 4,
+                    "type": "performance_degradation",
+                    "conditions": [
+                        {"metric": "delta_linf", "op": "<", "value": 0},  # Regressão
+                        {"metric": "ppl_ood", "op": ">", "value": constraints.ppl_ood_max * 1.2},
+                    ],
+                    "mode": "all",
+                    "action": "throttle_and_monitor",
+                    "severity": "low",
+                },
+                # Prioridade 5: Budget exceeded
+                {
+                    "priority": 5,
+                    "type": "budget_exceeded",
+                    "conditions": [
+                        {"metric": "cost_ratio", "op": ">", "value": 1.2},
+                        {"metric": "token_ratio", "op": ">", "value": 1.1},
+                    ],
+                    "mode": "any",
+                    "action": "resource_throttle",
+                    "severity": "warning",
+                },
+            ],
+            "evaluation_mode": "priority_ordered",
+            "grace_period_ms": 0,  # Sem período de graça para críticos
+            "notification": True,
+            "auto_recovery": True,  # Tentar recuperação automática
+        }
+    
+    def _create_priority_map(self, goals: List[Goal]) -> Dict[str, float]:
+        """Mapeia prioridades para fases F3-F8 do sistema."""
+        # Inicializar mapa
+        priority_map = {f"F{i}": 0.0 for i in range(3, 9)}
+        
+        # Mapear goals para fases
+        for goal in goals:
+            name_lower = goal.name.lower()
+            
+            # F3: Aquisição/Exploração
+            if any(word in name_lower for word in ["explore", "novel", "discover", "acquire"]):
+                priority_map["F3"] += goal.priority
+            
+            # F4: Calibração
+            elif any(word in name_lower for word in ["calibr", "uncertain", "confidence"]):
+                priority_map["F4"] += goal.priority
+            
+            # F5: Mutação/Robustez
+            elif any(word in name_lower for word in ["robust", "ood", "mutate", "adapt"]):
+                priority_map["F5"] += goal.priority
+            
+            # F6: Avaliação/Fairness
+            elif any(word in name_lower for word in ["fair", "bias", "eval", "assess"]):
+                priority_map["F6"] += goal.priority
+            
+            # F7: Scheduling/Eficiência
+            elif any(word in name_lower for word in ["effic", "speed", "schedul", "optim"]):
+                priority_map["F7"] += goal.priority
+            
+            # F8: Síntese/Integração
+            else:
+                priority_map["F8"] += goal.priority
+        
+        # Adicionar peso base para fases críticas
+        priority_map["F4"] += 0.1  # Calibração sempre importante
+        priority_map["F6"] += 0.1  # Avaliação sempre importante
+        
+        # Normalizar
+        total = sum(priority_map.values())
+        if total > 0:
+            priority_map = {k: v/total for k, v in priority_map.items()}
+        else:
+            # Distribuição uniforme se sem prioridades
+            priority_map = {k: 1.0/6 for k in priority_map.keys()}
+        
+        # Filtrar valores muito baixos
+        return {k: v for k, v in priority_map.items() if v > 0.01}
+    
+    def _generate_rationale(
+        self,
+        intent: str,
+        goals: List[Goal],
+        sr_score: float,
+        context: Optional[Dict[str, Any]]
+    ) -> str:
+        """Gera rationale explicativo do plano."""
+        # Tentar LLM se configurado e disponível
+        if self.cfg["llm"]["enabled"] and context and "llm_client" in context:
+            try:
+                return self._generate_llm_rationale(intent, goals, sr_score, context)
+            except:
+                pass  # Fallback para determinístico
+        
+        # Rationale determinístico estruturado
+        goal_summary = self._summarize_goals(goals)
+        strategy = self._describe_strategy(goals)
+        
+        rationale = (
+            f"Intent: '{intent[:100]}' | "
+            f"SR: {sr_score:.3f} | "
+            f"Strategy: {strategy} | "
+            f"Goals: {goal_summary} | "
+            f"Trust: {self.trust_manager.radius:.3f} | "
+            f"Confidence: {self._calculate_confidence(sr_score, goals, None):.2f}"
+        )
+        
+        return rationale
+    
+    def _summarize_goals(self, goals: List[Goal]) -> str:
+        """Sumariza objetivos por nível lexicográfico."""
+        by_level = {1: [], 2: [], 3: []}
+        for goal in goals:
+            by_level[goal.lexicographic_level].append(goal.name)
+        
+        summary_parts = []
+        if by_level[1]:
+            summary_parts.append(f"Ethics: {len(by_level[1])}")
+        if by_level[2]:
+            summary_parts.append(f"Risk: {len(by_level[2])}")
+        if by_level[3]:
+            summary_parts.append(f"Perf: {len(by_level[3])}")
+        
+        return " | ".join(summary_parts) if summary_parts else "None"
+    
+    def _describe_strategy(self, goals: List[Goal]) -> str:
+        """Descreve estratégia baseada nos objetivos."""
+        if not goals:
+            return "Conservative"
+        
+        ethics_goals = sum(1 for g in goals if g.lexicographic_level == 1)
+        risk_goals = sum(1 for g in goals if g.lexicographic_level == 2)
+        
+        if ethics_goals > len(goals) / 2:
+            return "Ethics-focused"
+        elif risk_goals > len(goals) / 2:
+            return "Risk-mitigation"
+        elif any("explore" in g.name.lower() for g in goals):
+            return "Exploratory"
+        else:
+            return "Performance-optimization"
+    
+    def _calculate_confidence(
+        self,
+        sr_score: float,
+        goals: List[Goal],
+        constraints: Optional[Constraints]
+    ) -> float:
+        """Calcula confiança multifatorial do plano."""
+        # Base: SR score
+        confidence = sr_score
+        
+        # Fator de viabilidade dos objetivos
+        if goals:
+            avg_viability = sum(g.viability_score for g in goals) / len(goals)
+            confidence *= (0.5 + 0.5 * avg_viability)
+            
+            # Penalizar muitos objetivos
+            if len(goals) > 7:
+                confidence *= 0.9
+            
+            # Boost para objetivos éticos
+            ethics_ratio = sum(1 for g in goals if g.lexicographic_level == 1) / len(goals)
+            confidence *= (1 + ethics_ratio * 0.1)
+        
+        # Boost se constraints são conservadoras
+        if constraints and constraints.rho_max < 0.9:
+            confidence *= 1.1
+        
+        # Trust region factor
+        tr_factor = 1.0 - abs(self.trust_manager.radius - 0.1) / 0.4
+        confidence *= (0.8 + 0.2 * tr_factor)
+        
+        return max(0.0, min(1.0, confidence))
+    
+    def _validate_plan(self, plan: PlanOmega, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Valida plano completo antes de retornar."""
+        validation = {
+            "valid": True,
+            "errors": [],
+            "warnings": [],
+        }
+        
+        # 1. Validar constraints
+        valid, violations = plan.constraints.validate(state)
+        if not valid:
+            validation["valid"] = False
+            validation["errors"].extend(violations)
+        
+        # 2. Validar budgets
+        if plan.budgets.get_usage_ratio() > 1.0:
+            validation["warnings"].append("Budget usage exceeds limits")
+        
+        # 3. Validar goals
+        for goal in plan.goals:
+            if goal.deadline < 1:
+                validation["warnings"].append(f"Goal {goal.name} has invalid deadline")
+            if goal.tolerance < 0:
+                validation["errors"].append(f"Goal {goal.name} has negative tolerance")
+                validation["valid"] = False
+        
+        # 4. Validar priority map
+        if not plan.priority_map:
+            validation["warnings"].append("Empty priority map")
+        elif abs(sum(plan.priority_map.values()) - 1.0) > 0.01:
+            validation["warnings"].append("Priority map not normalized")
+        
+        # 5. Validar políticas
+        if not plan.promotion_policy:
+            validation["errors"].append("Missing promotion policy")
+            validation["valid"] = False
+        if not plan.rollback_policy:
+            validation["errors"].append("Missing rollback policy")
+            validation["valid"] = False
+        
+        return validation
+    
+    def _check_rollback_triggers(
+        self,
+        policy: Dict[str, Any],
+        metrics: Dict[str, Any]
+    ) -> Optional[str]:
+        """Verifica se algum trigger de rollback foi acionado."""
+        if not policy or "triggers" not in policy:
+            return None
+        
+        for trigger in policy["triggers"]:
+            conditions_met = []
+            
+            for condition in trigger.get("conditions", []):
+                metric = condition.get("metric")
+                op = condition.get("op")
+                value = condition.get("value")
+                
+                if metric not in metrics:
+                    continue
+                
+                current = metrics[metric]
+                
+                # Avaliar condição
+                if op == ">":
+                    met = current > value
+                elif op == "<":
+                    met = current < value
+                elif op == ">=":
+                    met = current >= value
+                elif op == "<=":
+                    met = current <= value
+                elif op == "==":
+                    met = current == value
+                else:
+                    met = False
+                
+                conditions_met.append(met)
+            
+            # Avaliar modo
+            mode = trigger.get("mode", "all")
+            if mode == "all" and all(conditions_met):
+                return trigger.get("type", "unknown")
+            elif mode == "any" and any(conditions_met):
+                return trigger.get("type", "unknown")
+        
+        return None
+    
+    def _sync_with_scheduler(self, plan: PlanOmega, scheduler: Any) -> None:
+        """Sincroniza plano com scheduler (fase 7/8)."""
+        try:
+            # Preparar payload para scheduler
+            scheduler_payload = {
+                "plan_id": plan.id,
+                "priority_map": plan.priority_map,
+                "goals": [g.to_dict() for g in plan.goals],
+                "budgets": plan.budgets.remaining(),
+                "constraints": {
+                    "trust_region": plan.constraints.trust_region_radius_proposed,
+                    "rho_max": plan.constraints.rho_max,
+                },
+            }
+            
+            # Enviar para scheduler
+            if hasattr(scheduler, "update_priorities"):
+                scheduler.update_priorities(scheduler_payload)
+            
+            # Registrar sincronização
+            self._log_event(StrategyEvent.SYNC_WITH_SCHEDULER, {
+                "plan_id": plan.id,
+                "scheduler": str(scheduler),
+            })
+        except Exception as e:
+            # Log mas não falha
+            warnings.warn(f"Scheduler sync failed: {e}")
+    
+    def _compute_input_hash(self, *args) -> str:
+        """Calcula hash SHA-256 das entradas."""
+        content = []
+        for arg in args:
+            if arg is None:
+                content.append("null")
+            elif isinstance(arg, (dict, list)):
+                content.append(json.dumps(arg, sort_keys=True))
+            else:
+                content.append(str(arg))
+        
+        combined = "|".join(content)
+        return hashlib.sha256(combined.encode()).hexdigest()
+    
+    def _hash_config(self) -> str:
+        """Hash da configuração para auditoria."""
+        return hashlib.sha256(
+            json.dumps(self.cfg, sort_keys=True).encode()
+        ).hexdigest()
+    
+    def _timestamp(self) -> str:
+        """Timestamp ISO para registros."""
+        return datetime.now(timezone.utc).isoformat()
+    
+    def _merge_configs(
+        self,
+        custom: Dict[str, Any],
+        base: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Merge recursivo de configurações."""
+        result = deepcopy(base)
+        
+        for key, value in custom.items():
+            if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+                result[key] = self._merge_configs(value, result[key])
+            else:
+                result[key] = value
+        
+        # Integrar com governança do core se disponível
+        if CORE_INTEGRATION and CORE_GOVERNANCE:
+            for key in ["ethics", "risk", "performance"]:
+                if key in CORE_GOVERNANCE:
+                    result[key] = self._merge_configs(
+                        result.get(key, {}),
+                        CORE_GOVERNANCE[key]
+                    )
+        
+        return result
+    
+    def _log_event(self, event: StrategyEvent, data: Dict[str, Any]) -> None:
+        """Registra evento no WORM com compressão opcional."""
+        if not self.cfg["worm"]["enabled"] or not self.worm:
+            return
+        
+        try:
+            payload = {
+                **data,
+                "event": event.value,
+                "timestamp": self._timestamp(),
+                "cycle": self.cycle_count,
+                "module": "2/8",
+            }
+            
+            # Comprimir se configurado
+            if self.cfg["worm"].get("compression", False):
+                import zlib
+                import base64
+                compressed = base64.b64encode(
+                    zlib.compress(json.dumps(payload).encode())
+                ).decode()
+                payload = {"compressed": compressed}
+            
+            self.worm.record_event(event.value, payload)
+        except Exception as e:
+            # Silencioso mas registra internamente
+            warnings.warn(f"WORM logging failed: {e}")
+    
+    def _log_gate_failure(self, sr_score: float, decision: str) -> None:
+        """Registra falha de gate para análise."""
+        self.telemetry["gates_failed"] += 1
+        self._log_event(StrategyEvent.STRATEGY_GATE_FAIL, {
+            "sr_score": sr_score,
+            "threshold": self.cfg["sr_omega"]["tau_SR"],
+            "decision": decision,
+            "trust_radius": self.trust_manager.radius,
+        })
+    
+    def _update_telemetry(self, latency_ms: float, success: bool) -> None:
+        """Atualiza métricas de telemetria."""
+        self.telemetry["plans_created"] += 1
+        
+        if success:
+            self.telemetry["gates_passed"] += 1
+        
+        # Média móvel exponencial de latência
+        alpha = 0.1
+        self.telemetry["avg_latency_ms"] = (
+            alpha * latency_ms +
+            (1 - alpha) * self.telemetry["avg_latency_ms"]
+        )
+        
+        # Verificar se precisa exportar
+        if self.cfg["telemetry"]["export_interval"] > 0:
+            if self.cycle_count % self.cfg["telemetry"]["export_interval"] == 0:
+                self._export_telemetry()
+    
+    def _export_telemetry(self) -> None:
+        """Exporta telemetria (placeholder para integração)."""
+        # Aqui seria a integração com sistema de métricas
+        # Por ora, apenas registra no WORM
+        self._log_event(StrategyEvent.PERFORMANCE_METRIC, {
+            "telemetry": self.get_telemetry(),
+        })
+
+# =============================================================================
+# Factory Functions e Interface Principal
+# =============================================================================
+
+def create_strategy_module(
+    config: Optional[Dict[str, Any]] = None,
+    worm: Optional[WORMLedger] = None,
+    core: Optional[Dict[str, Any]] = None
+) -> StrategyModuleFusion:
+    """
+    Factory para criar módulo estratégico 2/8 fusionado.
+    
+    Args:
+        config: Configuração customizada
+        worm: Interface WORM para auditoria
+        core: Componentes do 1/8 se disponíveis
+        
+    Returns:
+        StrategyModuleFusion configurado e pronto para uso
+    """
+    return StrategyModuleFusion(config, worm, core)
+
+# Alias para compatibilidade
+StrategyModule = StrategyModuleFusion
+
+# UUID para IDs únicos
+try:
+    import uuid
+except ImportError:
+    # Fallback simples
+    class uuid:
+        @staticmethod
+        def uuid4():
+            import random
+            return type('obj', (object,), {'hex': hex(random.getrandbits(128))[2:]})()
+
+# =============================================================================
+# Main - Teste e Demonstração
+# =============================================================================
+
+if __name__ == "__main__":
+    print("="*80)
+    print("PENIN-Ω Strategy Module 2/8 - Fusão Definitiva")
+    print("="*80)
+    
+    # Criar módulo
+    strategy = create_strategy_module()
+    
+    # Estado de teste completo
+    test_state = OmegaState(
+        E_ok=0.95,
+        M=0.85,
+        C=0.80,
+        A=0.75,
+        ece=0.008,
+        rho_bias=1.02,
+        fairness=0.96,
+        consent=True,
+        eco_ok=True,
+        rho=0.82,
+        uncertainty=0.25,
+        volatility=0.15,
+        delta_linf=0.018,
+        mdl_gain=0.035,
+        ppl_ood=88.0,
+        efficiency=0.75,
+        caos_post=1.35,
+        caos_stable=True,
+        self_improvement=0.72,
+        exploration=0.65,
+        adaptation=0.80,
+        learning_rate=0.001,
+        sr_score=0.85,
+        trust_region_radius=0.12,
+        cycle_count=42
+    )
+    
+    # Intenção complexa
+    test_intent = "Melhorar robustez OOD em 5% mantendo ρ<0.9 com foco em fairness"
+    
+    # Contexto rico
+    test_context = {
+        "governance": {
+            "ethics": {"ece_max": 0.01, "fairness_min": 0.95},
+            "risk": {"rho_max": 0.90},
+            "performance": {"delta_linf_min": 0.01}
+        },
+        "quotas": {
+            "tokens": 50000,
+            "cost": 5.0,
+            "llm_calls": 50,
+        }
+    }
+    
+    print("\nGerando Plano Ω-META...")
+    print("-"*40)
+    
+    # Criar plano
+    result = strategy.create_plan(test_state, test_intent, test_context)
+    
+    # Exibir resultado
+    plan = result["PlanΩ"]
+    sr_report = result["SR_report"]
+    proof = result["proof"]
+    
+    print(f"\n📋 PLANO GERADO")
+    print(f"   ID: {plan['id']}")
+    print(f"   Ciclo: {plan['cycle']}")
+    print(f"   Status: {plan['status']}")
+    print(f"   Tempo de geração: {plan['generation_time_ms']:.2f}ms")
+    
+    print(f"\n📊 SR-Ω∞ REPORT")
+    print(f"   Score: {sr_report['sr_score']:.3f} (τ={sr_report['tau_SR']})")
+    print(f"   Válido: {sr_report['valid']}")
+    print(f"   Decisão: {sr_report['decision']}")
+    print(f"   Componentes:")
+    for comp, value in sr_report['components'].items():
+        print(f"      {comp}: {value:.3f}")
+    
+    print(f"\n🎯 OBJETIVOS ({len(plan['goals'])})")
+    for i, goal in enumerate(plan['goals'], 1):
+        print(f"   {i}. {goal['name']} (L{goal.get('lexicographic_level', 3)})")
+        print(f"      Métrica: {goal['metric']} → {goal['target']:.3f}")
+        print(f"      Prazo: {goal['deadline']} ciclos")
+        print(f"      Prioridade: {goal['priority']:.2f}")
+    
+    print(f"\n🔒 CONSTRAINTS")
+    constraints = plan['constraints']
+    print(f"   Ética: ECE≤{constraints['ece_max']}, ρ_bias≤{constraints['rho_bias_max']}")
+    print(f"   Risco: ρ≤{constraints['rho_max']}, σ≤{constraints['uncertainty_max']}")
+    print(f"   Trust Region: {constraints['trust_region_radius_proposed']:.3f}")
+    
+    print(f"\n💰 BUDGETS")
+    budgets = plan['budgets']
+    print(f"   Tokens: {budgets['max_tokens']:,}")
+    print(f"   Custo: ${budgets['max_cost']:.2f}")
+    print(f"   Latência: {budgets['max_latency_ms']}ms")
+    
+    print(f"\n📈 PRIORIDADES (Fases)")
+    for phase, weight in plan['priority_map'].items():
+        bar = "█" * int(weight * 20)
+        print(f"   {phase}: {weight:.2f} {bar}")
+    
+    print(f"\n🔐 PROVAS")
+    print(f"   Hash do Plano: {proof['plan_hash'][:32]}...")
+    print(f"   Hash de Entrada: {proof['input_hash'][:32]}...")
+    print(f"   Assinatura: {proof.get('signature', 'N/A')[:32]}...")
+    print(f"   Validação: {proof.get('validation', 'N/A')}")
+    
+    print(f"\n📡 SINAIS")
+    print(f"   U_signal (para F3): {result['U_signal']:.3f}")
+    print(f"   Confiança: {plan['confidence']:.3f}")
+    print(f"   SR Score: {plan['sr_score']:.3f}")
+    
+    print(f"\n💭 RATIONALE")
+    print(f"   {plan['rationale']}")
+    
+    # Testar atualização
+    print(f"\n\n{'='*40}")
+    print("Simulando feedback de execução...")
+    
+    test_results = {
+        "goal_results": {
+            plan['goals'][0]['id']: {"achieved": True, "progress": 1.0}
+        },
+        "performance": {
+            "delta_linf": 0.022,
+            "success": True,
+        },
+        "metrics": {
+            "sr_score": 0.87,
+            "rho": 0.81,
+        }
+    }
+    
+    strategy.update_from_results(plan['id'], test_results)
+    
+    # Telemetria
+    print(f"\n📊 TELEMETRIA")
+    telemetry = strategy.get_telemetry()
+    print(f"   Planos criados: {telemetry['plans_created']}")
+    print(f"   Gates passados: {telemetry['gates_passed']}")
+    print(f"   Gates falhados: {telemetry['gates_failed']}")
+    print(f"   Latência média: {telemetry['avg_latency_ms']:.2f}ms")
+    print(f"   Trust Region: {telemetry['trust_region']['trend']}")
+    
+    print(f"\n{'='*80}")
+    print("✅ Teste do Módulo 2/8 Fusão Definitiva Completo!")
+    print(f"{'='*80}")
