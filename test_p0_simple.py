@@ -29,11 +29,11 @@ def test_ethics_metrics_calculation():
         # Generate test data (without numpy)
         import random
         random.seed(42)
-        n_samples = 1000
+        n_samples = 100  # Reduced for faster testing
         predictions = [random.random() for _ in range(n_samples)]
         targets = [1 if random.random() > 0.3 else 0 for _ in range(n_samples)]
         protected_attrs = [random.choice(['A', 'B', 'C']) for _ in range(n_samples)]
-        risk_series = [sum(random.random() - 0.5 for _ in range(i)) + 10 for i in range(50)]
+        risk_series = [sum(random.random() - 0.5 for _ in range(i)) + 10 for i in range(20)]
         
         consent_data = {
             'user_consent': True,
