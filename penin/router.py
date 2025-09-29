@@ -1,4 +1,5 @@
 import asyncio
+import time
 from typing import List, Optional, Dict, Any
 from tenacity import retry, stop_after_attempt, wait_exponential
 from penin.config import settings
@@ -22,10 +23,13 @@ class MultiLLMRouter:
         tools: Optional[List[Dict[str, Any]]] = None,
         temperature: float = 0.7,
     ) -> LLMResponse:
-        tasks = [p.chat(messages, tools=tools, system=system, temperature=temperature) for p in self.providers]
+        tasks = [
+            p.chat(messages, tools=tools, system=system, temperature=temperature)
+            for p in self.providers
+        ]
         results: List[LLMResponse] = await asyncio.gather(*tasks, return_exceptions=True)
         ok = [r for r in results if isinstance(r, LLMResponse)]
         if not ok:
-            raise RuntimeError("all providers failed")
+            errors = [str(r) for r in results if isinstance(r, Exception)]
+            raise RuntimeError(f"All providers failed. Errors: {errors}")
         return max(ok, key=self._score)
-

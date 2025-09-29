@@ -24,8 +24,9 @@ class AnthropicProvider(BaseProvider):
         if system:
             msgs.append({"role": "system", "content": system})
         msgs += messages
-        resp = await asyncio.to_thread(self.client.messages.create, model=self.model, max_tokens=2048, messages=msgs)
+        resp = await asyncio.to_thread(
+            self.client.messages.create, model=self.model, max_tokens=2048, messages=msgs
+        )
         content = resp.content[0].text if getattr(resp, "content", None) else ""
         end = time.time()
         return LLMResponse(content=content, model=self.model, provider=self.name, latency_s=end - start)
-
