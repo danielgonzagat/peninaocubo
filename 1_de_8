@@ -894,6 +894,11 @@ class PeninOmegaCore:
             if not (0.0 < cfg["thresholds"]["beta_min"] <= 1.0):
                 raise ValueError("beta_min out of range")
         except Exception as e:
+            raise RuntimeError(f"Invalid configuration: {e}") from e
+                raise ValueError("rho_max out of range")
+            if not (0.0 < cfg["thresholds"]["beta_min"] <= 1.0):
+                raise ValueError("beta_min out of range")
+        except Exception as e:
             raise RuntimeError(f"Invalid configuration: {e}")
         return cfg
     def _register_boot(self):
