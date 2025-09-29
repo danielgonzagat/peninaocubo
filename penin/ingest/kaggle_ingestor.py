@@ -3,7 +3,7 @@ import re
 from typing import Any, Dict
 
 
-SAFE_QUERY_PATTERN = re.compile(r"^[\w\s-]+$")
+SAFE_QUERY_PATTERN = re.compile(r"^[a-zA-Z0-9\s-]+$")
 
 
 async def kaggle_search_datasets(query: str, max_results: int = 10) -> Dict[str, Any]:
