@@ -30,6 +30,7 @@ class OpenAIProvider(BaseProvider):
             tools=tools,
             temperature=temperature,
         )
+        )
         choice = resp.choices[0]
         content = choice.message.content or ""
         tool_calls = choice.message.tool_calls or []
