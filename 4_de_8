@@ -1547,6 +1547,7 @@ class MutationEngine:
         _seed_local = int(_hash_data({"cand": cand_id, "plan": plan.to_dict()})[:16], 16)
         _rng = random.Random(_seed_local)
         _rng = random.Random(_seed_local)
+        _rng = random.Random(_seed_local)
         pred_metrics = {
             "delta_linf_hat": max(0.0, 0.01 + 0.1 * _rng.random()),
             "mdl_gain_hat": max(0.0, 0.005 + 0.05 * _rng.random()),
