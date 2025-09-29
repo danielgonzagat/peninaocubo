@@ -1,3 +1,16 @@
+# --- Pydantic v1/v2 compatibility shim (auto-injected) ---
+try:
+    from pydantic import field_validator  # Pydantic v2
+except Exception:  # pragma: no cover
+    try:
+        from pydantic import validator as field_validator  # Pydantic v1 fallback
+    except Exception:  # última proteção: no-op decorator
+        def field_validator(*args, **kwargs):
+            def _wrap(fn): 
+                return fn
+            return _wrap
+# --- end shim ---
+
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
