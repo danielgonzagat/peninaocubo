@@ -146,6 +146,21 @@ logging.basicConfig(
 log = logging.getLogger("Ω-1/8")
 
 # -----------------------------------------------------------------------------
+# Helpers for hashing and seeding
+# -----------------------------------------------------------------------------
+def _hash_obj(obj: Any) -> str:
+    try:
+        return hashlib.sha256(json.dumps(obj, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+    except Exception:
+        return hashlib.sha256(str(obj).encode()).hexdigest()
+
+def _sigmoid(x: float, beta: float, mid: float) -> float:
+    try:
+        return 1.0 / (1.0 + math.exp(-beta * (x - mid)))
+    except OverflowError:
+        return 0.0 if (-beta * (x - mid)) > 0 else 1.0
+
+# -----------------------------------------------------------------------------
 # Fibonacci toolkit and Zeckendorf
 # -----------------------------------------------------------------------------
 PHI = (1.0 + math.sqrt(5)) / 2.0
@@ -341,6 +356,13 @@ class MultiLevelCache:
         self._lock = threading.RLock()
     def _init_l2_db(self):
         cursor = self.l2_db.cursor()
+        # Optimize SQLite for concurrent reads/writes
+        try:
+            cursor.execute('PRAGMA journal_mode=WAL')
+            cursor.execute('PRAGMA synchronous=NORMAL')
+            cursor.execute('PRAGMA busy_timeout=3000')
+        except Exception:
+            pass
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS cache (
                 key TEXT PRIMARY KEY,
@@ -629,14 +651,13 @@ class IRtoIC:
     def __init__(self, cfg: Dict[str, Any], use_phi: bool = False):
         self.rho_max = cfg.get("iric", {}).get("rho_max", 0.95)
         self.contraction = INV_PHI if use_phi else cfg.get("iric", {}).get("contraction_factor", 0.98)
-        self.exec = ThreadPoolExecutor(max_workers=4)
+        # Removed ThreadPoolExecutor: checks are synchronous and cheap
     def safe(self, xt: OmegaMEState) -> bool:
-        fs = [
-            self.exec.submit(lambda: xt.rho < self.rho_max),
-            self.exec.submit(lambda: xt.uncertainty < 0.9),
-            self.exec.submit(lambda: xt.cpu < 0.95 and xt.mem < 0.95),
-        ]
-        return all(f.result() for f in as_completed(fs))
+        return (
+            (xt.rho < self.rho_max)
+            and (xt.uncertainty < 0.9)
+            and (xt.cpu < 0.95 and xt.mem < 0.95)
+        )
     def contract(self, xt: OmegaMEState) -> None:
         xt.rho *= self.contraction
         xt.uncertainty *= self.contraction
@@ -649,6 +670,10 @@ class CAOSPlusEngine:
         self.pmax = c.get("pmax", 2.0)
         self.pchaos = c.get("chaos_probability", 0.01)
         self.fib = fib
+        # EWMA parameters for stability gating of Fibonacci boost
+        self._ewma_linf: Optional[float] = None
+        self._ewma_alpha: float = float(c.get("ewma_alpha", 0.2))
+        self._stable_threshold: float = float(c.get("stable_threshold", 0.02))
     def compute(self, xt: OmegaMEState) -> float:
         if random.random() < self.pchaos:
             fac = random.uniform(0.9, 1.1)
@@ -658,7 +683,16 @@ class CAOSPlusEngine:
         exponent = max(self.pmin, min(self.pmax, O * S))
         val = base ** exponent
         patt = self.fib.analyze_fibonacci_patterns([C, A, O, S])
-        val *= (1.0 + 0.1 * patt["pattern_strength"])
+        # Stability-gated, clamped Fibonacci boost ≤ +5%
+        cur_linf = getattr(xt, "l_inf", 0.0)
+        if self._ewma_linf is None:
+            self._ewma_linf = cur_linf
+        else:
+            self._ewma_linf = (1.0 - self._ewma_alpha) * self._ewma_linf + self._ewma_alpha * cur_linf
+        stable = abs(cur_linf - (self._ewma_linf or cur_linf)) < self._stable_threshold
+        boost = 1.0 + 0.05 * max(0.0, min(1.0, patt.get("pattern_strength", 0.0)))
+        if stable:
+            val *= boost
         xt.pattern_score = patt["pattern_strength"]
         xt.caos_plus = val
         xt.caos_harmony = (C + A) / (O + S if (O + S) > 1e-9 else 1.0)
@@ -834,9 +868,26 @@ class PeninOmegaCore:
                            "l1_ttl_base": 1, "l2_ttl_base": 60, "max_interval_s": 300,
                            "trust_growth": None, "trust_shrink": None, "search_method": "fibonacci"},
             "thresholds": {"tau_caos": 0.7, "beta_min": 0.02},
-            "evolution": {"alpha_0": 0.1},
+            "evolution": {"alpha_0": 0.1,
+                           "alpha_sigmoid": {
+                               "caos": {"beta": 4.0, "mid": 0.5},
+                               "sr":   {"beta": 6.0, "mid": 0.8},
+                               "g":    {"beta": 6.0, "mid": 0.7},
+                               "oci":  {"beta": 6.0, "mid": 0.9}
+                           }},
         }
-        return _deep_merge(default, custom or {})
+        cfg = _deep_merge(default, custom or {})
+        # Minimal validation fallback (pydantic optional)
+        try:
+            if not (0.0 < cfg["ethics"]["ece_max"] <= 1.0):
+                raise ValueError("ece_max out of range")
+            if not (0.0 < cfg["iric"]["rho_max"] <= 1.0):
+                raise ValueError("rho_max out of range")
+            if not (0.0 < cfg["thresholds"]["beta_min"] <= 1.0):
+                raise ValueError("beta_min out of range")
+        except Exception as e:
+            raise RuntimeError(f"Invalid configuration: {e}")
+        return cfg
     def _register_boot(self):
         self.worm.record("BOOT", {
             "version": PKG_VERSION,
@@ -848,12 +899,24 @@ class PeninOmegaCore:
         result = {"success": False, "decision": None, "metrics": {}}
         t0 = time.time()
         try:
+            # Deterministic seeding per cycle
+            seed_material = _hash_obj({"cycle": self.xt.cycle, "l_inf": self.xt.l_inf, "ts": int(time.time()*1000)})
+            seed_int = int(seed_material[:16], 16)
+            random.seed(seed_int)
+            self.worm.record("CYCLE_SEED", {"seed": seed_int, "seed_material": seed_material}, self.xt)
             if external_metrics:
                 for k, v in external_metrics.items():
                     if hasattr(self.xt, k): setattr(self.xt, k, float(v))
             if HAS_PSUTIL:
                 self.xt.cpu = psutil.cpu_percent(interval=None) / 100.0
                 self.xt.mem = psutil.virtual_memory().percent / 100.0
+            else:
+                # Fail-closed: assume high usage when psutil missing
+                self.xt.cpu = 1.0
+                self.xt.mem = 1.0
+                result.update({"decision": "ABORT", "reason": "RESOURCE_UNVERIFIED"})
+                self.worm.record("CYCLE_ABORT", result, self.xt)
+                return result
             ok, violations = self.sigma.check(self.xt)
             if not ok:
                 result.update({"decision": "ABORT", "reason": "SIGMA_GUARD", "violations": violations})
@@ -885,7 +948,11 @@ class PeninOmegaCore:
             if self.xt.delta_linf < self.cfg["thresholds"]["beta_min"]: gates.append("ΔL∞_GATE")
             if self.xt.caos_plus < self.cfg["thresholds"]["tau_caos"]: gates.append("CAOS⁺_GATE")
             if gates:
-                result.update({"decision": "ROLLBACK", "reason": "GATES_FAILED", "failed_gates": gates})
+                gate_trace = {"failed": gates, "values": {
+                    "SR": self.xt.sr_score, "G": self.xt.g_score, "OCI": self.xt.oci_score,
+                    "ΔL∞": self.xt.delta_linf, "CAOS⁺": self.xt.caos_plus
+                }}
+                result.update({"decision": "ROLLBACK", "reason": "GATES_FAILED", "gate_trace": gate_trace})
                 self.metrics["rollbacks"] += 1
                 self.worm.record("ROLLBACK", result, self.xt)
                 return result
@@ -916,7 +983,18 @@ class PeninOmegaCore:
             if step_opt > 0:
                 result.update({"success": True, "decision": "PROMOTE", "evolution_step": step_opt})
                 self.metrics["promotions"] += 1
+                pre_hash = _hash_obj({"state": {"l_inf": self.xt.l_inf_prev}, "metrics": result["metrics"]})
+                post_hash = _hash_obj({"state": {"l_inf": self.xt.l_inf}, "metrics": result["metrics"]})
+                cfg_hash = _hash_obj(self.cfg)
                 self.worm.record("PROMOTE", {"step": step_opt, "alpha": alpha, "ΔL∞": self.xt.delta_linf}, self.xt)
+                self.worm.record("PROMOTE_ATTEST", {
+                    "pre_hash": pre_hash,
+                    "post_hash": post_hash,
+                    "config_hash": cfg_hash,
+                    "seed": seed_int,
+                    "gate_trace": {"SR": self.xt.sr_score, "G": self.xt.g_score, "OCI": self.xt.oci_score,
+                                     "ΔL∞": self.xt.delta_linf, "CAOS⁺": self.xt.caos_plus}
+                }, self.xt)
             else:
                 result.update({"decision": "ROLLBACK", "reason": "NEGATIVE_STEP"})
                 self.metrics["rollbacks"] += 1
@@ -935,12 +1013,16 @@ class PeninOmegaCore:
             self.worm.record("CYCLE_ABORT", result, self.xt)
             return result
     def _compute_alpha(self) -> float:
-        alpha_0 = self.cfg["evolution"]["alpha_0"]
-        phi_caos = min(1.0, self.xt.caos_plus / 2.0)
-        sr_comp = min(2.0, max(0.1, self.xt.sr_score))
-        g_comp  = min(2.0, max(0.1, self.xt.g_score))
-        oci_comp= min(2.0, max(0.1, self.xt.oci_score))
-        self.xt.alpha_omega = alpha_0 * phi_caos * sr_comp * g_comp * oci_comp
+        e = self.cfg["evolution"]
+        alpha_0 = e["alpha_0"]
+        sig = e.get("alpha_sigmoid", {})
+        # Sigmoid funnel per component
+        caos_norm = min(1.0, max(0.0, self.xt.caos_plus / 2.0))
+        caos_comp = _sigmoid(caos_norm, sig.get("caos", {}).get("beta", 4.0), sig.get("caos", {}).get("mid", 0.5))
+        sr_comp = _sigmoid(min(1.0, max(0.0, self.xt.sr_score)), sig.get("sr", {}).get("beta", 6.0), sig.get("sr", {}).get("mid", 0.8))
+        g_comp  = _sigmoid(min(1.0, max(0.0, self.xt.g_score)),  sig.get("g",  {}).get("beta", 6.0), sig.get("g",  {}).get("mid", 0.7))
+        oci_comp= _sigmoid(min(1.0, max(0.0, self.xt.oci_score)),sig.get("oci",{}).get("beta", 6.0), sig.get("oci",{}).get("mid", 0.9))
+        self.xt.alpha_omega = alpha_0 * caos_comp * sr_comp * g_comp * oci_comp
         return min(1.0, max(0.0, self.xt.alpha_omega))
     def verify_integrity(self) -> Dict[str, Any]:
         ok, err = self.worm.verify_chain()

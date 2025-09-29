@@ -1127,12 +1127,17 @@ class KnowledgeAcquisitionEngine:
         plan_hash = _hash_data(self.plan.to_dict())
         
         # Registra início
+        # Deterministic seed per acquisition run
+        seed_material = _hash_data({"plan": plan_hash, "ts": int(time.time()*1000)})
+        seed_int = int(seed_material[:16], 16)
+        random.seed(seed_int)
         proof_id = self.worm.record_event(
             AcquisitionEventType.ACQ_START.value,
             {
                 "plan_hash": plan_hash,
                 "timestamp": _ts(),
-                "budgets": asdict(self.plan.budgets)
+                "budgets": asdict(self.plan.budgets),
+                "seed": seed_int
             }
         )
         

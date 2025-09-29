@@ -1543,11 +1543,13 @@ class MutationEngine:
         # Extract features
         features = extract_features(real_params, micro, acq)
         
-        # Initial prediction (will be refined after surrogate training)
+        # Initial prediction (deterministic RNG derived from cand_id)
+        _seed_local = int(_hash_data({"cand": cand_id, "plan": plan.to_dict()})[:16], 16)
+        _rng = random.Random(_seed_local)
         pred_metrics = {
-            "delta_linf_hat": max(0.0, 0.01 + 0.1 * random.random()),
-            "mdl_gain_hat": max(0.0, 0.005 + 0.05 * random.random()),
-            "ppl_ood_hat": max(1.0, 95.0 - 10.0 * random.random())
+            "delta_linf_hat": max(0.0, 0.01 + 0.1 * _rng.random()),
+            "mdl_gain_hat": max(0.0, 0.005 + 0.05 * _rng.random()),
+            "ppl_ood_hat": max(1.0, 95.0 - 10.0 * _rng.random())
         }
         
         # Calculate score
