@@ -1,225 +1,54 @@
-"""
-Enhanced cache module with HMAC integrity protection.
-Uses orjson for serialization instead of pickle for security.
-"""
-
-import hashlib
-import hmac
-import os
-import sqlite3
-import time
-from collections import OrderedDict
+from __future__ import annotations
+import hashlib, hmac, json, os
 from pathlib import Path
-from typing import Any, Dict, Optional
-
-import orjson
+from typing import Any, Optional
 
 
 class SecureCache:
     """
-    Multi-level cache with HMAC integrity protection.
-    L1: In-memory LRU cache
-    L2: SQLite with orjson + HMAC
+    Cache seguro em 2 camadas: L1 (memória) + L2 (arquivo).
+    A camada L2 guarda HMAC do payload. Em mismatch: levanta ValueError.
     """
 
-    def __init__(
-        self,
-        l1_size: int = 1000,
-        l2_size: int = 10000,
-        l1_ttl: int = 60,
-        l2_ttl: int = 3600,
-        cache_dir: Optional[Path] = None,
-    ):
-        self.l1_size = l1_size
-        self.l2_size = l2_size
-        self.l1_ttl = l1_ttl
-        self.l2_ttl = l2_ttl
+    def __init__(self, root: Optional[str | Path] = None, key: Optional[bytes] = None):
+        self.root = Path(os.path.expanduser(root or "~/.penin_omega/cache"))
+        self.root.mkdir(parents=True, exist_ok=True)
+        self.key = key or os.environ.get("PENIN_CACHE_KEY", "penin-dev-key").encode("utf-8")
+        self._l1: dict[str, Any] = {}
 
-        # L1: In-memory cache
-        self.l1_cache: OrderedDict[str, Dict[str, Any]] = OrderedDict()
+    def _path(self, key: str) -> Path:
+        safe = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in key)
+        return self.root / f"{safe}.json"
 
-        # L2: SQLite cache with HMAC
-        if cache_dir is None:
-            cache_dir = Path.home() / ".penin" / "cache"
-        cache_dir.mkdir(parents=True, exist_ok=True)
-
-        self.l2_db_path = cache_dir / "l2_cache.db"
-        self.l2_db = sqlite3.connect(str(self.l2_db_path), check_same_thread=False)
-        self._init_l2_db()
-
-        # HMAC key for integrity
-        self._hmac_key = self._get_hmac_key()
-
-        # Statistics
-        self.stats = {
-            "hits": 0,
-            "misses": 0,
-            "l1_hits": 0,
-            "l2_hits": 0,
-            "evictions": 0,
-        }
-
-    def _get_hmac_key(self) -> bytes:
-        """Get HMAC key from environment or use default for dev."""
-        key = os.getenv("PENIN_CACHE_HMAC_KEY", "penin-dev-key-change-me")
-        return key.encode("utf-8")
-
-    def _init_l2_db(self):
-        """Initialize L2 SQLite database."""
-        cursor = self.l2_db.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS cache (
-                key TEXT PRIMARY KEY,
-                value BLOB NOT NULL,
-                timestamp REAL NOT NULL,
-                access_count INTEGER DEFAULT 0
-            )
-        """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON cache(timestamp)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_access ON cache(access_count)")
-        self.l2_db.commit()
-
-    def _serialize(self, obj: Any) -> bytes:
-        """Serialize object with HMAC for integrity."""
-        data = orjson.dumps(obj)
-        mac = hmac.new(self._hmac_key, data, hashlib.sha256).digest()
-        return mac + data
-
-    def _deserialize(self, b: bytes) -> Any:
-        """Deserialize and verify HMAC."""
-        if len(b) < 32:
-            raise ValueError("Invalid cache data: too short for HMAC")
-
-        mac, data = b[:32], b[32:]
-        expected_mac = hmac.new(self._hmac_key, data, hashlib.sha256).digest()
-
-        if not hmac.compare_digest(mac, expected_mac):
-            raise ValueError("L2 cache HMAC mismatch - data may be corrupted or tampered")
-        return orjson.loads(data)
-
-    def _is_expired(self, timestamp: float, ttl: int) -> bool:
-        """Check if cache entry is expired."""
-        return time.time() - timestamp > ttl
-
-    def get(self, key: str) -> Optional[Any]:
-        """Get value from cache (L1 -> L2)."""
-        # Check L1
-        if key in self.l1_cache:
-            entry = self.l1_cache[key]
-            if not self._is_expired(entry["timestamp"], self.l1_ttl):
-                self.l1_cache.move_to_end(key)
-                self.stats["hits"] += 1
-                self.stats["l1_hits"] += 1
-                return entry["value"]
-            else:
-                del self.l1_cache[key]
-
-        # Check L2
-        cursor = self.l2_db.cursor()
-        cursor.execute("SELECT value, timestamp FROM cache WHERE key = ?", (key,))
-        row = cursor.fetchone()
-
-        if row:
-            value_bytes, timestamp = row
-            if not self._is_expired(timestamp, self.l2_ttl):
-                try:
-                    value = self._deserialize(value_bytes)
-                    # Promote to L1
-                    self._promote_to_l1(key, value)
-                    # Update access count
-                    cursor.execute("UPDATE cache SET access_count = access_count + 1 WHERE key = ?", (key,))
-                    self.l2_db.commit()
-                    self.stats["hits"] += 1
-                    self.stats["l2_hits"] += 1
-                    return value
-                except ValueError as e:
-                    # Remove corrupted entry and re-raise for caller visibility
-                    cursor.execute("DELETE FROM cache WHERE key = ?", (key,))
-                    self.l2_db.commit()
-                    raise
-            else:
-                # Expired
-                cursor.execute("DELETE FROM cache WHERE key = ?", (key,))
-                self.l2_db.commit()
-
-        self.stats["misses"] += 1
-        return None
+    def _mac(self, payload: bytes) -> str:
+        return hmac.new(self.key, payload, hashlib.sha256).hexdigest()
 
     def set(self, key: str, value: Any) -> None:
-        """Set value in cache."""
-        # Add to L1
-        self._promote_to_l1(key, value)
+        """Salva valor; persiste L2 com HMAC do payload."""
+        self._l1[key] = value
+        data = {"value": value}
+        raw = json.dumps(data, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        tag = self._mac(raw)
+        blob = {"hmac": tag, "data": data}
+        self._path(key).write_text(json.dumps(blob, ensure_ascii=False), encoding="utf-8")
 
-        # Add to L2
-        value_bytes = self._serialize(value)
-        cursor = self.l2_db.cursor()
-
-        # Check if we need to evict
-        cursor.execute("SELECT COUNT(*) FROM cache")
-        count = cursor.fetchone()[0]
-
-        if count >= self.l2_size:
-            # Evict oldest entries (10% of cache)
-            evict_count = max(1, self.l2_size // 10)
-            cursor.execute(
-                """
-                DELETE FROM cache
-                WHERE key IN (
-                    SELECT key FROM cache
-                    ORDER BY timestamp ASC
-                    LIMIT ?
-                )
-            """,
-                (evict_count,),
-            )
-            self.stats["evictions"] += evict_count
-
-        # Insert or replace
-        cursor.execute(
-            """
-            INSERT OR REPLACE INTO cache (key, value, timestamp, access_count)
-            VALUES (?, ?, ?, 0)
-        """,
-            (key, value_bytes, time.time()),
-        )
-        self.l2_db.commit()
-
-    def _promote_to_l1(self, key: str, value: Any):
-        """Promote entry to L1 cache."""
-        if len(self.l1_cache) >= self.l1_size:
-            # Evict LRU
-            evicted_key, _ = self.l1_cache.popitem(last=False)
-            self.stats["evictions"] += 1
-
-        self.l1_cache[key] = {"value": value, "timestamp": time.time()}
-        self.l1_cache.move_to_end(key)
-
-    def clear(self):
-        """Clear all cache levels."""
-        self.l1_cache.clear()
-        cursor = self.l2_db.cursor()
-        cursor.execute("DELETE FROM cache")
-        self.l2_db.commit()
-
-    def get_stats(self) -> Dict[str, Any]:
-        """Get cache statistics."""
-        cursor = self.l2_db.cursor()
-        cursor.execute("SELECT COUNT(*) FROM cache")
-        l2_count = cursor.fetchone()[0]
-
-        return {
-            **self.stats,
-            "l1_size": len(self.l1_cache),
-            "l2_size": l2_count,
-            "hit_rate": self.stats["hits"] / max(1, self.stats["hits"] + self.stats["misses"]),
-        }
-
-    def close(self):
-        """Close database connection."""
-        self.l2_db.close()
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
+    def get(self, key: str) -> Optional[Any]:
+        """
+        Recupera valor. Se arquivo não existe → None.
+        Se HMAC diverge → ValueError("L2 cache HMAC mismatch").
+        """
+        if key in self._l1:
+            return self._l1[key]
+        p = self._path(key)
+        if not p.exists():
+            return None
+        blob = json.loads(p.read_text(encoding="utf-8"))
+        tag = blob.get("hmac")
+        data = blob.get("data", {})
+        raw = json.dumps(data, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        calc = self._mac(raw)
+        if not tag or not hmac.compare_digest(tag, calc):
+            raise ValueError("L2 cache HMAC mismatch")
+        val = data.get("value", None)
+        self._l1[key] = val
+        return val
