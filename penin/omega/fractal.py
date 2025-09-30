@@ -1,9 +1,9 @@
 """
-Fractal DSL and Propagation Engine
-==================================
+Fractal DSL and Auto-Similarity Engine
+======================================
 
-Implements auto-similarity and fractal propagation for PENIN-Ω modules.
-Non-compensatory propagation: core updates spread to all children.
+Implements fractal/auto-similar architecture where core parameters
+are propagated to submódulos maintaining non-compensatory behavior.
 """
 
 from __future__ import annotations
@@ -17,13 +17,13 @@ from pathlib import Path
 
 @dataclass
 class OmegaNode:
-    """Fractal node in the omega tree"""
+    """Node in the fractal tree"""
     id: str
     depth: int
     config: Dict[str, Any]
     children: List["OmegaNode"] = field(default_factory=list)
     parent: Optional["OmegaNode"] = None
-    created_at: float = field(default_factory=time.time)
+    last_update: float = 0.0
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -32,353 +32,302 @@ class OmegaNode:
             "config": self.config,
             "children_ids": [c.id for c in self.children],
             "parent_id": self.parent.id if self.parent else None,
-            "created_at": self.created_at
+            "last_update": self.last_update
         }
 
 
+@dataclass
 class FractalConfig:
     """Configuration for fractal tree"""
-    
-    def __init__(self, config_path: Optional[str] = None):
-        if config_path and Path(config_path).exists():
-            with open(config_path, 'r') as f:
-                self.data = yaml.safe_load(f)
-        else:
-            # Default configuration
-            self.data = {
-                "version": 1,
-                "depth": 2,
-                "branching": 3,
-                "weights": {
-                    "caos": 1.0,
-                    "sr": 1.0,
-                    "g": 1.0
-                },
-                "sync": {
-                    "propagate_core_updates": True,
-                    "non_compensatory": True
-                }
-            }
-    
-    @property
-    def depth(self) -> int:
-        return self.data.get("depth", 2)
-    
-    @property
-    def branching(self) -> int:
-        return self.data.get("branching", 3)
-    
-    @property
-    def weights(self) -> Dict[str, float]:
-        return self.data.get("weights", {"caos": 1.0, "sr": 1.0, "g": 1.0})
-    
-    @property
-    def propagate_core_updates(self) -> bool:
-        return self.data.get("sync", {}).get("propagate_core_updates", True)
-    
-    @property
-    def non_compensatory(self) -> bool:
-        return self.data.get("sync", {}).get("non_compensatory", True)
+    version: int = 1
+    depth: int = 2
+    branching: int = 3
+    weights: Dict[str, float] = field(default_factory=lambda: {
+        "caos": 1.0,
+        "sr": 1.0,
+        "g": 1.0
+    })
+    sync: Dict[str, Any] = field(default_factory=lambda: {
+        "propagate_core_updates": True,
+        "non_compensatory": True
+    })
 
 
-def build_fractal(
-    root_cfg: Dict[str, Any], 
-    depth: int, 
-    branching: int, 
-    prefix: str = "Ω"
-) -> OmegaNode:
-    """
-    Build fractal tree structure
+class FractalTree:
+    """Fractal tree builder and manager"""
     
-    Args:
-        root_cfg: Root configuration
-        depth: Tree depth
-        branching: Children per node
-        prefix: Node ID prefix
-        
-    Returns:
-        Root node of the fractal tree
-    """
-    root = OmegaNode(id=f"{prefix}-0", depth=0, config=root_cfg.copy())
-    frontier = [root]
-    
-    for d in range(1, depth + 1):
-        new_frontier = []
-        for node in frontier:
-            for i in range(branching):
-                child = OmegaNode(
-                    id=f"{prefix}-{d}-{i}",
-                    depth=d,
-                    config=root_cfg.copy(),
-                    parent=node
-                )
-                node.children.append(child)
-                new_frontier.append(child)
-        frontier = new_frontier
-    
-    return root
-
-
-def propagate_update(root: OmegaNode, patch: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Propagate core updates to all children (non-compensatory)
-    
-    Args:
-        root: Root node of the tree
-        patch: Configuration patch to apply
-        
-    Returns:
-        Dict with propagation statistics
-    """
-    stats = {
-        "nodes_updated": 0,
-        "depth_reached": 0,
-        "propagation_time": 0
-    }
-    
-    start_time = time.time()
-    
-    # Non-compensatory: every child receives the core patch
-    stack = [root]
-    while stack:
-        node = stack.pop()
-        
-        # Apply patch
-        node.config.update(patch)
-        stats["nodes_updated"] += 1
-        stats["depth_reached"] = max(stats["depth_reached"], node.depth)
-        
-        # Add children to stack
-        stack.extend(node.children)
-    
-    stats["propagation_time"] = time.time() - start_time
-    return stats
-
-
-def collect_tree_state(root: OmegaNode) -> Dict[str, Any]:
-    """
-    Collect state from entire tree
-    
-    Args:
-        root: Root node
-        
-    Returns:
-        Dict with tree state
-    """
-    nodes = []
-    stack = [root]
-    
-    while stack:
-        node = stack.pop()
-        nodes.append(node.to_dict())
-        stack.extend(node.children)
-    
-    return {
-        "total_nodes": len(nodes),
-        "max_depth": max(n["depth"] for n in nodes),
-        "nodes": nodes
-    }
-
-
-def validate_fractal_integrity(root: OmegaNode) -> Dict[str, Any]:
-    """
-    Validate fractal tree integrity
-    
-    Args:
-        root: Root node
-        
-    Returns:
-        Validation results
-    """
-    issues = []
-    
-    # Check parent-child relationships
-    stack = [root]
-    while stack:
-        node = stack.pop()
-        
-        # Check children have correct parent reference
-        for child in node.children:
-            if child.parent != node:
-                issues.append(f"Child {child.id} has incorrect parent reference")
-        
-        # Check parent has child in children list
-        if node.parent:
-            if node not in node.parent.children:
-                issues.append(f"Node {node.id} not in parent's children list")
-        
-        stack.extend(node.children)
-    
-    return {
-        "valid": len(issues) == 0,
-        "issues": issues,
-        "total_nodes": len(collect_tree_state(root)["nodes"])
-    }
-
-
-class FractalManager:
-    """Manager for fractal tree operations"""
-    
-    def __init__(self, config_path: Optional[str] = None):
-        self.config = FractalConfig(config_path)
+    def __init__(self, config: FractalConfig = None):
+        self.config = config or FractalConfig()
         self.root: Optional[OmegaNode] = None
+        self.nodes: Dict[str, OmegaNode] = {}
         self.update_history: List[Dict[str, Any]] = []
     
-    def initialize_tree(self, root_config: Dict[str, Any]) -> OmegaNode:
-        """Initialize fractal tree"""
-        self.root = build_fractal(
-            root_config,
-            self.config.depth,
-            self.config.branching
+    def build_fractal(self, root_cfg: Dict[str, Any], prefix: str = "Ω") -> OmegaNode:
+        """Build fractal tree from root configuration"""
+        self.root = OmegaNode(
+            id=f"{prefix}-0",
+            depth=0,
+            config=root_cfg.copy(),
+            last_update=time.time()
         )
+        self.nodes[self.root.id] = self.root
+        
+        frontier = [self.root]
+        
+        for d in range(1, self.config.depth + 1):
+            new_frontier = []
+            for node in frontier:
+                for i in range(self.config.branching):
+                    child_id = f"{prefix}-{d}-{i}"
+                    child_config = root_cfg.copy()
+                    
+                    # Add fractal-specific parameters
+                    child_config.update({
+                        "fractal_depth": d,
+                        "fractal_branch": i,
+                        "parent_id": node.id,
+                        "fractal_weights": self.config.weights.copy()
+                    })
+                    
+                    child = OmegaNode(
+                        id=child_id,
+                        depth=d,
+                        config=child_config,
+                        parent=node,
+                        last_update=time.time()
+                    )
+                    
+                    node.children.append(child)
+                    self.nodes[child_id] = child
+                    new_frontier.append(child)
+            
+            frontier = new_frontier
+        
         return self.root
     
-    def update_core(self, patch: Dict[str, Any]) -> Dict[str, Any]:
-        """Update core configuration and propagate"""
+    def propagate_update(self, patch: Dict[str, Any], 
+                        non_compensatory: bool = True) -> Dict[str, Any]:
+        """
+        Propagate update from root to all children
+        
+        Args:
+            patch: Configuration patch to apply
+            non_compensatory: If True, all children get exact same patch
+            
+        Returns:
+            Update summary with affected nodes
+        """
         if not self.root:
-            raise ValueError("Tree not initialized")
+            raise ValueError("No fractal tree built yet")
+        
+        update_start = time.time()
+        affected_nodes = []
+        
+        # Apply patch to root
+        self.root.config.update(patch)
+        self.root.last_update = update_start
+        affected_nodes.append(self.root.id)
+        
+        # Propagate to all children
+        stack = list(self.root.children)
+        while stack:
+            node = stack.pop()
+            
+            if non_compensatory:
+                # Non-compensatory: exact same patch
+                node.config.update(patch)
+            else:
+                # Compensatory: allow some variation based on depth/position
+                modified_patch = self._modify_patch_for_node(patch, node)
+                node.config.update(modified_patch)
+            
+            node.last_update = update_start
+            affected_nodes.append(node.id)
+            
+            # Add children to stack
+            stack.extend(node.children)
         
         # Record update
         update_record = {
-            "timestamp": time.time(),
+            "timestamp": update_start,
             "patch": patch,
-            "before_state": collect_tree_state(self.root)
+            "affected_nodes": affected_nodes,
+            "non_compensatory": non_compensatory,
+            "total_nodes": len(affected_nodes)
         }
-        
-        # Propagate update
-        stats = propagate_update(self.root, patch)
-        
-        # Record after state
-        update_record["after_state"] = collect_tree_state(self.root)
-        update_record["stats"] = stats
-        
         self.update_history.append(update_record)
         
-        return stats
+        return update_record
     
-    def get_node_by_id(self, node_id: str) -> Optional[OmegaNode]:
-        """Find node by ID"""
-        if not self.root:
-            return None
+    def _modify_patch_for_node(self, patch: Dict[str, Any], 
+                              node: OmegaNode) -> Dict[str, Any]:
+        """Modify patch for specific node (compensatory mode)"""
+        modified = patch.copy()
         
-        stack = [self.root]
+        # Add depth-based scaling
+        depth_factor = 1.0 - (node.depth * 0.1)  # Slight reduction with depth
+        
+        for key, value in modified.items():
+            if isinstance(value, (int, float)):
+                modified[key] = value * depth_factor
+        
+        return modified
+    
+    def get_node_config(self, node_id: str) -> Optional[Dict[str, Any]]:
+        """Get configuration for specific node"""
+        node = self.nodes.get(node_id)
+        return node.config if node else None
+    
+    def get_subtree_configs(self, root_id: str) -> Dict[str, Dict[str, Any]]:
+        """Get all configurations in subtree"""
+        root = self.nodes.get(root_id)
+        if not root:
+            return {}
+        
+        configs = {}
+        stack = [root]
+        
         while stack:
             node = stack.pop()
-            if node.id == node_id:
-                return node
+            configs[node.id] = node.config.copy()
             stack.extend(node.children)
         
-        return None
+        return configs
     
-    def get_nodes_at_depth(self, depth: int) -> List[OmegaNode]:
-        """Get all nodes at specific depth"""
+    def validate_consistency(self) -> Dict[str, Any]:
+        """Validate consistency across fractal tree"""
         if not self.root:
-            return []
+            return {"valid": False, "error": "No tree built"}
         
-        nodes = []
-        stack = [self.root]
+        issues = []
+        core_params = set(self.root.config.keys())
         
-        while stack:
-            node = stack.pop()
-            if node.depth == depth:
-                nodes.append(node)
-            elif node.depth < depth:
-                stack.extend(node.children)
+        # Check all nodes have core parameters
+        for node_id, node in self.nodes.items():
+            node_params = set(node.config.keys())
+            missing_params = core_params - node_params
+            if missing_params:
+                issues.append(f"Node {node_id} missing params: {missing_params}")
         
-        return nodes
-    
-    def validate_tree(self) -> Dict[str, Any]:
-        """Validate entire tree"""
-        if not self.root:
-            return {"valid": False, "error": "Tree not initialized"}
-        
-        return validate_fractal_integrity(self.root)
-    
-    def export_tree(self, filepath: str) -> None:
-        """Export tree to JSON file"""
-        if not self.root:
-            raise ValueError("Tree not initialized")
-        
-        tree_data = {
-            "config": self.config.data,
-            "tree_state": collect_tree_state(self.root),
-            "update_history": self.update_history,
-            "exported_at": time.time()
-        }
-        
-        with open(filepath, 'w') as f:
-            json.dump(tree_data, f, indent=2)
-    
-    def import_tree(self, filepath: str) -> None:
-        """Import tree from JSON file"""
-        with open(filepath, 'r') as f:
-            tree_data = json.load(f)
-        
-        # Restore config
-        self.config.data = tree_data["config"]
-        
-        # Note: Tree reconstruction from state would require more complex logic
-        # For now, just restore the update history
-        self.update_history = tree_data.get("update_history", [])
-    
-    def get_stats(self) -> Dict[str, Any]:
-        """Get fractal manager statistics"""
-        if not self.root:
-            return {"status": "not_initialized"}
-        
-        tree_state = collect_tree_state(self.root)
-        validation = self.validate_tree()
+        # Check non-compensatory consistency
+        if self.config.sync.get("non_compensatory", True):
+            core_values = {}
+            for param in core_params:
+                if isinstance(self.root.config[param], (int, float, str, bool)):
+                    core_values[param] = self.root.config[param]
+            
+            for node_id, node in self.nodes.items():
+                for param, expected_value in core_values.items():
+                    if node.config.get(param) != expected_value:
+                        issues.append(f"Node {node_id} param {param} inconsistent")
         
         return {
-            "status": "initialized",
-            "total_nodes": tree_state["total_nodes"],
-            "max_depth": tree_state["max_depth"],
-            "valid": validation["valid"],
-            "update_count": len(self.update_history),
-            "config": self.config.data
+            "valid": len(issues) == 0,
+            "issues": issues,
+            "total_nodes": len(self.nodes),
+            "core_params": len(core_params)
         }
-
-
-# Convenience functions
-def create_default_fractal() -> FractalManager:
-    """Create default fractal manager"""
-    manager = FractalManager()
-    default_config = {
-        "base_alpha": 1e-3,
-        "caos_kappa": 20.0,
-        "sr_threshold": 0.8,
-        "global_coherence_threshold": 0.85
-    }
-    manager.initialize_tree(default_config)
-    return manager
-
-
-def quick_fractal_update(
-    manager: FractalManager, 
-    param_name: str, 
-    param_value: Any
-) -> Dict[str, Any]:
-    """Quick fractal update"""
-    patch = {param_name: param_value}
-    return manager.update_core(patch)
-
-
-def test_fractal_propagation() -> Dict[str, Any]:
-    """Test fractal propagation"""
-    manager = create_default_fractal()
     
-    # Test update
-    stats1 = quick_fractal_update(manager, "test_param", 42)
+    def get_stats(self) -> Dict[str, Any]:
+        """Get fractal tree statistics"""
+        if not self.root:
+            return {"nodes": 0, "depth": 0, "updates": 0}
+        
+        depths = [node.depth for node in self.nodes.values()]
+        update_times = [node.last_update for node in self.nodes.values()]
+        
+        return {
+            "nodes": len(self.nodes),
+            "depth": max(depths) if depths else 0,
+            "avg_depth": sum(depths) / len(depths) if depths else 0,
+            "updates": len(self.update_history),
+            "last_update": max(update_times) if update_times else 0,
+            "config_version": self.config.version
+        }
     
-    # Test another update
-    stats2 = quick_fractal_update(manager, "another_param", "test_value")
+    def export_tree(self) -> Dict[str, Any]:
+        """Export entire tree structure"""
+        return {
+            "config": {
+                "version": self.config.version,
+                "depth": self.config.depth,
+                "branching": self.config.branching,
+                "weights": self.config.weights,
+                "sync": self.config.sync
+            },
+            "nodes": {node_id: node.to_dict() for node_id, node in self.nodes.items()},
+            "update_history": self.update_history[-10:],  # Last 10 updates
+            "stats": self.get_stats()
+        }
     
-    # Get final stats
-    final_stats = manager.get_stats()
+    def load_from_yaml(self, yaml_path: str) -> FractalConfig:
+        """Load fractal configuration from YAML"""
+        with open(yaml_path, 'r') as f:
+            data = yaml.safe_load(f)
+        
+        self.config = FractalConfig(
+            version=data.get("version", 1),
+            depth=data.get("depth", 2),
+            branching=data.get("branching", 3),
+            weights=data.get("weights", {"caos": 1.0, "sr": 1.0, "g": 1.0}),
+            sync=data.get("sync", {"propagate_core_updates": True, "non_compensatory": True})
+        )
+        
+        return self.config
+
+
+# Utility functions
+def create_fractal_tree(config_path: str = None, 
+                       root_config: Dict[str, Any] = None) -> FractalTree:
+    """Create fractal tree from config"""
+    tree = FractalTree()
     
-    return {
-        "update1_stats": stats1,
-        "update2_stats": stats2,
-        "final_stats": final_stats,
-        "validation": manager.validate_tree()
-    }
+    if config_path and Path(config_path).exists():
+        tree.load_from_yaml(config_path)
+    
+    if root_config is None:
+        root_config = {
+            "base_alpha": 1e-3,
+            "caos_kappa": 20.0,
+            "sr_threshold": 0.80,
+            "life_thresholds": {
+                "beta_min": 0.01,
+                "theta_caos": 0.25,
+                "tau_sr": 0.80,
+                "theta_G": 0.85
+            }
+        }
+    
+    tree.build_fractal(root_config)
+    return tree
+
+
+def propagate_life_equation_params(tree: FractalTree, 
+                                  life_params: Dict[str, Any]) -> Dict[str, Any]:
+    """Propagate Life Equation parameters through fractal tree"""
+    return tree.propagate_update(life_params, non_compensatory=True)
+
+
+def validate_fractal_consistency(tree: FractalTree) -> bool:
+    """Validate fractal tree consistency"""
+    result = tree.validate_consistency()
+    return result["valid"]
+
+
+# Example usage
+if __name__ == "__main__":
+    # Create fractal tree
+    tree = create_fractal_tree()
+    
+    # Propagate update
+    update_result = tree.propagate_update({
+        "base_alpha": 2e-3,
+        "caos_kappa": 25.0
+    })
+    
+    print(f"Updated {update_result['total_nodes']} nodes")
+    print(f"Tree stats: {tree.get_stats()}")
+    
+    # Validate consistency
+    consistency = tree.validate_consistency()
+    print(f"Consistency: {consistency['valid']}")

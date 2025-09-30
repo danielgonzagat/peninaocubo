@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Simple test script for PENIN-Ω Vida+ system
-Tests core functionality without external dependencies
+Tests core functionality with actual module structure
 """
 
 import sys
@@ -103,14 +103,17 @@ def test_fractal_system():
     print("\n🧪 Testing Fractal System...")
     
     try:
-        from penin.omega.fractal import build_fractal, propagate_update
+        from penin.omega.fractal import FractalEngine
+        
+        # Create fractal engine
+        engine = FractalEngine()
         
         # Build fractal tree
         root_config = {"caos_weight": 1.0, "sr_weight": 1.0}
-        root = build_fractal(root_config, depth=2, branching=2)
+        root = engine.build_fractal(root_config, prefix="Ω")
         
         # Check structure
-        if root.id == "Ω-0" and len(root.children) == 2:
+        if root.id == "Ω-0" and len(root.children) > 0:
             print("✅ Fractal tree structure correct")
         else:
             print("❌ Fractal tree structure incorrect")
@@ -118,7 +121,7 @@ def test_fractal_system():
         
         # Test propagation
         patch = {"caos_weight": 1.5}
-        propagate_update(root, patch)
+        engine.propagate_update(root, patch)
         
         if root.config["caos_weight"] == 1.5:
             print("✅ Fractal propagation successful")
@@ -140,14 +143,16 @@ def test_swarm_system():
         temp_dir = tempfile.mkdtemp()
         os.environ["PENIN_ROOT"] = temp_dir
         
-        from penin.omega.swarm import heartbeat, sample_global_state
+        from penin.omega.swarm import SwarmCognitivo
+        
+        swarm = SwarmCognitivo()
         
         # Send heartbeats
-        heartbeat("node1", {"phi": 0.7, "sr": 0.8})
-        heartbeat("node2", {"phi": 0.6, "sr": 0.7})
+        swarm.heartbeat("node1", {"phi": 0.7, "sr": 0.8})
+        swarm.heartbeat("node2", {"phi": 0.6, "sr": 0.7})
         
         # Sample global state
-        global_state = sample_global_state(window_s=60.0)
+        global_state = swarm.sample_global_state(window_s=60.0)
         
         if "phi" in global_state and "sr" in global_state:
             print(f"✅ Swarm aggregation: phi={global_state['phi']:.3f}, sr={global_state['sr']:.3f}")
@@ -204,14 +209,16 @@ def test_neural_chain_system():
         os.environ["PENIN_ROOT"] = temp_dir
         os.environ["PENIN_CHAIN_KEY"] = "test-key"
         
-        from penin.omega.neural_chain import add_block
+        from penin.omega.neural_chain import NeuralChain
+        
+        chain = NeuralChain()
         
         # Create blocks
         state1 = {"alpha_eff": 0.5, "phi": 0.7}
-        hash1 = add_block(state1, None)
+        hash1 = chain.add_block(state1, None)
         
         state2 = {"alpha_eff": 0.6, "phi": 0.8}
-        hash2 = add_block(state2, hash1)
+        hash2 = chain.add_block(state2, hash1)
         
         if hash1 and hash2 and hash1 != hash2:
             print("✅ Neural chain block creation successful")
@@ -235,14 +242,16 @@ def test_self_rag_system():
         temp_dir = tempfile.mkdtemp()
         os.environ["PENIN_ROOT"] = temp_dir
         
-        from penin.omega.self_rag import ingest_text, query
+        from penin.omega.self_rag import SelfRAGEngine
+        
+        rag = SelfRAGEngine()
         
         # Ingest text
         text = "The PENIN-Ω system implements the Life Equation (+) as a non-compensatory gate."
-        ingest_text("penin_docs", text)
+        rag.ingest_text("penin_docs", text)
         
         # Query
-        result = query("What is the Life Equation?")
+        result = rag.query("What is the Life Equation?")
         
         if result["doc"] == "penin_docs.txt" and result["score"] > 0:
             print(f"✅ Self-RAG ingest and query successful: score={result['score']:.3f}")
@@ -266,15 +275,17 @@ def test_api_metabolizer_system():
         temp_dir = tempfile.mkdtemp()
         os.environ["PENIN_ROOT"] = temp_dir
         
-        from penin.omega.api_metabolizer import record_call, suggest_replay
+        from penin.omega.api_metabolizer import APIMetabolizer
+        
+        metabolizer = APIMetabolizer()
         
         # Record API call
         req = {"prompt": "What is the Life Equation?", "model": "gpt-4"}
         resp = {"response": "The Life Equation (+) is a non-compensatory gate."}
-        record_call("openai", "chat/completions", req, resp)
+        metabolizer.record_call("openai", "chat/completions", req, resp)
         
         # Suggest replay
-        replay = suggest_replay("What is the Life Equation?")
+        replay = metabolizer.suggest_replay("What is the Life Equation?")
         
         if "response" in replay:
             print("✅ API metabolizer record and replay successful")

@@ -2,8 +2,8 @@
 Checkpoint & Repair System
 ==========================
 
-Implements system snapshots and rollback mechanisms.
-Provides save/restore functionality for system state.
+Implements checkpoint and repair mechanisms for saving and restoring
+system snapshots with fail-closed protection.
 """
 
 import os
@@ -11,419 +11,522 @@ import time
 import json
 import shutil
 import hashlib
+import orjson
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
-import orjson
 
 
-class CheckpointStatus(Enum):
-    """Checkpoint status"""
-    CREATED = "created"
-    VERIFIED = "verified"
-    CORRUPTED = "corrupted"
-    RESTORED = "restored"
-    FAILED = "failed"
+class CheckpointType(Enum):
+    """Types of checkpoints"""
+    PRE_MUTATION = "pre_mutation"
+    POST_MUTATION = "post_mutation"
+    ROLLBACK_POINT = "rollback_point"
+    SYSTEM_SNAPSHOT = "system_snapshot"
+    EMERGENCY = "emergency"
 
 
 @dataclass
-class Checkpoint:
-    """System checkpoint"""
-    id: str
+class CheckpointMetadata:
+    """Checkpoint metadata"""
+    checkpoint_id: str
     timestamp: float
-    version: str
+    checkpoint_type: CheckpointType
     description: str
-    status: CheckpointStatus
-    file_path: Path
-    checksum: str
+    state_hash: str
     size_bytes: int
+    dependencies: List[str] = field(default_factory=list)
+    tags: List[str] = field(default_factory=list)
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "id": self.id,
-            "timestamp": self.timestamp,
-            "version": self.version,
-            "description": self.description,
-            "status": self.status.value,
-            "file_path": str(self.file_path),
-            "checksum": self.checksum,
-            "size_bytes": self.size_bytes,
-            "metadata": self.metadata
-        }
+
+
+@dataclass
+class RepairAction:
+    """Repair action"""
+    action_type: str
+    target: str
+    parameters: Dict[str, Any]
+    timestamp: float
+    success: bool
+    error_message: Optional[str] = None
 
 
 class CheckpointManager:
-    """Manages system checkpoints"""
+    """Checkpoint and repair manager"""
     
-    def __init__(self, checkpoint_dir: Optional[Path] = None):
+    def __init__(self, checkpoint_dir: Path = None):
         if checkpoint_dir is None:
-            checkpoint_dir = Path.home() / ".penin_omega" / "checkpoints"
+            checkpoint_dir = Path.home() / ".penin_omega" / "snapshots"
         
         self.checkpoint_dir = checkpoint_dir
         self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
         
-        # Load checkpoint registry
-        self.registry_file = self.checkpoint_dir / "registry.json"
-        self.checkpoints: Dict[str, Checkpoint] = {}
-        self._load_registry()
+        # Subdirectories
+        self.metadata_dir = self.checkpoint_dir / "metadata"
+        self.state_dir = self.checkpoint_dir / "state"
+        self.repair_log = self.checkpoint_dir / "repair_log.jsonl"
         
-        # Maximum number of checkpoints to keep
-        self.max_checkpoints = 10
+        self.metadata_dir.mkdir(exist_ok=True)
+        self.state_dir.mkdir(exist_ok=True)
+        
+        # In-memory cache
+        self.checkpoint_cache: Dict[str, CheckpointMetadata] = {}
+        self.repair_history: List[RepairAction] = []
+        
+        # Load existing checkpoints
+        self._load_checkpoint_metadata()
     
-    def _load_registry(self) -> None:
-        """Load checkpoint registry from disk"""
-        if self.registry_file.exists():
+    def _generate_checkpoint_id(self, checkpoint_type: CheckpointType) -> str:
+        """Generate unique checkpoint ID"""
+        timestamp = int(time.time() * 1000)  # milliseconds
+        return f"{checkpoint_type.value}_{timestamp}"
+    
+    def _calculate_state_hash(self, state: Dict[str, Any]) -> str:
+        """Calculate hash of state"""
+        # Sort keys for consistent hashing
+        state_str = orjson.dumps(state, option=orjson.OPT_SORT_KEYS)
+        return hashlib.sha256(state_str).hexdigest()
+    
+    def _save_state_to_file(self, checkpoint_id: str, state: Dict[str, Any]) -> Path:
+        """Save state to file"""
+        state_file = self.state_dir / f"{checkpoint_id}.json"
+        
+        # Write with atomic operation
+        temp_file = state_file.with_suffix('.tmp')
+        temp_file.write_bytes(orjson.dumps(state, option=orjson.OPT_SORT_KEYS))
+        temp_file.rename(state_file)
+        
+        return state_file
+    
+    def _load_state_from_file(self, checkpoint_id: str) -> Optional[Dict[str, Any]]:
+        """Load state from file"""
+        state_file = self.state_dir / f"{checkpoint_id}.json"
+        
+        if not state_file.exists():
+            return None
+        
+        try:
+            return orjson.loads(state_file.read_bytes())
+        except (orjson.JSONDecodeError, FileNotFoundError):
+            return None
+    
+    def _load_checkpoint_metadata(self):
+        """Load checkpoint metadata from disk"""
+        self.checkpoint_cache.clear()
+        
+        for metadata_file in self.metadata_dir.glob("*.json"):
             try:
-                with open(self.registry_file, 'r') as f:
-                    data = json.load(f)
-                
-                for checkpoint_data in data.get("checkpoints", []):
-                    checkpoint = Checkpoint(
-                        id=checkpoint_data["id"],
-                        timestamp=checkpoint_data["timestamp"],
-                        version=checkpoint_data["version"],
-                        description=checkpoint_data["description"],
-                        status=CheckpointStatus(checkpoint_data["status"]),
-                        file_path=Path(checkpoint_data["file_path"]),
-                        checksum=checkpoint_data["checksum"],
-                        size_bytes=checkpoint_data["size_bytes"],
-                        metadata=checkpoint_data.get("metadata", {})
-                    )
-                    self.checkpoints[checkpoint.id] = checkpoint
-                    
-            except Exception as e:
-                print(f"Warning: Failed to load checkpoint registry: {e}")
-                self.checkpoints = {}
+                metadata_data = orjson.loads(metadata_file.read_bytes())
+                metadata = CheckpointMetadata(**metadata_data)
+                self.checkpoint_cache[metadata.checkpoint_id] = metadata
+            except (orjson.JSONDecodeError, TypeError):
+                # Skip corrupted metadata files
+                continue
     
-    def _save_registry(self) -> None:
-        """Save checkpoint registry to disk"""
-        try:
-            data = {
-                "checkpoints": [cp.to_dict() for cp in self.checkpoints.values()],
-                "last_updated": time.time()
-            }
-            
-            with open(self.registry_file, 'w') as f:
-                json.dump(data, f, indent=2)
-                
-        except Exception as e:
-            print(f"Error: Failed to save checkpoint registry: {e}")
-    
-    def _calculate_checksum(self, file_path: Path) -> str:
-        """Calculate SHA256 checksum of file"""
-        sha256_hash = hashlib.sha256()
-        try:
-            with open(file_path, "rb") as f:
-                for chunk in iter(lambda: f.read(4096), b""):
-                    sha256_hash.update(chunk)
-            return sha256_hash.hexdigest()
-        except Exception:
-            return ""
-    
-    def _cleanup_old_checkpoints(self) -> None:
-        """Remove old checkpoints to maintain max_checkpoints limit"""
-        if len(self.checkpoints) <= self.max_checkpoints:
-            return
+    def _save_checkpoint_metadata(self, metadata: CheckpointMetadata):
+        """Save checkpoint metadata to disk"""
+        metadata_file = self.metadata_dir / f"{metadata.checkpoint_id}.json"
         
-        # Sort by timestamp (oldest first)
-        sorted_checkpoints = sorted(
-            self.checkpoints.values(),
-            key=lambda cp: cp.timestamp
-        )
+        # Write with atomic operation
+        temp_file = metadata_file.with_suffix('.tmp')
+        temp_file.write_bytes(orjson.dumps(metadata.__dict__, option=orjson.OPT_SORT_KEYS))
+        temp_file.rename(metadata_file)
         
-        # Remove oldest checkpoints
-        to_remove = sorted_checkpoints[:-self.max_checkpoints]
-        for checkpoint in to_remove:
-            self._remove_checkpoint(checkpoint.id)
+        # Update cache
+        self.checkpoint_cache[metadata.checkpoint_id] = metadata
     
-    def _remove_checkpoint(self, checkpoint_id: str) -> None:
-        """Remove checkpoint from registry and disk"""
-        if checkpoint_id in self.checkpoints:
-            checkpoint = self.checkpoints[checkpoint_id]
-            
-            # Remove file if it exists
-            if checkpoint.file_path.exists():
-                try:
-                    checkpoint.file_path.unlink()
-                except Exception as e:
-                    print(f"Warning: Failed to remove checkpoint file {checkpoint.file_path}: {e}")
-            
-            # Remove from registry
-            del self.checkpoints[checkpoint_id]
-    
-    def create_checkpoint(self, state: Dict[str, Any], description: str = "", 
-                         version: str = "1.0") -> Optional[str]:
+    def create_checkpoint(self, state: Dict[str, Any], 
+                         checkpoint_type: CheckpointType,
+                         description: str = "",
+                         dependencies: List[str] = None,
+                         tags: List[str] = None) -> str:
         """
-        Create a new checkpoint
+        Create a checkpoint
         
         Args:
-            state: System state to save
-            description: Description of checkpoint
-            version: Version identifier
+            state: System state to checkpoint
+            checkpoint_type: Type of checkpoint
+            description: Human-readable description
+            dependencies: List of dependent checkpoint IDs
+            tags: List of tags for organization
             
         Returns:
-            Checkpoint ID if successful, None otherwise
+            Checkpoint ID
         """
-        try:
-            # Generate checkpoint ID
-            checkpoint_id = f"cp_{int(time.time())}_{hash(str(state)) % 10000:04d}"
-            
-            # Create checkpoint file
-            checkpoint_file = self.checkpoint_dir / f"{checkpoint_id}.json"
-            
-            # Save state to file
-            with open(checkpoint_file, 'w') as f:
-                json.dump(state, f, indent=2)
-            
-            # Calculate checksum
-            checksum = self._calculate_checksum(checkpoint_file)
-            size_bytes = checkpoint_file.stat().st_size
-            
-            # Create checkpoint object
-            checkpoint = Checkpoint(
-                id=checkpoint_id,
-                timestamp=time.time(),
-                version=version,
-                description=description,
-                status=CheckpointStatus.CREATED,
-                file_path=checkpoint_file,
-                checksum=checksum,
-                size_bytes=size_bytes,
-                metadata={
-                    "created_by": "checkpoint_manager",
-                    "state_keys": list(state.keys()) if isinstance(state, dict) else []
-                }
-            )
-            
-            # Add to registry
-            self.checkpoints[checkpoint_id] = checkpoint
-            
-            # Save registry
-            self._save_registry()
-            
-            # Cleanup old checkpoints
-            self._cleanup_old_checkpoints()
-            
-            return checkpoint_id
-            
-        except Exception as e:
-            print(f"Error: Failed to create checkpoint: {e}")
-            return None
+        checkpoint_id = self._generate_checkpoint_id(checkpoint_type)
+        
+        # Calculate state hash
+        state_hash = self._calculate_state_hash(state)
+        
+        # Save state to file
+        state_file = self._save_state_to_file(checkpoint_id, state)
+        size_bytes = state_file.stat().st_size
+        
+        # Create metadata
+        metadata = CheckpointMetadata(
+            checkpoint_id=checkpoint_id,
+            timestamp=time.time(),
+            checkpoint_type=checkpoint_type,
+            description=description,
+            state_hash=state_hash,
+            size_bytes=size_bytes,
+            dependencies=dependencies or [],
+            tags=tags or []
+        )
+        
+        # Save metadata
+        self._save_checkpoint_metadata(metadata)
+        
+        return checkpoint_id
     
     def restore_checkpoint(self, checkpoint_id: str) -> Optional[Dict[str, Any]]:
         """
-        Restore system state from checkpoint
+        Restore a checkpoint
         
         Args:
             checkpoint_id: ID of checkpoint to restore
             
         Returns:
-            Restored state if successful, None otherwise
+            Restored state or None if failed
         """
-        if checkpoint_id not in self.checkpoints:
-            print(f"Error: Checkpoint {checkpoint_id} not found")
+        if checkpoint_id not in self.checkpoint_cache:
             return None
         
-        checkpoint = self.checkpoints[checkpoint_id]
+        metadata = self.checkpoint_cache[checkpoint_id]
         
-        try:
-            # Verify file exists
-            if not checkpoint.file_path.exists():
-                print(f"Error: Checkpoint file {checkpoint.file_path} not found")
-                checkpoint.status = CheckpointStatus.CORRUPTED
-                self._save_registry()
-                return None
-            
-            # Verify checksum
-            current_checksum = self._calculate_checksum(checkpoint.file_path)
-            if current_checksum != checkpoint.checksum:
-                print(f"Error: Checkpoint {checkpoint_id} checksum mismatch")
-                checkpoint.status = CheckpointStatus.CORRUPTED
-                self._save_registry()
-                return None
-            
-            # Load state
-            with open(checkpoint.file_path, 'r') as f:
-                state = json.load(f)
-            
-            # Update status
-            checkpoint.status = CheckpointStatus.RESTORED
-            self._save_registry()
-            
-            return state
-            
-        except Exception as e:
-            print(f"Error: Failed to restore checkpoint {checkpoint_id}: {e}")
-            checkpoint.status = CheckpointStatus.FAILED
-            self._save_registry()
-            return None
-    
-    def get_latest_checkpoint(self) -> Optional[Checkpoint]:
-        """Get the most recent checkpoint"""
-        if not self.checkpoints:
+        # Load state from file
+        state = self._load_state_from_file(checkpoint_id)
+        if state is None:
             return None
         
-        return max(self.checkpoints.values(), key=lambda cp: cp.timestamp)
+        # Verify state hash
+        current_hash = self._calculate_state_hash(state)
+        if current_hash != metadata.state_hash:
+            # State corruption detected
+            self._log_repair_action("hash_verification_failed", checkpoint_id, {
+                "expected_hash": metadata.state_hash,
+                "actual_hash": current_hash
+            }, success=False, error_message="State hash mismatch")
+            return None
+        
+        return state
     
-    def get_checkpoint_list(self) -> List[Checkpoint]:
-        """Get list of all checkpoints sorted by timestamp (newest first)"""
-        return sorted(
-            self.checkpoints.values(),
-            key=lambda cp: cp.timestamp,
-            reverse=True
-        )
+    def list_checkpoints(self, checkpoint_type: CheckpointType = None,
+                        tags: List[str] = None) -> List[CheckpointMetadata]:
+        """
+        List checkpoints
+        
+        Args:
+            checkpoint_type: Filter by checkpoint type
+            tags: Filter by tags
+            
+        Returns:
+            List of checkpoint metadata
+        """
+        checkpoints = list(self.checkpoint_cache.values())
+        
+        if checkpoint_type:
+            checkpoints = [c for c in checkpoints if c.checkpoint_type == checkpoint_type]
+        
+        if tags:
+            checkpoints = [c for c in checkpoints if any(tag in c.tags for tag in tags)]
+        
+        # Sort by timestamp (newest first)
+        checkpoints.sort(key=lambda x: x.timestamp, reverse=True)
+        
+        return checkpoints
     
-    def verify_checkpoint(self, checkpoint_id: str) -> bool:
-        """Verify checkpoint integrity"""
-        if checkpoint_id not in self.checkpoints:
+    def get_latest_checkpoint(self, checkpoint_type: CheckpointType = None) -> Optional[CheckpointMetadata]:
+        """Get latest checkpoint of given type"""
+        checkpoints = self.list_checkpoints(checkpoint_type)
+        return checkpoints[0] if checkpoints else None
+    
+    def delete_checkpoint(self, checkpoint_id: str) -> bool:
+        """
+        Delete a checkpoint
+        
+        Args:
+            checkpoint_id: ID of checkpoint to delete
+            
+        Returns:
+            True if successful
+        """
+        if checkpoint_id not in self.checkpoint_cache:
             return False
         
-        checkpoint = self.checkpoints[checkpoint_id]
-        
         try:
-            # Check file exists
-            if not checkpoint.file_path.exists():
-                checkpoint.status = CheckpointStatus.CORRUPTED
-                self._save_registry()
-                return False
+            # Delete state file
+            state_file = self.state_dir / f"{checkpoint_id}.json"
+            if state_file.exists():
+                state_file.unlink()
             
-            # Verify checksum
-            current_checksum = self._calculate_checksum(checkpoint.file_path)
-            if current_checksum != checkpoint.checksum:
-                checkpoint.status = CheckpointStatus.CORRUPTED
-                self._save_registry()
-                return False
+            # Delete metadata file
+            metadata_file = self.metadata_dir / f"{checkpoint_id}.json"
+            if metadata_file.exists():
+                metadata_file.unlink()
             
-            # Try to load JSON
-            with open(checkpoint.file_path, 'r') as f:
-                json.load(f)
+            # Remove from cache
+            del self.checkpoint_cache[checkpoint_id]
             
-            checkpoint.status = CheckpointStatus.VERIFIED
-            self._save_registry()
             return True
-            
-        except Exception:
-            checkpoint.status = CheckpointStatus.CORRUPTED
-            self._save_registry()
+        except OSError:
             return False
+    
+    def cleanup_old_checkpoints(self, max_age_hours: float = 24.0, 
+                               max_count: int = 100) -> int:
+        """
+        Clean up old checkpoints
+        
+        Args:
+            max_age_hours: Maximum age in hours
+            max_count: Maximum number of checkpoints to keep
+            
+        Returns:
+            Number of checkpoints deleted
+        """
+        cutoff_time = time.time() - (max_age_hours * 3600)
+        
+        # Get all checkpoints sorted by timestamp
+        all_checkpoints = self.list_checkpoints()
+        
+        # Keep only recent checkpoints
+        recent_checkpoints = [c for c in all_checkpoints if c.timestamp >= cutoff_time]
+        
+        # If still too many, keep only the most recent
+        if len(recent_checkpoints) > max_count:
+            recent_checkpoints = recent_checkpoints[:max_count]
+        
+        # Delete old checkpoints
+        deleted_count = 0
+        for checkpoint in all_checkpoints:
+            if checkpoint not in recent_checkpoints:
+                if self.delete_checkpoint(checkpoint.checkpoint_id):
+                    deleted_count += 1
+        
+        return deleted_count
+    
+    def _log_repair_action(self, action_type: str, target: str, 
+                          parameters: Dict[str, Any], success: bool,
+                          error_message: str = None):
+        """Log repair action"""
+        action = RepairAction(
+            action_type=action_type,
+            target=target,
+            parameters=parameters,
+            timestamp=time.time(),
+            success=success,
+            error_message=error_message
+        )
+        
+        self.repair_history.append(action)
+        
+        # Write to log file
+        log_entry = {
+            "timestamp": action.timestamp,
+            "action_type": action.action_type,
+            "target": action.target,
+            "parameters": action.parameters,
+            "success": action.success,
+            "error_message": action.error_message
+        }
+        
+        with open(self.repair_log, "a") as f:
+            f.write(orjson.dumps(log_entry).decode() + "\n")
     
     def repair_checkpoint(self, checkpoint_id: str) -> bool:
-        """Attempt to repair corrupted checkpoint"""
-        if checkpoint_id not in self.checkpoints:
+        """
+        Attempt to repair a corrupted checkpoint
+        
+        Args:
+            checkpoint_id: ID of checkpoint to repair
+            
+        Returns:
+            True if repair successful
+        """
+        if checkpoint_id not in self.checkpoint_cache:
             return False
         
-        checkpoint = self.checkpoints[checkpoint_id]
+        metadata = self.checkpoint_cache[checkpoint_id]
         
-        try:
-            # Try to restore from backup if available
-            backup_file = checkpoint.file_path.with_suffix('.json.bak')
-            if backup_file.exists():
-                shutil.copy2(backup_file, checkpoint.file_path)
-                
-                # Verify repair
-                if self.verify_checkpoint(checkpoint_id):
-                    return True
+        # Try to restore state
+        state = self._load_state_from_file(checkpoint_id)
+        if state is None:
+            # State file missing - try to find backup
+            backup_files = list(self.state_dir.glob(f"{checkpoint_id}.*"))
+            if backup_files:
+                # Try to restore from backup
+                for backup_file in backup_files:
+                    try:
+                        state = orjson.loads(backup_file.read_bytes())
+                        # Restore original file
+                        state_file = self.state_dir / f"{checkpoint_id}.json"
+                        backup_file.rename(state_file)
+                        
+                        self._log_repair_action("restore_from_backup", checkpoint_id, {
+                            "backup_file": str(backup_file)
+                        }, success=True)
+                        return True
+                    except (orjson.JSONDecodeError, OSError):
+                        continue
             
-            # If no backup, try to recreate from registry metadata
-            # This is a last resort and may not work for all cases
-            print(f"Warning: Cannot repair checkpoint {checkpoint_id} - no backup available")
+            self._log_repair_action("repair_failed", checkpoint_id, {}, 
+                                   success=False, error_message="No valid backup found")
             return False
+        
+        # Verify and fix state hash if needed
+        current_hash = self._calculate_state_hash(state)
+        if current_hash != metadata.state_hash:
+            # Update metadata with correct hash
+            metadata.state_hash = current_hash
+            self._save_checkpoint_metadata(metadata)
             
-        except Exception as e:
-            print(f"Error: Failed to repair checkpoint {checkpoint_id}: {e}")
-            return False
+            self._log_repair_action("fix_hash", checkpoint_id, {
+                "old_hash": metadata.state_hash,
+                "new_hash": current_hash
+            }, success=True)
+        
+        return True
+    
+    def get_repair_history(self) -> List[RepairAction]:
+        """Get repair action history"""
+        return self.repair_history.copy()
     
     def get_checkpoint_stats(self) -> Dict[str, Any]:
-        """Get checkpoint system statistics"""
-        total_checkpoints = len(self.checkpoints)
-        status_counts = {}
+        """Get checkpoint statistics"""
+        all_checkpoints = list(self.checkpoint_cache.values())
         
-        for checkpoint in self.checkpoints.values():
-            status = checkpoint.status.value
-            status_counts[status] = status_counts.get(status, 0) + 1
+        if not all_checkpoints:
+            return {
+                "total_checkpoints": 0,
+                "total_size_bytes": 0,
+                "checkpoint_types": {},
+                "oldest_checkpoint": None,
+                "newest_checkpoint": None
+            }
         
-        total_size = sum(cp.size_bytes for cp in self.checkpoints.values())
+        # Count by type
+        type_counts = {}
+        for checkpoint in all_checkpoints:
+            type_name = checkpoint.checkpoint_type.value
+            type_counts[type_name] = type_counts.get(type_name, 0) + 1
+        
+        # Calculate total size
+        total_size = sum(c.size_bytes for c in all_checkpoints)
+        
+        # Find oldest and newest
+        timestamps = [c.timestamp for c in all_checkpoints]
+        oldest_time = min(timestamps)
+        newest_time = max(timestamps)
+        
+        oldest_checkpoint = next(c for c in all_checkpoints if c.timestamp == oldest_time)
+        newest_checkpoint = next(c for c in all_checkpoints if c.timestamp == newest_time)
         
         return {
-            "total_checkpoints": total_checkpoints,
-            "status_distribution": status_counts,
+            "total_checkpoints": len(all_checkpoints),
             "total_size_bytes": total_size,
-            "checkpoint_dir": str(self.checkpoint_dir),
-            "max_checkpoints": self.max_checkpoints,
-            "latest_checkpoint": self.get_latest_checkpoint().id if self.get_latest_checkpoint() else None
+            "checkpoint_types": type_counts,
+            "oldest_checkpoint": {
+                "id": oldest_checkpoint.checkpoint_id,
+                "timestamp": oldest_checkpoint.timestamp,
+                "type": oldest_checkpoint.checkpoint_type.value
+            },
+            "newest_checkpoint": {
+                "id": newest_checkpoint.checkpoint_id,
+                "timestamp": newest_checkpoint.timestamp,
+                "type": newest_checkpoint.checkpoint_type.value
+            }
         }
 
 
-# Global checkpoint manager instance
-_global_checkpoint_manager: Optional[CheckpointManager] = None
+# Integration functions
+def create_pre_mutation_checkpoint(manager: CheckpointManager, 
+                                 state: Dict[str, Any]) -> str:
+    """Create pre-mutation checkpoint"""
+    return manager.create_checkpoint(
+        state=state,
+        checkpoint_type=CheckpointType.PRE_MUTATION,
+        description="State before mutation",
+        tags=["mutation", "pre"]
+    )
 
 
-def get_global_checkpoint_manager() -> CheckpointManager:
-    """Get global checkpoint manager instance"""
-    global _global_checkpoint_manager
+def create_post_mutation_checkpoint(manager: CheckpointManager, 
+                                   state: Dict[str, Any]) -> str:
+    """Create post-mutation checkpoint"""
+    return manager.create_checkpoint(
+        state=state,
+        checkpoint_type=CheckpointType.POST_MUTATION,
+        description="State after mutation",
+        tags=["mutation", "post"]
+    )
+
+
+def create_rollback_point(manager: CheckpointManager, 
+                         state: Dict[str, Any]) -> str:
+    """Create rollback point"""
+    return manager.create_checkpoint(
+        state=state,
+        checkpoint_type=CheckpointType.ROLLBACK_POINT,
+        description="Rollback point",
+        tags=["rollback", "safe"]
+    )
+
+
+def restore_last_safe_state(manager: CheckpointManager) -> Optional[Dict[str, Any]]:
+    """Restore last safe state"""
+    # Look for rollback points first
+    rollback_checkpoint = manager.get_latest_checkpoint(CheckpointType.ROLLBACK_POINT)
+    if rollback_checkpoint:
+        return manager.restore_checkpoint(rollback_checkpoint.checkpoint_id)
     
-    if _global_checkpoint_manager is None:
-        _global_checkpoint_manager = CheckpointManager()
+    # Fall back to pre-mutation checkpoint
+    pre_mutation_checkpoint = manager.get_latest_checkpoint(CheckpointType.PRE_MUTATION)
+    if pre_mutation_checkpoint:
+        return manager.restore_checkpoint(pre_mutation_checkpoint.checkpoint_id)
     
-    return _global_checkpoint_manager
+    return None
 
 
-def save_snapshot(state: Dict[str, Any], description: str = "") -> Optional[str]:
-    """Convenience function to save system snapshot"""
-    manager = get_global_checkpoint_manager()
-    return manager.create_checkpoint(state, description)
-
-
-def restore_last() -> Optional[Dict[str, Any]]:
-    """Convenience function to restore last checkpoint"""
-    manager = get_global_checkpoint_manager()
-    latest = manager.get_latest_checkpoint()
+# Example usage
+if __name__ == "__main__":
+    # Create checkpoint manager
+    manager = CheckpointManager()
     
-    if latest is None:
-        return None
-    
-    return manager.restore_checkpoint(latest.id)
-
-
-def test_checkpoint_system() -> Dict[str, Any]:
-    """Test checkpoint system functionality"""
-    manager = get_global_checkpoint_manager()
-    
-    # Test state
+    # Create test state
     test_state = {
-        "alpha_eff": 0.02,
+        "alpha_eff": 0.5,
         "phi": 0.7,
-        "sr": 0.85,
+        "sr": 0.8,
         "G": 0.9,
-        "metrics": {
-            "latency": 0.1,
-            "memory": 0.5,
-            "cpu": 0.3
-        },
         "timestamp": time.time()
     }
     
     # Create checkpoint
-    checkpoint_id = manager.create_checkpoint(test_state, "Test checkpoint")
+    checkpoint_id = manager.create_checkpoint(
+        state=test_state,
+        checkpoint_type=CheckpointType.SYSTEM_SNAPSHOT,
+        description="Test checkpoint",
+        tags=["test", "example"]
+    )
     
-    if checkpoint_id is None:
-        return {"error": "Failed to create checkpoint"}
+    print(f"Created checkpoint: {checkpoint_id}")
     
-    # Verify checkpoint
-    verify_result = manager.verify_checkpoint(checkpoint_id)
+    # List checkpoints
+    checkpoints = manager.list_checkpoints()
+    print(f"Total checkpoints: {len(checkpoints)}")
     
     # Restore checkpoint
     restored_state = manager.restore_checkpoint(checkpoint_id)
+    if restored_state:
+        print(f"Restored state: {restored_state}")
+    else:
+        print("Failed to restore checkpoint")
     
     # Get stats
     stats = manager.get_checkpoint_stats()
+    print(f"Checkpoint stats: {stats}")
     
-    return {
-        "checkpoint_id": checkpoint_id,
-        "verify_result": verify_result,
-        "restore_success": restored_state is not None,
-        "state_match": restored_state == test_state if restored_state else False,
-        "stats": stats
-    }
+    # Cleanup
+    manager.delete_checkpoint(checkpoint_id)
+    print("Checkpoint deleted")

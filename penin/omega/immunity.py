@@ -1,13 +1,14 @@
 """
-Digital Immunity System
-=======================
+Digital Immunity - Anomaly Detection and Fail-Closed Protection
+==============================================================
 
-Implements anomaly detection and fail-closed behavior.
-Detects invalid metrics and triggers rollback mechanisms.
+Implements digital immunity system for detecting anomalies and triggering
+fail-closed protection mechanisms.
 """
 
 import time
 import math
+import statistics
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
@@ -15,239 +16,302 @@ from enum import Enum
 
 class AnomalyType(Enum):
     """Types of anomalies"""
-    NUMERICAL_INVALID = "numerical_invalid"
-    OUT_OF_RANGE = "out_of_range"
-    NAN_VALUE = "nan_value"
-    INFINITE_VALUE = "infinite_value"
-    NEGATIVE_UNEXPECTED = "negative_unexpected"
-    SPIKE_DETECTED = "spike_detected"
-    TREND_ANOMALY = "trend_anomaly"
-
-
-class ImmunityStatus(Enum):
-    """Immunity system status"""
-    HEALTHY = "healthy"
-    WARNING = "warning"
-    CRITICAL = "critical"
-    FAILED = "failed"
+    VALUE_OUT_OF_RANGE = "value_out_of_range"
+    NAN_INF = "nan_inf"
+    SUDDEN_SPIKE = "sudden_spike"
+    PATTERN_DEVIATION = "pattern_deviation"
+    SYSTEM_ERROR = "system_error"
 
 
 @dataclass
-class Anomaly:
-    """Anomaly detection result"""
+class AnomalyAlert:
+    """Anomaly alert"""
+    timestamp: float
     anomaly_type: AnomalyType
     metric_name: str
     value: Any
     expected_range: Tuple[float, float]
     severity: float  # 0.0 to 1.0
-    timestamp: float = field(default_factory=time.time)
-    description: str = ""
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "anomaly_type": self.anomaly_type.value,
-            "metric_name": self.metric_name,
-            "value": self.value,
-            "expected_range": self.expected_range,
-            "severity": self.severity,
-            "timestamp": self.timestamp,
-            "description": self.description
-        }
+    message: str
+    context: Dict[str, Any] = field(default_factory=dict)
 
 
-class ImmunitySystem:
+@dataclass
+class ImmunityConfig:
+    """Configuration for digital immunity"""
+    anomaly_threshold: float = 1.0
+    spike_threshold: float = 3.0  # Standard deviations
+    pattern_window: int = 10
+    max_anomalies_per_minute: int = 5
+    auto_quarantine: bool = True
+    quarantine_duration_s: float = 300.0  # 5 minutes
+
+
+class DigitalImmunity:
     """Digital immunity system"""
     
-    def __init__(self, trigger_threshold: float = 1.0):
-        self.trigger_threshold = trigger_threshold
-        self.anomaly_history: List[Anomaly] = []
-        self.metric_history: Dict[str, List[Tuple[float, float]]] = {}  # metric -> [(value, timestamp)]
-        self.status = ImmunityStatus.HEALTHY
-        self.last_check_time = 0
-        
-        # Metric ranges for validation
-        self.metric_ranges = {
-            "alpha_eff": (0.0, 1.0),
-            "phi": (0.0, 1.0),
-            "sr": (0.0, 1.0),
-            "G": (0.0, 1.0),
-            "L_inf": (0.0, 1.0),
-            "dL_inf": (-1.0, 1.0),
-            "rho": (0.0, 2.0),
-            "ece": (0.0, 1.0),
-            "rho_bias": (0.0, 10.0),
-            "cost": (0.0, 1000.0),
-            "latency_s": (0.0, 60.0),
-            "memory_usage": (0.0, 1.0),
-            "cpu_usage": (0.0, 1.0)
-        }
+    def __init__(self, config: ImmunityConfig = None):
+        self.config = config or ImmunityConfig()
+        self.anomaly_history: List[AnomalyAlert] = []
+        self.metric_history: Dict[str, List[Tuple[float, Any]]] = {}
+        self.quarantine_status: Dict[str, float] = {}  # metric_name -> quarantine_until
+        self.immunity_score = 1.0  # Overall immunity score
+        self.last_reset = time.time()
     
-    def anomaly_score(self, metrics: Dict[str, Any]) -> float:
-        """
-        Calculate anomaly score for metrics
+    def _is_value_valid(self, value: Any) -> bool:
+        """Check if value is valid (not NaN, inf, etc.)"""
+        if value is None:
+            return False
         
-        Args:
-            metrics: Dictionary of metrics
+        try:
+            float_val = float(value)
+            return math.isfinite(float_val)
+        except (ValueError, TypeError):
+            return False
+    
+    def _detect_value_anomaly(self, metric_name: str, value: Any, 
+                             expected_range: Tuple[float, float]) -> Optional[AnomalyAlert]:
+        """Detect value out of range anomaly"""
+        if not self._is_value_valid(value):
+            return AnomalyAlert(
+                timestamp=time.time(),
+                anomaly_type=AnomalyType.NAN_INF,
+                metric_name=metric_name,
+                value=value,
+                expected_range=expected_range,
+                severity=1.0,
+                message=f"Invalid value detected: {value}"
+            )
+        
+        try:
+            float_val = float(value)
+            min_val, max_val = expected_range
             
-        Returns:
-            Anomaly score (0.0 = no anomalies, 1.0+ = severe anomalies)
-        """
-        total_score = 0.0
-        anomaly_count = 0
-        
-        for metric_name, value in metrics.items():
-            score = self._check_metric_anomaly(metric_name, value)
-            total_score += score
-            if score > 0:
-                anomaly_count += 1
-        
-        # Normalize by number of metrics
-        if len(metrics) > 0:
-            avg_score = total_score / len(metrics)
-        else:
-            avg_score = 0.0
-        
-        # Boost score if multiple anomalies
-        if anomaly_count > 1:
-            avg_score *= (1.0 + 0.1 * anomaly_count)
-        
-        return min(avg_score, 10.0)  # Cap at 10.0
-    
-    def _check_metric_anomaly(self, metric_name: str, value: Any) -> float:
-        """Check individual metric for anomalies"""
-        score = 0.0
-        
-        # Check for NaN
-        if isinstance(value, float) and math.isnan(value):
-            self._record_anomaly(AnomalyType.NAN_VALUE, metric_name, value, (0.0, 1.0), 1.0)
-            return 1.0
-        
-        # Check for infinite values
-        if isinstance(value, float) and math.isinf(value):
-            self._record_anomaly(AnomalyType.INFINITE_VALUE, metric_name, value, (0.0, 1.0), 1.0)
-            return 1.0
-        
-        # Check for negative values where not expected
-        if isinstance(value, (int, float)) and value < 0:
-            if metric_name in ["alpha_eff", "phi", "sr", "G", "L_inf", "ece", "memory_usage", "cpu_usage"]:
-                self._record_anomaly(AnomalyType.NEGATIVE_UNEXPECTED, metric_name, value, (0.0, 1.0), 0.8)
-                score += 0.8
-        
-        # Check for out-of-range values
-        if metric_name in self.metric_ranges:
-            min_val, max_val = self.metric_ranges[metric_name]
-            if isinstance(value, (int, float)):
-                if value < min_val or value > max_val:
-                    severity = min(1.0, abs(value - min_val) / (max_val - min_val) if max_val > min_val else 1.0)
-                    self._record_anomaly(AnomalyType.OUT_OF_RANGE, metric_name, value, (min_val, max_val), severity)
-                    score += severity
-        
-        # Check for extreme values (beyond reasonable bounds)
-        if isinstance(value, (int, float)):
-            if abs(value) > 1e6:  # Very large numbers
-                self._record_anomaly(AnomalyType.NUMERICAL_INVALID, metric_name, value, (-1e6, 1e6), 0.9)
-                score += 0.9
-        
-        return score
-    
-    def _record_anomaly(self, anomaly_type: AnomalyType, metric_name: str, value: Any, 
-                       expected_range: Tuple[float, float], severity: float) -> None:
-        """Record anomaly"""
-        anomaly = Anomaly(
-            anomaly_type=anomaly_type,
-            metric_name=metric_name,
-            value=value,
-            expected_range=expected_range,
-            severity=severity,
-            description=f"{anomaly_type.value} in {metric_name}: {value}"
-        )
-        
-        self.anomaly_history.append(anomaly)
-        
-        # Keep only recent anomalies
-        cutoff_time = time.time() - 3600  # 1 hour
-        self.anomaly_history = [a for a in self.anomaly_history if a.timestamp > cutoff_time]
-    
-    def guard(self, metrics: Dict[str, Any], trigger: float = 1.0) -> bool:
-        """
-        Guard function - returns True if OK, False if fail-closed
-        
-        Args:
-            metrics: Metrics to check
-            trigger: Trigger threshold
-            
-        Returns:
-            True if OK, False if fail-closed
-        """
-        anomaly_score = self.anomaly_score(metrics)
-        
-        # Update status
-        if anomaly_score < trigger * 0.5:
-            self.status = ImmunityStatus.HEALTHY
-        elif anomaly_score < trigger:
-            self.status = ImmunityStatus.WARNING
-        elif anomaly_score < trigger * 2:
-            self.status = ImmunityStatus.CRITICAL
-        else:
-            self.status = ImmunityStatus.FAILED
-        
-        self.last_check_time = time.time()
-        
-        # Fail-closed if anomaly score exceeds trigger
-        return anomaly_score < trigger
-    
-    def detect_spikes(self, metric_name: str, window_size: int = 10) -> List[Anomaly]:
-        """Detect spikes in metric values"""
-        if metric_name not in self.metric_history:
-            return []
-        
-        history = self.metric_history[metric_name]
-        if len(history) < window_size:
-            return []
-        
-        recent_values = [value for value, _ in history[-window_size:]]
-        spikes = []
-        
-        # Calculate moving average and standard deviation
-        mean_val = sum(recent_values) / len(recent_values)
-        variance = sum((v - mean_val) ** 2 for v in recent_values) / len(recent_values)
-        std_dev = math.sqrt(variance)
-        
-        # Detect spikes (values > 3 standard deviations from mean)
-        for i, value in enumerate(recent_values):
-            if abs(value - mean_val) > 3 * std_dev and std_dev > 0:
-                spike_anomaly = Anomaly(
-                    anomaly_type=AnomalyType.SPIKE_DETECTED,
+            if float_val < min_val or float_val > max_val:
+                # Calculate severity based on deviation
+                if float_val < min_val:
+                    deviation = (min_val - float_val) / (max_val - min_val)
+                else:
+                    deviation = (float_val - max_val) / (max_val - min_val)
+                
+                severity = min(1.0, deviation)
+                
+                return AnomalyAlert(
+                    timestamp=time.time(),
+                    anomaly_type=AnomalyType.VALUE_OUT_OF_RANGE,
                     metric_name=metric_name,
                     value=value,
-                    expected_range=(mean_val - 3 * std_dev, mean_val + 3 * std_dev),
-                    severity=min(1.0, abs(value - mean_val) / (3 * std_dev)),
-                    description=f"Spike detected in {metric_name}: {value} (mean: {mean_val:.3f}, std: {std_dev:.3f})"
+                    expected_range=expected_range,
+                    severity=severity,
+                    message=f"Value {float_val:.3f} outside range [{min_val:.3f}, {max_val:.3f}]"
                 )
-                spikes.append(spike_anomaly)
+        except (ValueError, TypeError):
+            return AnomalyAlert(
+                timestamp=time.time(),
+                anomaly_type=AnomalyType.SYSTEM_ERROR,
+                metric_name=metric_name,
+                value=value,
+                expected_range=expected_range,
+                severity=1.0,
+                message=f"Error processing value: {value}"
+            )
         
-        return spikes
+        return None
     
-    def update_metric_history(self, metrics: Dict[str, Any]) -> None:
-        """Update metric history for trend analysis"""
-        current_time = time.time()
+    def _detect_spike_anomaly(self, metric_name: str, value: Any) -> Optional[AnomalyAlert]:
+        """Detect sudden spike anomaly"""
+        if not self._is_value_valid(value):
+            return None
+        
+        history = self.metric_history.get(metric_name, [])
+        if len(history) < 3:
+            return None
+        
+        try:
+            float_val = float(value)
+            recent_values = [float(h[1]) for h in history[-10:] if self._is_value_valid(h[1])]
+            
+            if len(recent_values) < 3:
+                return None
+            
+            mean_val = statistics.mean(recent_values)
+            std_val = statistics.stdev(recent_values) if len(recent_values) > 1 else 0.0
+            
+            if std_val == 0:
+                return None
+            
+            z_score = abs(float_val - mean_val) / std_val
+            
+            if z_score > self.config.spike_threshold:
+                severity = min(1.0, z_score / self.config.spike_threshold)
+                
+                return AnomalyAlert(
+                    timestamp=time.time(),
+                    anomaly_type=AnomalyType.SUDDEN_SPIKE,
+                    metric_name=metric_name,
+                    value=value,
+                    expected_range=(mean_val - 2*std_val, mean_val + 2*std_val),
+                    severity=severity,
+                    message=f"Sudden spike detected: z-score {z_score:.2f}"
+                )
+        except (ValueError, TypeError, statistics.StatisticsError):
+            pass
+        
+        return None
+    
+    def _update_metric_history(self, metric_name: str, value: Any):
+        """Update metric history"""
+        if metric_name not in self.metric_history:
+            self.metric_history[metric_name] = []
+        
+        self.metric_history[metric_name].append((time.time(), value))
+        
+        # Keep only recent history
+        cutoff_time = time.time() - 3600  # 1 hour
+        self.metric_history[metric_name] = [
+            (t, v) for t, v in self.metric_history[metric_name]
+            if t >= cutoff_time
+        ]
+    
+    def _is_quarantined(self, metric_name: str) -> bool:
+        """Check if metric is quarantined"""
+        if metric_name not in self.quarantine_status:
+            return False
+        
+        quarantine_until = self.quarantine_status[metric_name]
+        if time.time() > quarantine_until:
+            # Quarantine expired
+            del self.quarantine_status[metric_name]
+            return False
+        
+        return True
+    
+    def _quarantine_metric(self, metric_name: str):
+        """Quarantine metric"""
+        if self.config.auto_quarantine:
+            self.quarantine_status[metric_name] = time.time() + self.config.quarantine_duration_s
+    
+    def _update_immunity_score(self):
+        """Update overall immunity score"""
+        if not self.anomaly_history:
+            self.immunity_score = 1.0
+            return
+        
+        # Recent anomalies (last hour)
+        cutoff_time = time.time() - 3600
+        recent_anomalies = [a for a in self.anomaly_history if a.timestamp >= cutoff_time]
+        
+        if not recent_anomalies:
+            self.immunity_score = 1.0
+            return
+        
+        # Calculate immunity based on anomaly frequency and severity
+        total_severity = sum(a.severity for a in recent_anomalies)
+        anomaly_rate = len(recent_anomalies) / 60  # per minute
+        
+        # Immunity decreases with anomalies
+        immunity_factor = max(0.0, 1.0 - (total_severity * 0.1 + anomaly_rate * 0.2))
+        self.immunity_score = immunity_factor
+    
+    def check_metrics(self, metrics: Dict[str, Any], 
+                     expected_ranges: Dict[str, Tuple[float, float]] = None) -> Tuple[bool, List[AnomalyAlert]]:
+        """
+        Check metrics for anomalies
+        
+        Args:
+            metrics: Dictionary of metric values
+            expected_ranges: Expected ranges for metrics
+            
+        Returns:
+            (all_ok, anomaly_alerts)
+        """
+        if expected_ranges is None:
+            expected_ranges = {}
+        
+        anomalies = []
         
         for metric_name, value in metrics.items():
-            if isinstance(value, (int, float)) and not math.isnan(value) and not math.isinf(value):
-                if metric_name not in self.metric_history:
-                    self.metric_history[metric_name] = []
-                
-                self.metric_history[metric_name].append((value, current_time))
-                
-                # Keep only recent history (1 hour)
-                cutoff_time = current_time - 3600
-                self.metric_history[metric_name] = [
-                    (v, t) for v, t in self.metric_history[metric_name] if t > cutoff_time
-                ]
+            # Skip quarantined metrics
+            if self._is_quarantined(metric_name):
+                continue
+            
+            # Update history
+            self._update_metric_history(metric_name, value)
+            
+            # Check for value anomalies
+            if metric_name in expected_ranges:
+                anomaly = self._detect_value_anomaly(metric_name, value, expected_ranges[metric_name])
+                if anomaly:
+                    anomalies.append(anomaly)
+            
+            # Check for spike anomalies
+            spike_anomaly = self._detect_spike_anomaly(metric_name, value)
+            if spike_anomaly:
+                anomalies.append(spike_anomaly)
+        
+        # Record anomalies
+        for anomaly in anomalies:
+            self.anomaly_history.append(anomaly)
+            
+            # Quarantine if severe
+            if anomaly.severity > 0.8:
+                self._quarantine_metric(anomaly.metric_name)
+        
+        # Update immunity score
+        self._update_immunity_score()
+        
+        # Check if too many anomalies
+        recent_anomalies = [a for a in self.anomaly_history 
+                           if a.timestamp >= time.time() - 60]  # Last minute
+        
+        if len(recent_anomalies) > self.config.max_anomalies_per_minute:
+            # System-wide anomaly
+            system_anomaly = AnomalyAlert(
+                timestamp=time.time(),
+                anomaly_type=AnomalyType.SYSTEM_ERROR,
+                metric_name="system",
+                value=len(recent_anomalies),
+                expected_range=(0, self.config.max_anomalies_per_minute),
+                severity=1.0,
+                message=f"Too many anomalies: {len(recent_anomalies)} in last minute"
+            )
+            anomalies.append(system_anomaly)
+        
+        all_ok = len(anomalies) == 0
+        return all_ok, anomalies
     
-    def get_immunity_stats(self) -> Dict[str, Any]:
-        """Get immunity system statistics"""
-        recent_anomalies = [a for a in self.anomaly_history if time.time() - a.timestamp < 3600]
+    def guard(self, metrics: Dict[str, Any], 
+              expected_ranges: Dict[str, Tuple[float, float]] = None,
+              trigger: float = 1.0) -> bool:
+        """
+        Guard function for fail-closed protection
+        
+        Args:
+            metrics: Dictionary of metric values
+            expected_ranges: Expected ranges for metrics
+            trigger: Threshold for triggering protection
+            
+        Returns:
+            True if OK, False if protection triggered
+        """
+        all_ok, anomalies = self.check_metrics(metrics, expected_ranges)
+        
+        if not all_ok:
+            # Check if any anomaly exceeds trigger threshold
+            max_severity = max(a.severity for a in anomalies)
+            if max_severity >= trigger:
+                return False
+        
+        # Check immunity score
+        if self.immunity_score < trigger:
+            return False
+        
+        return True
+    
+    def get_immunity_status(self) -> Dict[str, Any]:
+        """Get current immunity status"""
+        recent_anomalies = [a for a in self.anomaly_history 
+                           if a.timestamp >= time.time() - 3600]  # Last hour
         
         anomaly_counts = {}
         for anomaly in recent_anomalies:
@@ -255,137 +319,109 @@ class ImmunitySystem:
             anomaly_counts[anomaly_type] = anomaly_counts.get(anomaly_type, 0) + 1
         
         return {
-            "status": self.status.value,
-            "total_anomalies": len(self.anomaly_history),
+            "immunity_score": self.immunity_score,
+            "quarantined_metrics": list(self.quarantine_status.keys()),
             "recent_anomalies": len(recent_anomalies),
             "anomaly_types": anomaly_counts,
-            "last_check_time": self.last_check_time,
-            "tracked_metrics": len(self.metric_history),
-            "trigger_threshold": self.trigger_threshold
+            "total_metrics_tracked": len(self.metric_history),
+            "last_reset": self.last_reset
         }
     
-    def get_anomaly_report(self, hours: int = 1) -> Dict[str, Any]:
-        """Get detailed anomaly report"""
-        cutoff_time = time.time() - (hours * 3600)
-        recent_anomalies = [a for a in self.anomaly_history if a.timestamp > cutoff_time]
-        
-        if not recent_anomalies:
-            return {
-                "period_hours": hours,
-                "anomaly_count": 0,
-                "anomalies": [],
-                "summary": "No anomalies detected"
-            }
-        
-        # Group by metric
-        by_metric = {}
-        for anomaly in recent_anomalies:
-            metric = anomaly.metric_name
-            if metric not in by_metric:
-                by_metric[metric] = []
-            by_metric[metric].append(anomaly.to_dict())
-        
-        # Calculate severity distribution
-        severity_dist = {"low": 0, "medium": 0, "high": 0}
-        for anomaly in recent_anomalies:
-            if anomaly.severity < 0.3:
-                severity_dist["low"] += 1
-            elif anomaly.severity < 0.7:
-                severity_dist["medium"] += 1
-            else:
-                severity_dist["high"] += 1
-        
-        return {
-            "period_hours": hours,
-            "anomaly_count": len(recent_anomalies),
-            "anomalies_by_metric": by_metric,
-            "severity_distribution": severity_dist,
-            "most_problematic_metric": max(by_metric.keys(), key=lambda k: len(by_metric[k])) if by_metric else None,
-            "summary": f"{len(recent_anomalies)} anomalies detected in {hours} hour(s)"
-        }
-    
-    def reset_immunity(self) -> None:
+    def reset_immunity(self):
         """Reset immunity system"""
         self.anomaly_history.clear()
         self.metric_history.clear()
-        self.status = ImmunityStatus.HEALTHY
-        self.last_check_time = 0
+        self.quarantine_status.clear()
+        self.immunity_score = 1.0
+        self.last_reset = time.time()
 
 
-# Global immunity instance
-_global_immunity: Optional[ImmunitySystem] = None
-
-
-def get_global_immunity() -> ImmunitySystem:
-    """Get global immunity system instance"""
-    global _global_immunity
+# Integration with Life Equation
+def integrate_immunity_in_life_equation(
+    life_verdict: Dict[str, Any],
+    immunity: DigitalImmunity = None
+) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Integrate digital immunity into Life Equation evaluation
     
-    if _global_immunity is None:
-        _global_immunity = ImmunitySystem()
+    Args:
+        life_verdict: Result from life_equation()
+        immunity: Digital immunity instance
+        
+    Returns:
+        (immunity_ok, immunity_details)
+    """
+    if immunity is None:
+        immunity = DigitalImmunity()
     
-    return _global_immunity
-
-
-def anomaly_score(metrics: Dict[str, Any]) -> float:
-    """Convenience function to calculate anomaly score"""
-    immunity = get_global_immunity()
-    return immunity.anomaly_score(metrics)
-
-
-def guard(metrics: Dict[str, Any], trigger: float = 1.0) -> bool:
-    """Convenience function for immunity guard"""
-    immunity = get_global_immunity()
-    return immunity.guard(metrics, trigger)
-
-
-def test_immunity_system() -> Dict[str, Any]:
-    """Test immunity system functionality"""
-    immunity = get_global_immunity()
+    # Extract metrics from life verdict
+    metrics = life_verdict.get("metrics", {})
     
-    # Reset system
-    immunity.reset_immunity()
+    # Define expected ranges for key metrics
+    expected_ranges = {
+        "alpha_eff": (0.0, 1.0),
+        "phi": (0.0, 1.0),
+        "sr": (0.0, 1.0),
+        "G": (0.0, 1.0),
+        "L_inf": (0.0, 1.0),
+        "dL_inf": (-1.0, 1.0),
+        "rho": (0.0, 2.0)
+    }
+    
+    # Check immunity
+    immunity_ok = immunity.guard(metrics, expected_ranges, trigger=0.8)
+    
+    # Get immunity status
+    immunity_status = immunity.get_immunity_status()
+    
+    immunity_details = {
+        "immunity_ok": immunity_ok,
+        "immunity_score": immunity_status["immunity_score"],
+        "quarantined_metrics": immunity_status["quarantined_metrics"],
+        "recent_anomalies": immunity_status["recent_anomalies"],
+        "anomaly_types": immunity_status["anomaly_types"]
+    }
+    
+    return immunity_ok, immunity_details
+
+
+# Example usage
+if __name__ == "__main__":
+    # Create immunity system
+    immunity = DigitalImmunity()
     
     # Test with normal metrics
     normal_metrics = {
-        "alpha_eff": 0.02,
+        "alpha_eff": 0.5,
         "phi": 0.7,
-        "sr": 0.85,
-        "G": 0.9,
-        "L_inf": 0.8,
-        "dL_inf": 0.01,
-        "rho": 0.95,
-        "ece": 0.005,
-        "cost": 0.02
+        "sr": 0.8,
+        "G": 0.9
     }
     
-    normal_score = immunity.anomaly_score(normal_metrics)
-    normal_guard = immunity.guard(normal_metrics)
+    expected_ranges = {
+        "alpha_eff": (0.0, 1.0),
+        "phi": (0.0, 1.0),
+        "sr": (0.0, 1.0),
+        "G": (0.0, 1.0)
+    }
+    
+    ok, anomalies = immunity.check_metrics(normal_metrics, expected_ranges)
+    print(f"Normal metrics: OK={ok}, anomalies={len(anomalies)}")
     
     # Test with anomalous metrics
     anomalous_metrics = {
-        "alpha_eff": float('nan'),  # NaN
-        "phi": 1.5,  # Out of range
-        "sr": -0.1,  # Negative unexpected
-        "G": float('inf'),  # Infinite
-        "L_inf": 0.8,
-        "dL_inf": 0.01,
-        "rho": 0.95,
-        "ece": 0.005,
-        "cost": 0.02
+        "alpha_eff": 2.0,  # Out of range
+        "phi": float('inf'),  # Invalid
+        "sr": 0.8,
+        "G": 0.9
     }
     
-    anomalous_score = immunity.anomaly_score(anomalous_metrics)
-    anomalous_guard = immunity.guard(anomalous_metrics)
+    ok, anomalies = immunity.check_metrics(anomalous_metrics, expected_ranges)
+    print(f"Anomalous metrics: OK={ok}, anomalies={len(anomalies)}")
     
-    # Get stats
-    stats = immunity.get_immunity_stats()
-    report = immunity.get_anomaly_report()
+    for anomaly in anomalies:
+        print(f"  - {anomaly.anomaly_type.value}: {anomaly.message}")
     
-    return {
-        "normal_score": normal_score,
-        "normal_guard": normal_guard,
-        "anomalous_score": anomalous_score,
-        "anomalous_guard": anomalous_guard,
-        "immunity_stats": stats,
-        "anomaly_report": report
-    }
+    # Get immunity status
+    status = immunity.get_immunity_status()
+    print(f"Immunity status: {status}")
