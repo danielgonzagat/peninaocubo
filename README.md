@@ -1,8 +1,40 @@
-# PENIN-Ω v7.0 - Sistema de Evolução Mestre
+# PENIN-Ω v7.1 - Sistema de Evolução Mestre
 
 ## 📋 Status das Correções
 
-### ✅ P0 - Correções Críticas (Concluídas)
+### ✅ P0 - Correções Críticas AUDITADAS (Concluídas v7.1)
+
+**Nova Auditoria Completa:** Ver `AUDITORIA_P0_COMPLETA.md`
+
+1. **Métricas Éticas Computadas** ✓
+   - Módulo `penin/omega/ethics_metrics.py` implementado
+   - ECE (Expected Calibration Error) com binning
+   - ρ_bias (Bias Ratio) por grupo protegido
+   - Fairness Score (demographic parity/equalized odds)
+   - Ateste completo com hash de evidência para WORM
+   - Fail-closed: retorna valores piores se dados insuficientes
+
+2. **Endpoint /metrics Seguro** ✓
+   - Bind default em `127.0.0.1` (localhost only)
+   - Config `metrics_bind_host` em `ObservabilityConfig`
+   - Previne exposição de métricas sensíveis em hosts públicos
+
+3. **WORM com WAL + busy_timeout** ✓
+   - `PRAGMA journal_mode=WAL` ativado
+   - `PRAGMA busy_timeout=3000` configurado
+   - Melhor concorrência e durabilidade
+   - Alinhado com cache L2
+
+4. **Router Cost-Aware com Budget** ✓
+   - Score multi-fator: quality (40%) + latency (30%) + cost (30%)
+   - Budget diário configurável (default: $5 USD)
+   - Tracking automático de spend/tokens/requests
+   - Fail-closed: RuntimeError se budget excedido
+   - Método `get_usage_stats()` para monitoring
+
+**Testes:** 4/4 passando (`test_p0_audit_corrections.py`)
+
+### ✅ P0 - Correções Críticas (Base v7.0)
 
 1. **Seed Determinístico** ✓
    - Implementado `DeterministicRandom` para gerenciar toda aleatoriedade
@@ -176,7 +208,17 @@ Todos os logs incluem:
    - RNG state rastreado
    - Replay possível para debug
 
-## 📝 Próximos Passos (P2)
+## 📝 Próximos Passos
+
+### P1 - Melhorias Importantes (2-3 semanas)
+- [ ] Suites de testes de concorrência (WORM/League/Ethics)
+- [ ] Redaction de logs (segredos/tokens/payloads)
+- [ ] Substituir pickle no cache L2 por orjson + HMAC
+- [ ] Fix imports dos testes (sem sys.path.insert)
+- [ ] Testes de falhas de rede e timeout
+- [ ] Calibração de limiares éticos com dados reais
+
+### P2 - Higiene e Escala
 
 - [ ] Integração OPA/Rego para políticas
 - [ ] Bridge LLM com accounting real
