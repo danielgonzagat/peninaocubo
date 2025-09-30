@@ -4,7 +4,12 @@ import time
 import google.generativeai as genai
 
 from penin.config import settings
+<<<<<<< HEAD
 from penin.providers.pricing import estimate_cost, usage_value
+||||||| 0e918a6
+=======
+from penin.providers.pricing import estimate_cost_usd, get_first_available
+>>>>>>> origin/codex/capture-usage-metadata-and-calculate-costs
 
 from .base import BaseProvider, LLMResponse, Message, Tool
 
@@ -46,11 +51,28 @@ class GeminiProvider(BaseProvider):
         resp = await asyncio.to_thread(_generate)
         text = getattr(resp, "text", "") or ""
         usage = getattr(resp, "usage_metadata", None)
+<<<<<<< HEAD
         tokens_in = usage_value(usage, "prompt_token_count")
         tokens_out = usage_value(usage, "candidates_token_count")
         cost_usd = estimate_cost(self.name, self.model, tokens_in, tokens_out)
+||||||| 0e918a6
         tokens_in = getattr(usage, "prompt_token_count", 0) if usage else 0
         tokens_out = getattr(usage, "candidates_token_count", 0) if usage else 0
+=======
+        tokens_in = get_first_available(
+            usage,
+            "prompt_token_count",
+            "prompt_tokens",
+            "input_tokens",
+        )
+        tokens_out = get_first_available(
+            usage,
+            "candidates_token_count",
+            "completion_tokens",
+            "output_tokens",
+        )
+        cost_usd = estimate_cost_usd(self.name, self.model, tokens_in, tokens_out)
+>>>>>>> origin/codex/capture-usage-metadata-and-calculate-costs
         end = time.time()
         return LLMResponse(
             content=text,
