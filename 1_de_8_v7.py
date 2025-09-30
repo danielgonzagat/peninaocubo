@@ -1140,16 +1140,16 @@ class EthicsMetrics:
     def measure(self, xt: 'OmegaMEState') -> Dict[str, Any]:
         # Proxy confidence as (1 - uncertainty); proxy accuracy as stability
         confidence = max(0.0, min(1.0, 1.0 - xt.uncertainty))
+    def measure(self, xt: 'OmegaMEState') -> Dict[str, Any]:
+        # Proxy confidence as (1 - uncertainty); proxy accuracy as stability
+        confidence = max(0.0, min(1.0, 1.0 - xt.uncertainty))
         accuracy = max(0.0, min(1.0, xt.stability))
         ece = abs(confidence - accuracy)
         # Bias proxy stays as current xt.bias but clipped to [1, 2]
         bias = max(1.0, min(2.0, xt.bias))
         rho = max(0.0, min(1.0, xt.rho))
 
-        xt.ece = ece
-        xt.bias = bias
-        xt.rho = rho
-
+        # Return computed values without mutating input object
         return {
             "confidence": confidence,
             "accuracy": accuracy,
@@ -1157,6 +1157,7 @@ class EthicsMetrics:
             "bias": bias,
             "rho": rho,
             "limits": {"ece_max": self.ece_max, "bias_max": self.bias_max, "rho_max": self.rho_max},
+        }
         }
 
 # -----------------------------------------------------------------------------
