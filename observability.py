@@ -365,10 +365,12 @@ class MetricsCollector:
 class MetricsServer:
     """Simple HTTP server for Prometheus metrics with basic auth"""
     
-    def __init__(self, collector: MetricsCollector, port: int = 8000, host: str = "127.0.0.1"):
+    def __init__(self, collector: MetricsCollector, port: int = 8000, bind_host: str = "127.0.0.1", auth_token: Optional[str] = None):
         self.collector = collector
         self.port = port
-        self.host = host
+        # Expose bind_host attribute for tests and for clarity
+        self.bind_host = bind_host
+        self.auth_token = auth_token
         self.server = None
         self.thread = None
     
@@ -416,12 +418,12 @@ class MetricsServer:
             def log_message(self, format, *args):
                 pass  # Suppress request logs
         
-        # P0 Fix: Bind to localhost only for security
-        self.server = HTTPServer(('127.0.0.1', self.port), MetricsHandler)
+        # P0 Fix: Bind to localhost only for security (configurable)
+        self.server = HTTPServer((self.bind_host, self.port), MetricsHandler)
         self.thread = threading.Thread(target=self.server.serve_forever)
         self.thread.daemon = True
         self.thread.start()
-        print(f"Metrics server started on {self.host}:{self.port}")
+        print(f"Metrics server started on {self.bind_host}:{self.port}")
     
     def stop(self):
         """Stop metrics server"""
@@ -464,6 +466,7 @@ class ObservabilityManager:
             self.metrics_server = MetricsServer(
                 self.metrics,
                 port=self.config.metrics_port,
+                bind_host=self.config.metrics_bind_host,
                 auth_token=self.config.metrics_auth_token
             )
     

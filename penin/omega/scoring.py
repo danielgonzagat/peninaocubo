@@ -100,7 +100,8 @@ def score_gate(
     weights_sum = wU + wS + wC + wL
     if abs(weights_sum - 1.0) > 1e-6 and weights_sum > 0:
         wU, wS, wC, wL = (wU / weights_sum, wS / weights_sum, wC / weights_sum, wL / weights_sum)
-    score = wU * U + wS * S - wC * C + wL * L
+    # Favor higher U, S, L and lower C (cost). Lower cost increases score via (1 - C).
+    score = wU * U + wS * S + wL * L + wC * (1.0 - C)
     if score >= tau:
         return ScoreGateVerdict.PROMOTE, score
     if score >= max(0.0, tau - canary_margin):

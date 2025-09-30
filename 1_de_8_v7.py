@@ -277,6 +277,7 @@ class EventType:
     SEED_SET = "SEED_SET"
     GATE_FAIL = "GATE_FAIL"
     ETHICS_ATTEST = "ETHICS_ATTEST"  # P0 Fix: Ethics metrics attestation
+    METRIC = "METRIC"
 
 # -----------------------------------------------------------------------------
 # Configuration and paths
@@ -1147,9 +1148,6 @@ class EthicsMetrics:
     def measure(self, xt: 'OmegaMEState') -> Dict[str, Any]:
         # Proxy confidence as (1 - uncertainty); proxy accuracy as stability
         confidence = max(0.0, min(1.0, 1.0 - xt.uncertainty))
-    def measure(self, xt: 'OmegaMEState') -> Dict[str, Any]:
-        # Proxy confidence as (1 - uncertainty); proxy accuracy as stability
-        confidence = max(0.0, min(1.0, 1.0 - xt.uncertainty))
         accuracy = max(0.0, min(1.0, xt.stability))
         ece = abs(confidence - accuracy)
         # Bias proxy stays as current xt.bias but clipped to [1, 2]
@@ -1164,7 +1162,6 @@ class EthicsMetrics:
             "bias": bias,
             "rho": rho,
             "limits": {"ece_max": self.ece_max, "bias_max": self.bias_max, "rho_max": self.rho_max},
-        }
         }
 
 # -----------------------------------------------------------------------------
@@ -1421,48 +1418,19 @@ class PeninOmegaCore:
                 ).hexdigest()[:16]
             }, self.xt, seed_state=self.rng.get_state())
                 
-            # P0 Fix: Calculate and attest ethical metrics
+            # P0 Fix: Calculate and attest ethical metrics (only if model data available)
             ethics_metrics = None
             if self.ethics_calculator and HAS_ETHICS:
                 try:
-                    # Generate synthetic test data for demonstration
-                    # In production, this would come from actual model predictions and evaluation
-                    n_samples = 1000
-                    predictions = [self.rng.random() for _ in range(n_samples)]
-            # P0 Fix: Calculate and attest ethical metrics
-            ethics_metrics = None
-            if self.ethics_calculator and HAS_ETHICS:
-                try:
-                    # TODO: Replace with actual model predictions and evaluation data
-                    # This synthetic data should be replaced with real model outputs
-                    # from the current cycle's LLM interactions
-                    if not hasattr(self, '_model_predictions') or not self._model_predictions:
-                        log.warning("No model predictions available for ethics calculation - skipping")
-                        ethics_metrics = None
-                    else:
-                        # Use actual model data instead of synthetic
-                        predictions = self._model_predictions.get('predictions', [])
-                        targets = self._model_predictions.get('targets', [])
-                        protected_attrs = self._model_predictions.get('protected_attributes', [])
-                        
-                        if not all([predictions, targets, protected_attrs]):
-                            log.warning("Incomplete model data for ethics calculation - skipping")
-                            ethics_metrics = None
-                        else:
+                    model_data = getattr(self, '_model_predictions', None)
+                    if model_data:
+                        predictions = model_data.get('predictions', [])
+                        targets = model_data.get('targets', [])
+                        protected_attrs = model_data.get('protected_attributes', [])
+                        if predictions and targets and protected_attrs:
                             risk_series = getattr(self, '_risk_history', [self.rng.random() for _ in range(50)])
-                            
-                            consent_data = {
-                                'user_consent': True,
-                                'data_usage_consent': True,
-                                'processing_consent': True
-                            }
-                            
-                            eco_data = {
-                                'carbon_footprint_ok': True,
-                                'energy_efficiency_ok': True,
-                                'waste_minimization_ok': True
-                            }
-                            
+                            consent_data = {'user_consent': True, 'data_usage_consent': True, 'processing_consent': True}
+                            eco_data = {'carbon_footprint_ok': True, 'energy_efficiency_ok': True, 'waste_minimization_ok': True}
                             ethics_metrics = self.ethics_calculator.calculate_all_metrics(
                                 predictions=predictions,
                                 targets=targets,
@@ -1473,35 +1441,27 @@ class PeninOmegaCore:
                                 dataset_id=f"cycle_{self.xt.cycle}",
                                 seed=self.rng.seed
                             )
-                        consent_data=consent_data,
-                        eco_data=eco_data,
-                        dataset_id=f"cycle_{self.xt.cycle}",
-                        seed=self.rng.seed
-                    )
-                    
-                    # Log ethics metrics to WORM
-                    self.worm.record(
-                        EventType.ETHICS_ATTEST,
-                        {
-                            "cycle": self.xt.cycle,
-                            "ece": ethics_metrics.ece,
-                            "rho_bias": ethics_metrics.rho_bias,
-                            "fairness": ethics_metrics.fairness,
-                            "consent": ethics_metrics.consent,
-                            "eco_ok": ethics_metrics.eco_ok,
-                            "risk_rho": ethics_metrics.risk_rho,
-                            "evidence_hash": ethics_metrics.evidence_hash
-                        },
-                        self.xt,
-                        seed_state=self.rng.get_state()
-                    )
-                    
-                    log.info(f"Ethics metrics calculated: ECE={ethics_metrics.ece:.4f}, "
-                            f"Bias={ethics_metrics.rho_bias:.4f}, Fairness={ethics_metrics.fairness:.4f}")
-                    
+                            self.worm.record(
+                                EventType.ETHICS_ATTEST,
+                                {
+                                    "cycle": self.xt.cycle,
+                                    "ece": ethics_metrics.ece,
+                                    "rho_bias": ethics_metrics.rho_bias,
+                                    "fairness": ethics_metrics.fairness,
+                                    "consent": ethics_metrics.consent,
+                                    "eco_ok": ethics_metrics.eco_ok,
+                                    "risk_rho": ethics_metrics.risk_rho,
+                                    "evidence_hash": ethics_metrics.evidence_hash
+                                },
+                                self.xt,
+                                seed_state=self.rng.get_state()
+                            )
+                            log.info(
+                                f"Ethics metrics calculated: ECE={ethics_metrics.ece:.4f}, "
+                                f"Bias={ethics_metrics.rho_bias:.4f}, Fairness={ethics_metrics.fairness:.4f}"
+                            )
                 except Exception as e:
                     log.error(f"Failed to calculate ethics metrics: {e}")
-                    # Fail-closed: abort if ethics calculation fails
                     result.update({"decision": "ABORT", "reason": "ETHICS_CALC_FAILED", "error": str(e)})
                     self.worm.record(EventType.CYCLE_ABORT, result, self.xt, seed_state=self.rng.get_state())
                     return result
@@ -1615,15 +1575,6 @@ class PeninOmegaCore:
             except ImportError:
                 # penin.omega.scoring not available, skip scoring
                 pass
-            if _il.find_spec("penin.omega.scoring") is not None:
-                from penin.omega.scoring import score_gate
-                u = max(0.0, min(1.0, self.xt.rsi))
-                s = max(0.0, min(1.0, 1.0 - self.xt.ece))
-                c = max(0.0, min(1.0, self.xt.cost))
-                l = max(0.0, min(1.0, self.xt.novelty))
-                verdict, score = score_gate(u, s, c, l, {"U": 0.35, "S": 0.35, "C": 0.2, "L": 0.1}, tau=0.6)
-                result["metrics"]["USCL_score"] = score
-                result["metrics"]["USCL_verdict"] = verdict
 
             caos_val = self.caos.compute(self.xt)
             result["metrics"]["CAOS⁺"] = caos_val
