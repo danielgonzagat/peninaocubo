@@ -1,26 +1,26 @@
 # PENIN-Ω — Docs Autoatualizadas
 
-_Gerado automaticamente em 2025-09-30T15:19:31.092137+00:00Z_
+_Gerado automaticamente em 2025-09-30T15:24:24.172874+00:00Z_
 
 ## Estado Atual do Sistema
 
 ### Swarm Cognitivo
 ```json
 {
-  "timestamp": 1759245571.0925872,
-  "active_nodes": 3,
-  "global_phi": 0.39558842011266754,
-  "global_sr": 0.7136475491835724,
-  "global_G": 0.792452298366446,
-  "global_health": 0.9089123560329956,
-  "consensus_hash": "8539dc8a065f57d8"
+  "timestamp": 1759245864.1734445,
+  "active_nodes": 2,
+  "global_phi": 0.7241379310344828,
+  "global_sr": 0.8098765432098765,
+  "global_G": 0.8898876404494382,
+  "global_health": 1.0,
+  "consensus_hash": "c1a97e7a7d134045"
 }
 ```
 
 ### Blockchain Neural
-- Último bloco: 8b1a052afdffe388
+- Último bloco: 2f7fec014a19dbd7
 - Cadeia válida: False
-- Timestamp: 2025-09-30T15:19:31.081714
+- Timestamp: 2025-09-30T15:24:24.172645
 
 ### Módulos Implementados
 - ✅ Equação de Vida (+) - Gate não-compensatório

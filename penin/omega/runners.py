@@ -235,8 +235,74 @@ class EvolutionRunner:
                 evidence_hash=""
             )
             
+            # Record failure in WORM ledger
             self._record_cycle_result(result)
             raise
+
+
+# Função de conveniência para compatibilidade com CLI
+def quick_evolution_cycle(n_cycles: int = 1, dry_run: bool = True) -> Dict[str, Any]:
+    """
+    Execução rápida de ciclos evolutivos
+    
+    Args:
+        n_cycles: Número de ciclos
+        dry_run: Se True, não faz deploy real
+        
+    Returns:
+        Relatório dos ciclos
+    """
+    import asyncio
+    
+    config = EvolutionConfig(
+        n_challengers=3,
+        dry_run=dry_run,
+        auto_deploy=False
+    )
+    
+    runner = EvolutionRunner(config)
+    
+    async def run_cycles():
+        results = []
+        for i in range(n_cycles):
+            print(f"\n🔄 Ciclo {i+1}/{n_cycles}")
+            result = await runner.evolve_one_cycle()
+            results.append(result)
+        return results
+    
+    # Executar ciclos
+    results = asyncio.run(run_cycles())
+    
+    # Compilar relatório
+    total_cost = sum(r.cost_usd for r in results)
+    successful_cycles = sum(1 for r in results if r.decision != "reject")
+    
+    # Coletar métricas da Equação de Vida (+)
+    life_metrics = []
+    for result in results:
+        for challenger_id, gate_result in result.gate_results.items():
+            if "life_equation_details" in gate_result:
+                life_details = gate_result["life_equation_details"]
+                if "metrics" in life_details:
+                    life_metrics.append(life_details["metrics"])
+    
+    # Calcular médias das métricas de vida
+    avg_life_metrics = {}
+    if life_metrics:
+        for key in life_metrics[0].keys():
+            values = [m[key] for m in life_metrics if key in m]
+            avg_life_metrics[key] = sum(values) / len(values) if values else 0.0
+    
+    return {
+        "n_cycles": n_cycles,
+        "successful_cycles": successful_cycles,
+        "success_rate": successful_cycles / n_cycles if n_cycles > 0 else 0.0,
+        "total_cost_usd": total_cost,
+        "avg_cost_per_cycle": total_cost / n_cycles if n_cycles > 0 else 0.0,
+        "life_equation_metrics": avg_life_metrics,
+        "dry_run": dry_run,
+        "timestamp": time.time()
+    }
     
     async def _generate_challengers(self, base_config: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Generate challenger configurations"""
