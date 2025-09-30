@@ -45,10 +45,10 @@ import uuid
 import math
 import random
 import hashlib
+import hmac
 import asyncio
 import threading
 import multiprocessing
-import pickle
 import sqlite3
 import logging
 import signal
@@ -60,6 +60,8 @@ from collections import deque, defaultdict, OrderedDict
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from enum import Enum
+
+import orjson
 
 # Pydantic for config validation
 try:
@@ -591,6 +593,8 @@ class MultiLevelCache:
                 self.l3_redis = None
         self.stats = defaultdict(lambda: {"hits": 0, "misses": 0, "evictions": 0})
         self._lock = threading.RLock()
+        self._hmac_key = (os.getenv("PENIN_CACHE_HMAC_KEY") or "penin-dev-key").encode("utf-8")
+        self._digest_size = hashlib.sha256().digest_size
         
     def _init_l2_db(self):
         cursor = self.l2_db.cursor()
@@ -611,11 +615,20 @@ class MultiLevelCache:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_access ON cache(access_count)')
         self.l2_db.commit()
         
-    def _serialize(self, obj: Any) -> bytes: 
-        return pickle.dumps(obj)
-        
-    def _deserialize(self, b: bytes) -> Any: 
-        return pickle.loads(b)
+    def _serialize(self, obj: Any) -> bytes:
+        payload = orjson.dumps(obj)
+        mac = hmac.new(self._hmac_key, payload, hashlib.sha256).digest()
+        return mac + payload
+
+    def _deserialize(self, b: bytes) -> Any:
+        if len(b) < self._digest_size:
+            raise ValueError("L2 cache payload truncated")
+        mac = b[: self._digest_size]
+        payload = b[self._digest_size :]
+        expected = hmac.new(self._hmac_key, payload, hashlib.sha256).digest()
+        if not hmac.compare_digest(mac, expected):
+            raise ValueError("L2 cache HMAC mismatch")
+        return orjson.loads(payload)
         
     def _promote_to_l1(self, key: str, value: Any):
         if len(self.l1_cache) >= self.l1_size:
