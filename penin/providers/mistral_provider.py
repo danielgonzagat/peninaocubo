@@ -4,6 +4,7 @@ import time
 from mistralai import Mistral
 
 from penin.config import settings
+from penin.providers.pricing import estimate_cost, usage_value
 
 from .base import BaseProvider, LLMResponse, Message, Tool
 
@@ -28,5 +29,17 @@ class MistralProvider(BaseProvider):
         msgs += messages
         resp = await asyncio.to_thread(self.client.chat.complete, model=self.model, messages=msgs)
         content = resp.choices[0].message.content
+        usage = getattr(resp, "usage", None)
+        tokens_in = usage_value(usage, "prompt_tokens")
+        tokens_out = usage_value(usage, "completion_tokens")
+        cost_usd = estimate_cost(self.name, self.model, tokens_in, tokens_out)
         end = time.time()
-        return LLMResponse(content=content, model=self.model, provider=self.name, latency_s=end - start)
+        return LLMResponse(
+            content=content,
+            model=self.model,
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
+            provider=self.name,
+            cost_usd=cost_usd,
+            latency_s=end - start,
+        )
