@@ -30,8 +30,15 @@ def normalize_minmax(x: float, xmin: float, xmax: float) -> float:
 def harmonic_mean_weighted(values: List[float], weights: List[float]) -> float:
     assert len(values) == len(weights) and len(values) > 0
     denom = 0.0
+    weight_sum = sum(weights)
+    if weight_sum <= EPS:
+        # If all weights are zero, return simple harmonic mean
+        return len(values) / sum(1.0 / max(EPS, v) for v in values)
+    
     for v, w in zip(values, weights):
         v_clamped = max(EPS, v)
+        denom += w / v_clamped
+    return 1.0 / max(EPS, denom)
         denom += w / v_clamped
     return 1.0 / max(EPS, denom)
 
