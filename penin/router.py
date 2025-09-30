@@ -3,8 +3,34 @@ import time
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from tenacity import retry, stop_after_attempt, wait_exponential
+
 from penin.config import settings
 from penin.providers.base import BaseProvider, LLMResponse
+
+
+class CostTracker:
+    """Track costs with daily budget limits"""
+
+    def __init__(self, daily_budget: float):
+        self.daily_budget = daily_budget
+        self.daily_spent = 0.0
+        self.reset_time = time.time()
+
+    def add_cost(self, cost: float):
+        """Add cost and reset daily counter if needed"""
+        current_time = time.time()
+        if current_time - self.reset_time > DAY_SECONDS:  # 24 hours
+            self.daily_spent = 0.0
+            self.reset_time = current_time
+        self.daily_spent += cost
+
+    def is_over_budget(self) -> bool:
+        """Check if over daily budget"""
+        return self.daily_spent >= self.daily_budget
+
+    def remaining_budget(self) -> float:
+        """Get remaining budget for today"""
+        return max(0, self.daily_budget - self.daily_spent)
 
 
 class MultiLLMRouter:
@@ -90,9 +116,9 @@ class MultiLLMRouter:
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=0.5))
     async def ask(
         self,
-        messages: List[Dict[str, Any]],
-        system: Optional[str] = None,
-        tools: Optional[List[Dict[str, Any]]] = None,
+        messages: list[dict[str, Any]],
+        system: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
         temperature: float = 0.7,
     ) -> LLMResponse:
         """

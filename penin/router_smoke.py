@@ -1,8 +1,9 @@
 import asyncio
+
 from penin.config import settings
-from penin.router import MultiLLMRouter
-from penin.providers.openai_provider import OpenAIProvider
 from penin.providers.deepseek_provider import DeepSeekProvider
+from penin.providers.openai_provider import OpenAIProvider
+from penin.router import MultiLLMRouter
 
 
 async def main():

@@ -1,6 +1,5 @@
 import asyncio
 import time
-from typing import List, Optional
 
 import google.generativeai as genai
 
@@ -10,7 +9,7 @@ from .base import BaseProvider, LLMResponse, Message, Tool
 
 
 class GeminiProvider(BaseProvider):
-    def __init__(self, model: Optional[str] = None):
+    def __init__(self, model: str | None = None):
         self.name = "gemini"
         self.model = model or settings.GEMINI_MODEL
         api_key = settings.GEMINI_API_KEY
@@ -22,13 +21,13 @@ class GeminiProvider(BaseProvider):
 
     async def chat(
         self,
-        messages: List[Message],
-        tools: Optional[List[Tool]] = None,
-        system: Optional[str] = None,
+        messages: list[Message],
+        tools: list[Tool] | None = None,
+        system: str | None = None,
         temperature: float = 0.7,
     ) -> LLMResponse:
         start = time.time()
-        content_parts: List[str] = []
+        content_parts: list[str] = []
         if system:
             content_parts.append(f"System: {system}")
         for msg in messages:

@@ -1,12 +1,12 @@
 import asyncio
 import re
-from typing import Any, Dict
-
+import re as _re
+from typing import Any
 
 SAFE_QUERY_PATTERN = re.compile(r"^[a-zA-Z0-9\s.,-]+$")
 
 
-async def kaggle_search_datasets(query: str, max_results: int = 10) -> Dict[str, Any]:
+async def kaggle_search_datasets(query: str, max_results: int = 10) -> dict[str, Any]:
     if not query or not SAFE_QUERY_PATTERN.fullmatch(query):
         return {"error": "Invalid query format", "code": 1}
 
@@ -35,11 +35,12 @@ async def kaggle_search_datasets(query: str, max_results: int = 10) -> Dict[str,
     except Exception as e:
         return {"error": str(e), "code": 1}
 
+
 # --- Safe query guard (added by fix/kaggle-safe-query) ---
-import re as _re
 
 # Formatos aceitos: "owner/dataset" ou "dataset" (letras, números, ponto, underscore e hífen)
 SAFE_QUERY_PATTERN = _re.compile(r"^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)?$")
+
 
 def is_safe_kaggle_query(q: str) -> bool:
     """True se a consulta Kaggle for segura (sem espaços, sem '../', sem caracteres estranhos)."""
@@ -47,9 +48,5 @@ def is_safe_kaggle_query(q: str) -> bool:
         return False
     return bool(SAFE_QUERY_PATTERN.fullmatch(q))
 
-# exporta símbolos esperados pelos testes
-try:
-    __all__  # type: ignore[name-defined]
-except NameError:  # pragma: no cover
-    __all__ = []
-__all__ = list({*__all__, "SAFE_QUERY_PATTERN", "is_safe_kaggle_query"})
+
+__all__ = ["SAFE_QUERY_PATTERN", "is_safe_kaggle_query"]
