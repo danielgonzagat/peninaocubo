@@ -1,255 +1,251 @@
 from __future__ import annotations
-import math
-from dataclasses import dataclass
-from typing import List, Tuple, Optional, Dict
 
-# --------------------------------------------------------------------
-# Utilidades
-# --------------------------------------------------------------------
-def _clamp(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
-    """Clampa x no intervalo [lo, hi], tolerante a NaN/inf e conversões."""
-    try:
-        x = float(x)
-    except Exception:
-        return lo
-    if math.isnan(x) or math.isinf(x):
-        return lo
-    if x < lo:
-        return lo
-    if x > hi:
-        return hi
+import math
+from typing import Dict, Any, Tuple, Optional
+from dataclasses import dataclass
+
+EPS = 1e-9
+
+
+def clamp01(x: float) -> float:
+    """Clamp value to [0, 1] range."""
+    if x < 0.0:
+        return 0.0
+    if x > 1.0:
+        return 1.0
     return x
 
 
-# --------------------------------------------------------------------
-# CAOS⁺  e projeções φ
-# Fórmula estável:
-#   CAOS⁺ = (1 + κ·C·A)^(O·S) - 1,  com C,A,O,S∈[0,1], κ>0
-# Projeção saturante (monotônica):
-#   φ = 1 - exp(-γ · CAOS⁺)        → φ∈[0,1]
-# --------------------------------------------------------------------
-def compute_caos_plus(
-    c: float,
-    a: float,
-    o: float,
-    s: float,
-    *,
-    kappa: float = 25.0,
-    kappa_max: float = 10.0,  # default que os testes esperam
-) -> float:
-    c = _clamp(c)
-    a = _clamp(a)
-    o = _clamp(o)
-    s = _clamp(s)
-    try:
-        kappa = float(kappa)
-    except Exception:
-        kappa = 25.0
-    if kappa < 0:
-        kappa = 0.0
-    if kappa > kappa_max:
-        kappa = kappa_max
-
-    base = 1.0 + kappa * (c * a)    # ∈ [1, 1+κ]
-    exponent = o * s                # ∈ [0, 1]
-    z = (base ** exponent) - 1.0
-    if math.isnan(z) or z < 0.0:
-        return 0.0
-    return float(z)
-
-
 def phi_caos(
-    c: float,
-    a: float,
-    o: float,
-    s: float,
-    *,
-    kappa: float = 25.0,
-    gamma: float = 1.0,
-    kappa_max: float = 10.0,  # manter consistente com compute_caos_plus
-) -> float:
-    if gamma < 0:
-        gamma = 0.0
-    z = compute_caos_plus(c, a, o, s, kappa=kappa, kappa_max=kappa_max)
-    phi = 1.0 - math.exp(-gamma * z)
-    return _clamp(phi, 0.0, 1.0)
-
-
-def phi_kratos(
-    c: float,
-    a: float,
-    o: float,
-    s: float,
-    *,
-    exploration_factor: float = 2.0,
-    kappa: float = 25.0,
-    gamma: float = 1.0,
+    C: float,
+    A: float,
+    O: float,
+    S: float,
+    kappa: float = 2.0,
     kappa_max: float = 10.0,
+    gamma: float = 0.7,
 ) -> float:
-    """Variante de exploração: amplifica (o,s)^η de forma controlada."""
-    ef = max(1.0, float(exploration_factor))
-    o2 = _clamp(o) ** ef
-    s2 = _clamp(s) ** ef
-    return phi_caos(c, a, o2, s2, kappa=kappa, gamma=gamma, kappa_max=kappa_max)
+    """Calculate the phi_caos metric.
+
+    Args:
+        C, A, O, S: Input values (will be clamped to [0,1])
+        kappa: Scaling factor (will be clamped to [1.0, kappa_max])
+        kappa_max: Maximum kappa value
+        gamma: Gamma parameter (will be clamped to [0.1, 2.0])
+
+    Returns:
+        float: The calculated phi_caos value in range [0,1)
+    """
+    C = clamp01(C)
+    A = clamp01(A)
+    O = clamp01(O)
+    S = clamp01(S)
+    kappa = max(1.0, min(kappa_max, kappa))
+    base = 1.0 + kappa * C * A
+    base = max(base, 1.0 + EPS)
+    exp_term = max(0.0, min(1.0, O * S))
+    log_caos = exp_term * math.log(base)
+    return math.tanh(max(0.1, min(2.0, gamma)) * log_caos)
 
 
-# --------------------------------------------------------------------
-# Classes esperadas pelos testes
-# --------------------------------------------------------------------
-@dataclass
+def quick_caos_phi(C: float, A: float, O: float, S: float) -> float:
+    """Quick CAOS phi for testing."""
+    return phi_caos(C, A, O, S)
+
+
+def validate_caos_stability(C: float, A: float, O: float, S: float) -> Dict[str, Any]:
+    """Validate CAOS stability."""
+    phi = phi_caos(C, A, O, S)
+    if O is None and "openness" in kwargs:
+        O = kwargs["openness"]
+    if S is None and "stability" in kwargs:
+        S = kwargs["stability"]
+
+    return {"stable": phi < 0.8, "phi": phi, "risk_level": "low" if phi < 0.5 else "medium" if phi < 0.8 else "high"}
+
+
 class CAOSComponents:
-    """Container simples para os 4 componentes C,A,O,S."""
-    C: float
-    A: float
-    O: float
-    S: float
+    """CAOS components for testing."""
 
-    def clamped(self) -> "CAOSComponents":
-        return CAOSComponents(_clamp(self.C), _clamp(self.A), _clamp(self.O), _clamp(self.S))
-
-    def as_tuple(self) -> Tuple[float, float, float, float]:
-        cc = self.clamped()
-        return (cc.C, cc.A, cc.O, cc.S)
+    def __init__(self, C: float = 0.5, A: float = 0.5, O: float = 0.5, S: float = 0.5):
+        # Validate and clamp CAOS components to [0, 1] range
+        self.C = max(0.0, min(1.0, C))
+        self.A = max(0.0, min(1.0, A))
+        self.O = max(0.0, min(1.0, O))
+        self.S = max(0.0, min(1.0, S))
 
     def to_dict(self) -> Dict[str, float]:
-        cc = self.clamped()
-        return {"C": cc.C, "A": cc.A, "O": cc.O, "S": cc.S}
+        """Convert to dictionary."""
+        return {"C": self.C, "A": self.A, "O": self.O, "S": self.S}
+
+
+def compute_caos_plus(
+    C: float, A: float, O: float, S: float, kappa: float = 2.0, config: Optional["CAOSConfig"] = None
+) -> Tuple[float, Dict[str, Any]]:
+    """Compute CAOS⁺ with details."""
+    phi = phi_caos(C, A, O, S, kappa)
+    details = {
+        "C": C,
+        "A": A,
+        "O": O,
+        "S": S,
+        "kappa": kappa,
+        "phi": phi,
+        "components": {"C": C, "A": A, "O": O, "S": S},
+    }
+    return phi, details
+
+
+def apply_saturation(value: float, gamma: float = 0.7) -> float:
+    """Apply saturation function."""
+    return math.tanh(gamma * value)
+
+
+def compute_caos_harmony(C: float, A: float, O: float, S: float) -> float:
+    """Compute CAOS harmony score."""
+    # Geometric mean as harmony measure
+    product = C * A * O * S
+    if product <= 0:
+        return 0.0
+    return product**0.25
+
+
+def caos_gradient(C: float, A: float, O: float, S: float, kappa: float) -> Dict[str, float]:
+    """Compute CAOS gradients."""
+    eps = 1e-6
+
+    # Numerical gradients
+    phi_base = phi_caos(C, A, O, S, kappa)
+
+    dC = (phi_caos(C + eps, A, O, S, kappa) - phi_base) / eps
+    dA = (phi_caos(C, A + eps, O, S, kappa) - phi_base) / eps
+    dO = (phi_caos(C, A, O + eps, S, kappa) - phi_base) / eps
+    dS = (phi_caos(C, A, O, S + eps, kappa) - phi_base) / eps
+
+    return {"dC": dC, "dA": dA, "dO": dO, "dS": dS}
 
 
 @dataclass
 class CAOSConfig:
-    """Configuração padrão utilizada nos cálculos."""
-    kappa: float = 25.0
-    gamma: float = 0.7            # <- teste espera 0.7
-    kappa_max: float = 10.0       # <- teste espera 10.0
-    exploration_factor: float = 2.0
-    ema_beta: float = 0.9
+    """Configuration for CAOS⁺ computation."""
+
+    kappa_max: float = 10.0
+    gamma: float = 0.7
     use_log_space: bool = False
-    saturation_method: str = "tanh"         # para EMA do tracker
+    saturation_method: str = "tanh"
 
 
 class CAOSTracker:
-    """
-    Rastreador simples de histórico dos cálculos CAOS⁺ e φ + EMA do φ.
-    Mantém uma lista de (components, caos_plus, phi) e um estado ema_phi.
-    """
-    def __init__(self, cfg: Optional[CAOSConfig] = None):
-        self.cfg = cfg or CAOSConfig()
-        self.history: List[Tuple[CAOSComponents, float, float]] = []
-        self.ema_phi: float = 0.0
-        self._ema_initialized: bool = False
+    """Track CAOS⁺ values over time."""
 
-    def update(self, *args, **kwargs) -> Tuple[float, float]:
-        """
-        Aceita:
-          - update(CAOSComponents)
-          - update(C, A, O, S)
-          - update(C=..., A=..., O=..., S=...)
-        Retorna (phi, ema_phi).
-        """
-        comp: Optional[CAOSComponents] = None
-        if args:
-            if len(args) == 1 and isinstance(args[0], CAOSComponents):
-                comp = args[0]
-            elif len(args) == 4:
-                comp = CAOSComponents(*map(float, args))
-        if comp is None and kwargs:
-            comp = CAOSComponents(
-                float(kwargs.get("C", 0.0)),
-                float(kwargs.get("A", 0.0)),
-                float(kwargs.get("O", 0.0)),
-                float(kwargs.get("S", 0.0)),
-            )
-        if comp is None:
-            raise ValueError("CAOSTracker.update requer CAOSComponents ou (C,A,O,S).")
+    def __init__(self, alpha: float = 0.2, max_history: int = 100):
+        self.alpha = alpha
+        self.max_history = max_history
+        self.history = []
+        self.ema_value = None
 
-        c2 = comp.clamped()
-        z = compute_caos_plus(c2.C, c2.A, c2.O, c2.S, kappa=self.cfg.kappa, kappa_max=self.cfg.kappa_max)
-        phi = 1.0 - math.exp(-self.cfg.gamma * z)
-        phi = _clamp(phi, 0.0, 1.0)
+    def update(self, C: float, A: float, O: float, S: float, kappa: float = 2.0) -> Tuple[float, float]:
+        """Update with new CAOS values."""
+        caos_val = phi_caos(C, A, O, S, kappa)
 
-        # EMA do φ
-        b = _clamp(self.cfg.ema_beta, 0.0, 1.0)
-        if not self._ema_initialized:
-            self.ema_phi = phi
-            self._ema_initialized = True
+        # Update EMA
+        if self.ema_value is None:
+            self.ema_value = caos_val
         else:
-            self.ema_phi = b * self.ema_phi + (1.0 - b) * phi
+            self.ema_value = (1.0 - self.alpha) * self.ema_value + self.alpha * caos_val
 
-        self.history.append((c2, z, phi))
-        return phi, self.ema_phi
+        # Update history
+        self.history.append(caos_val)
+        if len(self.history) > self.max_history:
+            self.history.pop(0)
 
-    # alias comum
-    record = update
-
-    def last_phi(self) -> float:
-        return self.history[-1][2] if self.history else 0.0
+        return caos_val, self.ema_value
 
     def get_stability(self) -> float:
-        """
-        Proxy simples de estabilidade: 1 - |phi_atual - ema_phi|.
-        Retorna ∈[0,1]; maior = mais estável.
-        """
-        if not self.history:
+        """Get stability measure (inverse of variance)."""
+        if len(self.history) < 2:
+            return 1.0
+
+        mean_val = sum(self.history) / len(self.history)
+        variance = sum((v - mean_val) ** 2 for v in self.history) / len(self.history)
+
+        # Return inverse of coefficient of variation
+        if mean_val <= 1e-9:
             return 0.0
-        phi_now = self.last_phi()
-        diff = abs(phi_now - self.ema_phi)
-        return _clamp(1.0 - diff, 0.0, 1.0)
+
+        cv = math.sqrt(variance) / mean_val
+        return 1.0 / (1.0 + cv)
 
 
 class CAOSPlusEngine:
-    """
-    Motor com interface OO que os testes podem instanciar.
-    """
-    def __init__(self, cfg: Optional[CAOSConfig] = None):
-        self.cfg = cfg or CAOSConfig()
+    """CAOS⁺ engine for testing."""
 
-    def caos_plus(self, comp: CAOSComponents) -> float:
-        c2 = comp.clamped()
-        return compute_caos_plus(c2.C, c2.A, c2.O, c2.S, kappa=self.cfg.kappa, kappa_max=self.cfg.kappa_max)
+    def __init__(self, kappa: float = 2.0, gamma: float = 0.7):
+        self.kappa = kappa
+        self.gamma = gamma
 
-    def phi(self, comp: CAOSComponents) -> float:
-        c2 = comp.clamped()
-        return phi_caos(c2.C, c2.A, c2.O, c2.S, kappa=self.cfg.kappa, gamma=self.cfg.gamma, kappa_max=self.cfg.kappa_max)
+    def compute(self, C: float, A: float, O: float, S: float) -> float:
+        """Compute CAOS⁺ phi value."""
+        return phi_caos(C, A, O, S, self.kappa, gamma=self.gamma)
 
-    def phi_kratos(self, comp: CAOSComponents) -> float:
-        c2 = comp.clamped()
-        return phi_kratos(
-            c2.C, c2.A, c2.O, c2.S,
-            exploration_factor=self.cfg.exploration_factor,
-            kappa=self.cfg.kappa,
-            gamma=self.cfg.gamma,
-            kappa_max=self.cfg.kappa_max,
-        )
+    def compute_phi(self, components) -> Tuple[float, Dict[str, Any]]:
+        """Compute CAOS⁺ phi value from components."""
+        if hasattr(components, "to_dict"):
+            comp_dict = components.to_dict()
+            C, A, O, S = comp_dict["C"], comp_dict["A"], comp_dict["O"], comp_dict["S"]
+        else:
+            C, A, O, S = components
 
-    def compute(self, c: float, a: float, o: float, s: float) -> float:
-        """Compat: retorna φ diretamente a partir dos 4 componentes."""
-        return phi_caos(c, a, o, s, kappa=self.cfg.kappa, gamma=self.cfg.gamma, kappa_max=self.cfg.kappa_max)
+        phi = self.compute(C, A, O, S)
 
-    def compute_phi(self, comp: CAOSComponents):
-        """
-        Compat: retorna (phi_result, details_dict)
-        details inclui componentes clampados, κ, γ, κ_max e CAOS⁺.
-        """
-        phi_val = self.phi(comp)
         details = {
-            "components": comp.to_dict(),
-            "kappa": self.cfg.kappa,
-            "gamma": self.cfg.gamma,
-            "kappa_max": self.cfg.kappa_max,
-            "caos_plus": self.caos_plus(comp),
-            "phi": phi_val,
-            "mode": "kratos" if self.cfg.exploration_factor != 1.0 else "caos",
+            "phi": phi,
+            "components": {"C": C, "A": A, "O": O, "S": S},
+            "kappa": self.kappa,
+            "gamma": self.gamma,
+            "risk_level": "low" if phi < 0.5 else "medium" if phi < 0.8 else "high",
         }
-        return phi_val, details
+
+        return phi, details
 
 
-__all__ = [
-    "compute_caos_plus",
-    "phi_caos",
-    "phi_kratos",
-    "CAOSComponents",
-    "CAOSConfig",
-    "CAOSTracker",
-    "CAOSPlusEngine",
-]
+def caos_plus(
+    C: float | None = None,
+    A: float | None = None,
+    O: float | None = None,
+    S: float | None = None,
+    kappa: float = 0.1,
+    gamma: float = 0.5,
+    kappa_max: float = 1.0,
+    **kwargs,
+) -> Dict[str, Any]:
+    """
+    Computa CAOS⁺ com saturação log-space
+
+    Args:
+        C: Complexity (0-1)
+        A: Adaptability (0-1)
+        O: Openness (0-1)
+        S: Stability (0-1)
+        kappa: Chaos amplification factor (0-1)
+        gamma: Saturation parameter (0-1)
+        kappa_max: Maximum kappa for saturation
+
+    Returns:
+        Dict com phi, components e detalhes
+    """
+    # Accept alternative keyword names (coherence, awareness, openness, stability)
+    if C is None and "coherence" in kwargs:
+        C = kwargs["coherence"]
+    if A is None and "awareness" in kwargs:
+        A = kwargs["awareness"]
+    A = kwargs["awareness"]
+    return {
+        "phi": phi,
+        "components": {"C": C, "A": A, "O": O, "S": S},
+        "caos_product": C * A,
+        "openness_stability": O * S,
+        "kappa": kappa,
+        "gamma": gamma,
+        "risk_level": "low" if phi < 0.5 else "medium" if phi < 0.8 else "high",
+    }
