@@ -21,10 +21,10 @@ from .scoring import quick_harmonic, quick_score_gate
 from .caos import quick_caos_phi
 from .sr import quick_sr_harmonic
 from .guards import quick_sigma_guard_check_simple
-from .life_eq import life_equation, LifeEquationEngine
 from .acfa import LeagueOrchestrator, LeagueConfig, run_full_deployment_cycle
 from .tuner import PeninOmegaTuner, create_penin_tuner
 from .ledger import WORMLedger
+from .life_eq import life_equation
 
 
 @dataclass
@@ -109,19 +109,7 @@ class EvolutionRunner:
         # Initialize WORM ledger
         self.ledger = WORMLedger("evolution_cycles.db")
         
-        # Initialize Life Equation Engine
-        self.life_engine = LifeEquationEngine(
-            thresholds={
-                "beta_min": 0.01,
-                "theta_caos": 0.25,
-                "tau_sr": 0.80,
-                "theta_G": 0.85
-            },
-            base_alpha=0.001
-        )
-        
         print(f"🚀 Evolution runner initialized (seed={self.config.seed})")
-        print(f"   Life Equation Engine: {self.life_engine.get_config()}")
     
     async def evolve_one_cycle(self, base_config: Dict[str, Any] = None) -> CycleResult:
         """
@@ -170,6 +158,48 @@ class EvolutionRunner:
             best_challenger, decision, decision_reason = self._select_best_challenger(
                 challengers, scoring_results, gate_results
             )
+
+            # Vida+ gate: apply non-compensatory Life Equation on the best challenger
+            if best_challenger is not None:
+                cid = best_challenger['challenger_id']
+                s = scoring_results.get(cid, {})
+                # Extract scores
+                u = float(s.get('u_score', 0.0))
+                ss = float(s.get('s_score', 0.0))
+                c = float(s.get('c_score', 0.0))
+                l = float(s.get('l_score', 0.0))
+                linf_val = float(s.get('linf_score', 0.0))
+                caos_phi = float(s.get('caos_phi', 0.0))
+                sr_score = float(s.get('sr_score', 0.0))
+
+                # Inputs for Life Equation
+                ethics_input = {"ece": 0.006, "rho_bias": 1.02, "consent": True, "eco_ok": True}
+                risk_history = [0.95, 0.93, 0.90]
+                caos_components = (max(0.0, min(1.0, c)), 0.66, 1.0, 1.0)
+                sr_components = (0.90, True, 0.80, 0.85)
+                linf_metrics = {"U": u, "S": ss, "L": l, "C": max(1e-6, 1.0 - c)}
+                linf_weights = {k: 1.0 for k in linf_metrics.keys()}
+                linf_weights["lambda_c"] = 0.05
+                cost_norm = c
+                G = max(0.0, min(1.0, (caos_phi + sr_score) / 2.0))
+                dL_inf = linf_val - 0.60
+                verdict = life_equation(
+                    base_alpha=1e-3,
+                    ethics_input=ethics_input,
+                    risk_history=risk_history,
+                    caos_components=caos_components,
+                    sr_components=sr_components,
+                    linf_weights=linf_weights,
+                    linf_metrics=linf_metrics,
+                    cost=cost_norm,
+                    G=G,
+                    dL_inf=dL_inf,
+                    thresholds={"beta_min": 0.01, "theta_caos": 0.25, "tau_sr": 0.80, "theta_G": 0.85},
+                )
+                # Enforce fail-closed
+                if not verdict.ok:
+                    decision = "reject"
+                    decision_reason = "vida_gate_failed"
             
             # Step 5: Deploy if not dry run
             if not self.config.dry_run and self.config.auto_deploy and best_challenger:
@@ -235,74 +265,8 @@ class EvolutionRunner:
                 evidence_hash=""
             )
             
-            # Record failure in WORM ledger
             self._record_cycle_result(result)
             raise
-
-
-# Função de conveniência para compatibilidade com CLI
-def quick_evolution_cycle(n_cycles: int = 1, dry_run: bool = True) -> Dict[str, Any]:
-    """
-    Execução rápida de ciclos evolutivos
-    
-    Args:
-        n_cycles: Número de ciclos
-        dry_run: Se True, não faz deploy real
-        
-    Returns:
-        Relatório dos ciclos
-    """
-    import asyncio
-    
-    config = EvolutionConfig(
-        n_challengers=3,
-        dry_run=dry_run,
-        auto_deploy=False
-    )
-    
-    runner = EvolutionRunner(config)
-    
-    async def run_cycles():
-        results = []
-        for i in range(n_cycles):
-            print(f"\n🔄 Ciclo {i+1}/{n_cycles}")
-            result = await runner.evolve_one_cycle()
-            results.append(result)
-        return results
-    
-    # Executar ciclos
-    results = asyncio.run(run_cycles())
-    
-    # Compilar relatório
-    total_cost = sum(r.cost_usd for r in results)
-    successful_cycles = sum(1 for r in results if r.decision != "reject")
-    
-    # Coletar métricas da Equação de Vida (+)
-    life_metrics = []
-    for result in results:
-        for challenger_id, gate_result in result.gate_results.items():
-            if "life_equation_details" in gate_result:
-                life_details = gate_result["life_equation_details"]
-                if "metrics" in life_details:
-                    life_metrics.append(life_details["metrics"])
-    
-    # Calcular médias das métricas de vida
-    avg_life_metrics = {}
-    if life_metrics:
-        for key in life_metrics[0].keys():
-            values = [m[key] for m in life_metrics if key in m]
-            avg_life_metrics[key] = sum(values) / len(values) if values else 0.0
-    
-    return {
-        "n_cycles": n_cycles,
-        "successful_cycles": successful_cycles,
-        "success_rate": successful_cycles / n_cycles if n_cycles > 0 else 0.0,
-        "total_cost_usd": total_cost,
-        "avg_cost_per_cycle": total_cost / n_cycles if n_cycles > 0 else 0.0,
-        "life_equation_metrics": avg_life_metrics,
-        "dry_run": dry_run,
-        "timestamp": time.time()
-    }
     
     async def _generate_challengers(self, base_config: Dict[str, Any]) -> List[Dict[str, Any]]:
         """Generate challenger configurations"""
@@ -394,46 +358,6 @@ def quick_evolution_cycle(n_cycles: int = 1, dry_run: bool = True) -> Dict[str, 
                     ece=0.05, rho_bias=1.02, fairness=0.9, consent=True, eco_ok=True
                 )
                 
-                # *** EQUAÇÃO DE VIDA (+) - Gate não-compensatório ***
-                # Calcular ΔL∞ (diferença com baseline)
-                baseline_linf = 0.5  # Baseline fictício
-                delta_linf = linf_score - baseline_linf
-                
-                # Preparar inputs para Equação de Vida (+)
-                ethics_input = {
-                    "ece": 0.005,
-                    "rho_bias": 1.02,
-                    "fairness": 0.9,
-                    "consent_valid": True,
-                    "eco_impact": 0.3
-                }
-                
-                risk_series = [0.9, 0.88, 0.85]  # Série contrativa simulada
-                caos_components = (c_score, 0.8, 0.9, s_score)  # (C, A, O, S)
-                sr_components = (0.9, ethics_passed, 0.8, 0.85)  # (awareness, ethics_ok, autocorr, metacog)
-                
-                linf_weights = {"u": 0.25, "s": 0.25, "c": 0.25, "l": 0.25}
-                linf_metrics = {"u": u_score, "s": s_score, "c": c_score, "l": l_score}
-                
-                G = 0.90  # Coerência global simulada
-                
-                # Avaliar Equação de Vida (+)
-                life_verdict = self.life_engine.evaluate(
-                    ethics_input=ethics_input,
-                    risk_series=risk_series,
-                    caos_components=caos_components,
-                    sr_components=sr_components,
-                    linf_weights=linf_weights,
-                    linf_metrics=linf_metrics,
-                    cost=0.02,
-                    ethical_ok_flag=ethics_passed,
-                    G=G,
-                    dL_inf=delta_linf
-                )
-                
-                life_passed = life_verdict.ok
-                alpha_eff = life_verdict.alpha_eff
-                
                 scoring_results[challenger_id] = {
                     'u_score': u_score,
                     's_score': s_score,
@@ -441,39 +365,26 @@ def quick_evolution_cycle(n_cycles: int = 1, dry_run: bool = True) -> Dict[str, 
                     'l_score': l_score,
                     'linf_score': linf_score,
                     'caos_phi': caos_phi,
-                    'sr_score': sr_score,
-                    'delta_linf': delta_linf,
-                    'alpha_eff': alpha_eff,
-                    'life_verdict': life_verdict.to_dict()
+                    'sr_score': sr_score
                 }
-                
-                # Gate final: todos os gates anteriores + Equação de Vida (+)
-                all_gates_passed = (gate_passed and ethics_passed and 
-                                  sigma_guard_passed and life_passed)
                 
                 gate_results[challenger_id] = {
                     'score_gate_passed': gate_passed,
                     'score_gate_details': gate_details,
                     'ethics_passed': ethics_passed,
                     'sigma_guard_passed': sigma_guard_passed,
-                    'life_equation_passed': life_passed,
-                    'life_equation_details': life_verdict.to_dict(),
-                    'all_gates_passed': all_gates_passed
+                    'all_gates_passed': gate_passed and ethics_passed and sigma_guard_passed
                 }
             else:
                 # Failed evaluation
                 scoring_results[challenger_id] = {
                     'u_score': 0, 's_score': 0, 'c_score': 0, 'l_score': 0,
-                    'linf_score': 0, 'caos_phi': 0, 'sr_score': 0,
-                    'delta_linf': 0, 'alpha_eff': 0.0,
-                    'life_verdict': {'ok': False, 'alpha_eff': 0.0, 'reasons': {'evaluation_failed': True}}
+                    'linf_score': 0, 'caos_phi': 0, 'sr_score': 0
                 }
                 gate_results[challenger_id] = {
                     'score_gate_passed': False,
                     'ethics_passed': False,
                     'sigma_guard_passed': False,
-                    'life_equation_passed': False,
-                    'life_equation_details': {'ok': False, 'alpha_eff': 0.0},
                     'all_gates_passed': False
                 }
         
