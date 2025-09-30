@@ -143,9 +143,11 @@ class MultiLLMRouter:
         lat = max(0.01, r.latency_s)
         latency_component = 1.0 / lat
         # Penalize cost and token usage to respect budget constraints
-        budget = max(1e-6, settings.PENIN_BUDGET_DAILY_USD)
-        tokens_budget = max(1, settings.PENIN_MAX_TOKENS_PER_ROUND)
+        # Penalize cost and token usage to respect budget constraints
+        budget = max(1e-6, getattr(settings, 'PENIN_BUDGET_DAILY_USD', 1.0))
+        tokens_budget = max(1, getattr(settings, 'PENIN_MAX_TOKENS_PER_ROUND', 1000))
         cost_norm = r.cost_usd / budget
+        tokens_norm = (r.tokens_in + r.tokens_out) / tokens_budget
         tokens_norm = (r.tokens_in + r.tokens_out) / tokens_budget
         # Weights chosen conservatively to keep latency dominant but cost-aware
         return base + latency_component - 2.0 * cost_norm - 0.5 * tokens_norm
