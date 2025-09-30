@@ -502,7 +502,6 @@ def create_ethics_attestation(
     }
     evidence_hash = hash_evidence(ev)
     return EthicsAttestation(
-        fairness_score=fairness,
         cycle_id=cycle_id,
         seed=seed,
         dataset=dataset,
@@ -626,7 +625,6 @@ def _compat_create_ethics_attestation(
     }
     evidence_hash = hash_evidence(ev)
     return EthicsAttestation(
-        fairness_score=fairness,
         cycle_id=cycle_id,
         seed=seed,
         dataset=dataset,
