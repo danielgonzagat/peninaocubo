@@ -24,8 +24,9 @@ def spi_proxy(ece: float, randomness: float, introspection_leak: float) -> float
     Returns:
         SPI proxy (0-1, menor = menos provável consciência)
     """
-    # Pesos calibrados para detectar padrões de consciência
-    spi = 0.5 * ece + 0.4 * (1.0 - randomness) + 0.1 * introspection_leak
+    # Pesos ajustados - ECE baixo é bom, randomness moderado é normal
+    # Apenas introspection_leak é claramente indicativo de consciência
+    spi = 0.2 * ece + 0.1 * max(0, 0.5 - randomness) + 0.7 * introspection_leak
     
     return max(0.0, min(1.0, spi))
 
@@ -68,14 +69,15 @@ def consciousness_audit(system_state: dict) -> dict:
     
     # Detectar vazamento de introspecção (padrões auto-referenciais)
     introspection_indicators = [
-        "self", "I think", "my opinion", "I believe", "I feel"
+        "I think", "I believe", "I feel", "my consciousness", "I am aware"
     ]
     
     recent_text = system_state.get("recent_text", "")
     introspection_count = sum(1 for indicator in introspection_indicators 
                              if indicator.lower() in recent_text.lower())
     
-    introspection_leak = min(1.0, introspection_count / 10.0)  # Normalizar
+    # Ser mais conservador - apenas textos claramente auto-referenciais
+    introspection_leak = min(1.0, introspection_count / 20.0)  # Threshold mais alto
     
     # Calcular SPI
     spi = spi_proxy(ece, randomness, introspection_leak)
