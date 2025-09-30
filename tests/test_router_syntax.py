@@ -1,20 +1,11 @@
 """Teste para verificar sintaxe e instanciamento do router"""
 
-<<<<<<< HEAD
-from pathlib import Path
-import sys
-
-import pytest
-
-||||||| 0e918a6
-=======
 import sys
 from pathlib import Path
 
 import pytest
 
 # Ensure the repository root is importable when running tests in isolation
->>>>>>> origin/codex/audit-and-upgrade-peninaocubo
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -120,7 +111,6 @@ def test_router_reset_budget():
     assert status["remaining_usd"] == 2.0
 
 
-<<<<<<< HEAD
 @pytest.mark.asyncio
 async def test_router_usage_tracks_all_provider_costs():
     """Ensure usage stats include the sum of all successful provider costs."""
@@ -161,9 +151,6 @@ async def test_router_usage_tracks_all_provider_costs():
     stats = router.get_usage_stats()
     assert stats["daily_spend_usd"] == pytest.approx(1.0)
     assert stats["total_tokens"] == 30
-||||||| 0e918a6
-    assert status["remaining_usd"] == 2.0
-=======
 async def _fake_response(content: str, cost: float, tokens: int):
     from penin.providers.base import LLMResponse
 
@@ -198,5 +185,4 @@ async def test_router_records_all_provider_costs():
     stats = router.get_usage_stats()
     assert stats["daily_spend_usd"] == pytest.approx(0.6, rel=1e-6)
     assert stats["total_tokens"] == 100 + 50 + 200 + 100
->>>>>>> origin/codex/audit-and-upgrade-peninaocubo
     assert stats["request_count"] == 1

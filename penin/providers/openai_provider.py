@@ -2,15 +2,13 @@ import asyncio
 import time
 from typing import Any
 
-from openai import OpenAI
+try:
+    from openai import OpenAI  # type: ignore
+except Exception:  # pragma: no cover - allow import without dependency
+    OpenAI = None  # will be monkeypatched in tests
 
 from penin.config import settings
-<<<<<<< HEAD
 from penin.providers.pricing import estimate_cost, usage_value
-||||||| 0e918a6
-=======
-from penin.providers.pricing import estimate_cost_usd, get_first_available
->>>>>>> origin/codex/capture-usage-metadata-and-calculate-costs
 
 from .base import BaseProvider, LLMResponse, Message, Tool
 
@@ -59,30 +57,9 @@ class OpenAIProvider(BaseProvider):
                     tool_calls.append(call.model_dump())
 
         usage = getattr(resp, "usage", None)
-<<<<<<< HEAD
         tokens_in = usage_value(usage, "prompt_tokens")
         tokens_out = usage_value(usage, "completion_tokens")
         cost_usd = estimate_cost(self.name, self.model, tokens_in, tokens_out)
-||||||| 0e918a6
-        tokens_in = getattr(usage, "prompt_tokens", 0) if usage else 0
-        tokens_out = getattr(usage, "completion_tokens", 0) if usage else 0
-=======
-        tokens_in = get_first_available(
-            usage,
-            "prompt_tokens",
-            "input_tokens",
-            "promptTokenCount",
-            "prompt_token_count",
-        )
-        tokens_out = get_first_available(
-            usage,
-            "completion_tokens",
-            "output_tokens",
-            "completionTokenCount",
-            "candidates_token_count",
-        )
-        cost_usd = estimate_cost_usd(self.name, self.model, tokens_in, tokens_out)
->>>>>>> origin/codex/capture-usage-metadata-and-calculate-costs
         end = time.time()
         return LLMResponse(
             content=content,
@@ -92,6 +69,5 @@ class OpenAIProvider(BaseProvider):
             tool_calls=tool_calls,
             cost_usd=cost_usd,
             provider=self.name,
-            cost_usd=cost_usd,
             latency_s=end - start,
         )

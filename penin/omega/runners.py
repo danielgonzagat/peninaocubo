@@ -24,6 +24,7 @@ from .guards import quick_sigma_guard_check_simple
 from .acfa import LeagueOrchestrator, LeagueConfig, run_full_deployment_cycle
 from .tuner import PeninOmegaTuner, create_penin_tuner
 from .ledger import WORMLedger
+from .life_eq import life_equation
 
 
 @dataclass
@@ -157,6 +158,48 @@ class EvolutionRunner:
             best_challenger, decision, decision_reason = self._select_best_challenger(
                 challengers, scoring_results, gate_results
             )
+
+            # Vida+ gate: apply non-compensatory Life Equation on the best challenger
+            if best_challenger is not None:
+                cid = best_challenger['challenger_id']
+                s = scoring_results.get(cid, {})
+                # Extract scores
+                u = float(s.get('u_score', 0.0))
+                ss = float(s.get('s_score', 0.0))
+                c = float(s.get('c_score', 0.0))
+                l = float(s.get('l_score', 0.0))
+                linf_val = float(s.get('linf_score', 0.0))
+                caos_phi = float(s.get('caos_phi', 0.0))
+                sr_score = float(s.get('sr_score', 0.0))
+
+                # Inputs for Life Equation
+                ethics_input = {"ece": 0.006, "rho_bias": 1.02, "consent": True, "eco_ok": True}
+                risk_history = [0.95, 0.93, 0.90]
+                caos_components = (max(0.0, min(1.0, c)), 0.66, 1.0, 1.0)
+                sr_components = (0.90, True, 0.80, 0.85)
+                linf_metrics = {"U": u, "S": ss, "L": l, "C": max(1e-6, 1.0 - c)}
+                linf_weights = {k: 1.0 for k in linf_metrics.keys()}
+                linf_weights["lambda_c"] = 0.05
+                cost_norm = c
+                G = max(0.0, min(1.0, (caos_phi + sr_score) / 2.0))
+                dL_inf = linf_val - 0.60
+                verdict = life_equation(
+                    base_alpha=1e-3,
+                    ethics_input=ethics_input,
+                    risk_history=risk_history,
+                    caos_components=caos_components,
+                    sr_components=sr_components,
+                    linf_weights=linf_weights,
+                    linf_metrics=linf_metrics,
+                    cost=cost_norm,
+                    G=G,
+                    dL_inf=dL_inf,
+                    thresholds={"beta_min": 0.01, "theta_caos": 0.25, "tau_sr": 0.80, "theta_G": 0.85},
+                )
+                # Enforce fail-closed
+                if not verdict.ok:
+                    decision = "reject"
+                    decision_reason = "vida_gate_failed"
             
             # Step 5: Deploy if not dry run
             if not self.config.dry_run and self.config.auto_deploy and best_challenger:

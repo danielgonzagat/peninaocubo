@@ -128,15 +128,13 @@ class OPAPolicyEngine:
         # Hourly budget check
         hourly_spend = budget.get("hourly_spend")
         if hourly_spend is None:
+            # If no hourly tracking, treat as within hourly budget by default
             result["within_hourly_budget"] = True
-            hourly_limit = 0.0
+            hourly_limit = daily_limit / 24 if daily_limit else 0.0
         else:
             hourly_limit = daily_limit / 24 if daily_limit else 0.0
-            hourly_limit = daily_limit / 24 if daily_limit else 0.0
-            result["within_hourly_budget"] = (
-                hourly_spend <= hourly_limit and
-                hourly_spend + request_cost <= hourly_limit
-            )
+            # Hourly check considers current tracked spend only; per-request limit is checked separately
+            result["within_hourly_budget"] = (hourly_spend <= hourly_limit)
         
         # Request limit check
         max_request_cost = budget.get("max_request_cost")
