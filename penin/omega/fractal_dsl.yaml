@@ -1,0 +1,10 @@
+version: 1
+depth: 2            # níveis abaixo do núcleo
+branching: 3        # filhos por nó
+weights:
+  caos: 1.0
+  sr: 1.0
+  g: 1.0
+sync:
+  propagate_core_updates: true
+  non_compensatory: true
