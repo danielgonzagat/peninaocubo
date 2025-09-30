@@ -4,6 +4,12 @@ import time
 from openai import OpenAI
 
 from penin.config import settings
+<<<<<<< HEAD
+from penin.providers.pricing import estimate_cost, usage_value
+||||||| 0e918a6
+=======
+from penin.providers.pricing import estimate_cost_usd, get_first_available
+>>>>>>> origin/codex/capture-usage-metadata-and-calculate-costs
 
 from .base import BaseProvider, LLMResponse, Message, Tool
 
@@ -41,14 +47,39 @@ class DeepSeekProvider(BaseProvider):
         choice = resp.choices[0]
         content = getattr(choice.message, "content", "") if hasattr(choice, "message") else ""
         tool_calls = getattr(choice.message, "tool_calls", []) if hasattr(choice, "message") else []
+        usage = getattr(resp, "usage", None)
+<<<<<<< HEAD
+        tokens_in = usage_value(usage, "prompt_tokens")
+        tokens_out = usage_value(usage, "completion_tokens")
+        cost_usd = estimate_cost(self.name, self.model, tokens_in, tokens_out)
+||||||| 0e918a6
         usage = getattr(resp, "usage", {}) or {}
+=======
+        tokens_in = get_first_available(
+            usage,
+            "prompt_tokens",
+            "input_tokens",
+            "promptTokenCount",
+            "prompt_token_count",
+        )
+        tokens_out = get_first_available(
+            usage,
+            "completion_tokens",
+            "output_tokens",
+            "completionTokenCount",
+            "candidates_token_count",
+        )
+        cost_usd = estimate_cost_usd(self.name, self.model, tokens_in, tokens_out)
+>>>>>>> origin/codex/capture-usage-metadata-and-calculate-costs
         end = time.time()
         return LLMResponse(
             content=content,
             model=self.model,
-            tokens_in=usage.get("prompt_tokens", 0),
-            tokens_out=usage.get("completion_tokens", 0),
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
             tool_calls=tool_calls,
+            cost_usd=cost_usd,
             provider=self.name,
+            cost_usd=cost_usd,
             latency_s=end - start,
         )
