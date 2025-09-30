@@ -41,13 +41,17 @@ class MultiLLMRouter:
         self._daily_spend = float(entry.get("cost_usd", 0.0))
         self._total_tokens = int(entry.get("tokens", 0))
         self._request_count = int(entry.get("requests", 0))
-
-    def _ensure_day_entry(self, day: str) -> None:
-        if day not in self.daily_usage:
-            self.daily_usage[day] = {"cost_usd": 0.0, "tokens": 0, "requests": 0}
-            self._save_daily_usage()
-
     def _load_daily_usage(self) -> Dict[str, Dict[str, float | int]]:
+        if not self._usage_path.exists():
+            return {}
+        try:
+            with self._usage_path.open("r", encoding="utf-8") as handle:
+                data = json.load(handle)
+        except (OSError, json.JSONDecodeError) as e:
+            # Log the error but continue with empty dict to avoid breaking the system
+            import logging
+            logging.warning(f"Failed to load budget usage from {self._usage_path}: {e}")
+            return {}
         if not self._usage_path.exists():
             return {}
         try:
