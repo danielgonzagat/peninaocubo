@@ -1,0 +1,94 @@
+# PENIN-Ω Alerting Rules
+groups:
+  - name: penin-core
+    rules:
+      # High error rate
+      - alert: PeninHighErrorRate
+        expr: rate(penin_errors_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate in PENIN-Ω core"
+          description: "Error rate is {{ $value }} errors per second"
+          
+      # Budget exceeded
+      - alert: PeninBudgetExceeded
+        expr: penin_budget_remaining_usd <= 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PENIN-Ω daily budget exceeded"
+          description: "Daily budget has been exceeded. Current spend: {{ $value }} USD"
+          
+      # High resource usage
+      - alert: PeninHighCPUUsage
+        expr: penin_cpu_usage > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage in PENIN-Ω"
+          description: "CPU usage is {{ $value }}%"
+          
+      - alert: PeninHighMemoryUsage
+        expr: penin_mem_usage > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage in PENIN-Ω"
+          description: "Memory usage is {{ $value }}%"
+          
+      # Ethics violations
+      - alert: PeninEthicsViolation
+        expr: penin_ethics_ece > 0.01 or penin_ethics_bias_ratio > 1.05
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Ethics violation detected in PENIN-Ω"
+          description: "ECE: {{ $value }}, Bias Ratio: {{ $value }}"
+          
+      # Service down
+      - alert: PeninServiceDown
+        expr: up{job="penin-core"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PENIN-Ω service is down"
+          description: "PENIN-Ω core service is not responding"
+          
+  - name: infrastructure
+    rules:
+      # Nginx down
+      - alert: NginxDown
+        expr: up{job="nginx"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Nginx is down"
+          description: "Nginx reverse proxy is not responding"
+          
+      # Redis down
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache is not responding"
+          
+      # Prometheus down
+      - alert: PrometheusDown
+        expr: up{job="prometheus"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Prometheus is down"
+          description: "Prometheus monitoring is not responding"

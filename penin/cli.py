@@ -32,7 +32,7 @@ try:
 except ImportError:
     # Fallback para desenvolvimento
     import sys
-    sys.path.append('/workspace')
+    # Package imports now work without sys.path hacks
     try:
         from penin.omega.runners import EvolutionRunner, CycleConfig, BatchRunner
         from penin.omega.evaluators import ComprehensiveEvaluator

@@ -1,0 +1,49 @@
+# Prometheus configuration for PENIN-Ω monitoring
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Alerting rules
+rule_files:
+  - "penin_alerts.yml"
+
+# Scrape configurations
+scrape_configs:
+  # PENIN-Ω Core metrics
+  - job_name: 'penin-core'
+    static_configs:
+      - targets: ['penin-core:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    honor_labels: true
+    scheme: http
+    
+  # Nginx metrics
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx:8080']
+    metrics_path: '/nginx_status'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    scrape_interval: 30s
+    scrape_timeout: 10s
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
