@@ -224,6 +224,7 @@ def caos_plus(C: float | None = None, A: float | None = None, O: float | None = 
     if C is None and "coherence" in kwargs:
         C = kwargs["coherence"]
     if A is None and "awareness" in kwargs:
+        A = kwargs["awareness"]
     
     return {
         "phi": phi,
