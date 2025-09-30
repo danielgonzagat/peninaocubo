@@ -56,6 +56,52 @@ class EthicsCalculator:
     
     def __init__(self):
         self.evidence_cache = {}
+
+
+# Standalone functions for compatibility with tests
+def compute_ece(predictions: List[Tuple[float, bool]], n_bins: int = 10) -> Tuple[float, Dict[str, Any]]:
+    """Compute ECE from prediction tuples"""
+    calc = EthicsCalculator()
+    preds = [p[0] for p in predictions]
+    targets = [int(p[1]) for p in predictions]
+    return calc.calculate_ece(preds, targets, n_bins)
+
+
+def compute_bias_ratio(group_outcomes: Dict[str, List[float]]) -> Tuple[float, Dict[str, Any]]:
+    """Compute bias ratio across groups"""
+    calc = EthicsCalculator()
+    return calc.calculate_bias_ratio_from_groups(group_outcomes)
+
+
+def compute_risk_contractivity(risk_history: List[float]) -> Tuple[float, Dict[str, Any]]:
+    """Compute risk contractivity (IR→IC)"""
+    calc = EthicsCalculator()
+    return calc.calculate_risk_contractivity(risk_history)
+
+
+def compute_fairness_metrics(predictions_by_group: Dict[str, List[Tuple[float, bool]]]) -> Dict[str, float]:
+    """Compute fairness metrics by group"""
+    calc = EthicsCalculator()
+    return calc.calculate_fairness_metrics(predictions_by_group)
+
+
+def validate_consent(data_sources: List[Dict[str, Any]]) -> Tuple[bool, Dict[str, Any]]:
+    """Validate consent across data sources"""
+    calc = EthicsCalculator()
+    return calc.validate_consent(data_sources)
+
+
+def compute_ecological_impact(resource_usage: Dict[str, float]) -> float:
+    """Compute ecological impact score"""
+    calc = EthicsCalculator()
+    return calc.calculate_ecological_impact(resource_usage)
+
+
+class EthicsCalculator:
+    """Calculator for ethical metrics with evidence tracking"""
+    
+    def __init__(self):
+        self.evidence_cache = {}
     
     def calculate_ece(self, predictions: List[float], targets: List[int], 
                      n_bins: int = 15) -> Tuple[float, Dict[str, Any]]:
@@ -223,6 +269,163 @@ class EthicsCalculator:
         }
         
         return float(rho_bias), evidence
+    
+    def calculate_bias_ratio_from_groups(self, group_outcomes: Dict[str, List[float]]) -> Tuple[float, Dict[str, Any]]:
+        """Calculate bias ratio from group outcomes dictionary"""
+        if not group_outcomes:
+            return 10.0, {"error": "No group outcomes provided"}
+        
+        # Calculate mean outcome for each group
+        group_means = {}
+        for group, outcomes in group_outcomes.items():
+            if outcomes:
+                group_means[group] = sum(outcomes) / len(outcomes)
+            else:
+                group_means[group] = 0.0
+        
+        # Calculate overall mean
+        all_outcomes = []
+        for outcomes in group_outcomes.values():
+            all_outcomes.extend(outcomes)
+        
+        if not all_outcomes:
+            return 10.0, {"error": "No outcomes provided"}
+        
+        overall_mean = sum(all_outcomes) / len(all_outcomes)
+        
+        # Calculate bias ratio (max group rate / overall rate)
+        if overall_mean <= 1e-9:
+            return 10.0, {"error": "Overall mean too low"}
+        
+        max_ratio = max(group_means.values()) / overall_mean
+        
+        evidence = {
+            "method": "bias_ratio_from_groups",
+            "group_means": group_means,
+            "overall_mean": overall_mean,
+            "max_ratio": max_ratio,
+            "n_groups": len(group_outcomes)
+        }
+        
+        return float(max_ratio), evidence
+    
+    def calculate_risk_contractivity(self, risk_history: List[float]) -> Tuple[float, Dict[str, Any]]:
+        """Calculate risk contractivity (IR→IC)"""
+        if len(risk_history) < 2:
+            return 1.0, {"error": "Insufficient risk history"}
+        
+        # Calculate ratios between consecutive values
+        ratios = []
+        for i in range(1, len(risk_history)):
+            if risk_history[i-1] > 1e-9:
+                ratio = risk_history[i] / risk_history[i-1]
+                ratios.append(ratio)
+        
+        if not ratios:
+            return 1.0, {"error": "No valid ratios"}
+        
+        # Average ratio (should be < 1 for contractivity)
+        avg_ratio = sum(ratios) / len(ratios)
+        
+        evidence = {
+            "method": "risk_contractivity",
+            "risk_history": risk_history,
+            "ratios": ratios,
+            "avg_ratio": avg_ratio,
+            "is_contractive": avg_ratio < 1.0
+        }
+        
+        return float(avg_ratio), evidence
+    
+    def calculate_fairness_metrics(self, predictions_by_group: Dict[str, List[Tuple[float, bool]]]) -> Dict[str, float]:
+        """Calculate fairness metrics by group"""
+        if not predictions_by_group:
+            return {"demographic_parity": 0.0, "equal_opportunity": 0.0}
+        
+        # Calculate demographic parity
+        group_rates = {}
+        for group, predictions in predictions_by_group.items():
+            if predictions:
+                positive_rate = sum(1 for p, _ in predictions if p > 0.5) / len(predictions)
+                group_rates[group] = positive_rate
+        
+        if group_rates:
+            max_rate = max(group_rates.values())
+            min_rate = min(group_rates.values())
+            dp_diff = max_rate - min_rate
+        else:
+            dp_diff = 0.0
+        
+        # Calculate equal opportunity (TPR difference)
+        group_tpr = {}
+        for group, predictions in predictions_by_group.items():
+            positives = [(p, t) for p, t in predictions if t]
+            if positives:
+                tpr = sum(1 for p, _ in positives if p > 0.5) / len(positives)
+                group_tpr[group] = tpr
+        
+        if group_tpr:
+            max_tpr = max(group_tpr.values())
+            min_tpr = min(group_tpr.values())
+            eo_diff = max_tpr - min_tpr
+        else:
+            eo_diff = 0.0
+        
+        return {
+            "demographic_parity": 1.0 - dp_diff,  # Higher is better
+            "equal_opportunity": 1.0 - eo_diff    # Higher is better
+        }
+    
+    def validate_consent(self, data_sources: List[Dict[str, Any]]) -> Tuple[bool, Dict[str, Any]]:
+        """Validate consent across data sources"""
+        if not data_sources:
+            return False, {"error": "No data sources provided"}
+        
+        violations = []
+        valid_sources = 0
+        
+        for i, source in enumerate(data_sources):
+            source_id = source.get("id", f"source_{i}")
+            consent_given = source.get("consent_given", False)
+            purpose_specified = source.get("purpose_specified", False)
+            retention_defined = source.get("retention_defined", False)
+            
+            if not consent_given:
+                violations.append(f"{source_id}: No consent given")
+            if not purpose_specified:
+                violations.append(f"{source_id}: Purpose not specified")
+            if not retention_defined:
+                violations.append(f"{source_id}: Retention not defined")
+            
+            if consent_given and purpose_specified and retention_defined:
+                valid_sources += 1
+        
+        all_valid = len(violations) == 0
+        
+        details = {
+            "total_sources": len(data_sources),
+            "valid_sources": valid_sources,
+            "violations": violations,
+            "compliance_rate": valid_sources / len(data_sources) if data_sources else 0.0
+        }
+        
+        return all_valid, details
+    
+    def calculate_ecological_impact(self, resource_usage: Dict[str, float]) -> float:
+        """Calculate ecological impact score"""
+        if not resource_usage:
+            return 0.5  # Neutral score
+        
+        # Simple heuristic based on resource usage
+        cpu = resource_usage.get("cpu_percent", 50.0) / 100.0
+        memory = resource_usage.get("memory_mb", 1024.0) / 4096.0  # Normalize to 4GB
+        gpu_watts = resource_usage.get("gpu_watts", 100.0) / 300.0  # Normalize to 300W
+        
+        # Weighted average (higher values = worse impact)
+        impact = (0.4 * cpu + 0.3 * memory + 0.3 * gpu_watts)
+        
+        # Clamp to [0, 1]
+        return max(0.0, min(1.0, impact))
     
     def calculate_fairness(self, predictions: List[float], targets: List[int],
                           protected_attributes: List[str]) -> Tuple[float, Dict[str, Any]]:
