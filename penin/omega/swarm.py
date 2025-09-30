@@ -331,10 +331,10 @@ class SwarmOrchestrator:
         anomalies = detect_anomalies(threshold_stddev=1.5)
         
         return {
-            "consensus": len(anomalies["anomalies"]) == 0,
-            "anomaly_count": len(anomalies["anomalies"]),
+            "consensus": len(anomalies.get("anomalies", [])) == 0,
+            "anomaly_count": len(anomalies.get("anomalies", [])),
             "state": state,
-            "stats": anomalies["stats"]
+            "stats": anomalies.get("stats", {})
         }
     
     def should_promote(self, min_nodes: int = 3, min_consensus: float = 0.8) -> bool:

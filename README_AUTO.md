@@ -1,6 +1,6 @@
 # PENIN-Ω — Auto-Generated Documentation
 
-_Generated at 2025-09-30T15:15:45.326230Z_
+_Generated at 2025-09-30T15:18:24.989254Z_
 
 ## Current Status
 
@@ -21,16 +21,16 @@ System Version: **v8.0+Life**
 - ✅ **zero_consciousness**: active
 
 ### Blockchain Status
-- Blocks: 2
+- Blocks: 10
 - Valid: ✅
-- Last Hash: `411f14efb7dfa63f71bb3cfbd6eb09735f62610e90372d12b938af6fe8f7d204`
+- Last Hash: `dfc9962080c7e85d6b4a1ebf937ef5002f080392d57fd5b02c482e4221484645`
 
 ### Swarm Metrics
-- Active Nodes: 3
-- Avg φ (CAOS⁺): 0.750
-- Avg SR: 0.833
-- Avg G (Coherence): 0.890
-- Min Health: 0.950
+- Active Nodes: 5
+- Avg φ (CAOS⁺): 0.134
+- Avg SR: 0.829
+- Avg G (Coherence): 0.897
+- Min Health: 1.000
 
 ## Historical Evolution
 
@@ -194,7 +194,7 @@ sqlite3 ~/.penin_omega/state/heartbeats.db "SELECT * FROM heartbeats ORDER BY ti
 
 ```json
 {
-  "timestamp": "2025-09-30T15:15:45.326274Z",
+  "timestamp": "2025-09-30T15:18:24.989290Z",
   "version": "v8.0+Life",
   "modules": {
     "life_equation": "active",
@@ -211,21 +211,21 @@ sqlite3 ~/.penin_omega/state/heartbeats.db "SELECT * FROM heartbeats ORDER BY ti
     "zero_consciousness": "active"
   },
   "blockchain": {
-    "blocks": 2,
+    "blocks": 10,
     "valid": true,
-    "last_hash": "411f14efb7dfa63f71bb3cfbd6eb09735f62610e90372d12b938af6fe8f7d204"
+    "last_hash": "dfc9962080c7e85d6b4a1ebf937ef5002f080392d57fd5b02c482e4221484645"
   },
   "swarm": {
-    "phi_avg": 0.75,
-    "phi_harmonic": 0.7477744807121662,
-    "sr_avg": 0.8333333333333334,
-    "sr_harmonic": 0.8331477125438048,
-    "g_avg": 0.89,
-    "g_harmonic": 0.8899250904805993,
-    "health_avg": 0.9733333333333333,
-    "health_min": 0.95,
-    "node_count": 3,
-    "sample_count": 3,
+    "phi_avg": 0.1340905347096609,
+    "phi_harmonic": 0.1317939128942023,
+    "sr_avg": 0.8292668772604731,
+    "sr_harmonic": 0.8266421802648308,
+    "g_avg": 0.8966531973307825,
+    "g_harmonic": 0.8962430914966891,
+    "health_avg": 1.0,
+    "health_min": 1.0,
+    "node_count": 5,
+    "sample_count": 5,
     "window_s": 60
   }
 }
