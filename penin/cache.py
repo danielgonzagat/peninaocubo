@@ -21,6 +21,31 @@ class SecureCache:
     L1: In-memory LRU cache
     L2: SQLite with orjson + HMAC
     """
+def get_stats(self):
+    """Return cache stats including hits/misses and L1/L2 breakdown."""
+    # tamanhos auxiliares com fallback
+    def _n(v, d=0):
+        try: return int(v)
+        except Exception: return d
+
+    l1 = _n(getattr(self, "_l1_size", lambda: 0)())
+    l1_items = _n(getattr(self, "_l1_items", lambda: 0)())
+    l2 = _n(getattr(self, "_l2_size_bytes", lambda: 0)())
+    l2_files = _n(getattr(self, "_l2_files", lambda: 0)())
+
+    return {
+        "hits": int(getattr(self, "_hits", 0)),
+        "misses": int(getattr(self, "_misses", 0)),
+        "l1": l1,
+        "l1_items": l1_items,
+        "l1_hits": int(getattr(self, "_l1_hits", 0)),
+        "l1_misses": int(getattr(self, "_l1_misses", 0)),
+        "l2": l2,
+        "l2_files": l2_files,
+        "l2_hits": int(getattr(self, "_l2_hits", 0)),
+        "l2_misses": int(getattr(self, "_l2_misses", 0)),
+    }
+
 
     def __init__(
         self,
