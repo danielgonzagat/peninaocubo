@@ -142,7 +142,8 @@ class MultiLLMRouter:
         # Latency component (higher is better for lower latency)
         lat = max(0.01, r.latency_s)
         # P0 Fix: Include cost in scoring (higher cost = lower score)
-        cost_penalty = r.cost_usd * 1000  # Scale cost to meaningful range
+        cost_scaling = getattr(self, 'cost_scaling_factor', 1000)  # Make configurable
+        cost_penalty = r.cost_usd * cost_scaling
         return base + (1.0 / lat) - cost_penalty
 
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=0.5))
