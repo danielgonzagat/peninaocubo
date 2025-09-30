@@ -1,661 +1,497 @@
 """
-Runners Module - Evolve One Cycle Orquestrado
-=============================================
+PENIN-Ω Runners Module
+=====================
 
-Implementa orquestração completa do ciclo de auto-evolução:
-1. Gerar challengers (mutators)
-2. Avaliar challengers (evaluators)  
-3. Calcular gates (guards, sr, caos, linf)
-4. Decidir promoção/canário/rollback (acfa)
-5. Registrar no ledger (WORM)
-6. Atualizar champion ou canário
-7. Disparar auto-tuning
-
-Ciclo completo auditável e determinístico.
+Implements the main evolution cycle orchestrator that coordinates all components:
+mutators, evaluators, guards, scoring, and deployment decisions.
 """
 
+import asyncio
 import time
-import uuid
 import json
-import tempfile
+from typing import Dict, List, Any, Optional, Tuple
+from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Callable
-from typing_extensions import Tuple
-from dataclasses import dataclass
-from enum import Enum
 
-try:
-    from .mutators import ChallengerGenerator, MutationConfig
-    from .evaluators import ComprehensiveEvaluator, EvaluationResult
-    from .guards import GuardOrchestrator
-    from .scoring import USCLScorer, LInfinityScorer
-    from .caos import CAOSPlusEngine, CAOSComponents
-    from .sr import SROmegaEngine, SRComponents
-    from .acfa import LeagueManager, CanaryManager, PromotionDecisionEngine, PromotionCandidate
-    from .tuner import PeninAutoTuner
-    from .ledger import WORMLedger, create_run_record
-except ImportError:
-    # Fallback para execução direta
-    import sys
-    sys.path.append('/workspace')
-    from penin.omega.mutators import ChallengerGenerator, MutationConfig
-    from penin.omega.evaluators import ComprehensiveEvaluator, EvaluationResult
-    from penin.omega.guards import GuardOrchestrator
-    from penin.omega.scoring import USCLScorer, LInfinityScorer
-    from penin.omega.caos import CAOSPlusEngine, CAOSComponents
-    from penin.omega.sr import SROmegaEngine, SRComponents
-    from penin.omega.acfa import LeagueManager, CanaryManager, PromotionDecisionEngine, PromotionCandidate
-    from penin.omega.tuner import PeninAutoTuner
-    from penin.omega.ledger import WORMLedger, create_run_record
-
-
-class CyclePhase(Enum):
-    """Fases do ciclo de evolução"""
-    INIT = "init"
-    MUTATE = "mutate"
-    EVALUATE = "evaluate"
-    GATE_CHECK = "gate_check"
-    DECIDE = "decide"
-    PROMOTE = "promote"
-    TUNE = "tune"
-    COMPLETE = "complete"
-    ERROR = "error"
+# Import other omega modules
+from .mutators import ParameterMutator, MutationConfig
+from .evaluators import TaskBattery, TaskBatteryConfig, quick_evaluate_model
+from .ethics_metrics import EthicsCalculator, EthicsGate
+from .scoring import quick_harmonic, quick_score_gate
+from .caos import quick_caos_phi
+from .sr import quick_sr_harmonic
+from .guards import quick_sigma_guard_check_simple
+from .acfa import LeagueOrchestrator, LeagueConfig, run_full_deployment_cycle
+from .tuner import PeninOmegaTuner, create_penin_tuner
+from .ledger import WORMLedger
 
 
 @dataclass
-class CycleConfig:
-    """Configuração do ciclo de evolução"""
+class EvolutionConfig:
+    """Configuration for evolution cycles"""
     n_challengers: int = 8
-    budget_usd: float = 1.0
-    max_duration_s: float = 300.0  # 5 minutos
-    provider_id: str = "mock"
-    model_name: str = "mock-model"
-    
-    # Configuração do champion
-    champion_config: Dict[str, Any] = None
-    
-    # Flags
+    budget_minutes: int = 30
+    provider_id: str = "openai"
     dry_run: bool = False
-    enable_tuning: bool = True
-    enable_canary: bool = True
+    seed: int = 42
     
-    def __post_init__(self):
-        if self.champion_config is None:
-            self.champion_config = {
-                "temperature": 0.7,
-                "top_p": 0.9,
-                "max_tokens": 1000
-            }
+    # Evaluation settings
+    max_tasks_per_metric: int = 3
+    evaluation_timeout_s: int = 60
+    
+    # Deployment settings
+    auto_deploy: bool = True
+    shadow_duration_s: int = 300
+    canary_duration_s: int = 600
+    
+    # Tuning settings
+    enable_auto_tuning: bool = True
+    tuning_learning_rate: float = 0.01
 
 
 @dataclass
 class CycleResult:
-    """Resultado de um ciclo de evolução"""
+    """Result of an evolution cycle"""
     cycle_id: str
-    phase: CyclePhase
-    success: bool
+    timestamp: float
+    config: EvolutionConfig
     
-    # Timing
-    start_time: float
-    end_time: float
-    duration_s: float
+    # Generated variants
+    challengers: List[Dict[str, Any]]
     
-    # Resultados por fase
-    mutation_result: Optional[Dict[str, Any]] = None
-    evaluation_results: List[EvaluationResult] = None
-    gate_results: Optional[Dict[str, Any]] = None
-    decision_results: Optional[Dict[str, Any]] = None
-    tuning_result: Optional[Dict[str, Any]] = None
+    # Evaluation results
+    evaluation_results: Dict[str, Any]
     
-    # Métricas finais
-    final_champion_id: Optional[str] = None
-    promotions: int = 0
-    canaries: int = 0
-    rejections: int = 0
+    # Scoring results
+    scoring_results: Dict[str, Any]
     
-    # Erros
-    error_message: Optional[str] = None
-    failed_phase: Optional[CyclePhase] = None
+    # Gate results
+    gate_results: Dict[str, Any]
     
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "cycle_id": self.cycle_id,
-            "phase": self.phase.value,
-            "success": self.success,
-            "timing": {
-                "start_time": self.start_time,
-                "end_time": self.end_time,
-                "duration_s": self.duration_s
-            },
-            "results": {
-                "mutation": self.mutation_result,
-                "evaluations": [e.to_dict() for e in self.evaluation_results] if self.evaluation_results else [],
-                "gates": self.gate_results,
-                "decisions": self.decision_results,
-                "tuning": self.tuning_result
-            },
-            "metrics": {
-                "final_champion_id": self.final_champion_id,
-                "promotions": self.promotions,
-                "canaries": self.canaries,
-                "rejections": self.rejections
-            },
-            "error": {
-                "message": self.error_message,
-                "failed_phase": self.failed_phase.value if self.failed_phase else None
-            }
-        }
+    # Final decision
+    decision: str  # 'promote', 'canary', 'reject'
+    decision_reason: str
+    
+    # Best challenger
+    best_challenger: Optional[Dict[str, Any]]
+    
+    # Performance metrics
+    total_duration_s: float
+    cost_usd: float
+    
+    # Evidence
+    evidence_hash: str
 
 
 class EvolutionRunner:
-    """Runner principal do ciclo de evolução"""
+    """Main evolution cycle orchestrator"""
     
-    def __init__(self,
-                 ledger_path: Optional[Path] = None,
-                 runs_dir: Optional[Path] = None,
-                 seed: Optional[int] = None):
+    def __init__(self, config: EvolutionConfig = None):
+        self.config = config or EvolutionConfig()
+        
+        # Initialize components
+        self.mutator = ParameterMutator(MutationConfig(seed=self.config.seed))
+        self.evaluator = TaskBattery(TaskBatteryConfig(
+            seed=self.config.seed,
+            max_tasks_per_metric=self.config.max_tasks_per_metric
+        ))
+        self.ethics_calculator = EthicsCalculator()
+        self.ethics_gate = EthicsGate()
+        self.league = LeagueOrchestrator(LeagueConfig(
+            shadow_duration_s=self.config.shadow_duration_s,
+            canary_duration_s=self.config.canary_duration_s
+        ))
+        
+        # Initialize tuner if enabled
+        self.tuner = create_penin_tuner() if self.config.enable_auto_tuning else None
+        
+        # Initialize WORM ledger
+        self.ledger = WORMLedger("evolution_cycles.db")
+        
+        print(f"🚀 Evolution runner initialized (seed={self.config.seed})")
+    
+    async def evolve_one_cycle(self, base_config: Dict[str, Any] = None) -> CycleResult:
         """
-        Args:
-            ledger_path: Caminho do ledger WORM
-            runs_dir: Diretório para artifacts
-            seed: Seed para determinismo
-        """
-        # Paths
-        if ledger_path is None:
-            ledger_path = Path.home() / ".penin_omega" / "evolution_ledger.db"
-        if runs_dir is None:
-            runs_dir = Path.home() / ".penin_omega" / "evolution_runs"
-            
-        # Componentes principais
-        self.ledger = WORMLedger(ledger_path, runs_dir)
-        self.evaluator = ComprehensiveEvaluator()
-        self.challenger_generator = ChallengerGenerator(seed)
-        self.guard_orchestrator = GuardOrchestrator()
-        
-        # Engines de scoring
-        self.uscl_scorer = USCLScorer()
-        self.linf_scorer = LInfinityScorer()
-        self.caos_engine = CAOSPlusEngine()
-        self.sr_engine = SROmegaEngine()
-        
-        # Liga e tuning
-        self.canary_manager = CanaryManager()
-        self.decision_engine = PromotionDecisionEngine()
-        self.league_manager = LeagueManager(
-            self.ledger, self.evaluator, self.decision_engine, self.canary_manager
-        )
-        self.auto_tuner = PeninAutoTuner()
-        
-        # Estado
-        self.cycle_count = 0
-        self.evaluation_history: List[Dict[str, float]] = []
-        
-    def evolve_one_cycle(self,
-                        config: CycleConfig,
-                        model_func: Callable[[str], str]) -> CycleResult:
-        """
-        Executa um ciclo completo de evolução
+        Execute one complete evolution cycle
         
         Args:
-            config: Configuração do ciclo
-            model_func: Função do modelo para teste
+            base_config: Base configuration to mutate from
             
         Returns:
-            CycleResult com todos os detalhes
+            CycleResult with all cycle information
         """
-        cycle_id = f"cycle_{int(time.time())}_{uuid.uuid4().hex[:8]}"
-        start_time = time.time()
+        cycle_start = time.time()
+        cycle_id = f"cycle_{int(cycle_start)}"
         
-        result = CycleResult(
-            cycle_id=cycle_id,
-            phase=CyclePhase.INIT,
-            success=False,
-            start_time=start_time,
-            end_time=start_time,
-            duration_s=0.0
-        )
+        print(f"\n🔄 Starting evolution cycle {cycle_id}")
+        print("=" * 60)
+        
+        # Default base config if none provided
+        if base_config is None:
+            base_config = {
+                "temperature": 0.7,
+                "top_p": 0.9,
+                "max_tokens": 500,
+                "model": "gpt-4"
+            }
         
         try:
-            print(f"🚀 Iniciando ciclo de evolução: {cycle_id}")
-            print(f"   Challengers: {config.n_challengers}")
-            print(f"   Budget: ${config.budget_usd:.2f}")
-            print(f"   Provider: {config.provider_id}")
-            print(f"   Dry run: {config.dry_run}")
-            print()
+            # Step 1: Generate challengers
+            print("🧬 Step 1: Generating challengers...")
+            challengers = await self._generate_challengers(base_config)
+            print(f"   Generated {len(challengers)} challengers")
             
-            # Fase 1: MUTATE - Gerar challengers
-            result.phase = CyclePhase.MUTATE
-            print("🧬 Fase 1: Gerando challengers...")
+            # Step 2: Evaluate challengers
+            print("📊 Step 2: Evaluating challengers...")
+            evaluation_results = await self._evaluate_challengers(challengers)
+            print(f"   Evaluated {len(evaluation_results)} challengers")
             
-            challengers = self.challenger_generator.generate_from_champion(
-                config.champion_config,
-                config.n_challengers
+            # Step 3: Apply gates and scoring
+            print("🛡️  Step 3: Applying gates and scoring...")
+            scoring_results, gate_results = await self._score_and_gate_challengers(
+                challengers, evaluation_results
             )
             
-            mutation_summary = self.challenger_generator.get_challenger_summary(challengers)
-            result.mutation_result = mutation_summary
+            # Step 4: Select best challenger
+            print("🏆 Step 4: Selecting best challenger...")
+            best_challenger, decision, decision_reason = self._select_best_challenger(
+                challengers, scoring_results, gate_results
+            )
             
-            print(f"   ✅ {len(challengers)} challengers gerados")
-            print(f"   📊 Por tipo: {mutation_summary['by_type']}")
-            
-            if config.dry_run:
-                print("   🏃 Dry run - parando na mutação")
-                result.success = True
-                result.phase = CyclePhase.COMPLETE
-                return result
-                
-            # Fase 2: EVALUATE - Avaliar challengers
-            result.phase = CyclePhase.EVALUATE
-            print("\n📊 Fase 2: Avaliando challengers...")
-            
-            evaluation_results = []
-            total_cost = 0.0
-            
-            for i, challenger in enumerate(challengers, 1):
-                print(f"   Avaliando {i}/{len(challengers)}: {challenger.mutation_id}")
-                
-                # Criar função do modelo com config do challenger
-                def configured_model(prompt: str) -> str:
-                    # Em produção, aplicaria a config ao modelo real
-                    # Por ora, usar modelo mock
-                    return model_func(prompt)
-                    
-                # Avaliar
-                evaluation = self.evaluator.evaluate_model(
-                    configured_model,
-                    challenger.mutations.get("config", config.champion_config),
-                    config.provider_id,
-                    config.model_name
-                )
-                
-                evaluation_results.append(evaluation)
-                total_cost += evaluation.total_cost_usd
-                
-                print(f"      U={evaluation.U:.3f}, S={evaluation.S:.3f}, "
-                      f"C={evaluation.C:.3f}, L={evaluation.L:.3f}")
-                
-                # Verificar budget
-                if total_cost > config.budget_usd:
-                    print(f"   ⚠️  Budget esgotado: ${total_cost:.4f} > ${config.budget_usd:.2f}")
-                    break
-                    
-            result.evaluation_results = evaluation_results
-            print(f"   ✅ {len(evaluation_results)} avaliações completas")
-            print(f"   💰 Custo total: ${total_cost:.4f}")
-            
-            # Fase 3: GATE_CHECK - Verificar gates
-            result.phase = CyclePhase.GATE_CHECK
-            print("\n🛡️  Fase 3: Verificando gates...")
-            
-            gate_results = {"passed": 0, "failed": 0, "details": []}
-            
-            for evaluation in evaluation_results:
-                # Simular estado para guards
-                state_dict = {
-                    "consent": True,
-                    "eco": True,
-                    "ece": 0.005,
-                    "bias": 1.02,
-                    "rho": 0.8,
-                    "U": evaluation.U,
-                    "S": evaluation.S,
-                    "C": evaluation.C,
-                    "L": evaluation.L
-                }
-                
-                # Verificar guards
-                guards_passed, violations, evidence = self.guard_orchestrator.check_all_guards(state_dict)
-                
-                # Verificar CAOS⁺
-                caos_components = CAOSComponents(C=0.7, A=0.8, O=0.6, S=0.5)
-                caos_phi, caos_details = self.caos_engine.compute_phi(caos_components)
-                
-                # Verificar SR
-                sr_components = SRComponents(
-                    awareness=0.8, ethics=0.9 if guards_passed else 0.1,
-                    autocorrection=0.7, metacognition=0.6
-                )
-                sr_passed, sr_gate_details = self.sr_engine.gate_check(sr_components)
-                
-                # Resultado do gate
-                all_gates_passed = guards_passed and sr_passed and caos_phi > 0.5
-                
-                gate_detail = {
-                    "evaluation_id": f"{evaluation.provider_id}_{evaluation.timestamp}",
-                    "guards_passed": guards_passed,
-                    "sr_passed": sr_passed,
-                    "caos_phi": caos_phi,
-                    "all_passed": all_gates_passed,
-                    "violations": len(violations)
-                }
-                
-                gate_results["details"].append(gate_detail)
-                
-                if all_gates_passed:
-                    gate_results["passed"] += 1
+            # Step 5: Deploy if not dry run
+            if not self.config.dry_run and self.config.auto_deploy and best_challenger:
+                print("🚀 Step 5: Deploying challenger...")
+                deployment_success = await self._deploy_challenger(best_challenger)
+                if deployment_success:
+                    decision = "promoted"
                 else:
-                    gate_results["failed"] += 1
-                    
-            result.gate_results = gate_results
-            print(f"   ✅ Gates: {gate_results['passed']} passou, {gate_results['failed']} falhou")
+                    decision = "deployment_failed"
             
-            # Fase 4: DECIDE - Decisão de promoção
-            result.phase = CyclePhase.DECIDE
-            print("\n🏆 Fase 4: Decisões de promoção...")
+            # Step 6: Update tuner
+            if self.tuner:
+                print("🎯 Step 6: Updating tuner...")
+                cycle_metrics = self._extract_cycle_metrics(evaluation_results, scoring_results)
+                updated_params = self.tuner.update_from_cycle_result(cycle_metrics)
+                print(f"   Updated {len(updated_params)} parameters")
             
-            # Adicionar challengers à liga
-            candidates = []
-            for evaluation in evaluation_results:
-                candidate = PromotionCandidate(
-                    run_id=f"candidate_{int(evaluation.timestamp)}",
-                    config={"provider": evaluation.provider_id},
-                    evaluation=evaluation
-                )
-                candidates.append(candidate)
-                self.league_manager.active_challengers[candidate.run_id] = candidate
-                
-            # Executar ciclo de promoção
-            promotion_results = self.league_manager.run_promotion_cycle()
-            result.decision_results = promotion_results
+            # Create result
+            total_duration = time.time() - cycle_start
+            cost_usd = self._estimate_cycle_cost(challengers, evaluation_results)
             
-            result.promotions = len(promotion_results.get("promotions", []))
-            result.canaries = len(promotion_results.get("canaries", []))
-            result.rejections = len(promotion_results.get("rejections", []))
+            result = CycleResult(
+                cycle_id=cycle_id,
+                timestamp=cycle_start,
+                config=self.config,
+                challengers=challengers,
+                evaluation_results=evaluation_results,
+                scoring_results=scoring_results,
+                gate_results=gate_results,
+                decision=decision,
+                decision_reason=decision_reason,
+                best_challenger=best_challenger,
+                total_duration_s=total_duration,
+                cost_usd=cost_usd,
+                evidence_hash=self._compute_evidence_hash(cycle_id, challengers, evaluation_results)
+            )
             
-            print(f"   ✅ Decisões: {result.promotions} promoções, "
-                  f"{result.canaries} canários, {result.rejections} rejeições")
+            # Record in WORM ledger
+            self._record_cycle_result(result)
             
-            # Fase 5: PROMOTE - Executar promoções
-            result.phase = CyclePhase.PROMOTE
-            if result.promotions > 0:
-                print("\n🚀 Fase 5: Executando promoções...")
-                promoted_ids = promotion_results.get("promotions", [])
-                if promoted_ids:
-                    result.final_champion_id = promoted_ids[0]  # Primeiro promovido
-                    print(f"   ✅ Novo champion: {result.final_champion_id[:8]}...")
-            else:
-                print("\n⏸️  Fase 5: Nenhuma promoção - champion mantido")
-                
-            # Fase 6: TUNE - Auto-tuning
-            result.phase = CyclePhase.TUNE
-            if config.enable_tuning and len(self.evaluation_history) > 0:
-                print("\n🎛️  Fase 6: Auto-tuning...")
-                
-                # Adicionar avaliações atuais ao histórico
-                for evaluation in evaluation_results:
-                    eval_dict = {
-                        "U": evaluation.U,
-                        "S": evaluation.S,
-                        "C": evaluation.C,
-                        "L": evaluation.L,
-                        "cost": evaluation.total_cost_usd,
-                        "linf": self.linf_scorer.update_and_score({
-                            "rsi": 0.8, "synergy": 0.7, "novelty": 0.6,
-                            "stability": evaluation.S, "viability": 0.8, "cost": evaluation.C
-                        })["linf"]
-                    }
-                    self.evaluation_history.append(eval_dict)
-                    
-                # Executar tuning
-                tuning_result = self.auto_tuner.tune_from_evaluations(self.evaluation_history)
-                result.tuning_result = tuning_result
-                
-                if tuning_result.get("tuning_active", False):
-                    updates = len([u for u in tuning_result.get("parameter_updates", {}).values() 
-                                  if "error" not in u])
-                    print(f"   ✅ {updates} parâmetros atualizados")
-                    print(f"   📈 Objetivo: {tuning_result.get('current_objective', 0):.4f}")
-                else:
-                    print("   ⏸️  Warmup - tuning inativo")
-            else:
-                print("\n⏸️  Fase 6: Auto-tuning desabilitado")
-                
-            # Sucesso
-            result.phase = CyclePhase.COMPLETE
-            result.success = True
+            print(f"\n✅ Cycle {cycle_id} completed in {total_duration:.1f}s")
+            print(f"   Decision: {decision} ({decision_reason})")
+            print(f"   Cost: ${cost_usd:.4f}")
+            
+            return result
             
         except Exception as e:
-            result.error_message = str(e)
-            result.failed_phase = result.phase
-            result.phase = CyclePhase.ERROR
-            print(f"\n❌ Erro na fase {result.failed_phase.value}: {e}")
-            
-        finally:
-            result.end_time = time.time()
-            result.duration_s = result.end_time - result.start_time
-            self.cycle_count += 1
-            
-            # Registrar ciclo no ledger
-            self._record_cycle_in_ledger(result, config)
-            
-        return result
-        
-    def _record_cycle_in_ledger(self, result: CycleResult, config: CycleConfig):
-        """Registra ciclo no WORM ledger"""
-        try:
-            # Criar record do ciclo
-            record = create_run_record(
-                run_id=result.cycle_id,
-                provider_id=config.provider_id,
-                metrics={
-                    "U": 0.0,  # Será preenchido com média dos challengers
-                    "S": 0.0,
-                    "C": 0.0,
-                    "L": 0.0
-                },
-                decision_verdict="cycle_complete" if result.success else "cycle_failed"
+            print(f"❌ Cycle {cycle_id} failed: {e}")
+            # Create failure result
+            result = CycleResult(
+                cycle_id=cycle_id,
+                timestamp=cycle_start,
+                config=self.config,
+                challengers=[],
+                evaluation_results={},
+                scoring_results={},
+                gate_results={},
+                decision="failed",
+                decision_reason=str(e),
+                best_challenger=None,
+                total_duration_s=time.time() - cycle_start,
+                cost_usd=0.0,
+                evidence_hash=""
             )
             
-            # Calcular métricas médias
-            if result.evaluation_results:
-                avg_U = sum(e.U for e in result.evaluation_results) / len(result.evaluation_results)
-                avg_S = sum(e.S for e in result.evaluation_results) / len(result.evaluation_results)
-                avg_C = sum(e.C for e in result.evaluation_results) / len(result.evaluation_results)
-                avg_L = sum(e.L for e in result.evaluation_results) / len(result.evaluation_results)
+            self._record_cycle_result(result)
+            raise
+    
+    async def _generate_challengers(self, base_config: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """Generate challenger configurations"""
+        mutation_results = self.mutator.mutate_parameters(base_config, self.config.n_challengers)
+        
+        challengers = []
+        for i, result in enumerate(mutation_results):
+            challenger = {
+                'challenger_id': f"challenger_{i:03d}",
+                'config': result.mutated_config,
+                'mutation_type': result.mutation_type,
+                'config_hash': result.config_hash,
+                'seed_used': result.seed_used
+            }
+            challengers.append(challenger)
+        
+        return challengers
+    
+    async def _evaluate_challengers(self, challengers: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Evaluate all challengers using the task battery"""
+        evaluation_results = {}
+        
+        for challenger in challengers:
+            challenger_id = challenger['challenger_id']
+            
+            # Create mock model function for evaluation
+            def mock_model_fn(input_text: str) -> str:
+                # In a real implementation, this would call the actual model
+                # For now, return a simple response based on config
+                config = challenger['config']
+                temp = config.get('temperature', 0.7)
                 
-                record.metrics.U = avg_U
-                record.metrics.S = avg_S
-                record.metrics.C = avg_C
-                record.metrics.L = avg_L
+                # Simulate different responses based on temperature
+                if temp < 0.3:
+                    return "42"  # Deterministic
+                elif temp > 1.0:
+                    return "The answer varies depending on context and interpretation"  # Creative
+                else:
+                    return "42 is the answer"  # Balanced
+            
+            # Evaluate using task battery
+            try:
+                eval_result = self.evaluator.evaluate_all_metrics(mock_model_fn)
+                evaluation_results[challenger_id] = eval_result
+            except Exception as e:
+                print(f"   ⚠️  Evaluation failed for {challenger_id}: {e}")
+                evaluation_results[challenger_id] = {
+                    'aggregate_scores': {'U': {'mean': 0}, 'S': {'mean': 0}, 'C': {'mean': 0}, 'L': {'mean': 0}},
+                    'overall_score': 0.0,
+                    'error': str(e)
+                }
+        
+        return evaluation_results
+    
+    async def _score_and_gate_challengers(self, challengers: List[Dict[str, Any]], 
+                                        evaluation_results: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """Apply scoring and gates to challengers"""
+        scoring_results = {}
+        gate_results = {}
+        
+        for challenger in challengers:
+            challenger_id = challenger['challenger_id']
+            eval_result = evaluation_results.get(challenger_id, {})
+            
+            if 'aggregate_scores' in eval_result:
+                # Extract USCL scores
+                u_score = eval_result['aggregate_scores']['U']['mean']
+                s_score = eval_result['aggregate_scores']['S']['mean']
+                c_score = eval_result['aggregate_scores']['C']['mean']
+                l_score = eval_result['aggregate_scores']['L']['mean']
                 
-            # Artifacts do ciclo
-            artifacts = {
-                "cycle_result": result.to_dict(),
-                "config": config.__dict__,
-                "evaluation_history_size": len(self.evaluation_history),
-                "cycle_count": self.cycle_count
+                # Calculate L∞ harmonic score
+                linf_score = quick_harmonic([u_score, s_score, c_score, l_score])
+                
+                # Calculate CAOS+ phi
+                caos_phi = quick_caos_phi(c_score, 0.8, 0.9, s_score)  # Mock A, O values
+                
+                # Calculate SR score
+                sr_score = quick_sr_harmonic(0.9, True, 0.8, 0.85)  # Mock values
+                
+                # Apply score gate
+                gate_passed, gate_details = quick_score_gate(u_score, s_score, c_score, l_score)
+                
+                # Ethics check (simplified)
+                ethics_passed = True  # Would do real ethics check here
+                
+                # Sigma guard check
+                sigma_guard_passed = quick_sigma_guard_check_simple(
+                    ece=0.05, rho_bias=1.02, fairness=0.9, consent=True, eco_ok=True
+                )
+                
+                scoring_results[challenger_id] = {
+                    'u_score': u_score,
+                    's_score': s_score,
+                    'c_score': c_score,
+                    'l_score': l_score,
+                    'linf_score': linf_score,
+                    'caos_phi': caos_phi,
+                    'sr_score': sr_score
+                }
+                
+                gate_results[challenger_id] = {
+                    'score_gate_passed': gate_passed,
+                    'score_gate_details': gate_details,
+                    'ethics_passed': ethics_passed,
+                    'sigma_guard_passed': sigma_guard_passed,
+                    'all_gates_passed': gate_passed and ethics_passed and sigma_guard_passed
+                }
+            else:
+                # Failed evaluation
+                scoring_results[challenger_id] = {
+                    'u_score': 0, 's_score': 0, 'c_score': 0, 'l_score': 0,
+                    'linf_score': 0, 'caos_phi': 0, 'sr_score': 0
+                }
+                gate_results[challenger_id] = {
+                    'score_gate_passed': False,
+                    'ethics_passed': False,
+                    'sigma_guard_passed': False,
+                    'all_gates_passed': False
+                }
+        
+        return scoring_results, gate_results
+    
+    def _select_best_challenger(self, challengers: List[Dict[str, Any]], 
+                               scoring_results: Dict[str, Any],
+                               gate_results: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], str, str]:
+        """Select the best challenger based on scores and gates"""
+        
+        # Filter challengers that passed all gates
+        valid_challengers = []
+        for challenger in challengers:
+            challenger_id = challenger['challenger_id']
+            if gate_results.get(challenger_id, {}).get('all_gates_passed', False):
+                challenger['linf_score'] = scoring_results[challenger_id]['linf_score']
+                valid_challengers.append(challenger)
+        
+        if not valid_challengers:
+            return None, "reject", "no_challengers_passed_gates"
+        
+        # Select challenger with highest L∞ score
+        best_challenger = max(valid_challengers, key=lambda c: c['linf_score'])
+        
+        # Determine decision based on score improvement
+        linf_score = best_challenger['linf_score']
+        if linf_score > 0.8:
+            decision = "promote"
+            reason = f"high_linf_score_{linf_score:.3f}"
+        elif linf_score > 0.6:
+            decision = "canary"
+            reason = f"moderate_linf_score_{linf_score:.3f}"
+        else:
+            decision = "reject"
+            reason = f"low_linf_score_{linf_score:.3f}"
+        
+        return best_challenger, decision, reason
+    
+    async def _deploy_challenger(self, challenger: Dict[str, Any]) -> bool:
+        """Deploy challenger using league orchestrator"""
+        try:
+            success = await run_full_deployment_cycle(self.league, challenger['config'])
+            return success
+        except Exception as e:
+            print(f"   ❌ Deployment failed: {e}")
+            return False
+    
+    def _extract_cycle_metrics(self, evaluation_results: Dict[str, Any], 
+                              scoring_results: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract metrics for tuner update"""
+        if not evaluation_results or not scoring_results:
+            return {}
+        
+        # Get metrics from best performer
+        best_eval = max(evaluation_results.values(), 
+                       key=lambda x: x.get('overall_score', 0))
+        
+        return {
+            'linf_score': best_eval.get('overall_score', 0),
+            'U_score': best_eval['aggregate_scores']['U']['mean'],
+            'S_score': best_eval['aggregate_scores']['S']['mean'],
+            'C_score': best_eval['aggregate_scores']['C']['mean'],
+            'L_score': best_eval['aggregate_scores']['L']['mean'],
+            'caos_phi': 0.5,  # Would extract from scoring results
+            'cost_over_budget': False,  # Would check actual budget
+            'recent_promotion_rate': 0.1,  # Would track from history
+            'ethics_passed': True
+        }
+    
+    def _estimate_cycle_cost(self, challengers: List[Dict[str, Any]], 
+                           evaluation_results: Dict[str, Any]) -> float:
+        """Estimate total cost of the cycle"""
+        # Simple estimation based on number of challengers and evaluations
+        base_cost_per_challenger = 0.01  # $0.01 per challenger
+        evaluation_cost = len(challengers) * self.config.max_tasks_per_metric * 0.001
+        
+        return base_cost_per_challenger * len(challengers) + evaluation_cost
+    
+    def _compute_evidence_hash(self, cycle_id: str, challengers: List[Dict[str, Any]], 
+                              evaluation_results: Dict[str, Any]) -> str:
+        """Compute evidence hash for the cycle"""
+        evidence_data = {
+            'cycle_id': cycle_id,
+            'challenger_hashes': [c.get('config_hash', '') for c in challengers],
+            'evaluation_summary': {
+                cid: result.get('overall_score', 0) 
+                for cid, result in evaluation_results.items()
+            }
+        }
+        
+        import hashlib
+        evidence_str = json.dumps(evidence_data, sort_keys=True)
+        return hashlib.sha256(evidence_str.encode()).hexdigest()
+    
+    def _record_cycle_result(self, result: CycleResult):
+        """Record cycle result in WORM ledger"""
+        try:
+            record_data = {
+                'event_type': 'EVOLUTION_CYCLE',
+                'cycle_id': result.cycle_id,
+                'timestamp': result.timestamp,
+                'decision': result.decision,
+                'decision_reason': result.decision_reason,
+                'n_challengers': len(result.challengers),
+                'best_challenger_id': result.best_challenger['challenger_id'] if result.best_challenger else None,
+                'duration_s': result.total_duration_s,
+                'cost_usd': result.cost_usd,
+                'evidence_hash': result.evidence_hash
             }
             
-            # Salvar no ledger
-            hash_result = self.ledger.append_record(record, artifacts)
-            print(f"   📝 Ciclo registrado no ledger: {hash_result[:8]}...")
+            self.ledger.record(record_data)
+            print(f"   📝 Recorded cycle result in WORM ledger")
             
         except Exception as e:
-            print(f"   ⚠️  Erro ao registrar no ledger: {e}")
-            
-    def get_runner_status(self) -> Dict[str, Any]:
-        """Obtém status do runner"""
-        return {
-            "cycle_count": self.cycle_count,
-            "evaluation_history_size": len(self.evaluation_history),
-            "league_status": self.league_manager.get_league_status(),
-            "tuning_stats": self.auto_tuner.get_tuning_stats(),
-            "ledger_stats": self.ledger.get_stats()
-        }
-        
-    def rollback_to_cycle(self, target_cycle_id: str) -> bool:
-        """Rollback para ciclo específico"""
+            print(f"   ⚠️  Failed to record in WORM ledger: {e}")
+
+
+# Utility functions
+async def run_evolution_cycles(n_cycles: int = 5, 
+                             config: EvolutionConfig = None) -> List[CycleResult]:
+    """Run multiple evolution cycles"""
+    runner = EvolutionRunner(config)
+    results = []
+    
+    for i in range(n_cycles):
+        print(f"\n🔄 Running cycle {i+1}/{n_cycles}")
         try:
-            return self.league_manager.rollback_to_champion(target_cycle_id)
+            result = await runner.evolve_one_cycle()
+            results.append(result)
         except Exception as e:
-            print(f"❌ Erro no rollback: {e}")
-            return False
-
-
-class BatchRunner:
-    """Runner para múltiplos ciclos"""
+            print(f"❌ Cycle {i+1} failed: {e}")
+            break
     
-    def __init__(self, evolution_runner: EvolutionRunner):
-        self.runner = evolution_runner
-        self.batch_results: List[CycleResult] = []
-        
-    def run_batch(self,
-                 n_cycles: int,
-                 config: CycleConfig,
-                 model_func: Callable[[str], str],
-                 stop_on_error: bool = False) -> Dict[str, Any]:
-        """
-        Executa batch de ciclos
-        
-        Args:
-            n_cycles: Número de ciclos
-            config: Configuração base
-            model_func: Função do modelo
-            stop_on_error: Se deve parar no primeiro erro
-            
-        Returns:
-            Resumo do batch
-        """
-        print(f"🔄 Executando batch de {n_cycles} ciclos...")
-        
-        batch_start = time.time()
-        successful_cycles = 0
-        failed_cycles = 0
-        
-        for cycle_num in range(1, n_cycles + 1):
-            print(f"\n--- Ciclo {cycle_num}/{n_cycles} ---")
-            
-            # Executar ciclo
-            cycle_result = self.runner.evolve_one_cycle(config, model_func)
-            self.batch_results.append(cycle_result)
-            
-            if cycle_result.success:
-                successful_cycles += 1
-                print(f"✅ Ciclo {cycle_num} concluído em {cycle_result.duration_s:.2f}s")
-            else:
-                failed_cycles += 1
-                print(f"❌ Ciclo {cycle_num} falhou: {cycle_result.error_message}")
-                
-                if stop_on_error:
-                    print("🛑 Parando batch devido a erro")
-                    break
-                    
-        batch_duration = time.time() - batch_start
-        
-        # Resumo do batch
-        summary = {
-            "total_cycles": len(self.batch_results),
-            "successful_cycles": successful_cycles,
-            "failed_cycles": failed_cycles,
-            "success_rate": successful_cycles / len(self.batch_results) if self.batch_results else 0,
-            "batch_duration_s": batch_duration,
-            "avg_cycle_duration_s": batch_duration / len(self.batch_results) if self.batch_results else 0,
-            "runner_status": self.runner.get_runner_status()
-        }
-        
-        print(f"\n📊 Batch completo:")
-        print(f"   Ciclos: {summary['total_cycles']}")
-        print(f"   Sucessos: {summary['successful_cycles']}")
-        print(f"   Falhas: {summary['failed_cycles']}")
-        print(f"   Taxa de sucesso: {summary['success_rate']*100:.1f}%")
-        print(f"   Duração total: {summary['batch_duration_s']:.2f}s")
-        
-        return summary
+    return results
 
 
-# Funções de conveniência
-def quick_evolution_cycle(n_challengers: int = 4,
-                         budget_usd: float = 0.5,
-                         seed: Optional[int] = None) -> CycleResult:
-    """Executa ciclo rápido de evolução"""
-    
-    # Modelo mock
-    def mock_model(prompt: str) -> str:
-        if "json" in prompt.lower():
-            return '{"nome": "João Silva", "email": "joao@email.com"}'
-        elif "capital" in prompt.lower():
-            return "Brasília"
-        else:
-            return f"Resposta para: {prompt[:30]}..."
-            
-    # Configuração
-    config = CycleConfig(
-        n_challengers=n_challengers,
-        budget_usd=budget_usd,
-        provider_id="mock",
-        dry_run=False,
-        enable_tuning=True
-    )
-    
-    # Runner temporário
-    with tempfile.TemporaryDirectory() as tmpdir:
-        runner = EvolutionRunner(
-            ledger_path=Path(tmpdir) / "evolution.db",
-            runs_dir=Path(tmpdir) / "runs",
-            seed=seed
-        )
-        
-        return runner.evolve_one_cycle(config, mock_model)
-
-
-def quick_batch_evolution(n_cycles: int = 3,
-                         n_challengers: int = 3,
-                         seed: Optional[int] = None) -> Dict[str, Any]:
-    """Executa batch rápido de evolução"""
-    
-    def mock_model(prompt: str) -> str:
-        return f"Mock response to: {prompt[:20]}..."
-        
-    config = CycleConfig(
-        n_challengers=n_challengers,
-        budget_usd=1.0,
-        dry_run=False,
-        enable_tuning=True
-    )
-    
-    with tempfile.TemporaryDirectory() as tmpdir:
-        runner = EvolutionRunner(
-            ledger_path=Path(tmpdir) / "batch.db",
-            runs_dir=Path(tmpdir) / "runs",
-            seed=seed
-        )
-        
-        batch_runner = BatchRunner(runner)
-        return batch_runner.run_batch(n_cycles, config, mock_model)
-
-
-# Exemplo de uso
+# Example usage
 if __name__ == "__main__":
-    print("🔄 Demonstração: Runners - Evolve One Cycle")
-    print("=" * 60)
-    
-    # Executar ciclo único
-    print("🚀 Executando ciclo único de evolução...")
-    cycle_result = quick_evolution_cycle(n_challengers=3, budget_usd=0.5, seed=42)
-    
-    print(f"\n✅ Ciclo {cycle_result.cycle_id[:8]}... completo:")
-    print(f"   Sucesso: {cycle_result.success}")
-    print(f"   Fase final: {cycle_result.phase.value}")
-    print(f"   Duração: {cycle_result.duration_s:.2f}s")
-    
-    if cycle_result.mutation_result:
-        print(f"   Challengers: {cycle_result.mutation_result['total']}")
+    async def demo():
+        config = EvolutionConfig(
+            n_challengers=3,
+            budget_minutes=5,
+            dry_run=True,
+            max_tasks_per_metric=2
+        )
         
-    if cycle_result.evaluation_results:
-        print(f"   Avaliações: {len(cycle_result.evaluation_results)}")
+        results = await run_evolution_cycles(2, config)
         
-    if cycle_result.gate_results:
-        gates = cycle_result.gate_results
-        print(f"   Gates: {gates['passed']} passou, {gates['failed']} falhou")
-        
-    print(f"   Promoções: {cycle_result.promotions}")
-    print(f"   Canários: {cycle_result.canaries}")
-    print(f"   Rejeições: {cycle_result.rejections}")
+        print(f"\n📊 Completed {len(results)} cycles")
+        for result in results:
+            print(f"  {result.cycle_id}: {result.decision} ({result.decision_reason})")
     
-    if cycle_result.error_message:
-        print(f"   Erro: {cycle_result.error_message}")
-        
-    print("\n" + "="*60)
-    print("✅ Runners implementados e funcionando!")
-    print("🔄 Sistema de auto-evolução completo!")
-    print("🎯 Próximo: Implementar CLI (penin evolve/promote/rollback)")
+    asyncio.run(demo())

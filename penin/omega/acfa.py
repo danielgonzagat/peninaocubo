@@ -1,748 +1,358 @@
 """
-ACFA Module - Liga Canário + Decisão de Promoção
-===============================================
+PENIN-Ω ACFA Module (Adaptive Canary/Fallback Architecture)
+===========================================================
 
-Implementa:
-- Matchmaker champion↔challenger
-- Shadow/canary traffic (fração do tráfego)
-- Decisão de promoção baseada em ΔL∞ + Score U/S/C/L + gates
-- Rollback atômico via champion pointer
-- Liga EPV (Expected Performance Value)
+Implements league-based deployment with shadow/canary/promote patterns.
+Manages champion vs challenger comparisons with automatic rollback.
 """
 
-import time
-import hashlib
 import json
-from pathlib import Path
-from typing import Dict, Any, List, Optional, Callable
-from typing_extensions import Tuple
+import time
+import asyncio
+from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
-
-try:
-    from .scoring import ScoreVerdict, score_gate
-    from .evaluators import EvaluationResult, ComprehensiveEvaluator
-    from .guards import GuardOrchestrator
-    from .ledger import WORMLedger, RunRecord, create_run_record
-except ImportError:
-    # Fallback para execução direta
-    import sys
-    sys.path.append('/workspace')
-    from penin.omega.scoring import ScoreVerdict, score_gate
-    from penin.omega.evaluators import EvaluationResult, ComprehensiveEvaluator
-    from penin.omega.guards import GuardOrchestrator
-    from penin.omega.ledger import WORMLedger, RunRecord, create_run_record
+from pathlib import Path
 
 
-class CanaryStatus(Enum):
-    """Status do teste canário"""
-    PENDING = "pending"
-    RUNNING = "running"
-    SUCCESS = "success"
-    FAILED = "failed"
-    TIMEOUT = "timeout"
-
-
-class PromotionDecision(Enum):
-    """Decisão de promoção"""
-    PROMOTE = "promote"
-    CANARY = "canary"
-    ROLLBACK = "rollback"
-    REJECT = "reject"
+class DeploymentStage(Enum):
+    """Deployment stages"""
+    SHADOW = "shadow"      # 0% traffic, metrics only
+    CANARY = "canary"      # 1-10% traffic
+    PROMOTED = "promoted"  # 100% traffic
+    ROLLED_BACK = "rolled_back"
 
 
 @dataclass
-class CanaryTest:
-    """Configuração de teste canário"""
-    challenger_id: str
-    champion_id: str
-    traffic_fraction: float  # [0,1] fração do tráfego
-    duration_s: float        # Duração do teste
-    start_time: float
-    status: CanaryStatus
-    
-    # Métricas coletadas
-    requests_sent: int = 0
-    responses_received: int = 0
-    avg_latency_ms: float = 0.0
-    error_rate: float = 0.0
-    
-    # Avaliação
-    evaluation_result: Optional[EvaluationResult] = None
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "challenger_id": self.challenger_id,
-            "champion_id": self.champion_id,
-            "traffic_fraction": self.traffic_fraction,
-            "duration_s": self.duration_s,
-            "start_time": self.start_time,
-            "status": self.status.value,
-            "metrics": {
-                "requests_sent": self.requests_sent,
-                "responses_received": self.responses_received,
-                "avg_latency_ms": self.avg_latency_ms,
-                "error_rate": self.error_rate
-            },
-            "evaluation": self.evaluation_result.to_dict() if self.evaluation_result else None
-        }
+class LeagueConfig:
+    """Configuration for league deployment"""
+    shadow_duration_s: int = 300      # 5 minutes shadow
+    canary_duration_s: int = 600      # 10 minutes canary
+    canary_traffic_pct: float = 0.05  # 5% traffic
+    delta_threshold: float = 0.02     # Min improvement for promotion
+    error_rate_threshold: float = 0.05  # Max 5% error rate
+    auto_rollback: bool = True
+    metrics_window_s: int = 60        # Metrics aggregation window
 
 
 @dataclass
-class PromotionCandidate:
-    """Candidato à promoção"""
-    run_id: str
-    config: Dict[str, Any]
-    evaluation: EvaluationResult
-    canary_test: Optional[CanaryTest] = None
-    
-    def compute_hash(self) -> str:
-        """Hash do candidato"""
-        data = {
-            "run_id": self.run_id,
-            "config": self.config,
-            "evaluation_hash": hashlib.sha256(
-                json.dumps(self.evaluation.to_dict(), sort_keys=True).encode()
-            ).hexdigest()
-        }
-        return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
+class ModelCandidate:
+    """A model candidate in the league"""
+    candidate_id: str
+    model_config: Dict[str, Any]
+    deployment_stage: DeploymentStage
+    deployed_at: float
+    metrics: Dict[str, Any]
+    traffic_fraction: float = 0.0
+    error_count: int = 0
+    request_count: int = 0
 
 
-class CanaryManager:
-    """Gerenciador de testes canário"""
+class LeagueOrchestrator:
+    """Orchestrates league-based deployment"""
     
-    def __init__(self, 
-                 default_fraction: float = 0.1,
-                 default_duration_s: float = 300):  # 5 minutos
-        self.default_fraction = default_fraction
-        self.default_duration_s = default_duration_s
-        self.active_canaries: Dict[str, CanaryTest] = {}
+    def __init__(self, config: LeagueConfig = None):
+        self.config = config or LeagueConfig()
+        self.champion: Optional[ModelCandidate] = None
+        self.challenger: Optional[ModelCandidate] = None
+        self.deployment_history: List[Dict[str, Any]] = []
         
-    def start_canary_test(self,
-                         challenger_id: str,
-                         champion_id: str,
-                         traffic_fraction: Optional[float] = None,
-                         duration_s: Optional[float] = None) -> CanaryTest:
-        """
-        Inicia teste canário
-        
-        Args:
-            challenger_id: ID do challenger
-            champion_id: ID do champion atual
-            traffic_fraction: Fração do tráfego [0,1]
-            duration_s: Duração do teste
-            
-        Returns:
-            CanaryTest configurado
-        """
-        canary = CanaryTest(
-            challenger_id=challenger_id,
-            champion_id=champion_id,
-            traffic_fraction=traffic_fraction or self.default_fraction,
-            duration_s=duration_s or self.default_duration_s,
-            start_time=time.time(),
-            status=CanaryStatus.PENDING
+    def register_champion(self, model_config: Dict[str, Any], candidate_id: str = "champion_v1") -> ModelCandidate:
+        """Register the current champion model"""
+        champion = ModelCandidate(
+            candidate_id=candidate_id,
+            model_config=model_config,
+            deployment_stage=DeploymentStage.PROMOTED,
+            deployed_at=time.time(),
+            metrics={},
+            traffic_fraction=1.0
         )
         
-        self.active_canaries[challenger_id] = canary
-        return canary
+        self.champion = champion
+        self._log_deployment_event("champion_registered", champion)
+        return champion
+    
+    def deploy_challenger(self, model_config: Dict[str, Any], candidate_id: str = None) -> ModelCandidate:
+        """Deploy a new challenger in shadow mode"""
+        if candidate_id is None:
+            candidate_id = f"challenger_{int(time.time())}"
         
-    def update_canary_metrics(self,
-                            challenger_id: str,
-                            requests_sent: int,
-                            responses_received: int,
-                            latencies: List[float],
-                            errors: int) -> bool:
-        """
-        Atualiza métricas do canário
+        challenger = ModelCandidate(
+            candidate_id=candidate_id,
+            model_config=model_config,
+            deployment_stage=DeploymentStage.SHADOW,
+            deployed_at=time.time(),
+            metrics={},
+            traffic_fraction=0.0
+        )
         
-        Returns:
-            True se canário ainda ativo
-        """
-        if challenger_id not in self.active_canaries:
+        self.challenger = challenger
+        self._log_deployment_event("challenger_deployed", challenger)
+        return challenger
+    
+    async def run_shadow_phase(self) -> bool:
+        """Run shadow deployment phase"""
+        if not self.challenger or self.challenger.deployment_stage != DeploymentStage.SHADOW:
             return False
-            
-        canary = self.active_canaries[challenger_id]
         
-        # Atualizar métricas
-        canary.requests_sent = requests_sent
-        canary.responses_received = responses_received
-        canary.avg_latency_ms = sum(latencies) / len(latencies) if latencies else 0.0
-        canary.error_rate = errors / requests_sent if requests_sent > 0 else 0.0
+        print(f"🔍 Starting shadow phase for {self.challenger.candidate_id}")
         
-        # Verificar se teste terminou
-        elapsed = time.time() - canary.start_time
-        if elapsed >= canary.duration_s:
-            canary.status = CanaryStatus.SUCCESS if canary.error_rate < 0.1 else CanaryStatus.FAILED
-            return False
-        else:
-            canary.status = CanaryStatus.RUNNING
+        # Wait for shadow duration
+        await asyncio.sleep(self.config.shadow_duration_s)
+        
+        # Collect shadow metrics (simulated)
+        shadow_metrics = await self._collect_shadow_metrics()
+        self.challenger.metrics.update(shadow_metrics)
+        
+        # Check if shadow phase passed
+        shadow_passed = self._evaluate_shadow_metrics(shadow_metrics)
+        
+        if shadow_passed:
+            print(f"✅ Shadow phase passed for {self.challenger.candidate_id}")
             return True
-            
-    def get_canary_status(self, challenger_id: str) -> Optional[CanaryTest]:
-        """Obtém status do canário"""
-        return self.active_canaries.get(challenger_id)
-        
-    def finish_canary_test(self, challenger_id: str,
-                          evaluation_result: EvaluationResult) -> Optional[CanaryTest]:
-        """
-        Finaliza teste canário com avaliação
-        
-        Args:
-            challenger_id: ID do challenger
-            evaluation_result: Resultado da avaliação
-            
-        Returns:
-            CanaryTest finalizado ou None
-        """
-        if challenger_id not in self.active_canaries:
-            return None
-            
-        canary = self.active_canaries[challenger_id]
-        canary.evaluation_result = evaluation_result
-        
-        # Determinar status final
-        if canary.status == CanaryStatus.RUNNING:
-            if canary.error_rate < 0.1 and evaluation_result.U > 0.5:
-                canary.status = CanaryStatus.SUCCESS
-            else:
-                canary.status = CanaryStatus.FAILED
-                
-        return canary
-
-
-class PromotionDecisionEngine:
-    """Engine de decisão de promoção"""
-    
-    def __init__(self,
-                 beta_min: float = 0.02,  # ΔL∞ mínimo
-                 tau_score: float = 0.7,  # Threshold Score U/S/C/L
-                 score_weights: Optional[Dict[str, float]] = None):
-        """
-        Args:
-            beta_min: ΔL∞ mínimo para promoção
-            tau_score: Threshold do Score U/S/C/L
-            score_weights: Pesos para U/S/C/L
-        """
-        self.beta_min = beta_min
-        self.tau_score = tau_score
-        
-        if score_weights is None:
-            score_weights = {"wU": 0.3, "wS": 0.3, "wC": 0.2, "wL": 0.2}
-        self.score_weights = score_weights
-        
-        self.guard_orchestrator = GuardOrchestrator()
-        
-    def evaluate_promotion(self,
-                          candidate: PromotionCandidate,
-                          champion_evaluation: EvaluationResult,
-                          canary_test: Optional[CanaryTest] = None) -> Tuple[PromotionDecision, Dict[str, Any]]:
-        """
-        Avalia se candidato deve ser promovido
-        
-        Args:
-            candidate: Candidato à promoção
-            champion_evaluation: Avaliação do champion atual
-            canary_test: Teste canário (opcional)
-            
-        Returns:
-            (decision, details)
-        """
-        details = {
-            "timestamp": time.time(),
-            "candidate_id": candidate.run_id,
-            "champion_metrics": {
-                "U": champion_evaluation.U,
-                "S": champion_evaluation.S,
-                "C": champion_evaluation.C,
-                "L": champion_evaluation.L
-            },
-            "candidate_metrics": {
-                "U": candidate.evaluation.U,
-                "S": candidate.evaluation.S,
-                "C": candidate.evaluation.C,
-                "L": candidate.evaluation.L
-            },
-            "gates_checked": [],
-            "decision_factors": {}
-        }
-        
-        # 1. Calcular ΔL∞ (assumindo L∞ como média harmônica de U,S,L com penalização C)
-        champion_linf = self._compute_linf(champion_evaluation)
-        candidate_linf = self._compute_linf(candidate.evaluation)
-        delta_linf = candidate_linf - champion_linf
-        
-        details["delta_linf"] = delta_linf
-        details["decision_factors"]["delta_linf_check"] = delta_linf >= self.beta_min
-        
-        # 2. Calcular Score U/S/C/L
-        candidate_verdict, candidate_score = score_gate(
-            candidate.evaluation.U,
-            candidate.evaluation.S,
-            candidate.evaluation.C,
-            candidate.evaluation.L,
-            **self.score_weights,
-            tau=self.tau_score
-        )
-        
-        details["candidate_score"] = candidate_score
-        details["candidate_verdict"] = candidate_verdict.value
-        details["decision_factors"]["score_gate_check"] = candidate_verdict == ScoreVerdict.PASS
-        
-        # 3. Verificar guards (Σ-Guard + IR→IC)
-        # Simular estado para guards
-        candidate_state = {
-            "consent": True,  # Assumir OK para demo
-            "eco": True,
-            "ece": 0.005,     # Simular ECE baixo
-            "bias": 1.02,     # Simular bias baixo
-            "rho": 0.8        # Simular risco contrativo
-        }
-        
-        guards_passed, violations, guard_evidence = self.guard_orchestrator.check_all_guards(
-            candidate_state
-        )
-        
-        details["guards_passed"] = guards_passed
-        details["guard_violations"] = [v.to_dict() for v in violations]
-        details["decision_factors"]["guards_check"] = guards_passed
-        
-        # 4. Verificar canário (se aplicável)
-        canary_ok = True
-        if canary_test:
-            canary_ok = (canary_test.status == CanaryStatus.SUCCESS and 
-                        canary_test.error_rate < 0.05)
-            details["canary_test"] = canary_test.to_dict()
-            details["decision_factors"]["canary_check"] = canary_ok
-            
-        # 5. Decisão final (fail-closed)
-        all_checks = [
-            details["decision_factors"]["delta_linf_check"],
-            details["decision_factors"]["score_gate_check"],
-            details["decision_factors"]["guards_check"],
-            canary_ok
-        ]
-        
-        if all(all_checks):
-            decision = PromotionDecision.PROMOTE
-            reason = "All gates passed"
-        elif candidate_verdict == ScoreVerdict.CANARY and guards_passed:
-            decision = PromotionDecision.CANARY
-            reason = "Score in canary range, guards passed"
-        elif not guards_passed:
-            decision = PromotionDecision.REJECT
-            reason = f"Guards failed: {len(violations)} violations"
-        elif delta_linf < self.beta_min:
-            decision = PromotionDecision.REJECT
-            reason = f"ΔL∞ {delta_linf:.4f} < {self.beta_min}"
         else:
-            decision = PromotionDecision.ROLLBACK
-            reason = "Score too low for promotion"
-            
-        details["decision"] = decision.value
-        details["reason"] = reason
-        details["all_checks_passed"] = all(all_checks)
-        
-        return decision, details
-        
-    def _compute_linf(self, evaluation: EvaluationResult) -> float:
-        """Computa L∞ aproximado a partir de U/S/C/L"""
-        # Usar média harmônica de U,S,L com penalização por C
-        metrics = [evaluation.U, evaluation.S, evaluation.L]
-        weights = [0.4, 0.3, 0.3]  # Pesos para U,S,L
-        
-        # Média harmônica
-        if any(m <= 0 for m in metrics):
-            base_score = 0.0
-        else:
-            denom = sum(w / m for w, m in zip(weights, metrics))
-            base_score = 1.0 / denom
-            
-        # Penalização por custo (exponencial)
-        import math
-        cost_penalty = math.exp(-0.1 * evaluation.C)
-        
-        return base_score * cost_penalty
-
-
-class LeagueManager:
-    """Gerenciador da Liga (ACFA - Adaptive Challenger-Champion Framework)"""
+            print(f"❌ Shadow phase failed for {self.challenger.candidate_id}")
+            self._rollback_challenger("shadow_failed")
+            return False
     
-    def __init__(self,
-                 ledger: WORMLedger,
-                 evaluator: ComprehensiveEvaluator,
-                 decision_engine: PromotionDecisionEngine,
-                 canary_manager: CanaryManager):
-        """
-        Args:
-            ledger: WORM ledger para persistência
-            evaluator: Avaliador U/S/C/L
-            decision_engine: Engine de decisão
-            canary_manager: Gerenciador de canários
-        """
-        self.ledger = ledger
-        self.evaluator = evaluator
-        self.decision_engine = decision_engine
-        self.canary_manager = canary_manager
-        
-        # Estado da liga
-        self.current_champion: Optional[RunRecord] = None
-        self.active_challengers: Dict[str, PromotionCandidate] = {}
-        
-    def register_champion(self, champion_record: RunRecord) -> bool:
-        """Registra champion atual"""
-        try:
-            self.current_champion = champion_record
-            success = self.ledger.set_champion(champion_record.run_id)
-            
-            if success:
-                print(f"✅ Champion registrado: {champion_record.run_id[:8]}...")
-                
-            return success
-        except Exception as e:
-            print(f"❌ Erro ao registrar champion: {e}")
+    async def run_canary_phase(self) -> bool:
+        """Run canary deployment phase"""
+        if not self.challenger or self.challenger.deployment_stage != DeploymentStage.SHADOW:
             return False
-            
-    def add_challenger(self,
-                      challenger_config: Dict[str, Any],
-                      model_func: Callable[[str], str],
-                      provider_id: str = "unknown",
-                      model_name: str = "unknown") -> Optional[PromotionCandidate]:
-        """
-        Adiciona challenger à liga
         
-        Args:
-            challenger_config: Configuração do challenger
-            model_func: Função do modelo challenger
-            provider_id: ID do provider
-            model_name: Nome do modelo
-            
-        Returns:
-            PromotionCandidate ou None se falhou
-        """
-        try:
-            # Avaliar challenger
-            evaluation = self.evaluator.evaluate_model(
-                model_func, challenger_config, provider_id, model_name
-            )
-            
-            # Criar candidato
-            run_id = f"challenger_{int(time.time())}_{hash(str(challenger_config)) % 10000:04d}"
-            
-            candidate = PromotionCandidate(
-                run_id=run_id,
-                config=challenger_config,
-                evaluation=evaluation
-            )
-            
-            self.active_challengers[run_id] = candidate
-            
-            print(f"✅ Challenger adicionado: {run_id[:8]}... "
-                  f"(U={evaluation.U:.3f}, S={evaluation.S:.3f}, C={evaluation.C:.3f}, L={evaluation.L:.3f})")
-            
-            return candidate
-            
-        except Exception as e:
-            print(f"❌ Erro ao adicionar challenger: {e}")
-            return None
-            
-    def run_promotion_cycle(self) -> Dict[str, Any]:
-        """
-        Executa ciclo de promoção para todos os challengers
+        # Promote to canary
+        self.challenger.deployment_stage = DeploymentStage.CANARY
+        self.challenger.traffic_fraction = self.config.canary_traffic_pct
         
-        Returns:
-            Dict com resultados do ciclo
-        """
-        if not self.current_champion:
-            return {"error": "No champion registered"}
-            
-        if not self.active_challengers:
-            return {"message": "No challengers to evaluate"}
-            
-        # Obter avaliação do champion (simular)
-        champion_evaluation = EvaluationResult(
-            provider_id="champion",
-            model_name="champion-model",
-            config={},
-            U=0.7, S=0.8, C=0.4, L=0.6,
-            total_tokens=1000,
-            total_cost_usd=0.05,
-            avg_latency_ms=150.0,
-            task_results=[],
-            timestamp=time.time(),
-            duration_s=1.0
-        )
+        print(f"🐤 Starting canary phase for {self.challenger.candidate_id} ({self.config.canary_traffic_pct*100:.1f}% traffic)")
         
-        results = {
-            "timestamp": time.time(),
-            "champion_id": self.current_champion.run_id,
-            "challengers_evaluated": 0,
-            "decisions": {},
-            "promotions": [],
-            "canaries": [],
-            "rejections": []
-        }
+        # Wait for canary duration
+        await asyncio.sleep(self.config.canary_duration_s)
         
-        # Avaliar cada challenger
-        for challenger_id, candidate in self.active_challengers.items():
-            try:
-                # Decisão de promoção
-                decision, decision_details = self.decision_engine.evaluate_promotion(
-                    candidate, champion_evaluation
-                )
-                
-                results["decisions"][challenger_id] = {
-                    "decision": decision.value,
-                    "details": decision_details
-                }
-                
-                # Categorizar decisão
-                if decision == PromotionDecision.PROMOTE:
-                    results["promotions"].append(challenger_id)
-                    # Promover imediatamente
-                    self._promote_challenger(candidate)
-                elif decision == PromotionDecision.CANARY:
-                    results["canaries"].append(challenger_id)
-                    # Iniciar teste canário
-                    self._start_canary_for_challenger(candidate)
-                else:
-                    results["rejections"].append(challenger_id)
-                    
-                results["challengers_evaluated"] += 1
-                
-            except Exception as e:
-                results["decisions"][challenger_id] = {
-                    "decision": "error",
-                    "error": str(e)
-                }
-                
-        # Limpar challengers processados (exceto canários)
-        for challenger_id in list(self.active_challengers.keys()):
-            if challenger_id not in results["canaries"]:
-                del self.active_challengers[challenger_id]
-                
-        return results
+        # Collect canary metrics
+        canary_metrics = await self._collect_canary_metrics()
+        self.challenger.metrics.update(canary_metrics)
         
-    def _promote_challenger(self, candidate: PromotionCandidate) -> bool:
-        """Promove challenger para champion"""
-        try:
-            # Criar record no ledger
-            record = create_run_record(
-                run_id=candidate.run_id,
-                provider_id=candidate.evaluation.provider_id,
-                metrics={
-                    "U": candidate.evaluation.U,
-                    "S": candidate.evaluation.S,
-                    "C": candidate.evaluation.C,
-                    "L": candidate.evaluation.L,
-                    "linf": self.decision_engine._compute_linf(candidate.evaluation)
-                },
-                decision_verdict="promote"
-            )
-            
-            # Artifacts
-            artifacts = {
-                "evaluation": candidate.evaluation.to_dict(),
-                "config": candidate.config,
-                "promotion_timestamp": time.time()
-            }
-            
-            # Salvar no ledger
-            hash_result = self.ledger.append_record(record, artifacts)
-            
-            # Atualizar champion pointer
-            success = self.ledger.set_champion(candidate.run_id)
-            
-            if success:
-                self.current_champion = record
-                print(f"🚀 PROMOÇÃO: {candidate.run_id[:8]}... é o novo champion!")
-                
-            return success
-            
-        except Exception as e:
-            print(f"❌ Erro na promoção: {e}")
-            return False
-            
-    def _start_canary_for_challenger(self, candidate: PromotionCandidate) -> bool:
-        """Inicia teste canário para challenger"""
-        try:
-            canary = self.canary_manager.start_canary_test(
-                candidate.run_id,
-                self.current_champion.run_id if self.current_champion else "unknown"
-            )
-            
-            candidate.canary_test = canary
-            
-            print(f"🕊️  CANÁRIO: {candidate.run_id[:8]}... iniciou teste "
-                  f"({canary.traffic_fraction*100:.1f}% tráfego, {canary.duration_s}s)")
-            
+        # Compare with champion
+        promotion_decision = self._decide_promotion(canary_metrics)
+        
+        if promotion_decision['promote']:
+            print(f"✅ Canary phase passed for {self.challenger.candidate_id}")
             return True
-            
-        except Exception as e:
-            print(f"❌ Erro ao iniciar canário: {e}")
+        else:
+            print(f"❌ Canary phase failed: {promotion_decision['reason']}")
+            self._rollback_challenger(promotion_decision['reason'])
             return False
-            
-    def rollback_to_champion(self, target_run_id: Optional[str] = None) -> bool:
-        """
-        Rollback para champion específico ou último estável
-        
-        Args:
-            target_run_id: ID específico ou None para último champion
-            
-        Returns:
-            True se rollback bem-sucedido
-        """
-        try:
-            if target_run_id:
-                # Rollback para run específico
-                target_record = self.ledger.get_record(target_run_id)
-                if not target_record:
-                    return False
-            else:
-                # Rollback para champion atual
-                target_record = self.ledger.get_champion()
-                if not target_record:
-                    return False
-                    
-            # Atualizar champion pointer
-            success = self.ledger.set_champion(target_record.run_id)
-            
-            if success:
-                self.current_champion = target_record
-                print(f"⏪ ROLLBACK: Voltou para {target_record.run_id[:8]}...")
-                
-            return success
-            
-        except Exception as e:
-            print(f"❌ Erro no rollback: {e}")
-            return False
-            
-    def get_league_status(self) -> Dict[str, Any]:
-        """Obtém status da liga"""
-        return {
-            "champion": {
-                "run_id": self.current_champion.run_id if self.current_champion else None,
-                "timestamp": self.current_champion.timestamp if self.current_champion else None
-            },
-            "active_challengers": len(self.active_challengers),
-            "active_canaries": len([c for c in self.active_challengers.values() 
-                                  if c.canary_test and c.canary_test.status == CanaryStatus.RUNNING]),
-            "decision_config": {
-                "beta_min": self.decision_engine.beta_min,
-                "tau_score": self.decision_engine.tau_score,
-                "score_weights": self.decision_engine.score_weights
-            }
-        }
-
-
-# Funções de conveniência
-def quick_canary_test(challenger_config: Dict[str, Any],
-                     champion_config: Dict[str, Any],
-                     model_func: Callable[[str], str]) -> Dict[str, Any]:
-    """Teste canário rápido"""
-    import tempfile
     
-    with tempfile.TemporaryDirectory() as tmpdir:
-        # Setup
-        ledger = WORMLedger(
-            db_path=Path(tmpdir) / "test.db",
-            runs_dir=Path(tmpdir) / "runs"
-        )
+    def promote_challenger(self) -> bool:
+        """Promote challenger to champion"""
+        if not self.challenger or self.challenger.deployment_stage != DeploymentStage.CANARY:
+            return False
         
-        evaluator = ComprehensiveEvaluator()
-        decision_engine = PromotionDecisionEngine()
-        canary_manager = CanaryManager()
+        # Archive old champion
+        if self.champion:
+            self._archive_champion()
         
-        league = LeagueManager(ledger, evaluator, decision_engine, canary_manager)
+        # Promote challenger
+        self.challenger.deployment_stage = DeploymentStage.PROMOTED
+        self.challenger.traffic_fraction = 1.0
         
-        # Registrar champion mock
-        champion_record = create_run_record(
-            run_id="champion_001",
-            provider_id="champion",
-            decision_verdict="current_champion"
-        )
-        league.register_champion(champion_record)
+        # Swap roles
+        old_challenger = self.challenger
+        self.champion = old_challenger
+        self.challenger = None
         
-        # Adicionar challenger
-        candidate = league.add_challenger(
-            challenger_config, model_func, "test-provider", "test-model"
-        )
+        print(f"🏆 Promoted {self.champion.candidate_id} to champion")
+        self._log_deployment_event("challenger_promoted", self.champion)
         
-        if not candidate:
-            return {"error": "Failed to create challenger"}
+        return True
+    
+    def _rollback_challenger(self, reason: str):
+        """Rollback challenger deployment"""
+        if self.challenger:
+            self.challenger.deployment_stage = DeploymentStage.ROLLED_BACK
+            self.challenger.traffic_fraction = 0.0
             
-        # Executar ciclo
-        cycle_result = league.run_promotion_cycle()
+            print(f"🔄 Rolled back {self.challenger.candidate_id}: {reason}")
+            self._log_deployment_event("challenger_rolled_back", self.challenger, {"reason": reason})
+            
+            self.challenger = None
+    
+    async def _collect_shadow_metrics(self) -> Dict[str, Any]:
+        """Collect metrics during shadow phase (simulated)"""
+        # Simulate metrics collection
+        await asyncio.sleep(0.1)
         
         return {
-            "league_status": league.get_league_status(),
-            "cycle_result": cycle_result,
-            "candidate_hash": candidate.compute_hash()[:8]
+            'shadow_requests': 100,
+            'shadow_errors': 2,
+            'shadow_latency_p95': 150.0,
+            'shadow_accuracy': 0.92,
+            'shadow_cost_per_request': 0.001
+        }
+    
+    async def _collect_canary_metrics(self) -> Dict[str, Any]:
+        """Collect metrics during canary phase (simulated)"""
+        await asyncio.sleep(0.1)
+        
+        return {
+            'canary_requests': 50,
+            'canary_errors': 1,
+            'canary_latency_p95': 140.0,
+            'canary_accuracy': 0.94,
+            'canary_cost_per_request': 0.0009,
+            'canary_error_rate': 0.02
+        }
+    
+    def _evaluate_shadow_metrics(self, metrics: Dict[str, Any]) -> bool:
+        """Evaluate if shadow metrics are acceptable"""
+        error_rate = metrics.get('shadow_errors', 0) / max(1, metrics.get('shadow_requests', 1))
+        
+        # Shadow passes if error rate is acceptable
+        return error_rate <= self.config.error_rate_threshold
+    
+    def _decide_promotion(self, canary_metrics: Dict[str, Any]) -> Dict[str, Any]:
+        """Decide whether to promote challenger"""
+        if not self.champion or not self.champion.metrics:
+            # No champion to compare against, promote if canary is healthy
+            error_rate = canary_metrics.get('canary_error_rate', 0)
+            if error_rate <= self.config.error_rate_threshold:
+                return {'promote': True, 'reason': 'no_champion_comparison'}
+            else:
+                return {'promote': False, 'reason': f'high_error_rate_{error_rate:.3f}'}
+        
+        # Compare challenger vs champion
+        challenger_accuracy = canary_metrics.get('canary_accuracy', 0)
+        champion_accuracy = self.champion.metrics.get('accuracy', 0)
+        
+        challenger_latency = canary_metrics.get('canary_latency_p95', 1000)
+        champion_latency = self.champion.metrics.get('latency_p95', 1000)
+        
+        challenger_cost = canary_metrics.get('canary_cost_per_request', 0.01)
+        champion_cost = self.champion.metrics.get('cost_per_request', 0.01)
+        
+        # Calculate improvement delta
+        accuracy_delta = challenger_accuracy - champion_accuracy
+        latency_improvement = (champion_latency - challenger_latency) / champion_latency
+        cost_improvement = (champion_cost - challenger_cost) / champion_cost
+        
+        # Combined improvement score
+        improvement_score = accuracy_delta + (latency_improvement * 0.3) + (cost_improvement * 0.2)
+        
+        # Check error rate
+        error_rate = canary_metrics.get('canary_error_rate', 0)
+        if error_rate > self.config.error_rate_threshold:
+            return {'promote': False, 'reason': f'high_error_rate_{error_rate:.3f}'}
+        
+        # Check improvement threshold
+        if improvement_score >= self.config.delta_threshold:
+            return {
+                'promote': True, 
+                'reason': f'improvement_{improvement_score:.3f}',
+                'details': {
+                    'accuracy_delta': accuracy_delta,
+                    'latency_improvement': latency_improvement,
+                    'cost_improvement': cost_improvement
+                }
+            }
+        else:
+            return {
+                'promote': False, 
+                'reason': f'insufficient_improvement_{improvement_score:.3f}',
+                'threshold': self.config.delta_threshold
+            }
+    
+    def _archive_champion(self):
+        """Archive current champion"""
+        if self.champion:
+            archive_entry = {
+                'candidate_id': self.champion.candidate_id,
+                'model_config': self.champion.model_config,
+                'final_metrics': self.champion.metrics,
+                'archived_at': time.time(),
+                'deployment_duration': time.time() - self.champion.deployed_at
+            }
+            
+            self.deployment_history.append(archive_entry)
+            print(f"📦 Archived champion {self.champion.candidate_id}")
+    
+    def _log_deployment_event(self, event_type: str, candidate: ModelCandidate, extra_data: Dict = None):
+        """Log deployment events"""
+        event = {
+            'timestamp': time.time(),
+            'event_type': event_type,
+            'candidate_id': candidate.candidate_id,
+            'deployment_stage': candidate.deployment_stage.value,
+            'traffic_fraction': candidate.traffic_fraction
+        }
+        
+        if extra_data:
+            event.update(extra_data)
+        
+        # In a real implementation, this would go to a proper logging system
+        print(f"📝 Event: {event_type} for {candidate.candidate_id}")
+    
+    def get_deployment_status(self) -> Dict[str, Any]:
+        """Get current deployment status"""
+        return {
+            'champion': {
+                'candidate_id': self.champion.candidate_id if self.champion else None,
+                'stage': self.champion.deployment_stage.value if self.champion else None,
+                'traffic_fraction': self.champion.traffic_fraction if self.champion else 0,
+                'metrics': self.champion.metrics if self.champion else {}
+            } if self.champion else None,
+            'challenger': {
+                'candidate_id': self.challenger.candidate_id if self.challenger else None,
+                'stage': self.challenger.deployment_stage.value if self.challenger else None,
+                'traffic_fraction': self.challenger.traffic_fraction if self.challenger else 0,
+                'metrics': self.challenger.metrics if self.challenger else {}
+            } if self.challenger else None,
+            'deployment_history_count': len(self.deployment_history)
         }
 
 
-# Exemplo de uso
+async def run_full_deployment_cycle(orchestrator: LeagueOrchestrator, 
+                                  challenger_config: Dict[str, Any]) -> bool:
+    """Run complete deployment cycle: shadow -> canary -> promote"""
+    
+    # Deploy challenger
+    challenger = orchestrator.deploy_challenger(challenger_config)
+    
+    # Run shadow phase
+    shadow_success = await orchestrator.run_shadow_phase()
+    if not shadow_success:
+        return False
+    
+    # Run canary phase
+    canary_success = await orchestrator.run_canary_phase()
+    if not canary_success:
+        return False
+    
+    # Promote to champion
+    promotion_success = orchestrator.promote_challenger()
+    return promotion_success
+
+
+# Example usage
 if __name__ == "__main__":
-    print("🏆 Demonstração: ACFA - Liga Canário + Promoção")
-    print("=" * 60)
-    
-    # Modelo mock
-    def mock_model(prompt: str) -> str:
-        if "json" in prompt.lower():
-            return '{"nome": "João Silva", "email": "joao@email.com", "telefone": "(11) 99999-9999"}'
-        elif "capital" in prompt.lower():
-            return "Brasília"
-        elif "resumo" in prompt.lower():
-            return "IA transforma economia com investimentos, mas gera preocupações."
-        else:
-            return f"Resposta para: {prompt[:30]}..."
-            
-    # Configurações
-    champion_config = {
-        "temperature": 0.7,
-        "max_tokens": 1000,
-        "provider": "champion"
-    }
-    
-    challenger_config = {
-        "temperature": 0.8,  # Diferente do champion
-        "max_tokens": 1200,  # Mais tokens
-        "provider": "challenger"
-    }
-    
-    print("Champion config:", champion_config)
-    print("Challenger config:", challenger_config)
-    print()
-    
-    # Executar teste
-    result = quick_canary_test(challenger_config, champion_config, mock_model)
-    
-    if "error" in result:
-        print(f"❌ Erro: {result['error']}")
-    else:
-        print("✅ Liga ACFA executada:")
+    async def demo():
+        # Create orchestrator
+        config = LeagueConfig(
+            shadow_duration_s=5,    # Short for demo
+            canary_duration_s=5,
+            canary_traffic_pct=0.1
+        )
+        orchestrator = LeagueOrchestrator(config)
         
-        league_status = result["league_status"]
-        print(f"   Champion: {league_status['champion']['run_id']}")
-        print(f"   Challengers ativos: {league_status['active_challengers']}")
-        print(f"   Canários ativos: {league_status['active_canaries']}")
+        # Register champion
+        champion_config = {"model": "gpt-4", "temperature": 0.7}
+        orchestrator.register_champion(champion_config)
         
-        cycle_result = result["cycle_result"]
-        print(f"   Challengers avaliados: {cycle_result['challengers_evaluated']}")
-        print(f"   Promoções: {len(cycle_result['promotions'])}")
-        print(f"   Canários: {len(cycle_result['canaries'])}")
-        print(f"   Rejeições: {len(cycle_result['rejections'])}")
+        # Deploy and test challenger
+        challenger_config = {"model": "gpt-4", "temperature": 0.5}
+        success = await run_full_deployment_cycle(orchestrator, challenger_config)
         
-        # Mostrar decisões
-        for challenger_id, decision_info in cycle_result["decisions"].items():
-            decision = decision_info["decision"]
-            print(f"   {challenger_id[:8]}...: {decision}")
-            if "details" in decision_info:
-                details = decision_info["details"]
-                if "reason" in details:
-                    print(f"      Motivo: {details['reason']}")
-                if "delta_linf" in details:
-                    print(f"      ΔL∞: {details['delta_linf']:.4f}")
-                    
-    print("\n✅ ACFA implementado e funcionando!")
-    print("🔄 Próximo: Implementar auto-tuning AdaGrad")
+        print(f"Deployment cycle completed: {'SUCCESS' if success else 'FAILED'}")
+        print("Final status:", orchestrator.get_deployment_status())
+    
+    asyncio.run(demo())
