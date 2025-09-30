@@ -437,6 +437,7 @@ class ObservabilityConfig:
     """Configuration for observability"""
     enable_metrics: bool = True
     metrics_port: int = 8000
+    metrics_bind_host: str = "127.0.0.1"  # Default to localhost for security
     metrics_auth_token: Optional[str] = None  # Bearer token for /metrics endpoint
     enable_json_logs: bool = True
     log_file: Optional[Path] = None

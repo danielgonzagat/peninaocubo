@@ -12,93 +12,6 @@ from penin.providers.base import BaseProvider, LLMResponse
 
 
 class MultiLLMRouter:
-    def __init__(self, providers: List[BaseProvider], 
-                 daily_budget_usd: float = 100.0,
-                 cost_weight: float = 0.3):
-        self.providers = providers[: settings.PENIN_MAX_PARALLEL_PROVIDERS]
-        self.daily_budget_usd = daily_budget_usd
-        self.cost_weight = cost_weight
-        self.usage_file = Path.home() / ".penin_omega" / "router_usage.json"
-        self.usage_file.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Load today's usage
-        self.daily_usage = self._load_daily_usage()
-
-    def _load_daily_usage(self) -> Dict[str, float]:
-        """Load today's usage from file"""
-        today = date.today().isoformat()
-        
-        if not self.usage_file.exists():
-            return {today: 0.0}
-            
-        try:
-            with open(self.usage_file, 'r') as f:
-                all_usage = json.load(f)
-            return {today: all_usage.get(today, 0.0)}
-        except Exception:
-            return {today: 0.0}
-            
-    def _save_daily_usage(self):
-        """Save usage to file"""
-        try:
-            # Load existing data
-            all_usage = {}
-            if self.usage_file.exists():
-                with open(self.usage_file, 'r') as f:
-                    all_usage = json.load(f)
-                    
-            # Update with current usage
-            all_usage.update(self.daily_usage)
-            
-            # Keep only last 30 days
-            cutoff = (datetime.now().date() - timedelta(days=30)).isoformat()
-            all_usage = {k: v for k, v in all_usage.items() if k >= cutoff}
-            
-            # Save
-            with open(self.usage_file, 'w') as f:
-                json.dump(all_usage, f, indent=2)
-        except Exception as e:
-            print(f"Warning: Could not save usage data: {e}")
-            
-    def _get_today_usage(self) -> float:
-        """Get today's total usage in USD"""
-        today = date.today().isoformat()
-        return self.daily_usage.get(today, 0.0)
-        
-    def _add_usage(self, cost_usd: float):
-        """Add usage for today"""
-        today = date.today().isoformat()
-        self.daily_usage[today] = self.daily_usage.get(today, 0.0) + cost_usd
-        self._save_daily_usage()
-        
-    def _check_budget(self, estimated_cost: float) -> bool:
-        """Check if request fits within daily budget"""
-        current_usage = self._get_today_usage()
-        return (current_usage + estimated_cost) <= self.daily_budget_usd
-
-    def __init__(self, daily_budget: float):
-        self.daily_budget = daily_budget
-        self.daily_spent = 0.0
-        self.reset_time = time.time()
-
-    def add_cost(self, cost: float):
-        """Add cost and reset daily counter if needed"""
-        current_time = time.time()
-        if current_time - self.reset_time > DAY_SECONDS:  # 24 hours
-            self.daily_spent = 0.0
-            self.reset_time = current_time
-        self.daily_spent += cost
-
-    def is_over_budget(self) -> bool:
-        """Check if over daily budget"""
-        return self.daily_spent >= self.daily_budget
-
-    def remaining_budget(self) -> float:
-        """Get remaining budget for today"""
-        return max(0, self.daily_budget - self.daily_spent)
-
-
-class MultiLLMRouter:
     """
     Multi-LLM router with cost-aware selection and budget tracking.
     
@@ -133,6 +46,30 @@ class MultiLLMRouter:
             self._total_tokens = 0
             self._request_count = 0
             self._last_reset = today
+    
+    def _get_today_usage(self) -> float:
+        """Get today's total usage in USD"""
+        self._reset_daily_budget_if_needed()
+        return self._daily_spend
+    
+    def _add_usage(self, cost_usd: float, tokens: int = 0):
+        """Add usage for today"""
+        self._reset_daily_budget_if_needed()
+        self._daily_spend += cost_usd
+        self._total_tokens += tokens
+        self._request_count += 1
+    
+    def get_usage_stats(self) -> Dict[str, Any]:
+        """Get current usage statistics"""
+        self._reset_daily_budget_if_needed()
+        return {
+            "daily_spend_usd": self._daily_spend,
+            "budget_remaining_usd": max(0, self.daily_budget_usd - self._daily_spend),
+            "budget_used_pct": (self._daily_spend / self.daily_budget_usd) * 100,
+            "total_tokens": self._total_tokens,
+            "request_count": self._request_count,
+            "avg_cost_per_request": self._daily_spend / max(1, self._request_count),
+        }
     
     def _score(self, r: LLMResponse) -> float:
         """Score response considering content, latency, and cost"""

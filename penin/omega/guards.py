@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 # Import do módulo de métricas éticas
-from .ethics_metrics import EthicsMetricsCalculator, calculate_and_validate_ethics
+from .ethics_metrics import EthicsCalculator, EthicsMetrics
 
 
 class GuardResult(Enum):
@@ -74,7 +74,7 @@ class SigmaGuard:
         self.rho_bias_max = rho_bias_max
         self.require_consent = require_consent
         self.require_eco = require_eco
-        self.ethics_calc = EthicsMetricsCalculator()
+        self.ethics_calc = EthicsCalculator()
         
     def check(self, 
               state_dict: Dict[str, Any],
