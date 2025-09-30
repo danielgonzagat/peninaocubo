@@ -134,9 +134,10 @@ class EthicsCalculator:
             # Find predictions in this bin
             in_bin_preds = []
             in_bin_targets = []
-            
             for pred, target in zip(predictions, targets):
-                if bin_lower < pred <= bin_upper:
+                if (i == 0 and pred <= bin_upper) or (i > 0 and bin_lower < pred <= bin_upper):
+                    in_bin_preds.append(pred)
+                    in_bin_targets.append(target)
                     in_bin_preds.append(pred)
                     in_bin_targets.append(target)
             
