@@ -1,0 +1,170 @@
+chore(v8): packaging + deps dedup + fix(caos/router) + cache L2 HMAC + tooling
+
+BREAKING CHANGE: Cache L2 agora usa orjson+HMAC, dados antigos incompatíveis
+
+Upgrade completo v7.1 → v8.0 do sistema PENIN-Ω com correções P0.5,
+empacotamento profissional e melhorias de segurança.
+
+## Correções P0.5
+
+### fix(caos): remover duplicidades de definição
+- Remove segunda definição de `phi_caos` (linhas 17-29)
+- Remove `__init__` duplicado em `CAOSComponents`
+- Mantém única implementação com docstring completa
+- Adiciona `tests/test_caos_unique.py` para garantir unicidade
+
+### refactor(router): consolidar tracker de orçamento
+- Remove bloco órfão com tracker duplicado
+- Consolida em `_daily_spend`, `_last_reset`, `_total_tokens`, `_request_count`
+- Corrige `reset_daily_budget()` para resetar variáveis corretas
+- Adiciona `tests/test_router_syntax.py` para validar tracking
+
+### feat(cache): substituir pickle por orjson+HMAC
+- Implementa `_serialize()` com orjson + HMAC-SHA256
+- Implementa `_deserialize()` com verificação de integridade
+- Levanta `ValueError` em caso de HMAC mismatch (anti-tamper)
+- Chave configurável via `PENIN_CACHE_HMAC_KEY` (env)
+- Fallback para `json` se orjson indisponível
+- Adiciona `tests/test_cache_hmac.py` para validação
+
+## Empacotamento
+
+### chore(build): configurar pacote Python completo
+- Adiciona `[build-system]` com setuptools>=68
+- Adiciona `[project]` com metadados completos
+- Define entry-point CLI: `penin = "penin.cli:main"`
+- Configura `[project.optional-dependencies]`: full, dev, docs
+- Mantém configurações de ferramentas (black, ruff)
+
+### chore(deps): deduplicar requirements.txt
+- Remove 8 entradas duplicadas:
+  * openai, anthropic, mistralai, google-genai
+  * xai-sdk, huggingface_hub, kaggle, pydantic-settings
+- Organiza em seções: Core, Observability, Providers, ML, Dev, Docs
+- Alinha versões mínimas
+- Adiciona orjson>=3.9.0 para cache L2
+- Instrui geração de lockfile (pip-compile ou uv)
+
+## Tooling e Segurança
+
+### chore(security): adicionar tooling de dev e CI
+- `.env.example`: template para variáveis de ambiente
+- `.gitignore`: atualizado e expandido (Python, venvs, IDEs, PENIN)
+- `.pre-commit-config.yaml`: ruff, black, mypy, trailing-whitespace, detect-private-key
+- `.github/workflows/security.yml`: gitleaks, safety, bandit
+
+## Documentação
+
+### docs: adicionar LICENSE e CHANGELOG
+- `LICENSE`: Apache License 2.0
+- `CHANGELOG.md`: Keep a Changelog + SemVer
+  * Documenta v0.8.0 (este upgrade)
+  * Seções: Added, Changed, Fixed, Security
+  * Links para releases
+
+## Testes
+
+Novos módulos de teste (11 casos):
+- `tests/test_caos_unique.py`: unicidade, funcionalidade, componentes
+- `tests/test_router_syntax.py`: instanciação, budget tracking, limites
+- `tests/test_cache_hmac.py`: serialização, HMAC mismatch, validação
+
+## Arquivos Modificados
+
+- pyproject.toml (completo)
+- requirements.txt (deduplicado)
+- penin/omega/caos.py (sem duplicidades)
+- penin/router.py (tracker consolidado)
+- 1_de_8 (cache com HMAC)
+- .gitignore (atualizado)
+
+## Arquivos Criados
+
+- .env.example
+- .pre-commit-config.yaml
+- .github/workflows/security.yml
+- LICENSE
+- CHANGELOG.md
+- VALIDATION_REPORT_V8.md
+- SUMARIO_EXECUTIVO_V8.md
+- UPGRADE_COMMANDS_V8.sh
+- tests/test_caos_unique.py
+- tests/test_router_syntax.py
+- tests/test_cache_hmac.py
+
+## Impacto
+
+### Segurança
+- ✅ Cache L2 com verificação de integridade (HMAC-SHA256)
+- ✅ Gitleaks para scan de segredos no CI
+- ✅ Bandit e Safety para análise de código/deps
+- ✅ Pre-commit hooks previnem commits inseguros
+
+### Qualidade
+- ✅ Zero duplicidades de código
+- ✅ Zero dependências duplicadas
+- ✅ Empacotamento profissional
+- ✅ CLI configurado (`penin`)
+
+### Manutenibilidade
+- ✅ Documentação completa (LICENSE, CHANGELOG, reports)
+- ✅ Testes adicionais (cobertura melhorada)
+- ✅ Tooling automatizado (pre-commit)
+
+## Riscos e Rollback
+
+### Riscos Identificados
+- **Cache L2**: dados antigos incompatíveis (requer nova serialização)
+  * Mitigação: limpar cache L2 ou setar `PENIN_CACHE_HMAC_KEY`
+- **Router**: possível regressão em tracking de orçamento
+  * Mitigação: testes cobrem cenários principais
+- **Imports**: possíveis quebras se `sys.path` usado em outros locais
+  * Mitigação: instalar como pacote (`pip install -e .`)
+
+### Rollback
+```bash
+git revert HEAD  # ou
+git reset --hard v7.1  # se v7.1 tagged
+```
+
+## Próximos Passos (P1)
+
+- [ ] Remover hacks de import (`sys.path`)
+- [ ] Testes de concorrência (WORM, League, Router)
+- [ ] Testes de falhas de rede (timeouts, rate-limits)
+- [ ] Redação de logs (máscaras de segredos)
+- [ ] Calibração ética (thresholds ECE/ρ-bias)
+
+## Como Testar
+
+```bash
+# Instalar
+pip install -e ".[dev,full]"
+pre-commit install
+
+# Testes
+pytest tests/test_caos_unique.py -v
+pytest tests/test_router_syntax.py -v
+pytest tests/test_cache_hmac.py -v
+
+# Linters
+ruff check . --fix
+black .
+pre-commit run --all-files
+
+# CLI
+penin --help
+```
+
+## Referências
+
+- Auditoria P0.5: auditoria completa do sistema v7.1
+- Keep a Changelog: https://keepachangelog.com/
+- SemVer: https://semver.org/
+- VALIDATION_REPORT_V8.md: relatório técnico detalhado
+- SUMARIO_EXECUTIVO_V8.md: resumo executivo
+
+---
+
+Co-authored-by: Background Agent <agent@cursor.sh>
+Refs: #upgrade-v8 #p0.5 #security #packaging
