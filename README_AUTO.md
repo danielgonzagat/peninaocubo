@@ -1,6 +1,6 @@
 # PENIN-Ω Vida+ — Auto-Generated Documentation
 
-_Generated: 2025-09-30T15:16:28.315928Z_
+_Generated: 2025-09-30T15:22:30.259199Z_
 
 ## 🧬 System Evolution Status
 
@@ -16,9 +16,9 @@ The PENIN-Ω system has successfully evolved from v7 through v8 to the current *
 
 ### Module Statistics
 
-- Total Omega modules: **26**
+- Total Omega modules: **27**
 - Vida+ specific modules: **13/13**
-- Test files: **10**
+- Test files: **11**
 - Configuration files: **2**
 
 ## 📦 Vida+ Modules Implemented
@@ -138,6 +138,8 @@ uvicorn penin.meta.omega_meta_service:app --port 8010
 ## 🔄 Recent Git History
 
 ```
+94e0c83 feat(integration): complete Vida+ runner with all modules integrated
+ac67d7c test(all): unit+integration passing; canary logs
 7364f98 feat(caos): add CAOS-KRATOS exploration mode
 b937a69 feat(swarm): heartbeat + global aggregator G
 18aed0b feat(fractal): add fractal DSL and propagation engine
@@ -146,8 +148,6 @@ eacae22 squash(PR #69): standard conflict policy
 524ac43 squash(PR #68): standard conflict policy
 0d220ed squash(PR #66): standard conflict policy
 bbd9d22 merge(PR #67): resolve conflicts (router/scoring/caos/ledger=OURS; ethics_metrics=THEIRS; .env union)
-b97f847 Aggregate provider costs in router usage tracking
-0e918a6 Refactor: Upgrade to v8.0 with packaging, security, and testing improvements
 ```
 
 ## 🎯 Next Steps (Roadmap)
