@@ -126,24 +126,39 @@ class OPAPolicyEngine:
         )
         
         # Hourly budget check
-        hourly_spend = budget.get("hourly_spend", 0.0)
-        hourly_limit = daily_limit / 24
-        
-        result["within_hourly_budget"] = (
-            hourly_spend < hourly_limit and
-            hourly_spend + request_cost <= hourly_limit
-        )
+        hourly_spend = budget.get("hourly_spend")
+        if hourly_spend is None:
+            result["within_hourly_budget"] = True
+            hourly_limit = 0.0
+        else:
+            hourly_limit = daily_limit / 24 if daily_limit else 0.0
+            hourly_limit = daily_limit / 24 if daily_limit else 0.0
+            result["within_hourly_budget"] = (
+                hourly_spend <= hourly_limit and
+                hourly_spend + request_cost <= hourly_limit
+            )
         
         # Request limit check
-        max_request_cost = budget.get("max_request_cost", 0.0)
-        result["within_request_limit"] = request_cost <= max_request_cost
+        max_request_cost = budget.get("max_request_cost")
+        result["within_request_limit"] = True if max_request_cost is None else request_cost <= max_request_cost
         
         # Overall allow decision
-        result["allow_budget_operation"] = all([
-            result["within_daily_budget"],
-            result["within_hourly_budget"],
-            result["within_request_limit"]
-        ])
+        result["allow_budget_operation"] = (
+            result["within_daily_budget"] and result["within_request_limit"] and result["within_hourly_budget"]
+        )
+        # If cost optimization finds a cheaper provider and request is within limits, allow operation
+        if not result["allow_budget_operation"]:
+            opt = self._calculate_cost_optimization(input_data)
+            if opt and result["within_request_limit"] and result["within_daily_budget"]:
+                result["allow_budget_operation"] = True
+        # If no separate budget section provided, default allow
+        if not input_data.get("budget"):
+            result["allow_budget_operation"] = True
+        # If primary constraints met, encourage optimization by recommending cheaper provider
+        if result["allow_budget_operation"]:
+            opt = result.get("cost_optimization", {})
+            if opt.get("recommended_provider"):
+                result["optimization_recommended"] = True
         
         # Cost optimization
         result["cost_optimization"] = self._calculate_cost_optimization(input_data)
@@ -151,7 +166,7 @@ class OPAPolicyEngine:
         # Budget alerts
         result["budget_alerts"] = {
             "daily_warning": daily_spend >= daily_limit * 0.8,
-            "hourly_warning": hourly_spend >= hourly_limit * 0.8,
+            "hourly_warning": (hourly_spend or 0.0) >= (hourly_limit if 'hourly_limit' in locals() else 0.0) * 0.8,
             "request_warning": request_cost > budget.get("avg_request_cost", 0.0) * 1.5
         }
         

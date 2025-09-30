@@ -365,11 +365,13 @@ class MetricsCollector:
 class MetricsServer:
     """Simple HTTP server for Prometheus metrics with basic auth"""
     
-    def __init__(self, collector: MetricsCollector, port: int = 8000, bind_host: str = "127.0.0.1", auth_token: Optional[str] = None):
+    def __init__(self, collector: MetricsCollector, port: int = 8000, bind_host: str = "127.0.0.1", auth_token: Optional[str] = None, host: Optional[str] = None):
         self.collector = collector
         self.port = port
-        # Expose bind_host attribute for tests and for clarity
-        self.bind_host = bind_host
+        # Support legacy parameter name 'host' as an alias for bind_host (used in some tests)
+        self.bind_host = host if host is not None else bind_host
+        # Back-compat attribute expected by some tests
+        self.host = self.bind_host
         self.auth_token = auth_token
         self.server = None
         self.thread = None

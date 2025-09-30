@@ -584,6 +584,14 @@ def validate_sr_non_compensatory(awareness: float, ethics: float,
     return engine.analyze_non_compensatory(components)
 
 
+def sr_omega(awareness: float, ethics_ok: bool, autocorr: float, metacognition: float) -> float:
+    """Compatibility helper expected by some tests."""
+    engine = SROmegaEngine(method=SRAggregationMethod.HARMONIC)
+    comps = SRComponents(awareness, 1.0 if ethics_ok else 0.001, autocorr, metacognition)
+    score, _ = engine.compute_sr(comps)
+    return score
+
+
 def compute_sr_omega(awareness: float, ethics: float, autocorrection: float, metacognition: float,
                     method: str = 'harmonic', config: 'SRConfig' = None) -> Tuple[float, Dict[str, Any]]:
     """

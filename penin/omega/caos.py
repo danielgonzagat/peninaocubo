@@ -203,8 +203,8 @@ class CAOSPlusEngine:
         return phi, details
 
 
-def caos_plus(C: float, A: float, O: float, S: float, 
-              kappa: float = 0.1, gamma: float = 0.5, kappa_max: float = 1.0) -> Dict[str, Any]:
+def caos_plus(C: float | None = None, A: float | None = None, O: float | None = None, S: float | None = None, 
+              kappa: float = 0.1, gamma: float = 0.5, kappa_max: float = 1.0, **kwargs) -> Dict[str, Any]:
     """
     Computa CAOS⁺ com saturação log-space
     
@@ -220,7 +220,10 @@ def caos_plus(C: float, A: float, O: float, S: float,
     Returns:
         Dict com phi, components e detalhes
     """
-    phi = phi_caos(C, A, O, S, kappa, gamma)
+    # Accept alternative keyword names (coherence, awareness, openness, stability)
+    if C is None and "coherence" in kwargs:
+        C = kwargs["coherence"]
+    if A is None and "awareness" in kwargs:
     
     return {
         "phi": phi,
