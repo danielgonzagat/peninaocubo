@@ -124,7 +124,8 @@ class CAOSConfig:
     kappa_max: float = 10.0       # <- teste espera 10.0
     exploration_factor: float = 2.0
     ema_beta: float = 0.9
-    use_log_space: bool = False         # para EMA do tracker
+    use_log_space: bool = False
+    saturation_method: str = "tanh"         # para EMA do tracker
 
 
 class CAOSTracker:
