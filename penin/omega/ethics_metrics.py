@@ -175,9 +175,17 @@ class EthicsMetricsCalculator:
         ρ_bias = max_group(positive_rate_group / positive_rate_overall)
         
         Returns:
-            (rho_bias, evidence_hash)
-        """
         if len(predictions) != len(protected_groups) or len(predictions) != len(labels):
+            # Fail-closed
+            return 10.0, hashlib.sha256(b"length_mismatch").hexdigest()
+        
+        if len(predictions) < 10:
+            return 10.0, hashlib.sha256(b"insufficient_data").hexdigest()
+        
+        # Compute overall positive rate with safety check
+        overall_pos_rate = sum(predictions) / len(predictions)
+        if overall_pos_rate < 1e-6:
+            overall_pos_rate = 1e-6  # Avoid division by zero
             # Fail-closed
             return 10.0, hashlib.sha256(b"length_mismatch").hexdigest()
         
