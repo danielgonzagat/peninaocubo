@@ -347,12 +347,13 @@ class MetricsCollector:
 # Metrics Server
 # -----------------------------------------------------------------------------
 class MetricsServer:
-    """Simple HTTP server for Prometheus metrics"""
+    """Simple HTTP server for Prometheus metrics with basic auth"""
     
-    def __init__(self, collector: MetricsCollector, port: int = 8000, bind_host: str = "127.0.0.1"):
+    def __init__(self, collector: MetricsCollector, port: int = 8000, 
+                 auth_token: Optional[str] = None):
         self.collector = collector
         self.port = port
-        self.bind_host = bind_host  # P0-2: Security - bind to localhost by default
+        self.auth_token = auth_token
         self.server = None
         self.thread = None
     
@@ -366,10 +367,33 @@ class MetricsServer:
         class MetricsHandler(BaseHTTPRequestHandler):
             def do_GET(handler_self):
                 if handler_self.path == '/metrics':
+                    # Check authentication if token is set
+                    if self.auth_token:
+                        auth_header = handler_self.headers.get('Authorization', '')
+                        if not auth_header.startswith('Bearer '):
+                            handler_self.send_response(401)
+                            handler_self.send_header('WWW-Authenticate', 'Bearer')
+                            handler_self.end_headers()
+                            handler_self.wfile.write(b'Authentication required')
+                            return
+                        
+                        token = auth_header[7:]  # Remove 'Bearer '
+                        if token != self.auth_token:
+                            handler_self.send_response(403)
+                            handler_self.end_headers()
+                            handler_self.wfile.write(b'Invalid token')
+                            return
+                    
                     handler_self.send_response(200)
                     handler_self.send_header('Content-Type', CONTENT_TYPE_LATEST)
                     handler_self.end_headers()
                     handler_self.wfile.write(self.collector.get_metrics())
+                elif handler_self.path == '/health':
+                    # Health check endpoint (no auth required)
+                    handler_self.send_response(200)
+                    handler_self.send_header('Content-Type', 'application/json')
+                    handler_self.end_headers()
+                    handler_self.wfile.write(b'{"status": "healthy"}')
                 else:
                     handler_self.send_response(404)
                     handler_self.end_headers()
@@ -377,8 +401,7 @@ class MetricsServer:
             def log_message(self, format, *args):
                 pass  # Suppress request logs
         
-        # P0-2: Bind to specific host (default 127.0.0.1 for security)
-        self.server = HTTPServer((self.bind_host, self.port), MetricsHandler)
+        self.server = HTTPServer(('127.0.0.1', self.port), MetricsHandler)
         self.thread = threading.Thread(target=self.server.serve_forever)
         self.thread.daemon = True
         self.thread.start()
@@ -398,7 +421,7 @@ class ObservabilityConfig:
     """Configuration for observability"""
     enable_metrics: bool = True
     metrics_port: int = 8000
-    metrics_bind_host: str = "127.0.0.1"  # P0-2: Secure default (localhost only)
+    metrics_auth_token: Optional[str] = None  # Bearer token for /metrics endpoint
     enable_json_logs: bool = True
     log_file: Optional[Path] = None
     log_level: str = "INFO"
@@ -424,7 +447,7 @@ class ObservabilityManager:
             self.metrics_server = MetricsServer(
                 self.metrics,
                 port=self.config.metrics_port,
-                bind_host=self.config.metrics_bind_host  # P0-2: Pass secure bind host
+                auth_token=self.config.metrics_auth_token
             )
     
     def start(self):
@@ -497,9 +520,11 @@ def integrate_observability(core_instance):
         obs = integrate_observability(core)
         obs.start()
     """
+    import os
     obs_config = ObservabilityConfig(
         enable_metrics=True,
         metrics_port=8000,
+        metrics_auth_token=os.getenv("PENIN_METRICS_TOKEN"),  # Set via env var
         enable_json_logs=True,
         log_file=Path("/opt/penin_omega/logs/penin_structured.log")
     )

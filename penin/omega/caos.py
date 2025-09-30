@@ -1,280 +1,337 @@
 """
-CAOS⁺ Module
-============
+CAOS⁺ Engine - Estável com Log-Space + Tanh
+===========================================
 
-Implements φ(CAOS⁺) with stable computation using log-space and tanh saturation.
-
-CAOS⁺ = (1 + κ·C·A)^(O·S)
-
-Where:
-- C: Coherence [0,1]
-- A: Awareness [0,1]
-- O: Openness to the unknown [0,1]
-- S: Silence/listening [0,1]
-- κ: Amplification factor [1, κ_max]
-- φ: Saturation function (tanh)
-
-All computations use log-space for numerical stability.
+Implementa φ(CAOS⁺) com:
+- Log-space para evitar overflow: log_caos = (O*S) * log(1 + κ*C*A)
+- Saturação tanh: φ = tanh(γ * log_caos)
+- Clamps para C,A,O,S ∈ [0,1] e κ ≤ κ_max
+- Monotonicidade e estabilidade numérica
 """
 
 import math
+from typing import Dict, Any, Optional
+from typing_extensions import Tuple
 from dataclasses import dataclass
 
 
 @dataclass
-class CAOSConfig:
-    """Configuration for CAOS⁺ computation"""
-
-    kappa: float = 2.0  # Amplification factor
-    kappa_max: float = 10.0  # Maximum κ
-    gamma: float = 0.5  # Saturation steepness
-    epsilon: float = 1e-8  # Numerical stability
-    use_log_space: bool = True  # Use log-space computation
-    clamp_inputs: bool = True  # Clamp inputs to [0,1]
-
-
-def compute_caos_plus(
-    C: float, A: float, O: float, S: float, kappa: float, config: CAOSConfig | None = None
-) -> tuple[float, dict]:
-    """
-    Compute CAOS⁺ with numerical stability.
-
-    Args:
-        C: Coherence [0,1]
-        A: Awareness [0,1]
-        O: Openness [0,1]
-        S: Silence [0,1]
-        kappa: Amplification factor
-        config: Optional configuration
-
-    Returns:
-        Tuple of (caos_plus_value, details_dict)
-    """
-    if config is None:
-        config = CAOSConfig()
-
-    # Clamp inputs if configured
-    if config.clamp_inputs:
-        C = max(0.0, min(1.0, C))
-        A = max(0.0, min(1.0, A))
-        O = max(0.0, min(1.0, O))
-        S = max(0.0, min(1.0, S))
-        kappa = max(1.0, min(config.kappa_max, kappa))
-
-    details = {
-        "C": C,
-        "A": A,
-        "O": O,
-        "S": S,
-        "kappa": kappa,
-        "method": "log_space" if config.use_log_space else "direct",
-    }
-
-    # Compute base term
-    base = 1.0 + kappa * C * A
-    exponent = O * S
-
-    # Prevent edge cases
-    if base <= 0:
-        base = config.epsilon
-    exponent = max(exponent, 0)
-
-    # Compute CAOS⁺
-    if config.use_log_space:
-        # Log-space computation for stability
-        try:
-            log_caos = exponent * math.log(base)
-            # Prevent overflow
-            log_caos = min(log_caos, 100)  # exp(100) is huge enough
-            caos_raw = math.exp(log_caos)
-        except (ValueError, OverflowError):
-            caos_raw = 1.0
-            details["computation_error"] = True
-    else:
-        # Direct computation
-        try:
-            caos_raw = base**exponent
-        except (ValueError, OverflowError):
-            caos_raw = 1.0
-            details["computation_error"] = True
-
-    details["caos_raw"] = caos_raw
-
-    # Apply saturation function φ
-    phi_caos = apply_saturation(caos_raw, config.gamma)
-
-    details["phi_caos"] = phi_caos
-    details["gamma"] = config.gamma
-
-    return phi_caos, details
-
-
-def apply_saturation(value: float, gamma: float = 0.5) -> float:
-    """
-    Apply tanh saturation function.
-
-    φ(x) = tanh(γ * log(x))
-
-    Args:
-        value: Input value
-        gamma: Saturation steepness
-
-    Returns:
-        Saturated value in [0,1)
-    """
-    if value <= 0:
-        return 0.0
-
-    try:
-        # Use log for better scaling
-        log_val = math.log(value)
-        # Apply tanh with gamma scaling
-        saturated = math.tanh(gamma * log_val)
-        # Ensure positive output
-        return max(0.0, saturated)
-    except (ValueError, OverflowError):
-        # Fallback for edge cases
-        return min(0.999, value / (1.0 + value))
-
-
-def compute_caos_harmony(C: float, A: float, O: float, S: float, epsilon: float = 1e-8) -> float:
-    """
-    Compute CAOS harmony using harmonic mean.
-
-    Non-compensatory aggregation of CAOS components.
-
-    Args:
-        C, A, O, S: CAOS components [0,1]
-        epsilon: Small value for stability
-
-    Returns:
-        Harmonic mean of CAOS components
-    """
-    # Ensure all values are positive
-    values = [max(epsilon, v) for v in [C, A, O, S]]
-
-    # Harmonic mean
-    denominator = sum(1.0 / v for v in values)
-    if denominator < epsilon:
-        return epsilon
-
-    return 4.0 / denominator
-
-
-def caos_gradient(C: float, A: float, O: float, S: float, kappa: float, delta: float = 0.001) -> dict[str, float]:
-    """
-    Compute numerical gradient of CAOS⁺ with respect to each component.
-
-    Useful for understanding sensitivity and tuning.
-
-    Args:
-        C, A, O, S, kappa: CAOS parameters
-        delta: Small perturbation for numerical gradient
-
-    Returns:
-        Dict with gradients for each component
-    """
-    base_caos, _ = compute_caos_plus(C, A, O, S, kappa)
-
-    gradients = {}
-
-    # Gradient w.r.t C
-    caos_c_plus, _ = compute_caos_plus(C + delta, A, O, S, kappa)
-    gradients["dC"] = (caos_c_plus - base_caos) / delta
-
-    # Gradient w.r.t A
-    caos_a_plus, _ = compute_caos_plus(C, A + delta, O, S, kappa)
-    gradients["dA"] = (caos_a_plus - base_caos) / delta
-
-    # Gradient w.r.t O
-    caos_o_plus, _ = compute_caos_plus(C, A, O + delta, S, kappa)
-    gradients["dO"] = (caos_o_plus - base_caos) / delta
-
-    # Gradient w.r.t S
-    caos_s_plus, _ = compute_caos_plus(C, A, O, S + delta, kappa)
-    gradients["dS"] = (caos_s_plus - base_caos) / delta
-
-    # Gradient w.r.t kappa
-    caos_k_plus, _ = compute_caos_plus(C, A, O, S, kappa + delta)
-    gradients["dkappa"] = (caos_k_plus - base_caos) / delta
-
-    return gradients
-
-
-class CAOSTracker:
-    """Track CAOS components over time with EMA smoothing"""
-
-    def __init__(self, alpha: float = 0.3):
-        self.alpha = alpha
-        self.C_ema = None
-        self.A_ema = None
-        self.O_ema = None
-        self.S_ema = None
-        self.caos_ema = None
-        self.history = []
-
-    def update(self, C: float, A: float, O: float, S: float, kappa: float = 2.0):
-        """Update CAOS tracking with new values"""
-        # Update EMAs
-        if self.C_ema is None:
-            self.C_ema = C
-            self.A_ema = A
-            self.O_ema = O
-            self.S_ema = S
-        else:
-            self.C_ema = self.alpha * C + (1 - self.alpha) * self.C_ema
-            self.A_ema = self.alpha * A + (1 - self.alpha) * self.A_ema
-            self.O_ema = self.alpha * O + (1 - self.alpha) * self.O_ema
-            self.S_ema = self.alpha * S + (1 - self.alpha) * self.S_ema
-
-        # Compute CAOS⁺ with EMA values
-        caos_value, details = compute_caos_plus(self.C_ema, self.A_ema, self.O_ema, self.S_ema, kappa)
-
-        if self.caos_ema is None:
-            self.caos_ema = caos_value
-        else:
-            self.caos_ema = self.alpha * caos_value + (1 - self.alpha) * self.caos_ema
-
-        # Store in history
-        self.history.append(
-            {
-                "C": C,
-                "A": A,
-                "O": O,
-                "S": S,
-                "C_ema": self.C_ema,
-                "A_ema": self.A_ema,
-                "O_ema": self.O_ema,
-                "S_ema": self.S_ema,
-                "caos": caos_value,
-                "caos_ema": self.caos_ema,
-                "details": details,
-            }
+class CAOSComponents:
+    """Componentes do CAOS⁺"""
+    C: float  # Complexidade
+    A: float  # Adaptabilidade  
+    O: float  # Incognoscível (Unknowable)
+    S: float  # Silêncio (Silence)
+    
+    def clamp(self, min_val: float = 0.0, max_val: float = 1.0) -> 'CAOSComponents':
+        """Retorna componentes clampados"""
+        return CAOSComponents(
+            C=max(min_val, min(max_val, self.C)),
+            A=max(min_val, min(max_val, self.A)),
+            O=max(min_val, min(max_val, self.O)),
+            S=max(min_val, min(max_val, self.S))
         )
+        
+    def to_dict(self) -> Dict[str, float]:
+        return {"C": self.C, "A": self.A, "O": self.O, "S": self.S}
 
-        return caos_value, self.caos_ema
 
-    def get_stability(self, window: int = 10) -> float:
+class CAOSPlusEngine:
+    """
+    Engine CAOS⁺ com estabilidade numérica
+    
+    Fórmula estável:
+    log_caos = (O*S) * log(1 + κ*C*A)
+    φ = tanh(γ * log_caos)
+    """
+    
+    def __init__(self, 
+                 kappa: float = 2.0,
+                 kappa_max: float = 10.0,
+                 gamma: float = 0.5,
+                 epsilon: float = 1e-9):
         """
-        Compute stability metric based on recent variance.
-
-        Returns value in [0,1] where 1 is most stable.
+        Args:
+            kappa: Fator de amplificação
+            kappa_max: Valor máximo para κ (clamp)
+            gamma: Fator de saturação tanh
+            epsilon: Valor mínimo para estabilidade
         """
-        if len(self.history) < 2:
-            return 1.0
+        self.kappa = max(1.0, min(kappa_max, kappa))  # Clamp κ
+        self.kappa_max = kappa_max
+        self.gamma = gamma
+        self.epsilon = epsilon
+        
+    def compute_phi(self, components: CAOSComponents) -> Tuple[float, Dict[str, Any]]:
+        """
+        Computa φ(CAOS⁺) de forma estável
+        
+        Args:
+            components: Componentes C,A,O,S
+            
+        Returns:
+            (phi_value, details_dict)
+        """
+        # Clamp componentes
+        safe_comp = components.clamp()
+        C, A, O, S = safe_comp.C, safe_comp.A, safe_comp.O, safe_comp.S
+        
+        # Produto CA (núcleo da complexidade adaptativa)
+        ca_product = C * A
+        
+        # Produto OS (expoente - representa incognoscível × silêncio)
+        os_product = O * S
+        
+        # Log-space computation para evitar overflow
+        # log_caos = (O*S) * log(1 + κ*C*A)
+        inner_term = 1.0 + self.kappa * ca_product
+        
+        if inner_term <= self.epsilon:
+            # Caso degenerado
+            log_caos = 0.0
+        else:
+            log_caos = os_product * math.log(inner_term)
+            
+        # Saturação tanh para manter φ ∈ (-1, 1)
+        phi_raw = math.tanh(self.gamma * log_caos)
+        
+        # Mapear para [0, 1] se necessário
+        phi = (phi_raw + 1.0) / 2.0  # tanh ∈ [-1,1] → [0,1]
+        
+        # Detalhes para debug/auditoria
+        details = {
+            "components_raw": components.to_dict(),
+            "components_clamped": safe_comp.to_dict(),
+            "ca_product": ca_product,
+            "os_product": os_product,
+            "inner_term": inner_term,
+            "log_caos": log_caos,
+            "phi_raw": phi_raw,
+            "phi": phi,
+            "kappa": self.kappa,
+            "gamma": self.gamma,
+            "stable": True
+        }
+        
+        return phi, details
+        
+    def compute_harmony(self, components: CAOSComponents) -> float:
+        """
+        Computa harmonia CAOS: (C+A) / (O+S)
+        
+        Representa balanceamento entre:
+        - Numerador: Capacidades ativas (Complexidade + Adaptabilidade)
+        - Denominador: Incertezas passivas (Incognoscível + Silêncio)
+        """
+        safe_comp = components.clamp()
+        
+        numerator = safe_comp.C + safe_comp.A
+        denominator = safe_comp.O + safe_comp.S
+        
+        # Evitar divisão por zero
+        if denominator < self.epsilon:
+            return 1.0  # Default harmony
+            
+        harmony = numerator / denominator
+        
+        # Clamp para evitar valores extremos
+        return max(0.0, min(10.0, harmony))
+        
+    def update_kappa(self, new_kappa: float) -> float:
+        """
+        Atualiza κ com clamp de segurança
+        
+        Returns:
+            Valor efetivo de κ após clamp
+        """
+        self.kappa = max(1.0, min(self.kappa_max, new_kappa))
+        return self.kappa
+        
+    def analyze_sensitivity(self, components: CAOSComponents, 
+                          delta: float = 0.01) -> Dict[str, float]:
+        """
+        Análise de sensibilidade: ∂φ/∂component
+        
+        Args:
+            components: Componentes base
+            delta: Perturbação para diferença finita
+            
+        Returns:
+            Dict com sensibilidades
+        """
+        phi_base, _ = self.compute_phi(components)
+        
+        sensitivities = {}
+        
+        for comp_name in ["C", "A", "O", "S"]:
+            # Perturbar componente
+            perturbed = CAOSComponents(**components.to_dict())
+            current_val = getattr(perturbed, comp_name)
+            setattr(perturbed, comp_name, current_val + delta)
+            
+            # Calcular φ perturbado
+            phi_perturbed, _ = self.compute_phi(perturbed)
+            
+            # Sensibilidade (diferença finita)
+            sensitivity = (phi_perturbed - phi_base) / delta
+            sensitivities[f"d_phi_d_{comp_name}"] = sensitivity
+            
+        return sensitivities
+        
+    def check_monotonicity(self, components: CAOSComponents) -> Dict[str, bool]:
+        """
+        Verifica monotonicidade: φ deve crescer com C,A,O,S
+        
+        Returns:
+            Dict indicando se cada componente é monotônico
+        """
+        phi_base, _ = self.compute_phi(components)
+        
+        monotonic = {}
+        delta = 0.1
+        
+        for comp_name in ["C", "A", "O", "S"]:
+            # Aumentar componente
+            increased = CAOSComponents(**components.to_dict())
+            current_val = getattr(increased, comp_name)
+            new_val = min(1.0, current_val + delta)  # Clamp em 1.0
+            setattr(increased, comp_name, new_val)
+            
+            phi_increased, _ = self.compute_phi(increased)
+            
+            # Deve ser monotônico crescente (ou pelo menos não decrescente)
+            monotonic[comp_name] = phi_increased >= phi_base
+            
+        return monotonic
+        
+    def get_config(self) -> Dict[str, Any]:
+        """Retorna configuração atual"""
+        return {
+            "kappa": self.kappa,
+            "kappa_max": self.kappa_max,
+            "gamma": self.gamma,
+            "epsilon": self.epsilon
+        }
 
-        recent = self.history[-window:] if len(self.history) > window else self.history
-        caos_values = [h["caos"] for h in recent]
 
-        if len(caos_values) < 2:
-            return 1.0
+class CAOSPlusWithChaos(CAOSPlusEngine):
+    """
+    Extensão do CAOS⁺ com injeção de caos determinística
+    """
+    
+    def __init__(self, 
+                 kappa: float = 2.0,
+                 kappa_max: float = 10.0,
+                 gamma: float = 0.5,
+                 chaos_probability: float = 0.01,
+                 chaos_factor_range: Tuple[float, float] = (0.9, 1.1),
+                 epsilon: float = 1e-9):
+        """
+        Args:
+            chaos_probability: Probabilidade de injeção de caos
+            chaos_factor_range: Range do fator de caos (multiplicativo)
+        """
+        super().__init__(kappa, kappa_max, gamma, epsilon)
+        self.chaos_prob = chaos_probability
+        self.chaos_range = chaos_factor_range
+        
+    def inject_chaos(self, components: CAOSComponents, 
+                    rng_func: callable) -> CAOSComponents:
+        """
+        Injeta caos determinístico nos componentes
+        
+        Args:
+            components: Componentes originais
+            rng_func: Função RNG determinística (ex: lambda: random.random())
+            
+        Returns:
+            Componentes com caos injetado
+        """
+        if rng_func() >= self.chaos_prob:
+            return components  # Sem caos
+            
+        # Aplicar fator de caos
+        chaos_factor = self.chaos_range[0] + rng_func() * (
+            self.chaos_range[1] - self.chaos_range[0]
+        )
+        
+        chaotic = CAOSComponents(
+            C=components.C * chaos_factor,
+            A=components.A * chaos_factor,
+            O=components.O * chaos_factor,
+            S=components.S * chaos_factor
+        )
+        
+        return chaotic.clamp()  # Sempre clamp após caos
+        
+    def compute_phi_with_chaos(self, components: CAOSComponents,
+                              rng_func: callable) -> Tuple[float, Dict[str, Any]]:
+        """
+        Computa φ com injeção de caos
+        
+        Args:
+            components: Componentes base
+            rng_func: Função RNG determinística
+            
+        Returns:
+            (phi_value, details_with_chaos_info)
+        """
+        # Injetar caos
+        chaotic_components = self.inject_chaos(components, rng_func)
+        
+        # Computar φ
+        phi, details = self.compute_phi(chaotic_components)
+        
+        # Adicionar info de caos
+        details["chaos_injected"] = not (chaotic_components.to_dict() == components.to_dict())
+        details["original_components"] = components.to_dict()
+        details["chaos_probability"] = self.chaos_prob
+        
+        return phi, details
 
-        # Compute variance
-        mean = sum(caos_values) / len(caos_values)
-        variance = sum((v - mean) ** 2 for v in caos_values) / len(caos_values)
 
-        # Convert to stability score (lower variance = higher stability)
-        # Using exponential decay
-        stability = math.exp(-variance * 10)
+# Funções de conveniência
+def quick_caos_phi(C: float, A: float, O: float, S: float,
+                   kappa: float = 2.0, gamma: float = 0.5) -> float:
+    """Cálculo rápido de φ(CAOS⁺)"""
+    engine = CAOSPlusEngine(kappa=kappa, gamma=gamma)
+    components = CAOSComponents(C, A, O, S)
+    phi, _ = engine.compute_phi(components)
+    return phi
 
-        return max(0.0, min(1.0, stability))
+
+def quick_caos_harmony(C: float, A: float, O: float, S: float) -> float:
+    """Cálculo rápido de harmonia CAOS"""
+    engine = CAOSPlusEngine()
+    components = CAOSComponents(C, A, O, S)
+    return engine.compute_harmony(components)
+
+
+def validate_caos_stability(C: float, A: float, O: float, S: float,
+                           kappa: float = 2.0) -> Dict[str, Any]:
+    """
+    Valida estabilidade numérica do CAOS⁺
+    
+    Returns:
+        Dict com resultados de validação
+    """
+    engine = CAOSPlusEngine(kappa=kappa)
+    components = CAOSComponents(C, A, O, S)
+    
+    # Computar φ
+    phi, details = engine.compute_phi(components)
+    
+    # Verificar monotonicidade
+    monotonic = engine.check_monotonicity(components)
+    
+    # Análise de sensibilidade
+    sensitivity = engine.analyze_sensitivity(components)
+    
+    return {
+        "phi": phi,
+        "details": details,
+        "monotonic": monotonic,
+        "sensitivity": sensitivity,
+        "stable": details["stable"] and all(monotonic.values()),
+        "components_valid": all(0 <= v <= 1 for v in [C, A, O, S])
+    }
