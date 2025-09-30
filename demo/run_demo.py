@@ -16,7 +16,7 @@ def main():
         caos = compute_caos_plus(C, A, O, S)
 
         alpha = alpha_fib(t, alpha0=0.1, boost=max(0.1, caos / 1.0))
-        state = step_master(state, delta_linf=L_inf, alpha_omega=alpha)
+        state = step_master(state, delta_L_inf=L_inf, alpha_omega=alpha)
 
         print(f"t={t} | L∞={L_inf:.4f} | CAOS+={caos:.4f} | α={alpha:.5f} | I={state.I:.5f}")
 

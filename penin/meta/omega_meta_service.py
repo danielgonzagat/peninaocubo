@@ -13,7 +13,6 @@ from penin.plugins.naslib_adapter import propose_with_naslib
 from penin.plugins.mammoth_adapter import continual_step_mammoth
 from penin.plugins.symbolicai_adapter import verify_with_symbolicai
 
-
 app = FastAPI(title="Omega-META", version="0.2.0")
 
 GUARD = GuardClient("http://127.0.0.1:8011")
@@ -22,7 +21,7 @@ SR = SRClient("http://127.0.0.1:8012")
 
 class Proposal(BaseModel):
     id: str
-    kind: str
+    kind: str        # mut.lora|mut.moe|mut.quant|mut.rag|mut.data|mut.arch
     expected_gain: float
     cost: float
     metadata: Optional[Dict[str, Any]] = None
@@ -39,6 +38,9 @@ class GuardMetrics(BaseModel):
 @app.get("/health")
 async def health():
     return {"ok": True, "guard": GUARD.health(), "sr": SR.health()}
+
+
+# -------------------- Plugins: routes --------------------
 
 
 class NextPyInput(BaseModel):
@@ -67,7 +69,7 @@ async def plugin_naslib(p: NASLibInput):
         raise HTTPException(400, str(e))
 
 
-class  MammothInput(BaseModel):
+class MammothInput(BaseModel):
     dataset: str = "cifar10"
 
 
@@ -92,6 +94,9 @@ async def plugin_symbolic(p: SymbolicInput):
         return out
     except ImportError as e:
         raise HTTPException(400, str(e))
+
+
+# -------------------- Ω-META flows --------------------
 
 
 @app.post("/meta/propose")
@@ -131,8 +136,8 @@ async def promote(pid: str, dlinf: float, caos_plus: float, sr: float, guard: Gu
 
 class PipelineInput(BaseModel):
     id: str
-    plugin: str
-    payload: Dict[str, Any] = {}
+    plugin: str                    # "nextpy" | "naslib" | "mammoth" | "symbolicai"
+    payload: Dict[str, Any] = {}   # plugin-specific params
     caos_components: Dict[str, float] = {"C": 0.6, "A": 0.6, "O": 1.0, "S": 1.0}
     sr_probe: Dict[str, float] = {"ece": 0.006, "rho": 0.95, "risk": 0.2, "dlinf_dc": 1.0}
     guard_metrics: GuardMetrics = GuardMetrics(rho=0.95, ece=0.006, rho_bias=1.02, consent=True, eco_ok=True)
@@ -140,6 +145,7 @@ class PipelineInput(BaseModel):
 
 @app.post("/meta/propose_canary_promote")
 async def propose_canary_promote(x: PipelineInput):
+    # 1) plugin
     try:
         if x.plugin == "nextpy":
             out = propose_with_nextpy(x.payload.get("prompt", ""))
@@ -149,25 +155,31 @@ async def propose_canary_promote(x: PipelineInput):
             eg, cost = out["expected_gain"], out["cost"]
         elif x.plugin == "mammoth":
             out = continual_step_mammoth(x.payload.get("dataset", "cifar10"))
-            eg, cost = 0.012, 0.6
+            eg = 0.012
+            cost = 0.6
         elif x.plugin == "symbolicai":
             out = verify_with_symbolicai(x.payload.get("contract", ""), x.payload.get("specimen", ""))
-            eg, cost = (0.01 if out.get("passed") else 0.0), 0.3
+            eg = 0.01 if out.get("passed") else 0.0
+            cost = 0.3
         else:
-            raise HTTPException(400, f"Plugin desconhecido: {x.plugin}")
+            raise HTTPException(400, f"Unknown plugin: {x.plugin}")
     except ImportError as e:
         raise HTTPException(400, str(e))
 
+    # 2) propose
     prop = Proposal(id=x.id, kind=f"mut.{x.plugin}", expected_gain=eg, cost=cost, metadata={"plugin_output": out})
     accepted = (prop.expected_gain / max(1e-6, prop.cost)) > 0.01
     append_event({"type": "propose", "id": x.id, "accepted": accepted, "meta": prop.model_dump()})
 
+    # 3) canary (ΔL∞)
     can = await canary(x.id)
     dlinf = can["delta_linf"]
 
+    # 4) SR
     sr_res = SR.eval(**x.sr_probe)
     R = float(sr_res.get("R", 0.0))
 
+    # 5) CAOS⁺
     C, A, O, S = (
         x.caos_components.get("C", 0.6),
         x.caos_components.get("A", 0.6),
@@ -176,9 +188,11 @@ async def propose_canary_promote(x: PipelineInput):
     )
     caos = compute_caos_plus(C, A, O, S)
 
+    # 6) Σ-Guard
     g = GUARD.eval(x.guard_metrics.dict())
     allow = bool(g.get("allow", False))
 
+    # 7) promote (apply final gates)
     promoted = bool((dlinf >= 0.01) and (caos >= 1.0) and (R >= 0.80) and allow)
     append_event({
         "type": "promote",

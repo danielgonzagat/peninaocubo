@@ -230,24 +230,18 @@ def caos_plus(C: float | None = None, A: float | None = None, O: float | None = 
     if S is None and "stability" in kwargs:
         S = kwargs["stability"]
 
-    # Defaults if still None
-    C = 0.0 if C is None else float(C)
-    A = 0.0 if A is None else float(A)
-    O = 0.0 if O is None else float(O)
-    S = 0.0 if S is None else float(S)
+    # Clamp and defaults
+    C = clamp01(float(C or 0.0))
+    A = clamp01(float(A or 0.0))
+    O = clamp01(float(O or 0.0))
+    S = clamp01(float(S or 0.0))
+    kappa = max(1.0, min(kappa_max, float(kappa)))
+    gamma = max(0.1, min(2.0, float(gamma)))
 
-    # Clamp kappa/gamma
-    kappa = max(0.0, min(kappa_max, float(kappa)))
-    gamma = max(0.0, float(gamma))
+    base = 1.0 + kappa * C * A
+    base = max(base, 1.0 + EPS)
+    exp_term = max(0.0, min(1.0, O * S))
+    log_caos = exp_term * math.log(base)
+    phi = math.tanh(gamma * log_caos)
 
-    phi = phi_caos(
-        C,
-        A,
-        O,
-        S,
-        kappa=max(1.0, kappa_max if kappa_max > 1.0 else 1.0),
-        kappa_max=max(1.0, kappa_max),
-        gamma=max(0.1, min(2.0, gamma)),
-    )
-
-    return float(phi)
+    return phi

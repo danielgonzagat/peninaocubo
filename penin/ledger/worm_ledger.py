@@ -1,7 +1,4 @@
-import hashlib
-import json
-import os
-import time
+import hashlib, json, time, os
 
 LEDGER = "ledger/worm.log"
 
@@ -21,14 +18,14 @@ def append_event(evt: dict) -> None:
 def merkle_root() -> str | None:
     if not os.path.exists(LEDGER):
         return None
-    hashes: list[str] = []
+    hashes = []
     with open(LEDGER, encoding="utf-8") as f:
         for line in f:
             hashes.append(_h(line.encode()))
     if not hashes:
         return None
     while len(hashes) > 1:
-        nxt: list[str] = []
+        nxt = []
         for i in range(0, len(hashes), 2):
             a = hashes[i]
             b = hashes[i + 1] if i + 1 < len(hashes) else a

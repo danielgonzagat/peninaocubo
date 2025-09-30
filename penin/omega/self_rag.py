@@ -1,7 +1,6 @@
-import re
 from collections import Counter
+import re
 from pathlib import Path
-
 
 KB = Path.home() / ".penin_omega" / "knowledge"
 KB.mkdir(parents=True, exist_ok=True)

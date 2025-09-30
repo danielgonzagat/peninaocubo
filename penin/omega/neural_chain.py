@@ -1,11 +1,6 @@
-import hmac
-import hashlib
-import os
-import time
+import hmac, hashlib, time, os
 from pathlib import Path
-
 import orjson
-
 
 KEY = (os.getenv("PENIN_CHAIN_KEY") or "dev-key").encode()
 ROOT = Path.home() / ".penin_omega" / "worm_ledger"
@@ -18,7 +13,7 @@ def _hash_block(b: dict) -> str:
     return hmac.new(KEY, raw, hashlib.sha256).hexdigest()
 
 
-def add_block(state_snapshot: dict, prev_hash: str | None):
+def add_block(state_snapshot: dict, prev_hash: str | None) -> str:
     block = {
         "ts": time.time(),
         "prev": prev_hash or "GENESIS",
