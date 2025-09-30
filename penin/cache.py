@@ -160,3 +160,33 @@ class SecureCache:
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
         self.close()
+
+def _serialize(self, obj):
+    data = orjson.dumps(obj)
+    mac = hmac.new(self._hmac_key, data, hashlib.sha256).digest()
+    return mac + data
+
+def _deserialize(self, b):
+    mac, data = b[:32], b[32:]
+    calc = hmac.new(self._hmac_key, data, hashlib.sha256).digest()
+    if mac != calc: raise ValueError("L2 cache HMAC mismatch")
+    return orjson.loads(data)
+
+def get_stats(self):
+    def _safe(call, default=0):
+        try: return int(call())
+        except Exception: return default
+    l1 = _safe(getattr(self, "_l1_size", lambda: 0))
+    l1_items = _safe(getattr(self, "_l1_items", lambda: 0))
+    l2 = _safe(getattr(self, "_l2_size_bytes", lambda: 0))
+    l2_files = _safe(getattr(self, "_l2_files", lambda: 0))
+    return {
+        "hits": int(getattr(self, "_hits", 0)),
+        "misses": int(getattr(self, "_misses", 0)),
+        "l1": l1, "l1_items": l1_items,
+        "l1_hits": int(getattr(self, "_l1_hits", 0)),
+        "l1_misses": int(getattr(self, "_l1_misses", 0)),
+        "l2": l2, "l2_files": l2_files,
+        "l2_hits": int(getattr(self, "_l2_hits", 0)),
+        "l2_misses": int(getattr(self, "_l2_misses", 0)),
+    }
