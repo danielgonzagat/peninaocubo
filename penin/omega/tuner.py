@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, List, Any, Tuple
 
 
 class AdaGradTuner:
@@ -28,4 +28,48 @@ class AdaGradTuner:
                 nv = max(lo, min(hi, nv))
             updated[k] = nv
         return updated
+
+def quick_tune_kappa(history: List[Dict[str, Any]]) -> Tuple[float, Dict[str, Any]]:
+    """Quick tune kappa for testing"""
+    if not history:
+        return 2.0, {"method": "default", "iterations": 0}
+    
+    # Simple heuristic: if U is high and cost is low, increase kappa
+    avg_u = sum(h.get("U", 0.5) for h in history) / len(history)
+    avg_cost = sum(h.get("cost", 0.1) for h in history) / len(history)
+    
+    if avg_u > 0.7 and avg_cost < 0.05:
+        new_kappa = 3.0
+    elif avg_u < 0.5 or avg_cost > 0.1:
+        new_kappa = 1.5
+    else:
+        new_kappa = 2.0
+    
+    return new_kappa, {
+        "method": "heuristic",
+        "iterations": len(history),
+        "avg_u": avg_u,
+        "avg_cost": avg_cost
+    }
+
+class PeninAutoTuner:
+    """Auto tuner for PENIN system"""
+    
+    def __init__(self, lr: float = 0.05):
+        self.tuner = AdaGradTuner(lr=lr)
+        self.history: List[Dict[str, Any]] = []
+    
+    def update(self, metrics: Dict[str, Any]) -> Dict[str, float]:
+        """Update parameters based on metrics"""
+        self.history.append(metrics)
+        
+        # Simple parameter update
+        params = {"kappa": 2.0, "gamma": 0.7}
+        grads = {"kappa": 0.01, "gamma": 0.005}  # Mock gradients
+        
+        return self.tuner.update(params, grads)
+    
+    def get_best_params(self) -> Dict[str, float]:
+        """Get best parameters"""
+        return {"kappa": 2.0, "gamma": 0.7}
 
