@@ -11,6 +11,6 @@ from .ethics_metrics import EthicsCalculator, EthicsGate, EthicsMetrics
 
 __all__ = [
     'EthicsCalculator',
-    'EthicsGate', 
+    'EthicsGate',
     'EthicsMetrics'
 ]

@@ -11,7 +11,6 @@ Implementa:
 - Rollback atômico via champion pointer
 """
 
-import os
 import json
 import time
 import sqlite3
@@ -19,8 +18,8 @@ import hashlib
 import threading
 import uuid
 from pathlib import Path
-from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional, Union
+from datetime import datetime
+from typing import Dict, Any, List, Optional
 from typing_extensions import Tuple
 from contextlib import contextmanager
 
@@ -31,14 +30,13 @@ except ImportError:
     HAS_PORTALOCKER = False
     import fcntl  # Fallback para Unix
 
-from pydantic import BaseModel, Field, validator
-from dataclasses import asdict
+from pydantic import BaseModel, Field
 
 
 class RunMetrics(BaseModel):
     """Métricas de um run"""
     U: float = Field(0.0, ge=0, le=1, description="Utilidade")
-    S: float = Field(0.0, ge=0, le=1, description="Estabilidade") 
+    S: float = Field(0.0, ge=0, le=1, description="Estabilidade")
     C: float = Field(0.0, ge=0, le=1, description="Custo")
     L: float = Field(0.0, ge=0, le=1, description="Aprendizado futuro")
     linf: float = Field(0.0, ge=0, le=1, description="L∞ score")
@@ -46,7 +44,7 @@ class RunMetrics(BaseModel):
     cost_usd: float = Field(0.0, ge=0, description="Custo em USD")
     latency_ms: float = Field(0.0, ge=0, description="Latência em ms")
     tokens_used: int = Field(0, ge=0, description="Tokens utilizados")
-    
+
     # Métricas específicas do sistema
     caos_phi: float = Field(0.0, ge=0, le=1, description="φ(CAOS⁺)")
     sr_score: float = Field(0.0, ge=0, le=1, description="SR-Ω∞")
@@ -59,7 +57,7 @@ class GuardResults(BaseModel):
     ir_ic_ok: bool = Field(description="IR→IC passou")
     sr_gate_ok: bool = Field(description="SR gate passou")
     caos_gate_ok: bool = Field(description="CAOS⁺ gate passou")
-    
+
     # Detalhes das violações
     violations: List[Dict[str, Any]] = Field(default_factory=list)
     evidence_hash: Optional[str] = Field(None, description="Hash da evidência ética")
@@ -70,7 +68,7 @@ class DecisionInfo(BaseModel):
     verdict: str = Field(description="promote|canary|rollback|fail")
     reason: str = Field(description="Motivo da decisão")
     confidence: float = Field(0.0, ge=0, le=1, description="Confiança na decisão")
-    
+
     # Comparação com champion
     delta_linf: float = Field(description="ΔL∞ vs champion")
     delta_score: float = Field(description="ΔScore vs champion")
@@ -83,30 +81,30 @@ class RunRecord(BaseModel):
     run_id: str = Field(description="UUID único do run")
     timestamp: float = Field(description="Unix timestamp")
     cycle: int = Field(ge=0, description="Número do ciclo")
-    
+
     # Contexto técnico
     git_sha: Optional[str] = Field(None, description="SHA do commit")
     seed: Optional[int] = Field(None, description="Seed usado")
     config_hash: str = Field(description="Hash da configuração")
-    
+
     # Provider/modelo
     provider_id: str = Field(description="ID do provider usado")
     model_name: Optional[str] = Field(None, description="Nome do modelo")
     candidate_cfg_hash: str = Field(description="Hash da config do candidato")
-    
+
     # Métricas
     metrics: RunMetrics = Field(description="Métricas coletadas")
-    
+
     # Gates
     gates: GuardResults = Field(description="Resultados dos gates")
-    
+
     # Decisão
     decision: DecisionInfo = Field(description="Decisão tomada")
-    
+
     # Metadados
     artifacts_path: Optional[str] = Field(None, description="Caminho dos artifacts")
     parent_run_id: Optional[str] = Field(None, description="Run pai (se challenger)")
-    
+
     class Config:
         # Pydantic v2 compatibility
         json_encoders = {
@@ -125,8 +123,8 @@ class WORMLedger:
     - Schema Pydantic para validação
     - Artifacts em diretórios separados
     """
-    
-    def __init__(self, 
+
+    def __init__(self,
                  db_path: Optional[Path] = None,
                  runs_dir: Optional[Path] = None,
                  enable_wal: bool = True):
@@ -140,36 +138,36 @@ class WORMLedger:
             db_path = Path.home() / ".penin_omega" / "worm_ledger" / "ledger.db"
         if runs_dir is None:
             runs_dir = Path.home() / ".penin_omega" / "runs"
-            
+
         self.db_path = Path(db_path)
         self.runs_dir = Path(runs_dir)
         self.enable_wal = enable_wal
-        
+
         # Criar diretórios
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self.runs_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Lock para operações críticas
         self._lock = threading.RLock()
-        
+
         # Inicializar banco
         self._init_database()
-        
+
         # Cache do último hash
         self._tail_hash = self._get_last_hash()
-        
+
     def _init_database(self):
         """Inicializa banco com schema e configurações"""
         with sqlite3.connect(str(self.db_path)) as conn:
             cursor = conn.cursor()
-            
+
             # Configurar WAL mode e timeouts
             if self.enable_wal:
                 cursor.execute("PRAGMA journal_mode=WAL")
                 cursor.execute("PRAGMA synchronous=NORMAL")
                 cursor.execute("PRAGMA busy_timeout=5000")  # 5s timeout
                 cursor.execute("PRAGMA wal_autocheckpoint=1000")
-                
+
             # Criar tabela principal
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS run_records (
@@ -207,14 +205,14 @@ class WORMLedger:
                     FOREIGN KEY (parent_run_id) REFERENCES run_records(run_id)
                 )
             """)
-            
+
             # Índices
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_run_id ON run_records(run_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON run_records(timestamp)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_cycle ON run_records(cycle)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_provider ON run_records(provider_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_decision ON run_records(decision_json)")
-            
+
             # Tabela de champion pointer (para rollback atômico)
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS champion_pointer (
@@ -224,9 +222,9 @@ class WORMLedger:
                     FOREIGN KEY (run_id) REFERENCES run_records(run_id)
                 )
             """)
-            
+
             conn.commit()
-            
+
     def _get_last_hash(self) -> str:
         """Obtém último hash da chain"""
         with sqlite3.connect(str(self.db_path)) as conn:
@@ -234,29 +232,29 @@ class WORMLedger:
             cursor.execute("SELECT record_hash FROM run_records ORDER BY id DESC LIMIT 1")
             row = cursor.fetchone()
             return row[0] if row else "genesis"
-            
+
     def _compute_record_hash(self, record: RunRecord, prev_hash: str) -> str:
         """Computa hash do record para chain"""
         # Serializar record de forma determinística
         record_dict = record.model_dump()
         record_dict["prev_hash"] = prev_hash
-        
+
         # Hash SHA-256
         record_json = json.dumps(record_dict, sort_keys=True, ensure_ascii=False)
         return hashlib.sha256(record_json.encode()).hexdigest()
-        
+
     def _create_run_directory(self, run_id: str) -> Path:
         """Cria diretório para artifacts do run"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         run_dir = self.runs_dir / f"{timestamp}_{run_id[:8]}"
         run_dir.mkdir(parents=True, exist_ok=True)
         return run_dir
-        
+
     @contextmanager
     def _file_lock(self):
         """Context manager para file lock"""
         lock_file = self.db_path.parent / "ledger.lock"
-        
+
         try:
             with open(lock_file, 'w') as f:
                 if HAS_PORTALOCKER:
@@ -267,8 +265,8 @@ class WORMLedger:
         finally:
             # Lock é liberado automaticamente quando arquivo fecha
             pass
-            
-    def append_record(self, record: RunRecord, 
+
+    def append_record(self, record: RunRecord,
                      artifacts: Optional[Dict[str, Any]] = None) -> str:
         """
         Adiciona record ao ledger (append-only)
@@ -285,26 +283,26 @@ class WORMLedger:
                 # Criar diretório do run
                 run_dir = self._create_run_directory(record.run_id)
                 record.artifacts_path = str(run_dir)
-                
+
                 # Salvar artifacts
                 if artifacts:
                     for name, content in artifacts.items():
                         artifact_path = run_dir / f"{name}.json"
                         with open(artifact_path, 'w', encoding='utf-8') as f:
                             json.dump(content, f, indent=2, ensure_ascii=False)
-                            
+
                 # Salvar config do record
                 config_path = run_dir / "record.json"
                 with open(config_path, 'w', encoding='utf-8') as f:
                     json.dump(record.model_dump(), f, indent=2, ensure_ascii=False)
-                    
+
                 # Computar hash
                 record_hash = self._compute_record_hash(record, self._tail_hash)
-                
+
                 # Inserir no banco
                 with sqlite3.connect(str(self.db_path)) as conn:
                     cursor = conn.cursor()
-                    
+
                     cursor.execute("""
                         INSERT INTO run_records (
                             run_id, timestamp, cycle,
@@ -324,28 +322,28 @@ class WORMLedger:
                         record.artifacts_path, record.parent_run_id,
                         self._tail_hash, record_hash, time.time()
                     ))
-                    
+
                     conn.commit()
-                    
+
                 # Atualizar tail
                 self._tail_hash = record_hash
-                
+
                 return record_hash
-                
+
     def get_record(self, run_id: str) -> Optional[RunRecord]:
         """Recupera record por run_id"""
         with sqlite3.connect(str(self.db_path)) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            
+
             cursor.execute("""
                 SELECT * FROM run_records WHERE run_id = ?
             """, (run_id,))
-            
+
             row = cursor.fetchone()
             if not row:
                 return None
-                
+
             # Reconstruir RunRecord
             try:
                 record = RunRecord(
@@ -368,8 +366,8 @@ class WORMLedger:
             except Exception as e:
                 print(f"Error reconstructing record {run_id}: {e}")
                 return None
-                
-    def list_records(self, 
+
+    def list_records(self,
                     limit: int = 100,
                     offset: int = 0,
                     provider_id: Optional[str] = None,
@@ -378,28 +376,28 @@ class WORMLedger:
         with sqlite3.connect(str(self.db_path)) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            
+
             query = "SELECT * FROM run_records"
             params = []
             conditions = []
-            
+
             if provider_id:
                 conditions.append("provider_id = ?")
                 params.append(provider_id)
-                
+
             if verdict:
                 conditions.append("decision_json LIKE ?")
                 params.append(f'%"verdict": "{verdict}"%')
-                
+
             if conditions:
                 query += " WHERE " + " AND ".join(conditions)
-                
+
             query += " ORDER BY timestamp DESC LIMIT ? OFFSET ?"
             params.extend([limit, offset])
-            
+
             cursor.execute(query, params)
             rows = cursor.fetchall()
-            
+
             records = []
             for row in rows:
                 try:
@@ -423,63 +421,63 @@ class WORMLedger:
                 except Exception as e:
                     print(f"Error reconstructing record {row['run_id']}: {e}")
                     continue
-                    
+
             return records
-            
+
     def set_champion(self, run_id: str) -> bool:
         """Define champion atual (para rollback atômico)"""
         with self._lock:
             with self._file_lock():
                 with sqlite3.connect(str(self.db_path)) as conn:
                     cursor = conn.cursor()
-                    
+
                     # Verificar se run existe
                     cursor.execute("SELECT 1 FROM run_records WHERE run_id = ?", (run_id,))
                     if not cursor.fetchone():
                         return False
-                        
+
                     # Atualizar champion pointer
                     cursor.execute("""
                         INSERT OR REPLACE INTO champion_pointer (id, run_id, updated_at)
                         VALUES (1, ?, ?)
                     """, (run_id, time.time()))
-                    
+
                     conn.commit()
                     return True
-                    
+
     def get_champion(self) -> Optional[RunRecord]:
         """Obtém record do champion atual"""
         with sqlite3.connect(str(self.db_path)) as conn:
             cursor = conn.cursor()
-            
+
             cursor.execute("""
                 SELECT run_id FROM champion_pointer WHERE id = 1
             """)
-            
+
             row = cursor.fetchone()
             if not row:
                 return None
-                
+
             return self.get_record(row[0])
-            
+
     def verify_chain_integrity(self) -> Tuple[bool, Optional[str]]:
         """Verifica integridade da hash chain"""
         with sqlite3.connect(str(self.db_path)) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
-            
+
             cursor.execute("""
                 SELECT run_id, prev_hash, record_hash, 
                        metrics_json, gates_json, decision_json
                 FROM run_records ORDER BY id
             """)
-            
+
             prev_hash = "genesis"
-            
+
             for row in cursor.fetchall():
                 if row["prev_hash"] != prev_hash:
                     return False, f"Chain break at {row['run_id']}: expected prev_hash {prev_hash}, got {row['prev_hash']}"
-                    
+
                 # Reconstruir record para verificar hash
                 try:
                     # Simplificado - só verificar se hash bate
@@ -488,24 +486,24 @@ class WORMLedger:
                     prev_hash = expected_hash
                 except Exception as e:
                     return False, f"Hash verification failed at {row['run_id']}: {e}"
-                    
+
             return True, None
-            
+
     def get_stats(self) -> Dict[str, Any]:
         """Estatísticas do ledger"""
         with sqlite3.connect(str(self.db_path)) as conn:
             cursor = conn.cursor()
-            
+
             # Contagens básicas
             cursor.execute("SELECT COUNT(*) FROM run_records")
             total_records = cursor.fetchone()[0]
-            
+
             cursor.execute("""
                 SELECT decision_json, COUNT(*) 
                 FROM run_records 
                 GROUP BY decision_json
             """)
-            
+
             decisions = {}
             for row in cursor.fetchall():
                 try:
@@ -514,10 +512,10 @@ class WORMLedger:
                     decisions[verdict] = row[1]
                 except:
                     decisions["parse_error"] = decisions.get("parse_error", 0) + row[1]
-                    
+
             # Champion info
             champion = self.get_champion()
-            
+
             return {
                 "total_records": total_records,
                 "decisions": decisions,
@@ -646,10 +644,10 @@ def create_run_record(run_id: Optional[str] = None,
     """Cria RunRecord com defaults"""
     if run_id is None:
         run_id = str(uuid.uuid4())
-        
+
     if metrics is None:
         metrics = {}
-        
+
     return RunRecord(
         run_id=run_id,
         timestamp=time.time(),
@@ -685,5 +683,5 @@ def quick_ledger_append(ledger: WORMLedger,
         metrics=metrics,
         decision_verdict=verdict
     )
-    
+
     return ledger.append_record(record, artifacts)
