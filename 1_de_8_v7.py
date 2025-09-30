@@ -1364,6 +1364,10 @@ class PeninOmegaCore:
                         
             # Measure ethics metrics (ECE / Bias / Rho) and record attestation
             ethics_snapshot = self.ethics.measure(self.xt)
+            # Apply computed ethics values to state
+            self.xt.ece = ethics_snapshot["ece"]
+            self.xt.bias = ethics_snapshot["bias"]
+            self.xt.rho = ethics_snapshot["rho"]
             self.worm.record(
                 EventType.ETHICS_ATTEST,
                 ethics_snapshot,
