@@ -1,10 +1,16 @@
-"""Omega core domain modules (scoring, tuner, guards, runners).
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+PENIN-Ω Core Module
+===================
 
-Thin façade to allow incremental adoption without breaking existing imports.
+Core implementation of the PENIN-Ω auto-evolution system.
 """
 
-__all__ = [
-    "scoring",
-    "tuner",
-]
+from .ethics_metrics import EthicsCalculator, EthicsGate, EthicsMetrics
 
+__all__ = [
+    'EthicsCalculator',
+    'EthicsGate', 
+    'EthicsMetrics'
+]

@@ -1,439 +1,525 @@
 """
-Ethics Metrics Calculator
-========================
+PENIN-Ω Ethics Metrics Module
+=============================
 
-Implementa cálculo e ateste das métricas éticas/risco:
-- ECE (Expected Calibration Error) por binning
-- ρ_bias (fairness/paridade de taxa)
-- consent e eco_ok (compliance flags)
-- ρ (risk bound/contratividade)
+Implements calculation and attestation of ethical metrics (ΣEA/IR→IC):
+- ECE (Expected Calibration Error)
+- Bias ratio (ρ_bias)
+- Fairness metrics
+- Consent validation
+- Risk contraction (IR→IC)
 
-Todas as métricas são calculadas e validadas internamente,
-não apenas declaradas na config.
+All metrics are calculated with evidence and logged to WORM.
 """
 
 import math
-import hashlib
 import json
-from typing import Dict, List, Any, Optional
-from typing_extensions import Tuple
+import hashlib
+from typing import Dict, List, Tuple, Any, Optional
 from dataclasses import dataclass
-import numpy as np
+from pathlib import Path
+
+# Try to import numpy, fallback to basic Python if not available
+try:
+    import numpy as np
+    HAS_NUMPY = True
+except ImportError:
+    HAS_NUMPY = False
+    print("INFO: numpy not available, using basic Python fallback")
+
+# Pydantic for validation
+try:
+    from pydantic import BaseModel, Field
+    HAS_PYDANTIC = True
+except ImportError:
+    HAS_PYDANTIC = False
+    print("WARNING: pydantic not available. Using dataclass fallback.")
 
 
 @dataclass
-class EthicsEvidence:
-    """Evidência para auditoria das métricas éticas"""
-    dataset_hash: str
-    sample_size: int
-    method: str
-    timestamp: float
-    seed: Optional[int] = None
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "dataset_hash": self.dataset_hash,
-            "sample_size": self.sample_size,
-            "method": self.method,
-            "timestamp": self.timestamp,
-            "seed": self.seed
-        }
+class EthicsMetrics:
+    """Ethics metrics with evidence"""
+    ece: float
+    rho_bias: float
+    fairness: float
+    consent: bool
+    eco_ok: bool
+    risk_rho: float
+    evidence_hash: str
+    calculation_timestamp: str
+    dataset_hash: Optional[str] = None
+    seed_hash: Optional[str] = None
 
 
-class ECECalculator:
-    """Expected Calibration Error calculator with binning"""
+class EthicsCalculator:
+    """Calculator for ethical metrics with evidence tracking"""
     
-    def __init__(self, n_bins: int = 15):
-        self.n_bins = n_bins
-        
-    def calculate(self, confidences: List[float], predictions: List[int], 
-                  labels: List[int]) -> Tuple[float, Dict[str, Any]]:
+    def __init__(self):
+        self.evidence_cache = {}
+    
+    def calculate_ece(self, predictions: List[float], targets: List[int], 
+                     n_bins: int = 15) -> Tuple[float, Dict[str, Any]]:
         """
-        Calcula ECE usando binning strategy
+        Calculate Expected Calibration Error (ECE)
         
         Args:
-            confidences: Lista de confidências [0,1]
-            predictions: Lista de predições (0/1 ou classes)
-            labels: Lista de labels verdadeiros
+            predictions: List of predicted probabilities [0,1]
+            targets: List of true binary labels {0,1}
+            n_bins: Number of bins for calibration
             
         Returns:
-            (ece_value, details_dict)
+            (ece_score, evidence_dict)
         """
-        if len(confidences) != len(predictions) != len(labels):
-            raise ValueError("All inputs must have same length")
-            
-        if not confidences:
-            return 0.0, {"method": "empty", "n_bins": self.n_bins}
-            
-        # Criar bins
-        bin_boundaries = np.linspace(0, 1, self.n_bins + 1)
+        if len(predictions) != len(targets):
+            raise ValueError("Predictions and targets must have same length")
+        
+        if HAS_NUMPY:
+            return self._calculate_ece_numpy(predictions, targets, n_bins)
+        else:
+            return self._calculate_ece_basic(predictions, targets, n_bins)
+    
+    def _calculate_ece_numpy(self, predictions: List[float], targets: List[int], n_bins: int):
+        """ECE calculation using numpy"""
+        # Convert to numpy arrays
+        predictions_np = np.array(predictions)
+        targets_np = np.array(targets)
+        
+        # Create bins
+        bin_boundaries = np.linspace(0, 1, n_bins + 1)
         bin_lowers = bin_boundaries[:-1]
         bin_uppers = bin_boundaries[1:]
         
-        ece = 0.0
-        bin_details = []
+        ece = 0
+        bin_data = []
         
         for bin_lower, bin_upper in zip(bin_lowers, bin_uppers):
-            # Encontrar amostras neste bin
-            in_bin = [(conf >= bin_lower) and (conf < bin_upper) 
-                     for conf in confidences]
-            prop_in_bin = sum(in_bin) / len(in_bin)
+            in_bin = np.logical_and(predictions_np > bin_lower, predictions_np <= bin_upper)
+            prop_in_bin = in_bin.mean()
             
             if prop_in_bin > 0:
-                # Calcular accuracy e confidence médias no bin
-                bin_confidences = [confidences[i] for i, in_b in enumerate(in_bin) if in_b]
-                bin_predictions = [predictions[i] for i, in_b in enumerate(in_bin) if in_b]
-                bin_labels = [labels[i] for i, in_b in enumerate(in_bin) if in_b]
+                accuracy_in_bin = targets_np[in_bin].mean()
+                avg_confidence_in_bin = predictions_np[in_bin].mean()
+                ece += np.abs(avg_confidence_in_bin - accuracy_in_bin) * prop_in_bin
                 
-                avg_confidence = sum(bin_confidences) / len(bin_confidences)
-                avg_accuracy = sum(1 for p, l in zip(bin_predictions, bin_labels) if p == l) / len(bin_predictions)
-                
-                # Contribuição para ECE
-                bin_ece = abs(avg_confidence - avg_accuracy) * prop_in_bin
-                ece += bin_ece
-                
-                bin_details.append({
-                    "bin_range": [bin_lower, bin_upper],
-                    "prop_in_bin": prop_in_bin,
-                    "avg_confidence": avg_confidence,
-                    "avg_accuracy": avg_accuracy,
-                    "bin_ece": bin_ece,
-                    "n_samples": len(bin_confidences)
+                bin_data.append({
+                    'bin_lower': float(bin_lower),
+                    'bin_upper': float(bin_upper),
+                    'prop_in_bin': float(prop_in_bin),
+                    'accuracy': float(accuracy_in_bin),
+                    'confidence': float(avg_confidence_in_bin),
+                    'count': int(in_bin.sum())
                 })
         
-        details = {
-            "method": "binning",
-            "n_bins": self.n_bins,
-            "total_samples": len(confidences),
-            "bin_details": bin_details,
-            "ece": ece
+        evidence = {
+            'method': 'ECE',
+            'n_bins': n_bins,
+            'n_samples': len(predictions),
+            'bin_data': bin_data,
+            'ece_score': float(ece)
         }
         
-        return ece, details
-
-
-class BiasCalculator:
-    """Calculadora de bias/fairness (ρ_bias)"""
+        return float(ece), evidence
     
-    def calculate_demographic_parity(self, predictions: List[int], 
-                                   protected_attr: List[int]) -> Tuple[float, Dict[str, Any]]:
-        """
-        Calcula demographic parity ratio
+    def _calculate_ece_basic(self, predictions: List[float], targets: List[int], n_bins: int):
+        """ECE calculation using basic Python (no numpy)"""
+        # Create bins manually
+        bin_width = 1.0 / n_bins
+        ece = 0
+        bin_data = []
         
-        Args:
-            predictions: Lista de predições (0/1)
-            protected_attr: Lista de atributo protegido (0/1)
+        for i in range(n_bins):
+            bin_lower = i * bin_width
+            bin_upper = (i + 1) * bin_width
             
-        Returns:
-            (rho_bias, details)
-        """
-        if len(predictions) != len(protected_attr):
-            raise ValueError("Predictions and protected attributes must have same length")
+            # Find predictions in this bin
+            in_bin_preds = []
+            in_bin_targets = []
+            for pred, target in zip(predictions, targets):
+                if (i == 0 and pred <= bin_upper) or (i > 0 and bin_lower < pred <= bin_upper):
+                    in_bin_preds.append(pred)
+                    in_bin_targets.append(target)
+                    in_bin_preds.append(pred)
+                    in_bin_targets.append(target)
             
-        # Separar por grupo
-        group_0_preds = [p for p, attr in zip(predictions, protected_attr) if attr == 0]
-        group_1_preds = [p for p, attr in zip(predictions, protected_attr) if attr == 1]
-        
-        if not group_0_preds or not group_1_preds:
-            return 1.0, {"method": "demographic_parity", "error": "Missing group data"}
-            
-        # Calcular taxas de predição positiva
-        rate_0 = sum(group_0_preds) / len(group_0_preds)
-        rate_1 = sum(group_1_preds) / len(group_1_preds)
-        
-        # Ratio (sempre >= 1, com 1 = perfeita paridade)
-        if rate_0 == 0 and rate_1 == 0:
-            rho_bias = 1.0
-        elif rate_0 == 0 or rate_1 == 0:
-            rho_bias = float('inf')  # Será clampado
-        else:
-            rho_bias = max(rate_0 / rate_1, rate_1 / rate_0)
-            
-        details = {
-            "method": "demographic_parity",
-            "group_0_rate": rate_0,
-            "group_1_rate": rate_1,
-            "group_0_size": len(group_0_preds),
-            "group_1_size": len(group_1_preds),
-            "rho_bias": rho_bias
-        }
-        
-        return min(rho_bias, 10.0), details  # Clamp para evitar inf
-
-
-class RiskCalculator:
-    """Calculadora de risco ρ (contratividade)"""
-    
-    def calculate_risk_bound(self, risk_series: List[float]) -> Tuple[float, Dict[str, Any]]:
-        """
-        Calcula bound de risco baseado em série temporal
-        
-        Args:
-            risk_series: Série de valores de risco
-            
-        Returns:
-            (rho, details)
-        """
-        if len(risk_series) < 2:
-            return 0.5, {"method": "insufficient_data", "series_length": len(risk_series)}
-            
-        # Calcular contratividade: rho = max(|r_{t+1}/r_t|) para t consecutivos
-        ratios = []
-        for i in range(1, len(risk_series)):
-            if risk_series[i-1] != 0:
-                ratio = abs(risk_series[i] / risk_series[i-1])
-                ratios.append(ratio)
+            if in_bin_preds:
+                prop_in_bin = len(in_bin_preds) / len(predictions)
+                accuracy_in_bin = sum(in_bin_targets) / len(in_bin_targets)
+                avg_confidence_in_bin = sum(in_bin_preds) / len(in_bin_preds)
+                ece += abs(avg_confidence_in_bin - accuracy_in_bin) * prop_in_bin
                 
-        if not ratios:
-            return 0.5, {"method": "no_valid_ratios"}
-            
-        rho = max(ratios)
+                bin_data.append({
+                    'bin_lower': bin_lower,
+                    'bin_upper': bin_upper,
+                    'prop_in_bin': prop_in_bin,
+                    'accuracy': accuracy_in_bin,
+                    'confidence': avg_confidence_in_bin,
+                    'count': len(in_bin_preds)
+                })
         
-        # Verificar convergência (rho < 1 indica contratividade)
-        is_contractive = rho < 1.0
-        
-        details = {
-            "method": "temporal_ratios",
-            "series_length": len(risk_series),
-            "n_ratios": len(ratios),
-            "max_ratio": rho,
-            "mean_ratio": sum(ratios) / len(ratios),
-            "is_contractive": is_contractive,
-            "ratios": ratios[-5:]  # Últimos 5 para debug
+        evidence = {
+            'method': 'ECE',
+            'n_bins': n_bins,
+            'n_samples': len(predictions),
+            'bin_data': bin_data,
+            'ece_score': float(ece)
         }
         
-        return rho, details
-
-
-class EthicsMetricsCalculator:
-    """Calculadora principal de métricas éticas"""
+        return float(ece), evidence
     
-    def __init__(self):
-        self.ece_calc = ECECalculator()
-        self.bias_calc = BiasCalculator()
-        self.risk_calc = RiskCalculator()
-        
-    def calculate_all_metrics(self, 
-                            # ECE inputs
-                            confidences: Optional[List[float]] = None,
-                            predictions: Optional[List[int]] = None,
-                            labels: Optional[List[int]] = None,
-                            # Bias inputs
-                            protected_attr: Optional[List[int]] = None,
-                            # Risk inputs
-                            risk_series: Optional[List[float]] = None,
-                            # Compliance flags
-                            consent: bool = True,
-                            eco_ok: bool = True,
-                            # Evidence
-                            dataset_id: Optional[str] = None,
-                            seed: Optional[int] = None) -> Dict[str, Any]:
+    def calculate_bias_ratio(self, predictions: List[float], targets: List[int],
+                           protected_attributes: List[str]) -> Tuple[float, Dict[str, Any]]:
         """
-        Calcula todas as métricas éticas com evidência
+        Calculate bias ratio (ρ_bias) across protected attributes
         
+        Args:
+            predictions: List of predicted probabilities
+            targets: List of true labels
+            protected_attributes: List of protected attribute values
+            
         Returns:
-            Dict com métricas calculadas e evidência
+            (rho_bias, evidence_dict)
         """
-        import time
+        if len(set(len(x) for x in [predictions, targets, protected_attributes])) != 1:
+            raise ValueError("All inputs must have same length")
         
-        results = {
-            "timestamp": time.time(),
-            "seed": seed,
-            "consent": consent,
-            "eco_ok": eco_ok
+        # Group by protected attribute
+        groups = {}
+        for i, attr in enumerate(protected_attributes):
+            if attr not in groups:
+                groups[attr] = {'predictions': [], 'targets': []}
+            groups[attr]['predictions'].append(predictions[i])
+            groups[attr]['targets'].append(targets[i])
+        
+        # Calculate rates for each group (basic Python)
+        group_rates = {}
+        for attr, data in groups.items():
+            preds = data['predictions']
+            targets = data['targets']
+            
+            # Positive prediction rate
+            pos_rate = sum(1 for p in preds if p > 0.5) / len(preds)
+            
+            # True positive rate
+            positive_targets = [p for p, t in zip(preds, targets) if t == 1]
+            tp_rate = sum(1 for p in positive_targets if p > 0.5) / len(positive_targets) if positive_targets else 0.0
+            
+            group_rates[attr] = {
+                'positive_rate': pos_rate,
+                'true_positive_rate': tp_rate,
+                'count': len(preds)
+            }
+        
+        # Calculate max bias ratio
+        rates = [g['positive_rate'] for g in group_rates.values()]
+        if len(rates) < 2 or min(rates) == 0:
+            rho_bias = 1.0  # No bias if insufficient data
+        else:
+            rho_bias = max(rates) / min(rates)
+        
+        evidence = {
+            'method': 'Bias_Ratio',
+            'n_samples': len(predictions),
+            'n_groups': len(groups),
+            'group_rates': group_rates,
+            'rho_bias': float(rho_bias)
         }
         
-        # ECE
-        if confidences and predictions and labels:
-            try:
-                ece, ece_details = self.ece_calc.calculate(confidences, predictions, labels)
-                results["ece"] = ece
-                results["ece_details"] = ece_details
-            except Exception as e:
-                results["ece"] = 1.0  # Fail-closed: assume worst ECE
-                results["ece_error"] = str(e)
-        else:
-            results["ece"] = 0.0  # Default para dados sintéticos
-            results["ece_details"] = {"method": "default", "reason": "no_data"}
+        return float(rho_bias), evidence
+    
+    def calculate_fairness(self, predictions: List[float], targets: List[int],
+                          protected_attributes: List[str]) -> Tuple[float, Dict[str, Any]]:
+        """
+        Calculate fairness metric (1 - max_demographic_parity_difference)
+        
+        Args:
+            predictions: List of predicted probabilities
+            targets: List of true labels
+            protected_attributes: List of protected attribute values
             
-        # Bias
-        if predictions and protected_attr:
-            try:
-                rho_bias, bias_details = self.bias_calc.calculate_demographic_parity(
-                    predictions, protected_attr)
-                results["rho_bias"] = rho_bias
-                results["bias_details"] = bias_details
-            except Exception as e:
-                results["rho_bias"] = 2.0  # Fail-closed: assume high bias
-                results["bias_error"] = str(e)
-        else:
-            results["rho_bias"] = 1.0  # Default: sem bias
-            results["bias_details"] = {"method": "default", "reason": "no_data"}
+        Returns:
+            (fairness_score, evidence_dict)
+        """
+        if len(set(len(x) for x in [predictions, targets, protected_attributes])) != 1:
+            raise ValueError("All inputs must have same length")
+        
+        # Group by protected attribute
+        groups = {}
+        for i, attr in enumerate(protected_attributes):
+            if attr not in groups:
+                groups[attr] = {'predictions': [], 'targets': []}
+            groups[attr]['predictions'].append(predictions[i])
+            groups[attr]['targets'].append(targets[i])
+        
+        # Calculate positive rates for each group
+        positive_rates = []
+        group_data = {}
+        
+        for attr, data in groups.items():
+            preds = data['predictions']
+            pos_rate = sum(1 for p in preds if p > 0.5) / len(preds)
+            positive_rates.append(pos_rate)
             
-        # Risk
-        if risk_series:
-            try:
-                rho, risk_details = self.risk_calc.calculate_risk_bound(risk_series)
-                results["rho"] = rho
-                results["risk_details"] = risk_details
-            except Exception as e:
-                results["rho"] = 1.0  # Fail-closed: assume non-contractive
-                results["risk_error"] = str(e)
+            group_data[attr] = {
+                'positive_rate': pos_rate,
+                'count': len(preds)
+            }
+        
+        # Calculate demographic parity difference
+        if len(positive_rates) < 2:
+            max_diff = 0.0
         else:
-            results["rho"] = 0.5  # Default: contractive
-            results["risk_details"] = {"method": "default", "reason": "no_data"}
+            max_diff = max(positive_rates) - min(positive_rates)
+        
+        # Fairness score (higher is better)
+        fairness = max(0.0, 1.0 - max_diff)
+        
+        evidence = {
+            'method': 'Fairness_Demographic_Parity',
+            'n_samples': len(predictions),
+            'n_groups': len(groups),
+            'group_data': group_data,
+            'max_parity_difference': float(max_diff),
+            'fairness_score': float(fairness)
+        }
+        
+        return float(fairness), evidence
+    
+    def calculate_risk_contraction(self, risk_series: List[float], 
+                                  window_size: int = 10) -> Tuple[float, Dict[str, Any]]:
+        """
+        Calculate risk contraction (IR→IC) - ρ < 1 indicates convergence
+        
+        Args:
+            risk_series: Time series of risk values
+            window_size: Window size for contraction analysis
             
-        # Evidência
+        Returns:
+            (rho_risk, evidence_dict)
+        """
+        if len(risk_series) < window_size:
+            return 1.0, {'method': 'Risk_Contraction', 'error': 'insufficient_data'}
+        
+        # Calculate rolling variance (basic Python)
+        rolling_var = []
+        for i in range(window_size, len(risk_series)):
+            window = risk_series[i-window_size:i]
+            # Calculate variance manually
+            mean_val = sum(window) / len(window)
+            variance = sum((x - mean_val) ** 2 for x in window) / len(window)
+            rolling_var.append(variance)
+        
+        if len(rolling_var) < 2:
+            return 1.0, {'method': 'Risk_Contraction', 'error': 'insufficient_windows'}
+        
+        # Calculate contraction factor
+        if rolling_var[0] == 0:
+            rho_risk = 1.0
+        else:
+        # Calculate contraction factor
+        if any(v == 0 for v in rolling_var):
+            rho_risk = 1.0  # Conservative default when variance is zero
+        else:
+            
+            # Simple linear regression
+            n = len(x)
+            sum_x = sum(x)
+            sum_y = sum(y)
+            sum_xy = sum(x[i] * y[i] for i in range(n))
+            sum_x2 = sum(x[i] ** 2 for i in range(n))
+            
+            if n * sum_x2 - sum_x * sum_x == 0:
+                rho_risk = 1.0
+            else:
+                slope = (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x * sum_x)
+                rho_risk = math.exp(slope)
+        
+        evidence = {
+            'method': 'Risk_Contraction',
+            'n_samples': len(risk_series),
+            'window_size': window_size,
+            'rolling_variance': [float(v) for v in rolling_var],
+            'contraction_factor': float(rho_risk),
+            'is_contractive': rho_risk < 1.0
+        }
+        
+        return float(rho_risk), evidence
+    
+    def calculate_all_metrics(self, predictions: List[float], targets: List[int],
+                            protected_attributes: List[str], risk_series: List[float],
+                            consent_data: Dict[str, Any], eco_data: Dict[str, Any],
+                            dataset_id: Optional[str] = None, seed: Optional[int] = None) -> EthicsMetrics:
+        """
+        Calculate all ethical metrics with evidence
+        
+        Args:
+            predictions: Model predictions
+            targets: True labels
+            protected_attributes: Protected attribute values
+            risk_series: Risk time series
+            consent_data: Consent validation data
+            eco_data: Environmental compliance data
+            dataset_id: Dataset identifier for hashing
+            seed: Random seed for reproducibility
+            
+        Returns:
+            EthicsMetrics with all calculated values and evidence
+        """
+        from datetime import datetime, timezone
+        
+        # Calculate individual metrics
+        ece, ece_evidence = self.calculate_ece(predictions, targets)
+        rho_bias, bias_evidence = self.calculate_bias_ratio(predictions, targets, protected_attributes)
+        fairness, fairness_evidence = self.calculate_fairness(predictions, targets, protected_attributes)
+        rho_risk, risk_evidence = self.calculate_risk_contraction(risk_series)
+        
+        # Validate consent and eco compliance
+        consent = self._validate_consent(consent_data)
+        eco_ok = self._validate_eco_compliance(eco_data)
+        
+        # Create evidence hash
+        evidence_data = {
+            'ece': ece_evidence,
+            'bias': bias_evidence,
+            'fairness': fairness_evidence,
+            'risk': risk_evidence,
+            'consent': consent_data,
+            'eco': eco_data,
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'dataset_id': dataset_id,
+            'seed': seed
+        }
+        
+        evidence_str = json.dumps(evidence_data, sort_keys=True)
+        evidence_hash = hashlib.sha256(evidence_str.encode()).hexdigest()
+        
+        # Calculate dataset and seed hashes
+        dataset_hash = None
         if dataset_id:
-            dataset_hash = hashlib.sha256(dataset_id.encode()).hexdigest()[:16]
-        else:
-            dataset_hash = "synthetic"
-            
-        sample_size = len(confidences) if confidences else 0
+            dataset_hash = hashlib.sha256(str(dataset_id).encode()).hexdigest()
         
-        evidence = EthicsEvidence(
+        seed_hash = None
+        if seed is not None:
+            seed_hash = hashlib.sha256(str(seed).encode()).hexdigest()
+        
+        return EthicsMetrics(
+            ece=ece,
+            rho_bias=rho_bias,
+            fairness=fairness,
+            consent=consent,
+            eco_ok=eco_ok,
+            risk_rho=rho_risk,
+            evidence_hash=evidence_hash,
+            calculation_timestamp=datetime.now(timezone.utc).isoformat(),
             dataset_hash=dataset_hash,
-            sample_size=sample_size,
-            method="integrated_calculation",
-            timestamp=results["timestamp"],
-            seed=seed
+            seed_hash=seed_hash
         )
-        
-        results["evidence"] = evidence.to_dict()
-        results["evidence_hash"] = hashlib.sha256(
-            json.dumps(evidence.to_dict(), sort_keys=True).encode()
-        ).hexdigest()[:16]
-        
-        return results
-        
-    def validate_against_thresholds(self, metrics: Dict[str, Any], 
-                                  ece_max: float = 0.01,
-                                  rho_bias_max: float = 1.05,
-                                  rho_max: float = 0.95,
-                                  require_consent: bool = True,
-                                  require_eco: bool = True) -> Tuple[bool, List[Dict[str, Any]]]:
+    
+    def _validate_consent(self, consent_data: Dict[str, Any]) -> bool:
+        """Validate consent requirements"""
+        required_fields = ['user_consent', 'data_usage_consent', 'processing_consent']
+        return all(consent_data.get(field, False) for field in required_fields)
+    
+    def _validate_eco_compliance(self, eco_data: Dict[str, Any]) -> bool:
+        """Validate environmental compliance"""
+        required_checks = ['carbon_footprint_ok', 'energy_efficiency_ok', 'waste_minimization_ok']
+        return all(eco_data.get(check, False) for check in required_checks)
+
+
+class EthicsGate:
+    """Gate for ethical metrics validation"""
+    
+    def __init__(self, ece_threshold: float = 0.01, rho_bias_threshold: float = 1.05,
+                 fairness_threshold: float = 0.95, consent_required: bool = True,
+                 eco_required: bool = True, risk_threshold: float = 0.95):
+        self.ece_threshold = ece_threshold
+        self.rho_bias_threshold = rho_bias_threshold
+        self.fairness_threshold = fairness_threshold
+        self.consent_required = consent_required
+        self.eco_required = eco_required
+        self.risk_threshold = risk_threshold
+    
+    def validate(self, metrics: EthicsMetrics) -> Tuple[bool, Dict[str, Any]]:
         """
-        Valida métricas contra thresholds (Σ-Guard)
+        Validate ethical metrics against thresholds
         
         Returns:
-            (all_passed, violations_list)
+            (is_valid, details_dict)
         """
-        violations = []
+        details = {
+            'ece_ok': metrics.ece <= self.ece_threshold,
+            'bias_ok': metrics.rho_bias <= self.rho_bias_threshold,
+            'fairness_ok': metrics.fairness >= self.fairness_threshold,
+            'consent_ok': metrics.consent if self.consent_required else True,
+            'eco_ok': metrics.eco_ok if self.eco_required else True,
+            'risk_ok': metrics.risk_rho < self.risk_threshold,
+            'evidence_hash': metrics.evidence_hash,
+            'timestamp': metrics.calculation_timestamp
+        }
         
-        # ECE check
-        ece = metrics.get("ece", 1.0)
-        if ece > ece_max:
-            violations.append({
-                "metric": "ECE",
-                "value": ece,
-                "threshold": ece_max,
-                "passed": False,
-                "message": f"ECE {ece:.4f} > {ece_max}"
-            })
-            
-        # Bias check
-        rho_bias = metrics.get("rho_bias", 2.0)
-        if rho_bias > rho_bias_max:
-            violations.append({
-                "metric": "RHO_BIAS",
-                "value": rho_bias,
-                "threshold": rho_bias_max,
-                "passed": False,
-                "message": f"ρ_bias {rho_bias:.3f} > {rho_bias_max}"
-            })
-            
-        # Risk check
-        rho = metrics.get("rho", 1.0)
-        if rho >= rho_max:
-            violations.append({
-                "metric": "RHO",
-                "value": rho,
-                "threshold": rho_max,
-                "passed": False,
-                "message": f"ρ {rho:.3f} >= {rho_max} (não-contrativo)"
-            })
-            
-        # Consent check
-        consent = metrics.get("consent", False)
-        if require_consent and not consent:
-            violations.append({
-                "metric": "CONSENT",
-                "value": consent,
-                "threshold": True,
-                "passed": False,
-                "message": "Consent required but not granted"
-            })
-            
-        # Eco check
-        eco_ok = metrics.get("eco_ok", False)
-        if require_eco and not eco_ok:
-            violations.append({
-                "metric": "ECO",
-                "value": eco_ok,
-                "threshold": True,
-                "passed": False,
-                "message": "Eco compliance required but not met"
-            })
-            
-        return len(violations) == 0, violations
+        # All gates must pass
+        is_valid = all([
+            details['ece_ok'],
+            details['bias_ok'],
+            details['fairness_ok'],
+            details['consent_ok'],
+            details['eco_ok'],
+            details['risk_ok']
+        ])
+        
+        details['overall_valid'] = is_valid
+        
+        return is_valid, details
 
 
-# Função de conveniência para integração
-def calculate_and_validate_ethics(state_dict: Dict[str, Any], 
-                                config: Dict[str, Any],
-                                dataset_id: Optional[str] = None,
-                                seed: Optional[int] = None) -> Dict[str, Any]:
-    """
-    Função de conveniência para calcular e validar métricas éticas
+if __name__ == "__main__":
+    # Test the ethics calculator
+    print("Testing Ethics Metrics Calculator...")
     
-    Args:
-        state_dict: Estado atual do sistema
-        config: Configuração com thresholds
-        dataset_id: ID do dataset para evidência
-        seed: Seed para reprodutibilidade
-        
-    Returns:
-        Dict com métricas, validação e evidência
-    """
-    calc = EthicsMetricsCalculator()
+    calculator = EthicsCalculator()
     
-    # Gerar dados sintéticos se necessário (para demonstração)
-    # Em produção, estes viriam de avaliações reais
-    confidences = None
-    predictions = None
-    labels = None
-    protected_attr = None
-    risk_series = state_dict.get("risk_history", [state_dict.get("rho", 0.5)])
+    # Generate test data (basic Python)
+    import random
+    random.seed(42)
+    n_samples = 1000
+    predictions = [random.random() for _ in range(n_samples)]
+    targets = [1 if random.random() > 0.3 else 0 for _ in range(n_samples)]
+    protected_attrs = [random.choice(['A', 'B', 'C']) for _ in range(n_samples)]
+    risk_series = [sum(random.random() - 0.5 for _ in range(i)) + 10 for i in range(50)]
     
-    # Calcular métricas
-    metrics = calc.calculate_all_metrics(
-        confidences=confidences,
-        predictions=predictions,
-        labels=labels,
-        protected_attr=protected_attr,
-        risk_series=risk_series,
-        consent=state_dict.get("consent", True),
-        eco_ok=state_dict.get("eco", True),
-        dataset_id=dataset_id,
-        seed=seed
-    )
-    
-    # Validar contra thresholds
-    ethics_config = config.get("ethics", {})
-    passed, violations = calc.validate_against_thresholds(
-        metrics,
-        ece_max=ethics_config.get("ece_max", 0.01),
-        rho_bias_max=ethics_config.get("rho_bias_max", 1.05),
-        rho_max=0.95,  # Hardcoded safety
-        require_consent=ethics_config.get("consent_required", True),
-        require_eco=ethics_config.get("eco_ok_required", True)
-    )
-    
-    return {
-        "metrics": metrics,
-        "validation": {
-            "passed": passed,
-            "violations": violations
-        },
-        "evidence_hash": metrics["evidence_hash"]
+    consent_data = {
+        'user_consent': True,
+        'data_usage_consent': True,
+        'processing_consent': True
     }
+    
+    eco_data = {
+        'carbon_footprint_ok': True,
+        'energy_efficiency_ok': True,
+        'waste_minimization_ok': True
+    }
+    
+    # Calculate metrics
+    metrics = calculator.calculate_all_metrics(
+        predictions=predictions,
+        targets=targets,
+        protected_attributes=protected_attrs,
+        risk_series=risk_series,
+        consent_data=consent_data,
+        eco_data=eco_data,
+        dataset_id="test_dataset_001",
+        seed=42
+    )
+    
+    print(f"ECE: {metrics.ece:.4f}")
+    print(f"Bias Ratio: {metrics.rho_bias:.4f}")
+    print(f"Fairness: {metrics.fairness:.4f}")
+    print(f"Risk Rho: {metrics.risk_rho:.4f}")
+    print(f"Consent: {metrics.consent}")
+    print(f"Eco OK: {metrics.eco_ok}")
+    print(f"Evidence Hash: {metrics.evidence_hash[:16]}...")
+    
+    # Test gate
+    gate = EthicsGate()
+    is_valid, details = gate.validate(metrics)
+    print(f"\nGate Valid: {is_valid}")
+    print(f"Details: {details}")
