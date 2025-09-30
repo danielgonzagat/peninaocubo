@@ -1,0 +1,19 @@
+version: 1
+depth: 2            # níveis abaixo do núcleo
+branching: 3        # filhos por nó
+weights:
+  caos: 1.0
+  sr: 1.0
+  g: 1.0
+sync:
+  propagate_core_updates: true
+  non_compensatory: true
+thresholds:
+  beta_min: 0.01
+  theta_caos: 0.25
+  tau_sr: 0.80
+  theta_G: 0.85
+policies:
+  fail_closed: true
+  ethics_required: true
+  contractive_required: true
