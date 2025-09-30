@@ -95,6 +95,7 @@ class SecureCache:
 
         if not hmac.compare_digest(mac, expected_mac):
             raise ValueError("L2 cache HMAC mismatch - data may be corrupted or tampered")
+raise ValueError("L2 cache HMAC mismatch")
 
         return orjson.loads(data)
 
@@ -164,10 +165,10 @@ class SecureCache:
             evict_count = max(1, self.l2_size // 10)
             cursor.execute(
                 """
-                DELETE FROM cache 
+                DELETE FROM cache
                 WHERE key IN (
-                    SELECT key FROM cache 
-                    ORDER BY timestamp ASC 
+                    SELECT key FROM cache
+                    ORDER BY timestamp ASC
                     LIMIT ?
                 )
             """,
