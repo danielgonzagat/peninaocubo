@@ -767,7 +767,10 @@ class WORMLedger:
             cursor.execute("PRAGMA journal_mode=WAL")
             cursor.execute("PRAGMA synchronous=NORMAL")
             cursor.execute("PRAGMA busy_timeout=3000")
-        except Exception:
+        except Exception as e:
+            # Log the specific error but continue - some environments may not support WAL
+            print(f"Warning: Failed to set SQLite pragmas for concurrency: {e}")
+            # Consider falling back to safer defaults or raising for critical failures
             pass
         cursor.execute(
             """
