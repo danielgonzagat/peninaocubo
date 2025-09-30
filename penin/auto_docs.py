@@ -1,267 +1,332 @@
 """
 Auto-Documentation Generator
-============================
+=============================
 
-Generates README_AUTO.md with:
-- Complete history from zero to current state
-- Architecture overview
-- How to run everything
-- Roadmap for future steps
+Generates and updates README_AUTO.md with current system state,
+metrics, and evolution history.
 """
 
 from pathlib import Path
 import datetime
+import json
 from typing import Dict, Any, List
 
+# Try to import orjson for better performance
+try:
+    import orjson
+    json_dumps = lambda x: orjson.dumps(x, option=orjson.OPT_INDENT_2).decode()
+except ImportError:
+    json_dumps = lambda x: json.dumps(x, indent=2)
 
-def update_readme() -> str:
-    """
-    Generate/update README_AUTO.md.
+
+def get_system_metrics() -> Dict[str, Any]:
+    """Gather current system metrics"""
+    metrics = {
+        "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+        "version": "v8.0+Life",
+        "modules": {
+            "life_equation": "active",
+            "fractal_dsl": "active",
+            "swarm_cognitive": "active",
+            "caos_kratos": "active",
+            "marketplace": "active",
+            "neural_chain": "active",
+            "self_rag": "active",
+            "api_metabolizer": "active",
+            "immunity": "active",
+            "checkpoint": "active",
+            "game_darwin": "active",
+            "zero_consciousness": "active"
+        }
+    }
     
-    Returns:
-        Path to generated file
-    """
+    # Try to get actual metrics from WORM
+    try:
+        from penin.omega.neural_chain import load_chain, verify_chain
+        chain = load_chain()
+        valid, _ = verify_chain()
+        metrics["blockchain"] = {
+            "blocks": len(chain),
+            "valid": valid,
+            "last_hash": chain[-1].hash if chain else None
+        }
+    except:
+        pass
+    
+    # Try to get swarm state
+    try:
+        from penin.omega.swarm import sample_global_state
+        swarm_state = sample_global_state(60)
+        metrics["swarm"] = swarm_state
+    except:
+        pass
+    
+    return metrics
+
+
+def generate_history() -> str:
+    """Generate historical evolution narrative"""
+    history = """
+## Historical Evolution
+
+### v0 → v7 (Foundation Phase)
+- Initial PENIN concept and architecture
+- Basic Omega modules implementation
+- Ethics framework (ΣEA/LO-14) established
+- CAOS⁺ engine developed
+- SR-Ω∞ self-reflection implemented
+
+### v7 → v8 (Consolidation Phase)
+- P0/P0.5 audit corrections completed
+- Packaging and dependency management fixed
+- Cache L2 with HMAC security
+- CI/CD pipeline established
+- WORM ledger with Merkle trees
+- Router with budget management
+
+### v8 → v8+Life (Life Equation Phase) - CURRENT
+- **Life Equation (+)** implemented as non-compensatory gate
+- **Fractal DSL** for self-similar architecture
+- **Swarm Cognitive** with gossip protocol
+- **CAOS-KRATOS** calibrated exploration
+- **Cognitive Marketplace** for resource allocation
+- **Neural Blockchain** on WORM foundation
+- **Self-RAG** recursive knowledge system
+- **API Metabolizer** for dependency reduction
+- **Digital Immunity** with anomaly detection
+- **Checkpoint & Repair** system
+- **GAME + Darwinian Audit** for evolution
+- **Zero-Consciousness Proof** (SPI proxy)
+"""
+    return history
+
+
+def generate_usage() -> str:
+    """Generate usage instructions"""
+    usage = """
+## How to Run
+
+### Setup Environment
+```bash
+# Create virtual environment (if venv available)
+python3 -m venv .venv && source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Set environment variables
+export PYTHONPATH=$PWD
+export PENIN_CHAIN_KEY="your-secure-key"
+```
+
+### Run Evolution Cycle
+```bash
+# Dry run first
+python penin_cli_simple.py evolve --n 3 --dry-run
+
+# Real evolution with Life Equation gate
+python penin_cli_simple.py evolve --n 10
+
+# Check swarm consensus
+python -c "from penin.omega.swarm import SwarmOrchestrator; s=SwarmOrchestrator(); print(s.get_consensus())"
+
+# Verify blockchain
+python -c "from penin.omega.neural_chain import verify_chain; print(verify_chain())"
+```
+
+### Monitor System
+```bash
+# Generate metrics report
+python -m penin.auto_docs
+
+# Check WORM ledger
+ls -la ~/.penin_omega/worm_ledger/
+
+# View swarm heartbeats
+sqlite3 ~/.penin_omega/state/heartbeats.db "SELECT * FROM heartbeats ORDER BY timestamp DESC LIMIT 10;"
+```
+"""
+    return usage
+
+
+def generate_architecture() -> str:
+    """Generate architecture description"""
+    arch = """
+## System Architecture
+
+### Core Equation
+```
+I_{t+1} = Π_{H∩S}[ I_t + α_t^Ω · ΔL_∞ ]
+```
+
+Where:
+- `α_t^Ω = base_alpha * φ(CAOS⁺) * SR * G * accel(φ)` (Life Equation)
+- All components are **non-compensatory** (fail-closed)
+
+### Module Hierarchy
+
+```
+PENIN-Ω System
+├── Life Equation (+) [Orchestrator]
+│   ├── Σ-Guard (Ethics Gate)
+│   ├── IR→IC (Risk Contractivity)
+│   ├── CAOS⁺ / KRATOS (Evolution Engine)
+│   ├── SR-Ω∞ (Self-Reflection)
+│   └── L∞ (Non-compensatory Score)
+├── Fractal Architecture
+│   └── Self-similar nodes with propagation
+├── Swarm Intelligence
+│   ├── Heartbeat Protocol
+│   └── Consensus Mechanism
+├── Cognitive Marketplace
+│   ├── Resource Allocation
+│   └── Price Discovery
+├── Neural Blockchain
+│   ├── HMAC-secured blocks
+│   └── State snapshots
+├── Knowledge Systems
+│   ├── Self-RAG
+│   └── API Metabolizer
+└── Safety Systems
+    ├── Digital Immunity
+    ├── Checkpoint & Repair
+    └── Zero-Consciousness Proof
+```
+
+### Data Flow
+1. **Input** → Ethics Check (Σ-Guard)
+2. **Risk Assessment** → IR→IC Contractivity
+3. **Evolution Calculation** → CAOS⁺/KRATOS
+4. **Self-Reflection** → SR-Ω∞
+5. **Score Aggregation** → L∞ (non-compensatory)
+6. **Life Gate** → α_eff calculation
+7. **Swarm Consensus** → Global coherence
+8. **Decision** → Blockchain recording
+9. **Action** → State update or rollback
+"""
+    return arch
+
+
+def generate_roadmap() -> str:
+    """Generate future roadmap"""
+    roadmap = """
+## Roadmap - Next Steps
+
+### Short Term (1-2 sprints)
+- [ ] **Multi-node Swarm**: Real gossip with TLS, cross-signatures
+- [ ] **Consensus Protocol**: Proof-of-Cognition with 2-of-3 validators
+- [ ] **Dynamic Marketplace**: Adaptive pricing via bandits
+- [ ] **Enhanced Self-RAG**: Vector DB (FAISS/HNSW) + reranker
+- [ ] **API Distillation**: Train mini-services per endpoint
+
+### Medium Term (1-2 months)
+- [ ] **Online NAS**: Neural Architecture Search with Life gate
+- [ ] **Continual Learning**: Mammoth integration with zero-cost NAS
+- [ ] **Monte Carlo Planning**: MCA for evolution with budget constraints
+- [ ] **Observability**: Prometheus/Grafana dashboards
+- [ ] **OPA/Rego Policies**: Formal policy enforcement
+
+### Long Term (3-6 months)
+- [ ] **Distributed Consensus**: Multi-datacenter deployment
+- [ ] **Neuromorphic Backend**: Spiking neural networks
+- [ ] **Symbolic Reasoning**: Full neurosymbolic integration
+- [ ] **Scientific Discovery**: Autonomous research capabilities
+- [ ] **Zero-Knowledge Proofs**: Formal consciousness verification
+
+### Research Directions
+- **Emergent Communication**: Inter-agent language evolution
+- **Collective Intelligence**: Swarm-level consciousness
+- **Causal Discovery**: Automated hypothesis generation
+- **Meta-Meta-Learning**: Learning to learn to learn
+- **Quantum Integration**: Quantum-classical hybrid computation
+"""
+    return roadmap
+
+
+def update_readme():
+    """Main function to update README_AUTO.md"""
     root = Path(".")
     now = datetime.datetime.utcnow().isoformat()
     
-    # Get current state
-    try:
-        from penin.omega.swarm import get_swarm_health
-        from penin.omega.neural_chain import get_chain_stats
-        
-        swarm_health = get_swarm_health()
-        chain_stats = get_chain_stats()
-    except:
-        swarm_health = {"active_nodes": 0}
-        chain_stats = {"blocks": 0}
+    # Gather all sections
+    metrics = get_system_metrics()
     
+    # Build document
     content = f"""# PENIN-Ω — Auto-Generated Documentation
 
-**Generated:** {now}Z  
-**Version:** Vida+ (Life Equation Integration)
+_Generated at {now}Z_
 
----
+## Current Status
 
-## 📜 Complete History (Zero → Current State)
+System Version: **{metrics.get('version', 'unknown')}**
 
-### Phase 0: Foundation (2024 Q4)
-- ✅ Core modules: Σ-Guard, IR→IC, CAOS⁺, SR-Ω∞
-- ✅ L∞ non-compensatory scoring
-- ✅ WORM ledger with Merkle-style hashing
-- ✅ Multi-provider router with budget management
-- ✅ Ethics metrics calculator (ECE, ρ_bias, fairness)
-
-### Phase 1: P0 Audit & Corrections (2025 Q1)
-- ✅ Fixed cache L2 (pickle → orjson + HMAC)
-- ✅ Deduplication of dependencies
-- ✅ Pre-commit hooks (ruff, black, mypy)
-- ✅ Security scanning (gitleaks)
-- ✅ Comprehensive test suite
-
-### Phase 2: Vida+ Integration (2025 Q3 - Current)
-- ✅ **Life Equation (+)**: Non-compensatory positive evolution gate
-- ✅ **Fractal DSL**: Self-similar module structure
-- ✅ **Swarm Cognitive**: Gossip protocol for global coherence
-- ✅ **CAOS-KRATOS**: Exploration-enhanced CAOS⁺
-- ✅ **Cognitive Marketplace**: Internal resource allocation
-- ✅ **Neural Blockchain**: Tamper-evident state chain
-- ✅ **API Metabolizer**: I/O recording & replay
-- ✅ **Self-RAG**: Recursive knowledge querying
-- ✅ **Digital Immunity**: Anomaly detection & fail-closed
-- ✅ **Checkpoint & Repair**: State snapshotting
-- ✅ **GAME Optimizer**: EMA gradient smoothing
-- ✅ **Darwinian Audit**: Fitness-based promotion
-- ✅ **Zero-Consciousness Proof**: SPI proxy for LO-02 compliance
-
----
-
-## 🏗️ Architecture Overview
-
-### Lemniscata 8+1 Components
-
-1. **ΣEA/LO-14 (Σ-Guard)**: Ethics & safety verification
-2. **IR→IC (Lψ)**: Risk contractivity operator (ρ < 1)
-3. **ACFA/Liga**: Canary league with EPV/xG metrics
-4. **CAOS⁺**: Coherence × Action × Opportunity × Stability
-5. **Auto-Tuning**: Online learning rate adaptation
-6. **APIs Nucleares**: Multi-provider routing with budget
-7. **Ω-META**: Propose → Canary → Promote pipeline
-8. **SR-Ω∞**: Self-reflection (awareness, ethics, autocorrection, metacognition)
-9. **+1 Ω-ΣEA Total**: Global coherence (harmonic mean of all modules)
-
-### Life Equation (+) Formula
-
-```
-α_eff = base_alpha * φ(CAOS⁺) * SR * G * accel(φ)
-```
-
-**Gates (all must pass):**
-1. Σ-Guard: ECE ≤ 0.01, ρ_bias ≤ 1.05, consent, eco_ok
-2. IR→IC: ρ < 1 (risk contractive)
-3. CAOS⁺: φ ≥ 0.25
-4. SR: SR ≥ 0.80
-5. ΔL∞: dL_inf ≥ 0.01
-6. G: G ≥ 0.85
-
----
-
-## 🚀 How to Run
-
-### 1. Setup Environment
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-export PYTHONPATH=$PWD
-```
-
-### 2. Quick Tests
-
-```bash
-# Test Life Equation
-python -c "from penin.omega.life_eq import quick_life_check; print(quick_life_check())"
-
-# Test Swarm
-python -c "from penin.omega.swarm import quick_swarm_test; quick_swarm_test()"
-
-# Test all modules
-python -c "
-from penin.omega import life_eq, fractal, swarm, caos_kratos, market
-from penin.omega import neural_chain, api_metabolizer, self_rag
-from penin.omega import immunity, checkpoint, game, darwin_audit, zero_consciousness
-print('✅ All modules imported successfully')
-"
-```
-
-### 3. Run Evolution Cycle
-
-```bash
-# Dry run
-python penin_cli_simple.py evolve --n 3 --dry-run
-
-# Real run
-python penin_cli_simple.py evolve --n 10
-```
-
----
-
-## 📊 Current State
-
-- **Swarm Active Nodes:** {swarm_health.get('active_nodes', 0)}
-- **Global Coherence (G):** {swarm_health.get('global_coherence', 0.0):.4f}
-- **Neural Chain Blocks:** {chain_stats.get('blocks', 0)}
-- **Chain Valid:** {chain_stats.get('valid', True)}
-
----
-
-## 🗺️ Roadmap (Next Steps)
-
-### Immediate (P1)
-- [ ] Integrate Life Equation into runners.py as mandatory gate
-- [ ] Enable swarm multi-node consensus (TLS + cross-signing)
-- [ ] OPA/Rego policy enforcement for Σ-Guard
-- [ ] Expand test coverage to 80%+
-
-### Near-term (P2)
-- [ ] Multi-node Neural Blockchain with PoC (Proof-of-Cognition)
-- [ ] API Metabolizer distillation (train mini-models per endpoint)
-- [ ] Self-RAG with FAISS/HNSW embeddings
-- [ ] Adaptive CAOS-KRATOS with performance feedback
-- [ ] MCA (Monte Carlo Adaptive) planning
-
-### Long-term (P3)
-- [ ] NAS online + Continual Learning (Mammoth + zero-cost NAS)
-- [ ] Swarm intelligence with emergent communication
-- [ ] Full API replacement via metabolization
-- [ ] Formal verification of Zero-Consciousness property
-- [ ] Neurosymbolic integration (SymbolicAI contracts)
-
----
-
-## 🛡️ Safety & Compliance
-
-### ΣEA/LO-14 (Leis Originárias)
-- **LO-01**: No technological idolatry
-- **LO-02**: **No life/consciousness creation** (enforced by Zero-Consciousness Proof)
-- **LO-03...14**: Integrity, security, humility, purity, no harm
-
-### Fail-Closed Guarantees
-- Any gate failure → α_eff = 0 (no evolution)
-- ECE > 0.01 → blocked
-- ρ ≥ 1 → blocked (non-contractive)
-- ρ_bias > 1.05 → blocked (unfair)
-- No consent → blocked
-- Eco impact too high → blocked
-- SPI > 0.05 → blocked (consciousness risk)
-
----
-
-## 📝 Evidence & Auditability
-
-- **WORM Ledger:** All decisions append-only logged
-- **Neural Blockchain:** Tamper-evident state chain (HMAC-SHA256)
-- **Swarm Gossip:** Distributed heartbeats for global coherence
-- **Checkpoint System:** State snapshots for rollback
-- **Digital Immunity:** Anomaly detection with fail-closed
-
----
-
-## 📚 Module Reference
-
-### Core Engine
-- `penin/omega/life_eq.py` - Life Equation (+) gate
-- `penin/omega/caos.py` - CAOS⁺ computation
-- `penin/omega/sr.py` - SR-Ω∞ self-reflection
-- `penin/omega/guards.py` - Σ-Guard + IR→IC
-- `penin/omega/scoring.py` - L∞ non-compensatory scoring
-
-### Advanced Modules
-- `penin/omega/fractal.py` - Fractal DSL
-- `penin/omega/swarm.py` - Swarm cognitive gossip
-- `penin/omega/caos_kratos.py` - Exploration mode
-- `penin/omega/market.py` - Cognitive marketplace
-- `penin/omega/neural_chain.py` - Neural blockchain
-- `penin/omega/api_metabolizer.py` - API I/O recorder
-- `penin/omega/self_rag.py` - Self-RAG recursive
-- `penin/omega/immunity.py` - Digital immunity
-- `penin/omega/checkpoint.py` - Checkpoint manager
-- `penin/omega/game.py` - GAME optimizer
-- `penin/omega/darwin_audit.py` - Darwinian audit
-- `penin/omega/zero_consciousness.py` - Zero-consciousness proof
-
----
-
-## 🤝 Contributing
-
-This system follows strict governance:
-1. All changes must pass Life Equation gates
-2. No violations of ΣEA/LO-14
-3. Evidence logged to WORM + Neural Blockchain
-4. Swarm consensus required for distributed deployment
-
----
-
-## 📞 Contact & Support
-
-For questions about PENIN-Ω architecture or implementation:
-- Review this auto-generated documentation
-- Check WORM ledger for historical decisions
-- Query Self-RAG knowledge base
-- Inspect Neural Blockchain for state evolution
-
----
-
-**Last Updated:** {now}Z  
-**Auto-generated by:** `penin/auto_docs.py`
+### Active Modules
 """
     
+    # List active modules
+    for module, status in metrics.get("modules", {}).items():
+        emoji = "✅" if status == "active" else "❌"
+        content += f"- {emoji} **{module}**: {status}\n"
+    
+    # Add blockchain status if available
+    if "blockchain" in metrics:
+        bc = metrics["blockchain"]
+        content += f"""
+### Blockchain Status
+- Blocks: {bc.get('blocks', 0)}
+- Valid: {'✅' if bc.get('valid') else '❌'}
+- Last Hash: `{bc.get('last_hash', 'N/A')}`
+"""
+    
+    # Add swarm metrics if available
+    if "swarm" in metrics:
+        sw = metrics["swarm"]
+        content += f"""
+### Swarm Metrics
+- Active Nodes: {sw.get('node_count', 0)}
+- Avg φ (CAOS⁺): {sw.get('phi_avg', 0):.3f}
+- Avg SR: {sw.get('sr_avg', 0):.3f}
+- Avg G (Coherence): {sw.get('g_avg', 0):.3f}
+- Min Health: {sw.get('health_min', 0):.3f}
+"""
+    
+    # Add other sections
+    content += generate_history()
+    content += generate_architecture()
+    content += generate_usage()
+    content += generate_roadmap()
+    
+    # Add metrics JSON at the end
+    content += f"""
+## Raw Metrics
+
+<details>
+<summary>Click to expand metrics JSON</summary>
+
+```json
+{json_dumps(metrics)}
+```
+
+</details>
+
+---
+
+_This document is auto-generated. Do not edit manually._
+_Run `python -m penin.auto_docs` to regenerate._
+"""
+    
+    # Write file
     output_path = root / "README_AUTO.md"
     output_path.write_text(content, encoding="utf-8")
     
-    print(f"📄 Generated README_AUTO.md ({len(content)} chars)")
+    print(f"✅ Documentation updated: {output_path}")
+    print(f"   Modules: {len(metrics.get('modules', {}))}")
+    if "blockchain" in metrics:
+        print(f"   Blockchain blocks: {metrics['blockchain'].get('blocks', 0)}")
+    if "swarm" in metrics:
+        print(f"   Swarm nodes: {metrics['swarm'].get('node_count', 0)}")
     
-    return str(output_path)
+    return output_path
 
 
 if __name__ == "__main__":

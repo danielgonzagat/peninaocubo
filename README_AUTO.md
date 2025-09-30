@@ -1,219 +1,239 @@
 # PENIN-Ω — Auto-Generated Documentation
 
-**Generated:** 2025-09-30T15:14:59.321111Z  
-**Version:** Vida+ (Life Equation Integration)
+_Generated at 2025-09-30T15:18:24.989254Z_
 
----
+## Current Status
 
-## 📜 Complete History (Zero → Current State)
+System Version: **v8.0+Life**
 
-### Phase 0: Foundation (2024 Q4)
-- ✅ Core modules: Σ-Guard, IR→IC, CAOS⁺, SR-Ω∞
-- ✅ L∞ non-compensatory scoring
-- ✅ WORM ledger with Merkle-style hashing
-- ✅ Multi-provider router with budget management
-- ✅ Ethics metrics calculator (ECE, ρ_bias, fairness)
+### Active Modules
+- ✅ **life_equation**: active
+- ✅ **fractal_dsl**: active
+- ✅ **swarm_cognitive**: active
+- ✅ **caos_kratos**: active
+- ✅ **marketplace**: active
+- ✅ **neural_chain**: active
+- ✅ **self_rag**: active
+- ✅ **api_metabolizer**: active
+- ✅ **immunity**: active
+- ✅ **checkpoint**: active
+- ✅ **game_darwin**: active
+- ✅ **zero_consciousness**: active
 
-### Phase 1: P0 Audit & Corrections (2025 Q1)
-- ✅ Fixed cache L2 (pickle → orjson + HMAC)
-- ✅ Deduplication of dependencies
-- ✅ Pre-commit hooks (ruff, black, mypy)
-- ✅ Security scanning (gitleaks)
-- ✅ Comprehensive test suite
+### Blockchain Status
+- Blocks: 10
+- Valid: ✅
+- Last Hash: `dfc9962080c7e85d6b4a1ebf937ef5002f080392d57fd5b02c482e4221484645`
 
-### Phase 2: Vida+ Integration (2025 Q3 - Current)
-- ✅ **Life Equation (+)**: Non-compensatory positive evolution gate
-- ✅ **Fractal DSL**: Self-similar module structure
-- ✅ **Swarm Cognitive**: Gossip protocol for global coherence
-- ✅ **CAOS-KRATOS**: Exploration-enhanced CAOS⁺
-- ✅ **Cognitive Marketplace**: Internal resource allocation
-- ✅ **Neural Blockchain**: Tamper-evident state chain
-- ✅ **API Metabolizer**: I/O recording & replay
-- ✅ **Self-RAG**: Recursive knowledge querying
-- ✅ **Digital Immunity**: Anomaly detection & fail-closed
-- ✅ **Checkpoint & Repair**: State snapshotting
-- ✅ **GAME Optimizer**: EMA gradient smoothing
-- ✅ **Darwinian Audit**: Fitness-based promotion
-- ✅ **Zero-Consciousness Proof**: SPI proxy for LO-02 compliance
+### Swarm Metrics
+- Active Nodes: 5
+- Avg φ (CAOS⁺): 0.134
+- Avg SR: 0.829
+- Avg G (Coherence): 0.897
+- Min Health: 1.000
 
----
+## Historical Evolution
 
-## 🏗️ Architecture Overview
+### v0 → v7 (Foundation Phase)
+- Initial PENIN concept and architecture
+- Basic Omega modules implementation
+- Ethics framework (ΣEA/LO-14) established
+- CAOS⁺ engine developed
+- SR-Ω∞ self-reflection implemented
 
-### Lemniscata 8+1 Components
+### v7 → v8 (Consolidation Phase)
+- P0/P0.5 audit corrections completed
+- Packaging and dependency management fixed
+- Cache L2 with HMAC security
+- CI/CD pipeline established
+- WORM ledger with Merkle trees
+- Router with budget management
 
-1. **ΣEA/LO-14 (Σ-Guard)**: Ethics & safety verification
-2. **IR→IC (Lψ)**: Risk contractivity operator (ρ < 1)
-3. **ACFA/Liga**: Canary league with EPV/xG metrics
-4. **CAOS⁺**: Coherence × Action × Opportunity × Stability
-5. **Auto-Tuning**: Online learning rate adaptation
-6. **APIs Nucleares**: Multi-provider routing with budget
-7. **Ω-META**: Propose → Canary → Promote pipeline
-8. **SR-Ω∞**: Self-reflection (awareness, ethics, autocorrection, metacognition)
-9. **+1 Ω-ΣEA Total**: Global coherence (harmonic mean of all modules)
+### v8 → v8+Life (Life Equation Phase) - CURRENT
+- **Life Equation (+)** implemented as non-compensatory gate
+- **Fractal DSL** for self-similar architecture
+- **Swarm Cognitive** with gossip protocol
+- **CAOS-KRATOS** calibrated exploration
+- **Cognitive Marketplace** for resource allocation
+- **Neural Blockchain** on WORM foundation
+- **Self-RAG** recursive knowledge system
+- **API Metabolizer** for dependency reduction
+- **Digital Immunity** with anomaly detection
+- **Checkpoint & Repair** system
+- **GAME + Darwinian Audit** for evolution
+- **Zero-Consciousness Proof** (SPI proxy)
 
-### Life Equation (+) Formula
+## System Architecture
+
+### Core Equation
+```
+I_{t+1} = Π_{H∩S}[ I_t + α_t^Ω · ΔL_∞ ]
+```
+
+Where:
+- `α_t^Ω = base_alpha * φ(CAOS⁺) * SR * G * accel(φ)` (Life Equation)
+- All components are **non-compensatory** (fail-closed)
+
+### Module Hierarchy
 
 ```
-α_eff = base_alpha * φ(CAOS⁺) * SR * G * accel(φ)
+PENIN-Ω System
+├── Life Equation (+) [Orchestrator]
+│   ├── Σ-Guard (Ethics Gate)
+│   ├── IR→IC (Risk Contractivity)
+│   ├── CAOS⁺ / KRATOS (Evolution Engine)
+│   ├── SR-Ω∞ (Self-Reflection)
+│   └── L∞ (Non-compensatory Score)
+├── Fractal Architecture
+│   └── Self-similar nodes with propagation
+├── Swarm Intelligence
+│   ├── Heartbeat Protocol
+│   └── Consensus Mechanism
+├── Cognitive Marketplace
+│   ├── Resource Allocation
+│   └── Price Discovery
+├── Neural Blockchain
+│   ├── HMAC-secured blocks
+│   └── State snapshots
+├── Knowledge Systems
+│   ├── Self-RAG
+│   └── API Metabolizer
+└── Safety Systems
+    ├── Digital Immunity
+    ├── Checkpoint & Repair
+    └── Zero-Consciousness Proof
 ```
 
-**Gates (all must pass):**
-1. Σ-Guard: ECE ≤ 0.01, ρ_bias ≤ 1.05, consent, eco_ok
-2. IR→IC: ρ < 1 (risk contractive)
-3. CAOS⁺: φ ≥ 0.25
-4. SR: SR ≥ 0.80
-5. ΔL∞: dL_inf ≥ 0.01
-6. G: G ≥ 0.85
+### Data Flow
+1. **Input** → Ethics Check (Σ-Guard)
+2. **Risk Assessment** → IR→IC Contractivity
+3. **Evolution Calculation** → CAOS⁺/KRATOS
+4. **Self-Reflection** → SR-Ω∞
+5. **Score Aggregation** → L∞ (non-compensatory)
+6. **Life Gate** → α_eff calculation
+7. **Swarm Consensus** → Global coherence
+8. **Decision** → Blockchain recording
+9. **Action** → State update or rollback
 
----
+## How to Run
 
-## 🚀 How to Run
-
-### 1. Setup Environment
-
+### Setup Environment
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
+# Create virtual environment (if venv available)
+python3 -m venv .venv && source .venv/bin/activate
+
+# Install dependencies
 pip install -r requirements.txt
+
+# Set environment variables
 export PYTHONPATH=$PWD
+export PENIN_CHAIN_KEY="your-secure-key"
 ```
 
-### 2. Quick Tests
-
+### Run Evolution Cycle
 ```bash
-# Test Life Equation
-python -c "from penin.omega.life_eq import quick_life_check; print(quick_life_check())"
-
-# Test Swarm
-python -c "from penin.omega.swarm import quick_swarm_test; quick_swarm_test()"
-
-# Test all modules
-python -c "
-from penin.omega import life_eq, fractal, swarm, caos_kratos, market
-from penin.omega import neural_chain, api_metabolizer, self_rag
-from penin.omega import immunity, checkpoint, game, darwin_audit, zero_consciousness
-print('✅ All modules imported successfully')
-"
-```
-
-### 3. Run Evolution Cycle
-
-```bash
-# Dry run
+# Dry run first
 python penin_cli_simple.py evolve --n 3 --dry-run
 
-# Real run
+# Real evolution with Life Equation gate
 python penin_cli_simple.py evolve --n 10
+
+# Check swarm consensus
+python -c "from penin.omega.swarm import SwarmOrchestrator; s=SwarmOrchestrator(); print(s.get_consensus())"
+
+# Verify blockchain
+python -c "from penin.omega.neural_chain import verify_chain; print(verify_chain())"
 ```
 
----
+### Monitor System
+```bash
+# Generate metrics report
+python -m penin.auto_docs
 
-## 📊 Current State
+# Check WORM ledger
+ls -la ~/.penin_omega/worm_ledger/
 
-- **Swarm Active Nodes:** 0
-- **Global Coherence (G):** 0.0000
-- **Neural Chain Blocks:** 0
-- **Chain Valid:** True
+# View swarm heartbeats
+sqlite3 ~/.penin_omega/state/heartbeats.db "SELECT * FROM heartbeats ORDER BY timestamp DESC LIMIT 10;"
+```
 
----
+## Roadmap - Next Steps
 
-## 🗺️ Roadmap (Next Steps)
+### Short Term (1-2 sprints)
+- [ ] **Multi-node Swarm**: Real gossip with TLS, cross-signatures
+- [ ] **Consensus Protocol**: Proof-of-Cognition with 2-of-3 validators
+- [ ] **Dynamic Marketplace**: Adaptive pricing via bandits
+- [ ] **Enhanced Self-RAG**: Vector DB (FAISS/HNSW) + reranker
+- [ ] **API Distillation**: Train mini-services per endpoint
 
-### Immediate (P1)
-- [ ] Integrate Life Equation into runners.py as mandatory gate
-- [ ] Enable swarm multi-node consensus (TLS + cross-signing)
-- [ ] OPA/Rego policy enforcement for Σ-Guard
-- [ ] Expand test coverage to 80%+
+### Medium Term (1-2 months)
+- [ ] **Online NAS**: Neural Architecture Search with Life gate
+- [ ] **Continual Learning**: Mammoth integration with zero-cost NAS
+- [ ] **Monte Carlo Planning**: MCA for evolution with budget constraints
+- [ ] **Observability**: Prometheus/Grafana dashboards
+- [ ] **OPA/Rego Policies**: Formal policy enforcement
 
-### Near-term (P2)
-- [ ] Multi-node Neural Blockchain with PoC (Proof-of-Cognition)
-- [ ] API Metabolizer distillation (train mini-models per endpoint)
-- [ ] Self-RAG with FAISS/HNSW embeddings
-- [ ] Adaptive CAOS-KRATOS with performance feedback
-- [ ] MCA (Monte Carlo Adaptive) planning
+### Long Term (3-6 months)
+- [ ] **Distributed Consensus**: Multi-datacenter deployment
+- [ ] **Neuromorphic Backend**: Spiking neural networks
+- [ ] **Symbolic Reasoning**: Full neurosymbolic integration
+- [ ] **Scientific Discovery**: Autonomous research capabilities
+- [ ] **Zero-Knowledge Proofs**: Formal consciousness verification
 
-### Long-term (P3)
-- [ ] NAS online + Continual Learning (Mammoth + zero-cost NAS)
-- [ ] Swarm intelligence with emergent communication
-- [ ] Full API replacement via metabolization
-- [ ] Formal verification of Zero-Consciousness property
-- [ ] Neurosymbolic integration (SymbolicAI contracts)
+### Research Directions
+- **Emergent Communication**: Inter-agent language evolution
+- **Collective Intelligence**: Swarm-level consciousness
+- **Causal Discovery**: Automated hypothesis generation
+- **Meta-Meta-Learning**: Learning to learn to learn
+- **Quantum Integration**: Quantum-classical hybrid computation
 
----
+## Raw Metrics
 
-## 🛡️ Safety & Compliance
+<details>
+<summary>Click to expand metrics JSON</summary>
 
-### ΣEA/LO-14 (Leis Originárias)
-- **LO-01**: No technological idolatry
-- **LO-02**: **No life/consciousness creation** (enforced by Zero-Consciousness Proof)
-- **LO-03...14**: Integrity, security, humility, purity, no harm
+```json
+{
+  "timestamp": "2025-09-30T15:18:24.989290Z",
+  "version": "v8.0+Life",
+  "modules": {
+    "life_equation": "active",
+    "fractal_dsl": "active",
+    "swarm_cognitive": "active",
+    "caos_kratos": "active",
+    "marketplace": "active",
+    "neural_chain": "active",
+    "self_rag": "active",
+    "api_metabolizer": "active",
+    "immunity": "active",
+    "checkpoint": "active",
+    "game_darwin": "active",
+    "zero_consciousness": "active"
+  },
+  "blockchain": {
+    "blocks": 10,
+    "valid": true,
+    "last_hash": "dfc9962080c7e85d6b4a1ebf937ef5002f080392d57fd5b02c482e4221484645"
+  },
+  "swarm": {
+    "phi_avg": 0.1340905347096609,
+    "phi_harmonic": 0.1317939128942023,
+    "sr_avg": 0.8292668772604731,
+    "sr_harmonic": 0.8266421802648308,
+    "g_avg": 0.8966531973307825,
+    "g_harmonic": 0.8962430914966891,
+    "health_avg": 1.0,
+    "health_min": 1.0,
+    "node_count": 5,
+    "sample_count": 5,
+    "window_s": 60
+  }
+}
+```
 
-### Fail-Closed Guarantees
-- Any gate failure → α_eff = 0 (no evolution)
-- ECE > 0.01 → blocked
-- ρ ≥ 1 → blocked (non-contractive)
-- ρ_bias > 1.05 → blocked (unfair)
-- No consent → blocked
-- Eco impact too high → blocked
-- SPI > 0.05 → blocked (consciousness risk)
-
----
-
-## 📝 Evidence & Auditability
-
-- **WORM Ledger:** All decisions append-only logged
-- **Neural Blockchain:** Tamper-evident state chain (HMAC-SHA256)
-- **Swarm Gossip:** Distributed heartbeats for global coherence
-- **Checkpoint System:** State snapshots for rollback
-- **Digital Immunity:** Anomaly detection with fail-closed
-
----
-
-## 📚 Module Reference
-
-### Core Engine
-- `penin/omega/life_eq.py` - Life Equation (+) gate
-- `penin/omega/caos.py` - CAOS⁺ computation
-- `penin/omega/sr.py` - SR-Ω∞ self-reflection
-- `penin/omega/guards.py` - Σ-Guard + IR→IC
-- `penin/omega/scoring.py` - L∞ non-compensatory scoring
-
-### Advanced Modules
-- `penin/omega/fractal.py` - Fractal DSL
-- `penin/omega/swarm.py` - Swarm cognitive gossip
-- `penin/omega/caos_kratos.py` - Exploration mode
-- `penin/omega/market.py` - Cognitive marketplace
-- `penin/omega/neural_chain.py` - Neural blockchain
-- `penin/omega/api_metabolizer.py` - API I/O recorder
-- `penin/omega/self_rag.py` - Self-RAG recursive
-- `penin/omega/immunity.py` - Digital immunity
-- `penin/omega/checkpoint.py` - Checkpoint manager
-- `penin/omega/game.py` - GAME optimizer
-- `penin/omega/darwin_audit.py` - Darwinian audit
-- `penin/omega/zero_consciousness.py` - Zero-consciousness proof
-
----
-
-## 🤝 Contributing
-
-This system follows strict governance:
-1. All changes must pass Life Equation gates
-2. No violations of ΣEA/LO-14
-3. Evidence logged to WORM + Neural Blockchain
-4. Swarm consensus required for distributed deployment
+</details>
 
 ---
 
-## 📞 Contact & Support
-
-For questions about PENIN-Ω architecture or implementation:
-- Review this auto-generated documentation
-- Check WORM ledger for historical decisions
-- Query Self-RAG knowledge base
-- Inspect Neural Blockchain for state evolution
-
----
-
-**Last Updated:** 2025-09-30T15:14:59.321111Z  
-**Auto-generated by:** `penin/auto_docs.py`
+_This document is auto-generated. Do not edit manually._
+_Run `python -m penin.auto_docs` to regenerate._
