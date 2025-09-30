@@ -3,10 +3,10 @@ from typing import Dict, Any
 
 def continual_step_mammoth(dataset: str = "cifar10") -> Dict[str, Any]:
     try:
-        import mammoth  # type: ignore
-    except Exception as e:
+        import mammoth  # type: ignore  # noqa: F401
+    except Exception as e:  # pragma: no cover
         raise ImportError(
-            "Mammoth não instalado. Instale com `pip install mammoth-cl` ou desative este plugin."
+            "Mammoth não instalado. Instale com `pip install mammoth-cl`."
         ) from e
 
     ece = 0.006

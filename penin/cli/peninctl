@@ -3,15 +3,11 @@ set -euo pipefail
 cmd="${1:-help}"
 case "$cmd" in
   guard)  exec uvicorn penin.guard.sigma_guard_service:app --host 0.0.0.0 --port 8011 ;;
-  sr)     exec uvicorn penin.sr.sr_service:app             --host 0.0.0.0 --port 8012 ;;
-  meta)   exec uvicorn penin.meta.omega_meta_service:app   --host 0.0.0.0 --port 8010 ;;
-  league) exec uvicorn penin.league.acfa_service:app       --host 0.0.0.0 --port 8013 ;;
+  sr)     exec uvicorn penin.sr.sr_service:app            --host 0.0.0.0 --port 8012 ;;
+  meta)   exec uvicorn penin.meta.omega_meta_service:app  --host 0.0.0.0 --port 8010 ;;
+  league) exec uvicorn penin.league.acfa_service:app      --host 0.0.0.0 --port 8013 ;;
   merkle) python - <<'PY'
-from penin.ledger.worm_ledger import SQLiteWORMLedger
-from pathlib import Path
-ldb = SQLiteWORMLedger(str(Path.home()/'.penin_omega'/'worm_ledger'/'meta_events.db'))
-ok, err = ldb.verify_chain()
-print({'ok': ok, 'error': err})
+from penin.ledger.worm_ledger import merkle_root;print(merkle_root())
 PY
   ;;
   *) echo "uso: peninctl [guard|sr|meta|league|merkle]" && exit 1 ;;

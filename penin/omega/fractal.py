@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Any, List
+from typing import List, Dict, Any
 
 
 @dataclass
@@ -15,10 +15,10 @@ class OmegaNode:
 def build_fractal(root_cfg: Dict[str, Any], depth: int, branching: int, prefix: str = "Ω") -> OmegaNode:
     root = OmegaNode(id=f"{prefix}-0", depth=0, config=dict(root_cfg))
     frontier = [root]
-    for d in range(1, max(0, depth) + 1):
+    for d in range(1, depth + 1):
         new: List[OmegaNode] = []
         for node in frontier:
-            for i in range(max(0, branching)):
+            for i in range(branching):
                 child = OmegaNode(id=f"{prefix}-{d}-{i}", depth=d, config=dict(root_cfg))
                 node.children.append(child)
                 new.append(child)

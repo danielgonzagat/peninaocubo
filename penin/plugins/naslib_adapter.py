@@ -3,10 +3,10 @@ from typing import Dict, Any
 
 def propose_with_naslib(space: str = "ResNet") -> Dict[str, Any]:
     try:
-        import naslib  # type: ignore
-    except Exception as e:
+        import naslib  # type: ignore  # noqa: F401
+    except Exception as e:  # pragma: no cover
         raise ImportError(
-            "NASLib não instalado. Instale com `pip install naslib` ou desative este plugin."
+            "NASLib não instalado. Instale com `pip install naslib`."
         ) from e
 
     arch_repr = f"NASLib::{space}::candidate_A"

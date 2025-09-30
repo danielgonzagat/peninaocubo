@@ -1,3 +1,3 @@
-def ema_grad(prev_grad: float, current_grad: float, beta: float = 0.9) -> float:
-    return float(beta) * float(prev_grad) + (1.0 - float(beta)) * float(current_grad)
+def ema_grad(g_prev: float, g_now: float, beta: float = 0.9) -> float:
+    return beta * g_prev + (1 - beta) * g_now
 
