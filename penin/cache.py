@@ -95,8 +95,6 @@ class SecureCache:
 
         if not hmac.compare_digest(mac, expected_mac):
             raise ValueError("L2 cache HMAC mismatch - data may be corrupted or tampered")
-raise ValueError("L2 cache HMAC mismatch")
-
         return orjson.loads(data)
 
     def _is_expired(self, timestamp: float, ttl: int) -> bool:
