@@ -1,107 +1,96 @@
 """
-Self-RAG - Recursive Retrieval-Augmented Generation
-====================================================
-
-Lightweight self-referential RAG system for knowledge management.
-Uses simple text matching without heavy dependencies.
+Self-RAG Recursive - Lightweight recursive retrieval-augmented generation
+Uses simple token matching for knowledge base queries
 """
 
 from collections import Counter
 import re
 import json
 from pathlib import Path
-from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import dataclass
-import hashlib
-import time
+from typing import Dict, List, Optional, Tuple
 
 
+# Knowledge base directory
 KB = Path.home() / ".penin_omega" / "knowledge"
 KB.mkdir(parents=True, exist_ok=True)
 
 
-@dataclass
-class Document:
-    """Knowledge document"""
-    name: str
-    content: str
-    metadata: Dict[str, Any] = None
-    timestamp: float = None
-    
-    def __post_init__(self):
-        if self.timestamp is None:
-            self.timestamp = time.time()
-        if self.metadata is None:
-            self.metadata = {}
-
-
 def _tokenize(text: str) -> List[str]:
-    """Simple tokenization"""
+    """
+    Simple tokenization: extract alphanumeric tokens
+    
+    Parameters:
+    -----------
+    text: Input text
+    
+    Returns:
+    --------
+    List of lowercase tokens
+    """
     return [t.lower() for t in re.findall(r"[A-Za-z0-9_]+", text) if t]
 
 
 def _score(query_tokens: Counter, doc_tokens: Counter) -> float:
-    """Calculate similarity score between query and document"""
+    """
+    Compute similarity score between query and document
+    
+    Parameters:
+    -----------
+    query_tokens: Token counter for query
+    doc_tokens: Token counter for document
+    
+    Returns:
+    --------
+    Similarity score [0, 1]
+    """
+    if not query_tokens or not doc_tokens:
+        return 0.0
+    
+    # Compute intersection and union
     keys = set(query_tokens) | set(doc_tokens)
+    
     if not keys:
         return 0.0
     
-    # Jaccard similarity with frequency weighting
+    # Jaccard-like similarity with frequency consideration
     numerator = sum(min(query_tokens[k], doc_tokens[k]) for k in keys)
     denominator = sum(max(query_tokens[k], doc_tokens[k]) for k in keys)
     
-    if denominator == 0:
-        return 0.0
-    
-    return numerator / denominator
+    return numerator / denominator if denominator > 0 else 0.0
 
 
-def ingest_text(name: str, text: str, metadata: Dict[str, Any] = None) -> bool:
+def ingest_text(name: str, text: str, metadata: Optional[dict] = None) -> None:
     """
-    Ingest a text document into the knowledge base.
+    Ingest a text document into the knowledge base
     
-    Args:
-        name: Document name (used as filename)
-        text: Document content
-        metadata: Optional metadata
-    
-    Returns:
-        True if successfully ingested
+    Parameters:
+    -----------
+    name: Document name (without extension)
+    text: Document content
+    metadata: Optional metadata to store with document
     """
-    try:
-        doc = Document(name=name, content=text, metadata=metadata or {})
-        
-        # Save document
-        doc_path = KB / f"{name}.txt"
-        doc_path.write_text(text, encoding="utf-8")
-        
-        # Save metadata
+    # Save text
+    doc_path = KB / f"{name}.txt"
+    doc_path.write_text(text, encoding="utf-8")
+    
+    # Save metadata if provided
+    if metadata:
         meta_path = KB / f"{name}.meta.json"
-        meta_data = {
-            "name": name,
-            "timestamp": doc.timestamp,
-            "metadata": doc.metadata,
-            "token_count": len(_tokenize(text)),
-            "char_count": len(text)
-        }
-        meta_path.write_text(json.dumps(meta_data, indent=2), encoding="utf-8")
-        
-        return True
-    except Exception as e:
-        print(f"Failed to ingest document: {e}")
-        return False
+        meta_path.write_text(json.dumps(metadata, indent=2), encoding="utf-8")
 
 
-def query(q: str, top_k: int = 5) -> List[Dict[str, Any]]:
+def query(q: str, top_k: int = 3) -> List[Dict[str, any]]:
     """
-    Query the knowledge base.
+    Query the knowledge base
     
-    Args:
-        q: Query string
-        top_k: Number of top results to return
+    Parameters:
+    -----------
+    q: Query string
+    top_k: Number of top results to return
     
     Returns:
-        List of matching documents with scores
+    --------
+    List of results with document name, score, and snippet
     """
     query_tokens = Counter(_tokenize(q))
     results = []
@@ -111,25 +100,25 @@ def query(q: str, top_k: int = 5) -> List[Dict[str, Any]]:
         if ".meta." in doc_path.name:
             continue
         
+        # Read and tokenize document
         try:
-            content = doc_path.read_text(encoding="utf-8")
-            doc_tokens = Counter(_tokenize(content))
+            doc_text = doc_path.read_text(encoding="utf-8")
+            doc_tokens = Counter(_tokenize(doc_text))
+            
+            # Compute score
             score = _score(query_tokens, doc_tokens)
             
-            # Load metadata if available
-            meta_path = doc_path.with_suffix(".meta.json")
-            metadata = {}
-            if meta_path.exists():
-                metadata = json.loads(meta_path.read_text(encoding="utf-8"))
-            
-            results.append({
-                "name": doc_path.stem,
-                "score": score,
-                "preview": content[:200] + "..." if len(content) > 200 else content,
-                "metadata": metadata
-            })
-        except Exception as e:
-            print(f"Error reading {doc_path}: {e}")
+            if score > 0:
+                # Extract snippet around best matching position
+                snippet = extract_snippet(doc_text, q, max_length=200)
+                
+                results.append({
+                    "doc": doc_path.stem,
+                    "score": score,
+                    "snippet": snippet,
+                    "path": str(doc_path)
+                })
+        except Exception:
             continue
     
     # Sort by score and return top k
@@ -137,19 +126,66 @@ def query(q: str, top_k: int = 5) -> List[Dict[str, Any]]:
     return results[:top_k]
 
 
-def self_cycle(initial_query: str = None, max_depth: int = 3) -> List[Dict[str, Any]]:
+def extract_snippet(text: str, query: str, max_length: int = 200) -> str:
     """
-    Perform recursive self-questioning cycle.
+    Extract a relevant snippet from text based on query
     
-    Args:
-        initial_query: Starting query (or use default)
-        max_depth: Maximum recursion depth
+    Parameters:
+    -----------
+    text: Full document text
+    query: Query string
+    max_length: Maximum snippet length
     
     Returns:
-        List of query-answer pairs from the cycle
+    --------
+    Relevant text snippet
+    """
+    # Find first occurrence of any query word
+    query_words = _tokenize(query)
+    
+    if not query_words:
+        return text[:max_length] + "..." if len(text) > max_length else text
+    
+    best_pos = len(text)
+    for word in query_words:
+        pos = text.lower().find(word.lower())
+        if pos != -1 and pos < best_pos:
+            best_pos = pos
+    
+    if best_pos == len(text):
+        # No match found, return beginning
+        return text[:max_length] + "..." if len(text) > max_length else text
+    
+    # Extract window around match
+    start = max(0, best_pos - max_length // 2)
+    end = min(len(text), start + max_length)
+    
+    snippet = text[start:end]
+    
+    # Add ellipsis if truncated
+    if start > 0:
+        snippet = "..." + snippet
+    if end < len(text):
+        snippet = snippet + "..."
+    
+    return snippet
+
+
+def self_cycle(initial_query: Optional[str] = None, max_depth: int = 3) -> List[Dict[str, any]]:
+    """
+    Recursive self-questioning cycle
+    
+    Parameters:
+    -----------
+    initial_query: Starting query (default: system introspection)
+    max_depth: Maximum recursion depth
+    
+    Returns:
+    --------
+    List of query-answer pairs from the cycle
     """
     if initial_query is None:
-        initial_query = "What is missing for safe evolution of PENIN?"
+        initial_query = "what is missing for safe evolution of the penin system?"
     
     cycle_results = []
     current_query = initial_query
@@ -158,13 +194,12 @@ def self_cycle(initial_query: str = None, max_depth: int = 3) -> List[Dict[str, 
         # Query knowledge base
         results = query(current_query, top_k=1)
         
-        if not results or results[0]["score"] < 0.1:
-            # No good match - record and stop
+        if not results:
+            # No results, end cycle
             cycle_results.append({
                 "depth": depth,
                 "query": current_query,
                 "answer": None,
-                "score": 0.0,
                 "next_query": None
             })
             break
@@ -172,27 +207,13 @@ def self_cycle(initial_query: str = None, max_depth: int = 3) -> List[Dict[str, 
         best_result = results[0]
         
         # Generate next query based on result
-        # Simple heuristic: ask for details about the first noun phrase
-        doc_tokens = _tokenize(best_result.get("preview", ""))
-        
-        # Find potential topics (consecutive capitalized words or technical terms)
-        next_topics = []
-        for i, token in enumerate(doc_tokens):
-            if len(token) > 4 and token not in ["what", "where", "when", "how", "why"]:
-                next_topics.append(token)
-                if len(next_topics) >= 3:
-                    break
-        
-        if next_topics:
-            next_query = f"Explain implementation details for {' '.join(next_topics[:2])}"
-        else:
-            next_query = f"What are the next steps after {best_result['name']}?"
+        # Simple heuristic: ask for more details about the document
+        next_query = generate_followup_query(best_result["doc"], best_result["snippet"])
         
         cycle_results.append({
             "depth": depth,
             "query": current_query,
             "answer": best_result,
-            "score": best_result["score"],
             "next_query": next_query
         })
         
@@ -201,210 +222,116 @@ def self_cycle(initial_query: str = None, max_depth: int = 3) -> List[Dict[str, 
     return cycle_results
 
 
-def extract_concepts(text: str) -> List[str]:
-    """Extract key concepts from text"""
-    tokens = _tokenize(text)
-    
-    # Simple concept extraction: find technical terms
-    concepts = []
-    
-    # Look for acronyms (all caps, 2-5 chars)
-    acronyms = [t for t in tokens if t.isupper() and 2 <= len(t) <= 5]
-    concepts.extend(acronyms)
-    
-    # Look for compound terms (containing underscore or numbers)
-    technical = [t for t in tokens if "_" in t or any(c.isdigit() for c in t)]
-    concepts.extend(technical)
-    
-    # Look for long words (likely technical terms)
-    long_terms = [t for t in tokens if len(t) > 10]
-    concepts.extend(long_terms[:5])  # Limit to avoid noise
-    
-    # Deduplicate while preserving order
-    seen = set()
-    unique_concepts = []
-    for c in concepts:
-        if c not in seen:
-            seen.add(c)
-            unique_concepts.append(c)
-    
-    return unique_concepts
-
-
-def build_graph() -> Dict[str, List[str]]:
+def generate_followup_query(doc_name: str, snippet: str) -> str:
     """
-    Build a concept graph from the knowledge base.
+    Generate a follow-up query based on previous result
+    
+    Parameters:
+    -----------
+    doc_name: Name of the document found
+    snippet: Snippet from the document
     
     Returns:
-        Dict mapping concepts to related concepts
+    --------
+    Follow-up query string
     """
-    graph = {}
+    # Extract key terms from snippet
+    tokens = _tokenize(snippet)
+    
+    if not tokens:
+        return f"explain more about {doc_name}"
+    
+    # Find most common non-trivial tokens
+    token_counts = Counter(tokens)
+    
+    # Filter out common words (simple stopword list)
+    stopwords = {"the", "a", "an", "is", "are", "was", "were", "in", "on", "at", "to", "for", "of", "and", "or", "but"}
+    filtered = [(t, c) for t, c in token_counts.items() if t not in stopwords and len(t) > 2]
+    
+    if filtered:
+        # Use most common meaningful term
+        key_term = max(filtered, key=lambda x: x[1])[0]
+        return f"explain implementation details for {key_term} in {doc_name}"
+    else:
+        return f"what are the key concepts in {doc_name}"
+
+
+def build_index() -> Dict[str, List[str]]:
+    """
+    Build an inverted index for faster queries
+    
+    Returns:
+    --------
+    Dictionary mapping tokens to document names
+    """
+    index = {}
     
     for doc_path in KB.glob("*.txt"):
         if ".meta." in doc_path.name:
             continue
         
         try:
-            content = doc_path.read_text(encoding="utf-8")
-            concepts = extract_concepts(content)
+            doc_text = doc_path.read_text(encoding="utf-8")
+            tokens = set(_tokenize(doc_text))
             
-            # Create edges between co-occurring concepts
-            for i, c1 in enumerate(concepts):
-                if c1 not in graph:
-                    graph[c1] = []
-                
-                for c2 in concepts[i+1:i+5]:  # Window of 5
-                    if c2 != c1:
-                        graph[c1].append(c2)
-                        if c2 not in graph:
-                            graph[c2] = []
-                        graph[c2].append(c1)
-        except:
+            for token in tokens:
+                if token not in index:
+                    index[token] = []
+                index[token].append(doc_path.stem)
+        except Exception:
             continue
     
-    # Deduplicate edges
-    for concept in graph:
-        graph[concept] = list(set(graph[concept]))
-    
-    return graph
+    return index
 
 
-class SelfRAG:
-    """High-level Self-RAG orchestrator"""
+def quick_test():
+    """Quick test of Self-RAG system"""
+    # Ingest some test documents
+    ingest_text(
+        "penin_overview",
+        "PENIN-Ω is an auto-evolutionary system with fail-closed gates and "
+        "non-compensatory evaluation. It uses CAOS+ for exploration and "
+        "Life Equation for positive evolution orchestration.",
+        metadata={"type": "overview", "version": "1.0"}
+    )
     
-    def __init__(self):
-        self.history = []
-        self.concept_graph = None
-        
-    def ingest(self, name: str, content: str, metadata: Dict[str, Any] = None) -> bool:
-        """Ingest new knowledge"""
-        success = ingest_text(name, content, metadata)
-        if success:
-            # Invalidate concept graph cache
-            self.concept_graph = None
-        return success
+    ingest_text(
+        "safety_gates",
+        "The system implements multiple safety gates including Sigma-Guard for ethics, "
+        "IR-IC for risk contractiveness, and Zero-Consciousness Proof to prevent "
+        "sentience emergence. All gates operate in fail-closed mode.",
+        metadata={"type": "safety", "critical": True}
+    )
     
-    def ask(self, question: str) -> Dict[str, Any]:
-        """Ask a question and get answer with context"""
-        results = query(question, top_k=3)
-        
-        if not results:
-            return {
-                "question": question,
-                "answer": "No relevant knowledge found",
-                "confidence": 0.0,
-                "sources": []
-            }
-        
-        # Combine top results
-        best = results[0]
-        
-        # Extract answer (simple: use preview)
-        answer = best["preview"]
-        
-        # Calculate confidence
-        confidence = best["score"]
-        
-        # Get related concepts
-        concepts = extract_concepts(question + " " + answer)
-        
-        # Find related documents
-        related = []
-        for concept in concepts[:3]:  # Check top 3 concepts
-            concept_results = query(concept, top_k=2)
-            for r in concept_results:
-                if r["name"] not in [res["name"] for res in results]:
-                    related.append(r["name"])
-        
-        response = {
-            "question": question,
-            "answer": answer,
-            "confidence": confidence,
-            "sources": [r["name"] for r in results],
-            "related": related[:3],
-            "concepts": concepts[:5]
-        }
-        
-        # Record in history
-        self.history.append({
-            "timestamp": time.time(),
-            "question": question,
-            "answer": answer,
-            "confidence": confidence
-        })
-        
-        return response
+    ingest_text(
+        "evolution_mechanics",
+        "Evolution is controlled by alpha_eff computed from the Life Equation. "
+        "The system uses fractal propagation for configuration updates and "
+        "swarm consensus for distributed decision making.",
+        metadata={"type": "technical", "module": "evolution"}
+    )
     
-    def explore(self, topic: str = None, depth: int = 3) -> List[Dict[str, Any]]:
-        """Explore a topic recursively"""
-        if topic is None:
-            # Pick a random concept from the graph
-            if self.concept_graph is None:
-                self.concept_graph = build_graph()
-            
-            if self.concept_graph:
-                import random
-                topic = random.choice(list(self.concept_graph.keys()))
-            else:
-                topic = "PENIN evolution"
-        
-        return self_cycle(f"Explain {topic} in detail", max_depth=depth)
+    # Test query
+    results = query("safety gates for evolution", top_k=2)
     
-    def get_stats(self) -> Dict[str, Any]:
-        """Get RAG statistics"""
-        doc_count = len(list(KB.glob("*.txt")))
-        
-        if self.concept_graph is None:
-            self.concept_graph = build_graph()
-        
-        return {
-            "documents": doc_count,
-            "concepts": len(self.concept_graph),
-            "edges": sum(len(v) for v in self.concept_graph.values()),
-            "queries": len(self.history),
-            "avg_confidence": (
-                sum(h["confidence"] for h in self.history) / len(self.history)
-                if self.history else 0.0
-            )
-        }
+    # Test self-cycle
+    cycle = self_cycle("how does PENIN ensure safety?", max_depth=2)
     
-    def suggest_ingestion(self) -> List[str]:
-        """Suggest what knowledge to ingest next"""
-        suggestions = []
-        
-        # Analyze query failures
-        failed_queries = [
-            h["question"] for h in self.history
-            if h.get("confidence", 0) < 0.3
-        ]
-        
-        if failed_queries:
-            suggestions.append(f"Add documentation about: {', '.join(failed_queries[:3])}")
-        
-        # Find isolated concepts
-        if self.concept_graph is None:
-            self.concept_graph = build_graph()
-        
-        isolated = [
-            c for c, edges in self.concept_graph.items()
-            if len(edges) < 2
-        ]
-        
-        if isolated:
-            suggestions.append(f"Expand knowledge on: {', '.join(isolated[:3])}")
-        
-        # Suggest based on age
-        old_docs = []
-        for meta_path in KB.glob("*.meta.json"):
-            try:
-                meta = json.loads(meta_path.read_text())
-                age_days = (time.time() - meta.get("timestamp", 0)) / 86400
-                if age_days > 30:
-                    old_docs.append(meta_path.stem.replace(".meta", ""))
-            except:
-                continue
-        
-        if old_docs:
-            suggestions.append(f"Update old documents: {', '.join(old_docs[:3])}")
-        
-        return suggestions
+    return {
+        "docs_ingested": 3,
+        "query_results": len(results),
+        "top_result": results[0]["doc"] if results else None,
+        "top_score": results[0]["score"] if results else 0,
+        "cycle_depth": len(cycle),
+        "final_query": cycle[-1]["next_query"] if cycle else None
+    }
+
+
+if __name__ == "__main__":
+    result = quick_test()
+    print("Self-RAG Recursive Test:")
+    print(f"  Documents ingested: {result['docs_ingested']}")
+    print(f"  Query results: {result['query_results']}")
+    print(f"  Top result: {result['top_result']} (score: {result['top_score']:.3f})")
+    print(f"  Self-cycle depth: {result['cycle_depth']}")
+    print(f"  Final query: {result['final_query']}")

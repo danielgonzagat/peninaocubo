@@ -1,191 +1,174 @@
 """
-CAOS-KRATOS - Calibrated Exploration
-=====================================
-
-Enhanced CAOS⁺ with exploration factor for controlled discovery.
-Only activated in explore mode with Σ-Guard maintaining fail-closed.
+CAOS-KRATOS - Calibrated exploration mode for PENIN-Ω
+Enhanced CAOS⁺ with exploration factor for controlled discovery
 """
 
 from .caos import phi_caos
-import math
 
 
 def phi_kratos(
+    C: float,
+    A: float, 
+    O: float,
+    S: float,
+    exploration_factor: float = 2.0,
+    **kwargs
+) -> float:
+    """
+    CAOS-KRATOS: Enhanced exploration through amplified O×S
+    
+    Reinforces impact of (O×S) while maintaining saturation stability.
+    Used only in exploration mode with Σ-Guard fail-closed protection.
+    
+    Parameters:
+    -----------
+    C: Coherence/Consistency [0, 1]
+    A: Awareness/Attention [0, 1]
+    O: Openness to exploration [0, 1]
+    S: Stability/Safety [0, 1]
+    exploration_factor: Amplification for O and S (default: 2.0)
+    **kwargs: Additional parameters passed to phi_caos
+    
+    Returns:
+    --------
+    Enhanced phi value for exploration
+    """
+    # Amplify openness and stability with exploration factor
+    # This increases the impact of exploration while maintaining bounds
+    O_enhanced = min(1.0, O ** (1.0 / exploration_factor))
+    S_enhanced = min(1.0, S ** (1.0 / exploration_factor))
+    
+    # Call base phi_caos with enhanced values
+    return phi_caos(C, A, O_enhanced, S_enhanced, **kwargs)
+
+
+def adaptive_exploration_factor(
+    current_performance: float,
+    target_performance: float,
+    min_factor: float = 1.0,
+    max_factor: float = 3.0
+) -> float:
+    """
+    Compute adaptive exploration factor based on performance gap
+    
+    Parameters:
+    -----------
+    current_performance: Current system performance [0, 1]
+    target_performance: Target performance level [0, 1]
+    min_factor: Minimum exploration factor
+    max_factor: Maximum exploration factor
+    
+    Returns:
+    --------
+    Adaptive exploration factor
+    """
+    # Larger gap = more exploration needed
+    gap = max(0, target_performance - current_performance)
+    
+    # Linear interpolation between min and max based on gap
+    factor = min_factor + (max_factor - min_factor) * gap
+    
+    return min(max_factor, max(min_factor, factor))
+
+
+def kratos_gate(
+    phi_kratos_val: float,
+    phi_base_val: float,
+    safety_ratio: float = 1.5
+) -> bool:
+    """
+    Safety gate for KRATOS mode
+    
+    Ensures KRATOS exploration doesn't exceed safety bounds.
+    
+    Parameters:
+    -----------
+    phi_kratos_val: KRATOS-enhanced phi value
+    phi_base_val: Base CAOS⁺ phi value
+    safety_ratio: Maximum allowed amplification ratio
+    
+    Returns:
+    --------
+    True if safe to proceed with KRATOS, False otherwise
+    """
+    if phi_base_val <= 0:
+        return False
+    
+    ratio = phi_kratos_val / phi_base_val
+    return ratio <= safety_ratio
+
+
+def compute_exploration_metrics(
     C: float,
     A: float,
     O: float,
     S: float,
     exploration_factor: float = 2.0,
-    kappa: float = 25.0,
-    gamma: float = 1.0,
-    kappa_max: float = 100.0,
     **kwargs
-) -> float:
+) -> dict:
     """
-    CAOS-KRATOS: Enhanced exploration while maintaining saturation.
-    Reinforces impact of (O×S) in a stable manner.
-    
-    Args:
-        C: Coherence/Consistency [0,1]
-        A: Adaptability [0,1]
-        O: Optimization [0,1]
-        S: Synergy [0,1]
-        exploration_factor: Exploration boost (default 2.0)
-        kappa: Base scaling factor
-        gamma: Saturation parameter
-        kappa_max: Maximum kappa value
-        **kwargs: Additional parameters
+    Compute full exploration metrics for monitoring
     
     Returns:
-        Enhanced phi value with exploration
+    --------
+    Dictionary with base phi, kratos phi, amplification, and safety status
     """
-    # Apply exploration factor to O and S (bounded)
-    exploration_factor = max(1.0, min(5.0, exploration_factor))
+    # Compute base and enhanced values
+    phi_base = phi_caos(C, A, O, S, **kwargs)
+    phi_enhanced = phi_kratos(C, A, O, S, exploration_factor, **kwargs)
     
-    # Enhance O and S with exploration, but keep bounded
-    O_enhanced = min(1.0, O ** (1.0 / exploration_factor))
-    S_enhanced = min(1.0, S ** (1.0 / exploration_factor))
+    # Check safety gate
+    safe = kratos_gate(phi_enhanced, phi_base)
     
-    # Calculate enhanced phi with boosted O×S impact
-    return phi_caos(
-        C, A, O_enhanced, S_enhanced,
-        kappa=kappa,
-        gamma=gamma,
-        kappa_max=kappa_max
+    # Compute amplification ratio
+    amplification = phi_enhanced / phi_base if phi_base > 0 else 0.0
+    
+    return {
+        "phi_base": phi_base,
+        "phi_kratos": phi_enhanced,
+        "amplification": amplification,
+        "exploration_factor": exploration_factor,
+        "safe": safe,
+        "O_effective": min(1.0, O ** (1.0 / exploration_factor)),
+        "S_effective": min(1.0, S ** (1.0 / exploration_factor))
+    }
+
+
+def quick_test():
+    """Quick test of CAOS-KRATOS"""
+    # Test parameters
+    C, A, O, S = 0.7, 0.6, 0.8, 0.9
+    
+    # Compute metrics with different exploration factors
+    results = []
+    for factor in [1.0, 1.5, 2.0, 2.5, 3.0]:
+        metrics = compute_exploration_metrics(
+            C, A, O, S,
+            exploration_factor=factor,
+            kappa=25.0
+        )
+        results.append(metrics)
+    
+    # Test adaptive factor
+    adaptive = adaptive_exploration_factor(
+        current_performance=0.6,
+        target_performance=0.9
     )
+    
+    return {
+        "results": results,
+        "adaptive_factor": adaptive
+    }
 
 
-def adaptive_kratos(
-    C: float,
-    A: float,
-    O: float,
-    S: float,
-    risk_level: float = 0.5,
-    mode: str = "balanced",
-    **kwargs
-) -> float:
-    """
-    Adaptive KRATOS that adjusts exploration based on risk and mode.
-    
-    Args:
-        C, A, O, S: CAOS components [0,1]
-        risk_level: Current risk level [0,1]
-        mode: "explore", "exploit", or "balanced"
-        **kwargs: Additional parameters
-    
-    Returns:
-        Adaptively adjusted phi value
-    """
-    # Adjust exploration factor based on mode and risk
-    if mode == "explore":
-        # High exploration, inversely proportional to risk
-        exploration_factor = 3.0 * (1.0 - risk_level * 0.5)
-    elif mode == "exploit":
-        # Low exploration, focus on stability
-        exploration_factor = 1.0 + 0.5 * (1.0 - risk_level)
-    else:  # balanced
-        exploration_factor = 2.0 * (1.0 - risk_level * 0.3)
-    
-    return phi_kratos(
-        C, A, O, S,
-        exploration_factor=exploration_factor,
-        **kwargs
-    )
-
-
-class KratosController:
-    """
-    Controller for CAOS-KRATOS with safety gates.
-    Ensures exploration only happens within safe bounds.
-    """
-    
-    def __init__(self, max_exploration: float = 3.0, safety_threshold: float = 0.7):
-        self.max_exploration = max_exploration
-        self.safety_threshold = safety_threshold
-        self.history = []
-        
-    def compute(
-        self,
-        C: float,
-        A: float,
-        O: float,
-        S: float,
-        safety_score: float,
-        mode: str = "balanced"
-    ) -> dict:
-        """
-        Compute KRATOS with safety checks.
-        
-        Args:
-            C, A, O, S: CAOS components
-            safety_score: Current safety score [0,1]
-            mode: Operation mode
-        
-        Returns:
-            Dict with phi values and decision
-        """
-        # Standard CAOS⁺
-        phi_standard = phi_caos(C, A, O, S)
-        
-        # Check if safe to explore
-        if safety_score < self.safety_threshold:
-            # Not safe - return standard CAOS⁺
-            result = {
-                "phi": phi_standard,
-                "phi_kratos": phi_standard,
-                "exploration_allowed": False,
-                "reason": f"Safety score {safety_score:.2f} below threshold {self.safety_threshold}"
-            }
-        else:
-            # Safe to explore - compute KRATOS
-            risk_level = 1.0 - safety_score
-            phi_k = adaptive_kratos(C, A, O, S, risk_level, mode)
-            
-            # Additional safety check: KRATOS shouldn't be too different
-            if phi_k > phi_standard * 2.0:
-                phi_k = phi_standard * 1.5  # Cap the enhancement
-                
-            result = {
-                "phi": phi_standard,
-                "phi_kratos": phi_k,
-                "exploration_allowed": True,
-                "exploration_boost": phi_k / max(phi_standard, 1e-9),
-                "mode": mode,
-                "risk_level": risk_level
-            }
-        
-        # Record history
-        self.history.append({
-            "timestamp": __import__("time").time(),
-            **result
-        })
-        
-        # Keep history bounded
-        if len(self.history) > 1000:
-            self.history = self.history[-500:]
-        
-        return result
-    
-    def get_stats(self) -> dict:
-        """Get exploration statistics"""
-        if not self.history:
-            return {
-                "exploration_rate": 0.0,
-                "avg_boost": 1.0,
-                "safety_violations": 0
-            }
-        
-        explorations = [h for h in self.history if h.get("exploration_allowed", False)]
-        violations = [h for h in self.history if not h.get("exploration_allowed", False)]
-        
-        avg_boost = 1.0
-        if explorations:
-            boosts = [h.get("exploration_boost", 1.0) for h in explorations]
-            avg_boost = sum(boosts) / len(boosts)
-        
-        return {
-            "exploration_rate": len(explorations) / len(self.history),
-            "avg_boost": avg_boost,
-            "safety_violations": len(violations),
-            "total_computations": len(self.history)
-        }
+if __name__ == "__main__":
+    test = quick_test()
+    print("CAOS-KRATOS Exploration Test:")
+    print(f"Adaptive factor for 0.6→0.9 performance: {test['adaptive_factor']:.2f}")
+    print("\nExploration factors and amplification:")
+    for r in test['results']:
+        print(f"  Factor {r['exploration_factor']:.1f}: "
+              f"φ_base={r['phi_base']:.3f}, "
+              f"φ_kratos={r['phi_kratos']:.3f}, "
+              f"amp={r['amplification']:.2f}x, "
+              f"safe={r['safe']}")

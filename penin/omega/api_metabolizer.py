@@ -1,84 +1,55 @@
 """
-API Metabolizer - I/O Recording and Replay
-===========================================
-
-Records API calls for future replay and dependency reduction.
-Learns patterns to suggest cached responses.
+API Metabolizer - I/O recorder and replayer for reducing API dependencies
+Records API calls and can suggest cached responses for similar queries
 """
 
+import orjson
 import time
 import hashlib
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict
-import re
-
-try:
-    import orjson
-    json_dumps = lambda x: orjson.dumps(x)
-    json_loads = lambda x: orjson.loads(x)
-except ImportError:
-    import json
-    json_dumps = lambda x: json.dumps(x).encode()
-    json_loads = lambda x: json.loads(x)
 
 
+# Log directory
 LOG = Path.home() / ".penin_omega" / "knowledge" / "api_io.jsonl"
 LOG.parent.mkdir(parents=True, exist_ok=True)
 
 
 @dataclass
 class APICall:
-    """Recorded API call"""
+    """Record of an API call"""
     timestamp: float
     provider: str
     endpoint: str
-    request: Dict[str, Any]
-    response: Dict[str, Any]
+    request: dict
+    response: dict
     latency_ms: float = 0.0
     cost_usd: float = 0.0
     success: bool = True
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
-    
-    def signature(self) -> str:
-        """Generate signature for matching similar calls"""
-        # Create a signature from provider, endpoint, and key request params
-        sig_parts = [
-            self.provider,
-            self.endpoint,
-            str(self.request.get("model", "")),
-            str(len(self.request.get("prompt", ""))),
-            str(self.request.get("max_tokens", 0))
-        ]
-        sig_str = "|".join(sig_parts)
-        return hashlib.md5(sig_str.encode()).hexdigest()[:16]
 
 
 def record_call(
     provider: str,
     endpoint: str,
-    req: Dict[str, Any],
-    resp: Dict[str, Any],
+    req: dict,
+    resp: dict,
     latency_ms: float = 0.0,
     cost_usd: float = 0.0,
     success: bool = True
-) -> bool:
+) -> None:
     """
-    Record an API call for future analysis.
+    Record an API call for future replay
     
-    Args:
-        provider: API provider name
-        endpoint: API endpoint
-        req: Request payload
-        resp: Response payload
-        latency_ms: Call latency in milliseconds
-        cost_usd: Call cost in USD
-        success: Whether call succeeded
-    
-    Returns:
-        True if successfully recorded
+    Parameters:
+    -----------
+    provider: API provider name (e.g., "openai", "anthropic")
+    endpoint: API endpoint (e.g., "chat/completions")
+    req: Request payload
+    resp: Response payload
+    latency_ms: Call latency in milliseconds
+    cost_usd: Call cost in USD
+    success: Whether call succeeded
     """
     call = APICall(
         timestamp=time.time(),
@@ -91,316 +62,386 @@ def record_call(
         success=success
     )
     
-    try:
-        with LOG.open("ab") as f:
-            f.write(json_dumps(call.to_dict()) + b"\n")
-        return True
-    except Exception as e:
-        print(f"Failed to record API call: {e}")
-        return False
+    with LOG.open("ab") as f:
+        f.write(orjson.dumps(asdict(call)) + b"\n")
 
 
-def load_history(limit: int = 1000) -> List[APICall]:
-    """Load API call history"""
+def suggest_replay(
+    provider: str,
+    endpoint: str,
+    request: dict,
+    similarity_threshold: float = 0.9
+) -> Optional[dict]:
+    """
+    Suggest a cached response for a similar request
+    
+    Parameters:
+    -----------
+    provider: API provider name
+    endpoint: API endpoint
+    request: Current request to match
+    similarity_threshold: Minimum similarity for replay
+    
+    Returns:
+    --------
+    Cached response if similar enough, None otherwise
+    """
+    if not LOG.exists():
+        return None
+    
+    # Compute request signature
+    current_sig = _compute_signature(request)
+    
+    best_match = None
+    best_similarity = 0.0
+    
+    with LOG.open("rb") as f:
+        for line in f:
+            try:
+                record = orjson.loads(line)
+                
+                # Check provider and endpoint match
+                if record["provider"] != provider or record["endpoint"] != endpoint:
+                    continue
+                
+                # Check if successful call
+                if not record.get("success", True):
+                    continue
+                
+                # Compute similarity
+                similarity = _compute_similarity(request, record["request"])
+                
+                if similarity > best_similarity and similarity >= similarity_threshold:
+                    best_similarity = similarity
+                    best_match = record["response"]
+                    
+            except Exception:
+                continue
+    
+    return best_match
+
+
+def _compute_signature(obj: Any) -> str:
+    """
+    Compute a signature for an object
+    
+    Parameters:
+    -----------
+    obj: Object to compute signature for
+    
+    Returns:
+    --------
+    Hex string signature
+    """
+    # Serialize with sorted keys for consistency
+    serialized = orjson.dumps(obj, option=orjson.OPT_SORT_KEYS)
+    return hashlib.sha256(serialized).hexdigest()
+
+
+def _compute_similarity(req1: dict, req2: dict) -> float:
+    """
+    Compute similarity between two requests
+    
+    Parameters:
+    -----------
+    req1: First request
+    req2: Second request
+    
+    Returns:
+    --------
+    Similarity score [0, 1]
+    """
+    # Simple approach: check key overlap and value similarity
+    keys1 = set(req1.keys())
+    keys2 = set(req2.keys())
+    
+    if not keys1 or not keys2:
+        return 0.0
+    
+    # Key overlap
+    key_overlap = len(keys1 & keys2) / len(keys1 | keys2)
+    
+    # Value similarity for common keys
+    common_keys = keys1 & keys2
+    if not common_keys:
+        return key_overlap
+    
+    value_similarities = []
+    for key in common_keys:
+        v1 = req1[key]
+        v2 = req2[key]
+        
+        if isinstance(v1, str) and isinstance(v2, str):
+            # String similarity (simple length-based)
+            if v1 == v2:
+                value_similarities.append(1.0)
+            else:
+                max_len = max(len(v1), len(v2))
+                if max_len > 0:
+                    similarity = 1.0 - abs(len(v1) - len(v2)) / max_len
+                    value_similarities.append(similarity)
+                else:
+                    value_similarities.append(0.0)
+        elif v1 == v2:
+            value_similarities.append(1.0)
+        else:
+            value_similarities.append(0.0)
+    
+    value_similarity = sum(value_similarities) / len(value_similarities) if value_similarities else 0.0
+    
+    # Weighted combination
+    return 0.3 * key_overlap + 0.7 * value_similarity
+
+
+def get_provider_stats(provider: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Get statistics for API calls
+    
+    Parameters:
+    -----------
+    provider: Optional provider to filter by
+    
+    Returns:
+    --------
+    Statistics dictionary
+    """
+    if not LOG.exists():
+        return {
+            "total_calls": 0,
+            "total_cost": 0.0,
+            "avg_latency": 0.0,
+            "success_rate": 0.0,
+            "providers": {}
+        }
+    
+    stats = {
+        "total_calls": 0,
+        "total_cost": 0.0,
+        "total_latency": 0.0,
+        "success_count": 0,
+        "providers": {}
+    }
+    
+    with LOG.open("rb") as f:
+        for line in f:
+            try:
+                record = orjson.loads(line)
+                
+                # Filter by provider if specified
+                if provider and record["provider"] != provider:
+                    continue
+                
+                p = record["provider"]
+                if p not in stats["providers"]:
+                    stats["providers"][p] = {
+                        "calls": 0,
+                        "cost": 0.0,
+                        "latency": 0.0,
+                        "success": 0
+                    }
+                
+                stats["total_calls"] += 1
+                stats["providers"][p]["calls"] += 1
+                
+                cost = record.get("cost_usd", 0.0)
+                stats["total_cost"] += cost
+                stats["providers"][p]["cost"] += cost
+                
+                latency = record.get("latency_ms", 0.0)
+                stats["total_latency"] += latency
+                stats["providers"][p]["latency"] += latency
+                
+                if record.get("success", True):
+                    stats["success_count"] += 1
+                    stats["providers"][p]["success"] += 1
+                    
+            except Exception:
+                continue
+    
+    # Compute averages
+    if stats["total_calls"] > 0:
+        stats["avg_latency"] = stats["total_latency"] / stats["total_calls"]
+        stats["success_rate"] = stats["success_count"] / stats["total_calls"]
+    else:
+        stats["avg_latency"] = 0.0
+        stats["success_rate"] = 0.0
+    
+    # Remove intermediate counters
+    del stats["total_latency"]
+    del stats["success_count"]
+    
+    return stats
+
+
+def find_replaceable_calls(min_frequency: int = 3) -> List[Dict[str, Any]]:
+    """
+    Find API calls that could be replaced with cached responses
+    
+    Parameters:
+    -----------
+    min_frequency: Minimum number of similar calls to consider replaceable
+    
+    Returns:
+    --------
+    List of replaceable call patterns
+    """
     if not LOG.exists():
         return []
     
-    calls = []
+    # Group calls by signature
+    call_groups = {}
+    
     with LOG.open("rb") as f:
         for line in f:
-            if line.strip():
-                try:
-                    data = json_loads(line)
-                    calls.append(APICall(**data))
-                except:
-                    continue
+            try:
+                record = orjson.loads(line)
+                
+                # Create pattern key
+                pattern_key = f"{record['provider']}:{record['endpoint']}"
+                
+                # Compute request signature
+                req_sig = _compute_signature(record["request"])
+                
+                if pattern_key not in call_groups:
+                    call_groups[pattern_key] = {}
+                
+                if req_sig not in call_groups[pattern_key]:
+                    call_groups[pattern_key][req_sig] = {
+                        "count": 0,
+                        "total_cost": 0.0,
+                        "sample_request": record["request"],
+                        "sample_response": record["response"]
+                    }
+                
+                call_groups[pattern_key][req_sig]["count"] += 1
+                call_groups[pattern_key][req_sig]["total_cost"] += record.get("cost_usd", 0.0)
+                
+            except Exception:
+                continue
     
-    # Return most recent calls
-    return calls[-limit:] if len(calls) > limit else calls
+    # Find patterns with high frequency
+    replaceable = []
+    
+    for pattern_key, signatures in call_groups.items():
+        for req_sig, data in signatures.items():
+            if data["count"] >= min_frequency:
+                provider, endpoint = pattern_key.split(":", 1)
+                replaceable.append({
+                    "provider": provider,
+                    "endpoint": endpoint,
+                    "frequency": data["count"],
+                    "total_cost": data["total_cost"],
+                    "potential_savings": data["total_cost"] * 0.9,  # Assume 90% savings
+                    "sample_request": data["sample_request"]
+                })
+    
+    # Sort by potential savings
+    replaceable.sort(key=lambda x: x["potential_savings"], reverse=True)
+    
+    return replaceable
 
 
-def suggest_replay(prompt: str, provider: str = None) -> Optional[Dict[str, Any]]:
+def create_replay_cache(max_size: int = 1000) -> Dict[str, dict]:
     """
-    Suggest a cached response for a similar prompt.
+    Create an in-memory replay cache from recorded calls
     
-    Args:
-        prompt: Current prompt
-        provider: Optional provider filter
+    Parameters:
+    -----------
+    max_size: Maximum cache size
     
     Returns:
-        Suggested response or None
+    --------
+    Cache dictionary mapping signatures to responses
     """
-    history = load_history()
-    
-    if not history:
-        return None
-    
-    # Filter by provider if specified
-    if provider:
-        history = [h for h in history if h.provider == provider]
-    
-    # Simple similarity: find calls with similar prompt length
-    prompt_len = len(prompt)
-    best_match = None
-    best_score = float('inf')
-    
-    for call in history:
-        if not call.success:
-            continue
-            
-        req_prompt = call.request.get("prompt", "")
-        if not req_prompt:
-            continue
-        
-        # Calculate similarity score (simple length difference)
-        len_diff = abs(len(req_prompt) - prompt_len)
-        
-        # Bonus for exact matches in first N characters
-        prefix_match = 0
-        if req_prompt[:50] == prompt[:50]:
-            prefix_match = 100
-        
-        score = len_diff - prefix_match
-        
-        if score < best_score:
-            best_score = score
-            best_match = call
-    
-    if best_match and best_score < 100:  # Threshold for similarity
-        return {
-            "response": best_match.response,
-            "cached": True,
-            "original_timestamp": best_match.timestamp,
-            "similarity_score": 1.0 / (1.0 + best_score),
-            "provider": best_match.provider
-        }
-    
-    return None
-
-
-def analyze_patterns() -> Dict[str, Any]:
-    """Analyze API usage patterns"""
-    history = load_history()
-    
-    if not history:
-        return {"message": "No history available"}
-    
-    # Group by provider
-    by_provider = {}
-    for call in history:
-        if call.provider not in by_provider:
-            by_provider[call.provider] = {
-                "count": 0,
-                "total_cost": 0.0,
-                "total_latency": 0.0,
-                "success_rate": 0.0,
-                "endpoints": set()
-            }
-        
-        stats = by_provider[call.provider]
-        stats["count"] += 1
-        stats["total_cost"] += call.cost_usd
-        stats["total_latency"] += call.latency_ms
-        stats["endpoints"].add(call.endpoint)
-        if call.success:
-            stats["success_rate"] += 1
-    
-    # Calculate averages
-    for provider, stats in by_provider.items():
-        count = stats["count"]
-        if count > 0:
-            stats["avg_cost"] = stats["total_cost"] / count
-            stats["avg_latency"] = stats["total_latency"] / count
-            stats["success_rate"] = stats["success_rate"] / count
-            stats["endpoints"] = list(stats["endpoints"])
-    
-    # Find most similar calls (potential duplicates)
-    signatures = {}
-    for call in history:
-        sig = call.signature()
-        if sig not in signatures:
-            signatures[sig] = []
-        signatures[sig].append(call)
-    
-    duplicates = {
-        sig: len(calls) 
-        for sig, calls in signatures.items() 
-        if len(calls) > 1
-    }
-    
-    return {
-        "total_calls": len(history),
-        "by_provider": by_provider,
-        "duplicate_patterns": duplicates,
-        "potential_savings": sum(
-            (len(calls) - 1) * calls[0].cost_usd
-            for calls in signatures.values()
-            if len(calls) > 1
-        )
-    }
-
-
-class APIMetabolizer:
-    """
-    High-level API metabolizer that learns and replaces API calls.
-    """
-    
-    def __init__(self, cache_threshold: float = 0.8):
-        self.cache_threshold = cache_threshold  # Similarity threshold for caching
-        self.stats = {
-            "cache_hits": 0,
-            "cache_misses": 0,
-            "total_saved": 0.0
-        }
-    
-    def metabolize(
-        self,
-        provider: str,
-        endpoint: str,
-        request: Dict[str, Any],
-        fallback_fn = None
-    ) -> Tuple[Dict[str, Any], bool]:
-        """
-        Try to metabolize (cache) an API call.
-        
-        Args:
-            provider: API provider
-            endpoint: API endpoint
-            request: Request payload
-            fallback_fn: Function to call if cache miss
-        
-        Returns:
-            (response, was_cached)
-        """
-        # Try to find cached response
-        prompt = request.get("prompt", "")
-        cached = suggest_replay(prompt, provider)
-        
-        if cached and cached.get("similarity_score", 0) >= self.cache_threshold:
-            # Use cached response
-            self.stats["cache_hits"] += 1
-            self.stats["total_saved"] += request.get("estimated_cost", 0.001)
-            
-            return cached["response"], True
-        
-        # Cache miss - make real call if fallback provided
-        self.stats["cache_misses"] += 1
-        
-        if fallback_fn:
-            start_time = time.time()
-            response = fallback_fn(request)
-            latency_ms = (time.time() - start_time) * 1000
-            
-            # Record for future use
-            record_call(
-                provider=provider,
-                endpoint=endpoint,
-                req=request,
-                resp=response,
-                latency_ms=latency_ms,
-                cost_usd=request.get("estimated_cost", 0.001)
-            )
-            
-            return response, False
-        
-        return {"error": "No cached response and no fallback"}, False
-    
-    def get_stats(self) -> Dict[str, Any]:
-        """Get metabolizer statistics"""
-        total = self.stats["cache_hits"] + self.stats["cache_misses"]
-        hit_rate = self.stats["cache_hits"] / max(total, 1)
-        
-        return {
-            **self.stats,
-            "hit_rate": hit_rate,
-            "total_calls": total,
-            "patterns": analyze_patterns()
-        }
-    
-    def learn_pattern(self, pattern_type: str, examples: List[Dict[str, Any]]):
-        """
-        Learn a pattern from examples (future: train small model).
-        
-        Args:
-            pattern_type: Type of pattern (completion, classification, etc)
-            examples: List of input/output examples
-        """
-        # Placeholder for future ML-based pattern learning
-        # Could train a small model to replicate API behavior
-        pass
-    
-    def suggest_replacement(self, provider: str) -> Optional[str]:
-        """
-        Suggest a replacement strategy for a provider.
-        
-        Args:
-            provider: Provider to analyze
-        
-        Returns:
-            Suggestion string or None
-        """
-        patterns = analyze_patterns()
-        
-        if provider not in patterns.get("by_provider", {}):
-            return None
-        
-        stats = patterns["by_provider"][provider]
-        
-        suggestions = []
-        
-        # High cost suggestion
-        if stats.get("avg_cost", 0) > 0.01:
-            suggestions.append(
-                f"High average cost (${stats['avg_cost']:.4f}). "
-                "Consider caching or using cheaper provider."
-            )
-        
-        # High latency suggestion
-        if stats.get("avg_latency", 0) > 1000:
-            suggestions.append(
-                f"High latency ({stats['avg_latency']:.0f}ms). "
-                "Consider async batching or local model."
-            )
-        
-        # Duplicate pattern suggestion
-        duplicate_count = sum(
-            1 for v in patterns.get("duplicate_patterns", {}).values()
-            if v > 5
-        )
-        if duplicate_count > 0:
-            suggestions.append(
-                f"Found {duplicate_count} duplicate patterns. "
-                f"Potential savings: ${patterns.get('potential_savings', 0):.2f}"
-            )
-        
-        return " ".join(suggestions) if suggestions else None
-
-
-def cleanup_old_logs(days: int = 30) -> int:
-    """Clean up old API logs"""
     if not LOG.exists():
-        return 0
+        return {}
     
-    cutoff = time.time() - (days * 24 * 3600)
-    kept_calls = []
-    removed = 0
+    cache = {}
+    entries = []
     
+    # Collect all successful calls
     with LOG.open("rb") as f:
         for line in f:
-            if line.strip():
-                try:
-                    data = json_loads(line)
-                    if data.get("timestamp", 0) >= cutoff:
-                        kept_calls.append(line)
-                    else:
-                        removed += 1
-                except:
-                    continue
+            try:
+                record = orjson.loads(line)
+                
+                if record.get("success", True):
+                    sig = f"{record['provider']}:{record['endpoint']}:{_compute_signature(record['request'])}"
+                    entries.append((
+                        sig,
+                        record["response"],
+                        record["timestamp"]
+                    ))
+            except Exception:
+                continue
     
-    # Rewrite file with kept calls
-    if removed > 0:
-        with LOG.open("wb") as f:
-            for line in kept_calls:
-                f.write(line)
+    # Keep most recent entries up to max_size
+    entries.sort(key=lambda x: x[2], reverse=True)
     
-    return removed
+    for sig, response, _ in entries[:max_size]:
+        cache[sig] = response
+    
+    return cache
+
+
+def quick_test():
+    """Quick test of API metabolizer"""
+    # Record some test calls
+    record_call(
+        provider="openai",
+        endpoint="chat/completions",
+        req={"model": "gpt-4", "messages": [{"role": "user", "content": "Hello"}]},
+        resp={"choices": [{"message": {"content": "Hi there!"}}]},
+        latency_ms=523.4,
+        cost_usd=0.002
+    )
+    
+    record_call(
+        provider="openai",
+        endpoint="chat/completions",
+        req={"model": "gpt-4", "messages": [{"role": "user", "content": "Hello"}]},
+        resp={"choices": [{"message": {"content": "Hello!"}}]},
+        latency_ms=412.1,
+        cost_usd=0.002
+    )
+    
+    record_call(
+        provider="anthropic",
+        endpoint="messages",
+        req={"model": "claude-3", "messages": [{"role": "user", "content": "Test"}]},
+        resp={"content": "Test response"},
+        latency_ms=234.5,
+        cost_usd=0.001
+    )
+    
+    # Test replay suggestion
+    replay = suggest_replay(
+        provider="openai",
+        endpoint="chat/completions",
+        request={"model": "gpt-4", "messages": [{"role": "user", "content": "Hello"}]},
+        similarity_threshold=0.9
+    )
+    
+    # Get stats
+    stats = get_provider_stats()
+    
+    # Find replaceable calls
+    replaceable = find_replaceable_calls(min_frequency=2)
+    
+    return {
+        "calls_recorded": stats["total_calls"],
+        "total_cost": stats["total_cost"],
+        "replay_found": replay is not None,
+        "replaceable_patterns": len(replaceable),
+        "potential_savings": sum(r["potential_savings"] for r in replaceable)
+    }
+
+
+if __name__ == "__main__":
+    result = quick_test()
+    print("API Metabolizer Test:")
+    print(f"  Calls recorded: {result['calls_recorded']}")
+    print(f"  Total cost: ${result['total_cost']:.3f}")
+    print(f"  Replay found: {result['replay_found']}")
+    print(f"  Replaceable patterns: {result['replaceable_patterns']}")
+    print(f"  Potential savings: ${result['potential_savings']:.3f}")

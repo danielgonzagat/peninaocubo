@@ -1,19 +1,14 @@
 """
-Life Equation (+) - Non-Compensatory Gate and Positive Orchestrator
-===================================================================
-
-Implements the Life Equation (+) as the counterpart to Death Equation.
-Non-compensatory gate: if ANY condition fails, alpha_eff = 0 (fail-closed).
-alpha_eff = base_alpha * φ(CAOS⁺) * SR * G * accel(φ)
-
-This module ensures evolution only happens when ALL safety conditions pass.
+Life Equation (+) - Non-compensatory gate and positive evolution orchestrator
+Implements alpha_eff = base_alpha * φ(CAOS⁺) * SR * G * accel(φ)
+Fail-closed: any gate failure → alpha_eff = 0
 """
 
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Dict, Any, Tuple, Optional
+from typing import Dict, Any, Tuple
 
-# Import existing engines from the repository
+# Import existing modules from repo
 from .guards import sigma_guard, ir_to_ic_contractive
 from .scoring import linf_harmonic
 from .caos import phi_caos
@@ -22,21 +17,12 @@ from .sr import sr_omega
 
 @dataclass
 class LifeVerdict:
-    """Verdict from Life Equation evaluation"""
+    """Result of Life Equation evaluation"""
     ok: bool
     alpha_eff: float
     reasons: Dict[str, Any]
     metrics: Dict[str, float]
     thresholds: Dict[str, float]
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "ok": self.ok,
-            "alpha_eff": self.alpha_eff,
-            "reasons": self.reasons,
-            "metrics": self.metrics,
-            "thresholds": self.thresholds
-        }
 
 
 def _accel(phi: float, kappa: float = 20.0) -> float:
@@ -59,136 +45,95 @@ def life_equation(
     cost: float,
     ethical_ok_flag: bool,
     G: float,    # Global coherence (Ω-ΣEA)
-    dL_inf: float,  # ΔL∞ in the cycle
-    thresholds: Optional[Dict[str, float]] = None,
+    dL_inf: float,  # ΔL∞ in cycle
+    thresholds: Dict[str, float],   # {beta_min, theta_caos, tau_sr, theta_G}
 ) -> LifeVerdict:
     """
-    Implements the Life Equation (+) as counterpart to Death Equation.
+    Implements Life Equation (+) as counterpart to Death Equation.
     Non-compensatory gate: if ANY condition fails, alpha_eff = 0 (fail-closed).
     alpha_eff = base_alpha * φ(CAOS⁺) * SR * G * accel(φ)
     
-    Args:
-        base_alpha: Base learning rate
-        ethics_input: Ethics metrics dict (ece, rho_bias, fairness, consent, eco_ok)
-        risk_series: Risk time series for contractivity check
-        caos_components: (C, A, O, S) tuple for CAOS⁺ calculation
-        sr_components: (awareness, ethics_ok, autocorr, metacog) for SR-Ω∞
-        linf_weights: Weights for L∞ calculation
-        linf_metrics: Current metrics dict
-        cost: Current cost
-        ethical_ok_flag: Overall ethics flag
-        G: Global coherence (Ω-ΣEA)
-        dL_inf: ΔL∞ change in cycle
-        thresholds: Thresholds dict (beta_min, theta_caos, tau_sr, theta_G)
+    Parameters:
+    -----------
+    base_alpha: Base learning rate
+    ethics_input: Ethics metrics (ece, rho_bias, fairness, consent, eco_ok)
+    risk_series: Risk time series for contractiveness check
+    caos_components: (C, A, O, S) for CAOS⁺ computation
+    sr_components: (awareness, ethics_ok, autocorr, metacog) for SR
+    linf_weights: Weights for L∞ computation
+    linf_metrics: Metrics for L∞ computation
+    cost: Current cost
+    ethical_ok_flag: External ethics flag
+    G: Global coherence across 8 modules
+    dL_inf: Delta L∞ improvement
+    thresholds: Gates thresholds
     
     Returns:
-        LifeVerdict with decision and details
+    --------
+    LifeVerdict with ok status, alpha_eff, reasons, metrics, and thresholds
     """
-    # Default thresholds if not provided
-    if thresholds is None:
-        thresholds = {
-            "beta_min": 0.01,    # Minimum ΔL∞
-            "theta_caos": 0.25,  # Minimum CAOS⁺
-            "tau_sr": 0.80,      # Minimum SR
-            "theta_G": 0.85,     # Minimum global coherence
-            "ece_max": 0.01,     # Maximum ECE
-            "rho_bias_max": 1.05 # Maximum ρ_bias
-        }
-    
     reasons = {}
-    
-    # 1) Σ-Guard (ethics) - non-compensatory
-    guard_metrics = {
+
+    # 1) Σ-Guard (ethics) – non-compensatory
+    # Prepare metrics dict for sigma_guard
+    metrics = {
         "ece": ethics_input.get("ece", 1.0),
         "rho_bias": ethics_input.get("rho_bias", 999.0),
         "fairness": ethics_input.get("fairness", 0.0),
-        "consent": bool(ethics_input.get("consent", False)),
-        "eco_ok": bool(ethics_input.get("eco_ok", False)),
+        "consent": bool(ethics_input.get("consent", 0)),
+        "eco_ok": bool(ethics_input.get("eco_ok", 0))
     }
-    
-    # Create a simple policy object or use the function differently
-    from .guards import GuardResult
-    
-    # Simple check based on thresholds
-    ok_sigma = (
-        guard_metrics["ece"] <= thresholds.get("ece_max", 0.01) and
-        guard_metrics["rho_bias"] <= thresholds.get("rho_bias_max", 1.05) and
-        guard_metrics["consent"] and
-        guard_metrics["eco_ok"]
-    )
-    details = guard_metrics
+    ok_sigma = sigma_guard(metrics)
     reasons["sigma_ok"] = ok_sigma
-    reasons["sigma_details"] = details
-    
+    reasons["sigma_details"] = metrics
     if not (ok_sigma and ethical_ok_flag):
         return LifeVerdict(False, 0.0, reasons, {}, thresholds)
-    
-    # 2) IR→IC (risk contractivity)
-    # Convert risk_series dict to list
-    risk_history = list(risk_series.values()) if isinstance(risk_series, dict) else risk_series
-    
-    # Calculate contractivity
-    if len(risk_history) >= 2:
-        rho = max(risk_history[-1] / max(risk_history[-2], 1e-9), 0.0)
-    else:
-        rho = 0.9  # Default safe value
-    
-    contractive = rho < 1.0
-    reasons["risk_contractive"] = contractive
+
+    # 2) IR→IC (risk contractiveness)
+    # Convert risk_series dict to list for ir_to_ic_contractive
+    risk_list = list(risk_series.values()) if isinstance(risk_series, dict) else risk_series
+    contractive_result = ir_to_ic_contractive(risk_list, rho_threshold=1.0)
+    reasons["risk_contractive"] = contractive_result
+    # Estimate rho from risk series
+    rho = max(risk_list[-1] / risk_list[0], 0.01) if len(risk_list) >= 2 else 0.9
     reasons["risk_rho"] = rho
-    
-    if not contractive:
-        return LifeVerdict(False, 0.0, reasons, {"rho": float(rho)}, thresholds)
-    
+    if not contractive_result:
+        return LifeVerdict(False, 0.0, reasons, {}, thresholds)
+
     # 3) CAOS⁺ and SR
     C, A, O, S = caos_components
-    phi = phi_caos(C, A, O, S, kappa=25.0, gamma=1.0, kappa_max=100.0)
+    phi = phi_caos(C, A, O, S, kappa=25.0, gamma=1.0, kappa_max=100.0)  # stable (log+tanh)
     reasons["caos_phi"] = phi
-    
     if phi < thresholds.get("theta_caos", 0.25):
-        return LifeVerdict(False, 0.0, reasons, {"phi": float(phi)}, thresholds)
-    
+        return LifeVerdict(False, 0.0, reasons, {}, thresholds)
+
     awr, eth_ok, autoc, meta = sr_components
-    sr = sr_omega(awr, eth_ok, autoc, meta)  # Non-compensatory (harmonic/min-soft)
+    sr = sr_omega(awr, eth_ok, autoc, meta)  # non-compensatory (harmonic/min-soft)
     reasons["sr"] = sr
-    
     if sr < thresholds.get("tau_sr", 0.80):
-        return LifeVerdict(False, 0.0, reasons, {"sr": float(sr)}, thresholds)
-    
+        return LifeVerdict(False, 0.0, reasons, {}, thresholds)
+
     # 4) L∞ and ΔL∞ (anti-Goodhart)
-    # Convert metrics to lists for linf_harmonic
-    weights_list = [linf_weights.get(k, 1.0) for k in linf_metrics.keys()]
-    metrics_list = [linf_metrics[k] for k in linf_metrics.keys()]
-    
     L_inf = linf_harmonic(
-        weights_list,
-        metrics_list,
+        [linf_weights[k] for k in linf_metrics],
+        [linf_metrics[k] for k in linf_metrics],
         cost=cost,
-        lambda_c=linf_weights.get("lambda_c", 0.01),
-        ethical_ok=True
+        lambda_c=linf_weights.get("lambda_c", 0.0),
+        ethical_ok=True,
     )
     reasons["L_inf"] = L_inf
     reasons["dL_inf"] = dL_inf
-    
     if dL_inf < thresholds.get("beta_min", 0.01):
-        return LifeVerdict(
-            False, 0.0, reasons, 
-            {"L_inf": float(L_inf), "dL_inf": float(dL_inf)}, 
-            thresholds
-        )
-    
+        return LifeVerdict(False, 0.0, reasons, {"L_inf": float(L_inf), "dL_inf": float(dL_inf)}, thresholds)
+
     # 5) Global coherence Ω-ΣEA (harmonic mean of 8 modules)
     reasons["G"] = G
     if G < thresholds.get("theta_G", 0.85):
-        return LifeVerdict(
-            False, 0.0, reasons, 
-            {"L_inf": float(L_inf), "dL_inf": float(dL_inf), "G": float(G)}, 
-            thresholds
-        )
-    
-    # 6) α_eff - acceleration by CAOS⁺, SR and G (fail-closed)
+        return LifeVerdict(False, 0.0, reasons, {"L_inf": float(L_inf), "dL_inf": float(dL_inf)}, thresholds)
+
+    # 6) α_eff – acceleration by CAOS⁺, SR and G (fail-closed)
     alpha_eff = base_alpha * phi * sr * G * _accel(phi, kappa=20.0)
-    
+
     metrics = {
         "alpha_eff": float(alpha_eff),
         "phi": float(phi),
@@ -198,73 +143,41 @@ def life_equation(
         "dL_inf": float(dL_inf),
         "rho": float(rho),
     }
-    
     return LifeVerdict(True, float(alpha_eff), reasons, metrics, thresholds)
 
 
-def life_equation_simple(
-    base_alpha: float = 0.001,
-    ece: float = 0.005,
-    rho_bias: float = 1.01,
-    risk_rho: float = 0.95,
-    caos_values: Tuple[float, float, float, float] = (0.8, 0.7, 0.6, 0.9),
-    sr_values: Tuple[float, float, float, float] = (0.85, 1.0, 0.80, 0.82),
-    dL_inf: float = 0.02,
-    G: float = 0.90,
-    **kwargs
-) -> LifeVerdict:
-    """
-    Simplified interface for Life Equation with sensible defaults.
-    
-    Args:
-        base_alpha: Base learning rate (default 0.001)
-        ece: Expected Calibration Error (default 0.005)
-        rho_bias: Bias ratio (default 1.01)
-        risk_rho: Risk contractivity factor (default 0.95)
-        caos_values: (C, A, O, S) tuple (default high values)
-        sr_values: (awareness, ethics, autocorr, metacog) tuple
-        dL_inf: Delta L-infinity (default 0.02)
-        G: Global coherence (default 0.90)
-        **kwargs: Additional parameters
-    
-    Returns:
-        LifeVerdict with decision
-    """
-    ethics_input = {
-        "ece": ece,
-        "rho_bias": rho_bias,
-        "fairness": kwargs.get("fairness", 0.9),
-        "consent": kwargs.get("consent", True),
-        "eco_ok": kwargs.get("eco_ok", True),
-    }
-    
-    risk_series = {
-        f"r{i}": risk_rho * (0.95 + 0.05 * (i % 2))
-        for i in range(5)
-    }
-    
-    linf_metrics = kwargs.get("linf_metrics", {
-        "accuracy": 0.85,
-        "robustness": 0.80,
-        "calibration": 0.90,
-    })
-    
-    linf_weights = kwargs.get("linf_weights", {
-        k: 1.0 for k in linf_metrics.keys()
-    })
-    linf_weights["lambda_c"] = kwargs.get("lambda_c", 0.01)
-    
-    return life_equation(
-        base_alpha=base_alpha,
-        ethics_input=ethics_input,
-        risk_series=risk_series,
-        caos_components=caos_values,
-        sr_components=sr_values,
-        linf_weights=linf_weights,
-        linf_metrics=linf_metrics,
-        cost=kwargs.get("cost", 0.02),
-        ethical_ok_flag=kwargs.get("ethical_ok", True),
-        G=G,
-        dL_inf=dL_inf,
-        thresholds=kwargs.get("thresholds", None)
+def quick_test():
+    """Quick test of Life Equation"""
+    result = life_equation(
+        base_alpha=1e-3,
+        ethics_input={
+            "ece": 0.005,
+            "rho_bias": 1.01,
+            "fairness": 0.9,
+            "consent": 1,
+            "eco_ok": 1,
+            "thresholds": {}
+        },
+        risk_series={"r0": 0.9, "r1": 0.92, "r2": 0.88},
+        caos_components=(0.8, 0.7, 0.6, 0.9),
+        sr_components=(0.85, True, 0.80, 0.82),
+        linf_weights={"w1": 1, "w2": 1, "lambda_c": 0.1},
+        linf_metrics={"w1": 0.8, "w2": 0.9},
+        cost=0.02,
+        ethical_ok_flag=True,
+        G=0.90,
+        dL_inf=0.02,
+        thresholds={
+            "beta_min": 0.01,
+            "theta_caos": 0.25,
+            "tau_sr": 0.80,
+            "theta_G": 0.85
+        },
     )
+    return result
+
+
+if __name__ == "__main__":
+    result = quick_test()
+    print(f"Life Equation OK? {result.ok}, alpha_eff={result.alpha_eff:.6f}")
+    print(f"Metrics: {result.metrics}")
