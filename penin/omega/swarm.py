@@ -1,194 +1,172 @@
 """
-Swarm Cognitive Module - Gossip Protocol & Global State Aggregation
-===================================================================
+Swarm Cognitive - Local Gossip Protocol
+========================================
 
-Implements a lightweight swarm intelligence system where:
-- Multiple logical nodes share state via heartbeat/gossip
-- Global coherence (G) is computed from swarm consensus
-- Uses local SQLite for persistence (single-node PoC, extensible to multi-node)
-
-This enables distributed cognition while maintaining auditability.
+Implements local gossip/heartbeat protocol for swarm intelligence.
+Uses SQLite for persistence and aggregates global state.
 """
 
 import os
 import sqlite3
 import time
+import random
 import json
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, asdict
 
 
-# Root directory for PENIN state
 ROOT = Path(os.getenv("PENIN_ROOT", Path.home() / ".penin_omega"))
 DB = ROOT / "state" / "heartbeats.db"
+DB.parent.mkdir(parents=True, exist_ok=True)
 
 
 @dataclass
-class SwarmNode:
-    """Represents a node in the swarm"""
-    node_id: str
-    role: str  # "core", "explorer", "validator", etc.
-    metrics: Dict[str, float]
+class Heartbeat:
+    """Heartbeat data from a swarm node"""
+    node: str
     timestamp: float
+    phi: float  # CAOS⁺ value
+    sr: float   # SR-Ω∞ value
+    g: float    # Global coherence
+    health: float  # Node health
+    metadata: Dict[str, Any] = None
     
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "node_id": self.node_id,
-            "role": self.role,
-            "metrics": self.metrics,
-            "timestamp": self.timestamp
-        }
+        d = asdict(self)
+        if self.metadata is None:
+            d["metadata"] = {}
+        return d
 
 
 def _init_db():
-    """Initialize swarm database"""
-    DB.parent.mkdir(parents=True, exist_ok=True)
-    
+    """Initialize database schema"""
     with sqlite3.connect(DB) as con:
         con.execute("""
-            CREATE TABLE IF NOT EXISTS hb (
-                node TEXT,
-                ts REAL,
+            CREATE TABLE IF NOT EXISTS heartbeats (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                node TEXT NOT NULL,
+                timestamp REAL NOT NULL,
+                phi REAL,
+                sr REAL,
+                g REAL,
+                health REAL,
                 payload TEXT,
-                role TEXT DEFAULT 'core'
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
+        """)
+        con.execute("""
+            CREATE INDEX IF NOT EXISTS idx_timestamp 
+            ON heartbeats(timestamp DESC)
+        """)
+        con.execute("""
+            CREATE INDEX IF NOT EXISTS idx_node 
+            ON heartbeats(node)
         """)
         con.commit()
 
 
-def heartbeat(node: str, payload: Dict[str, Any], role: str = "core") -> None:
+def heartbeat(node: str, payload: Dict[str, Any]) -> bool:
     """
     Record a heartbeat from a node.
     
     Args:
         node: Node identifier
-        payload: Metrics payload (should contain phi, sr, G, etc.)
-        role: Node role (core, explorer, validator)
+        payload: Metrics payload (should contain phi, sr, g, health)
+    
+    Returns:
+        True if successfully recorded
     """
     _init_db()
     
-    with sqlite3.connect(DB) as con:
-        con.execute(
-            "INSERT INTO hb(node, ts, payload, role) VALUES(?, ?, ?, ?)",
-            (node, time.time(), json.dumps(payload), role)
+    try:
+        hb = Heartbeat(
+            node=node,
+            timestamp=time.time(),
+            phi=float(payload.get("phi", 0.0)),
+            sr=float(payload.get("sr", 0.0)),
+            g=float(payload.get("g", 0.0)),
+            health=float(payload.get("health", 1.0)),
+            metadata=payload.get("metadata", {})
         )
-        con.commit()
+        
+        with sqlite3.connect(DB) as con:
+            con.execute("""
+                INSERT INTO heartbeats(node, timestamp, phi, sr, g, health, payload)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                hb.node, hb.timestamp, hb.phi, hb.sr, hb.g, hb.health,
+                json.dumps(hb.to_dict())
+            ))
+            con.commit()
+        
+        return True
+    except Exception as e:
+        print(f"Heartbeat error: {e}")
+        return False
 
 
 def sample_global_state(window_s: float = 60.0) -> Dict[str, float]:
     """
-    Sample global state from recent heartbeats.
+    Sample and aggregate global state from recent heartbeats.
     
     Args:
         window_s: Time window in seconds
-        
+    
     Returns:
-        Dict with aggregated metrics (mean over window)
+        Aggregated metrics dict
     """
     _init_db()
     
     t0 = time.time() - window_s
     
     with sqlite3.connect(DB) as con:
-        cur = con.execute("SELECT payload FROM hb WHERE ts >= ?", (t0,))
-        data = [json.loads(r[0]) for r in cur.fetchall()]
-    
-    if not data:
-        return {}
-    
-    # Aggregate metrics (simple mean for now)
-    agg = {}
-    counts = {}
-    
-    for payload in data:
-        for k, v in payload.items():
-            try:
-                v_float = float(v)
-                agg[k] = agg.get(k, 0.0) + v_float
-                counts[k] = counts.get(k, 0) + 1
-            except (ValueError, TypeError):
-                pass
-    
-    # Calculate means
-    result = {}
-    for k, total in agg.items():
-        result[k] = total / max(1, counts[k])
-    
-    return result
-
-
-def compute_global_coherence(window_s: float = 60.0) -> float:
-    """
-    Compute global coherence (G) from swarm state.
-    
-    G is computed as the harmonic mean of key metrics across all nodes.
-    
-    Args:
-        window_s: Time window in seconds
+        cur = con.execute("""
+            SELECT phi, sr, g, health, payload
+            FROM heartbeats
+            WHERE timestamp >= ?
+            ORDER BY timestamp DESC
+        """, (t0,))
         
-    Returns:
-        Global coherence score [0, 1]
-    """
-    state = sample_global_state(window_s)
+        rows = cur.fetchall()
     
-    # Extract key metrics for coherence
-    key_metrics = ["phi", "sr", "ece", "rho"]
+    if not rows:
+        return {
+            "phi_avg": 0.0,
+            "sr_avg": 0.0,
+            "g_avg": 0.0,
+            "health_avg": 0.0,
+            "node_count": 0,
+            "window_s": window_s
+        }
     
-    values = []
-    for metric in key_metrics:
-        if metric in state:
-            # Normalize to [0, 1] if needed
-            val = state[metric]
-            if metric == "ece":
-                val = max(0.0, 1.0 - val / 0.01)  # Lower ECE is better
-            elif metric == "rho":
-                val = max(0.0, 1.0 - val)  # Lower rho is better
-            
-            values.append(max(1e-9, min(1.0, val)))
+    # Aggregate metrics
+    phi_vals = [r[0] for r in rows if r[0] is not None]
+    sr_vals = [r[1] for r in rows if r[1] is not None]
+    g_vals = [r[2] for r in rows if r[2] is not None]
+    health_vals = [r[3] for r in rows if r[3] is not None]
     
-    if not values:
-        return 0.0
+    def safe_avg(vals: List[float]) -> float:
+        return sum(vals) / len(vals) if vals else 0.0
     
-    # Harmonic mean (non-compensatory)
-    return len(values) / sum(1.0 / v for v in values)
-
-
-def get_swarm_health() -> Dict[str, Any]:
-    """
-    Get overall swarm health metrics.
-    
-    Returns:
-        Dict with health indicators
-    """
-    _init_db()
-    
-    with sqlite3.connect(DB) as con:
-        # Count nodes
-        cur = con.execute("SELECT COUNT(DISTINCT node) FROM hb WHERE ts >= ?", 
-                         (time.time() - 300,))
-        active_nodes = cur.fetchone()[0]
-        
-        # Get roles distribution
-        cur = con.execute(
-            "SELECT role, COUNT(DISTINCT node) FROM hb WHERE ts >= ? GROUP BY role",
-            (time.time() - 300,)
-        )
-        roles = dict(cur.fetchall())
-        
-        # Get total heartbeats
-        cur = con.execute("SELECT COUNT(*) FROM hb WHERE ts >= ?",
-                         (time.time() - 300,))
-        total_hb = cur.fetchone()[0]
-    
-    G = compute_global_coherence(window_s=300)
+    # Non-compensatory: use harmonic mean for critical metrics
+    def harmonic_mean(vals: List[float]) -> float:
+        if not vals or any(v <= 0 for v in vals):
+            return 0.0
+        return len(vals) / sum(1.0 / v for v in vals)
     
     return {
-        "active_nodes": active_nodes,
-        "roles": roles,
-        "total_heartbeats": total_hb,
-        "global_coherence": G,
-        "healthy": G >= 0.85 and active_nodes > 0
+        "phi_avg": safe_avg(phi_vals),
+        "phi_harmonic": harmonic_mean(phi_vals),
+        "sr_avg": safe_avg(sr_vals),
+        "sr_harmonic": harmonic_mean(sr_vals),
+        "g_avg": safe_avg(g_vals),
+        "g_harmonic": harmonic_mean(g_vals),
+        "health_avg": safe_avg(health_vals),
+        "health_min": min(health_vals) if health_vals else 0.0,
+        "node_count": len(set(r[4] for r in rows)),  # Unique nodes
+        "sample_count": len(rows),
+        "window_s": window_s
     }
 
 
@@ -199,115 +177,196 @@ def get_node_history(node: str, limit: int = 100) -> List[Dict[str, Any]]:
     Args:
         node: Node identifier
         limit: Maximum number of records
-        
+    
     Returns:
         List of heartbeat records
     """
     _init_db()
     
     with sqlite3.connect(DB) as con:
-        cur = con.execute(
-            "SELECT ts, payload, role FROM hb WHERE node = ? ORDER BY ts DESC LIMIT ?",
-            (node, limit)
-        )
+        cur = con.execute("""
+            SELECT timestamp, phi, sr, g, health, payload
+            FROM heartbeats
+            WHERE node = ?
+            ORDER BY timestamp DESC
+            LIMIT ?
+        """, (node, limit))
         
-        records = []
-        for ts, payload, role in cur.fetchall():
-            records.append({
-                "timestamp": ts,
-                "payload": json.loads(payload),
-                "role": role
-            })
+        rows = cur.fetchall()
     
-    return records
+    return [
+        {
+            "timestamp": r[0],
+            "phi": r[1],
+            "sr": r[2],
+            "g": r[3],
+            "health": r[4],
+            "payload": json.loads(r[5]) if r[5] else {}
+        }
+        for r in rows
+    ]
 
 
-def cleanup_old_heartbeats(max_age_s: float = 86400) -> int:
+def detect_anomalies(threshold_stddev: float = 2.0) -> Dict[str, Any]:
+    """
+    Detect anomalies in swarm metrics.
+    
+    Args:
+        threshold_stddev: Number of standard deviations for anomaly
+    
+    Returns:
+        Dict with anomaly information
+    """
+    _init_db()
+    
+    # Get recent data (last 5 minutes)
+    window_s = 300
+    t0 = time.time() - window_s
+    
+    with sqlite3.connect(DB) as con:
+        cur = con.execute("""
+            SELECT node, phi, sr, g, health
+            FROM heartbeats
+            WHERE timestamp >= ?
+        """, (t0,))
+        
+        rows = cur.fetchall()
+    
+    if len(rows) < 10:
+        return {"anomalies": [], "message": "Insufficient data"}
+    
+    # Calculate statistics
+    import statistics
+    
+    phi_vals = [r[1] for r in rows if r[1] is not None]
+    sr_vals = [r[2] for r in rows if r[2] is not None]
+    g_vals = [r[3] for r in rows if r[3] is not None]
+    health_vals = [r[4] for r in rows if r[4] is not None]
+    
+    anomalies = []
+    
+    for metric_name, vals in [
+        ("phi", phi_vals),
+        ("sr", sr_vals),
+        ("g", g_vals),
+        ("health", health_vals)
+    ]:
+        if len(vals) < 2:
+            continue
+            
+        mean = statistics.mean(vals)
+        stddev = statistics.stdev(vals)
+        
+        if stddev > 0:
+            for i, v in enumerate(vals):
+                z_score = abs(v - mean) / stddev
+                if z_score > threshold_stddev:
+                    anomalies.append({
+                        "metric": metric_name,
+                        "value": v,
+                        "z_score": z_score,
+                        "node": rows[i][0] if i < len(rows) else "unknown"
+                    })
+    
+    return {
+        "anomalies": anomalies,
+        "stats": {
+            "phi": {"mean": statistics.mean(phi_vals), "stddev": statistics.stdev(phi_vals)} if len(phi_vals) > 1 else {},
+            "sr": {"mean": statistics.mean(sr_vals), "stddev": statistics.stdev(sr_vals)} if len(sr_vals) > 1 else {},
+            "g": {"mean": statistics.mean(g_vals), "stddev": statistics.stdev(g_vals)} if len(g_vals) > 1 else {},
+            "health": {"mean": statistics.mean(health_vals), "stddev": statistics.stdev(health_vals)} if len(health_vals) > 1 else {},
+        }
+    }
+
+
+def cleanup_old_heartbeats(days: int = 7) -> int:
     """
     Clean up old heartbeat records.
     
     Args:
-        max_age_s: Maximum age in seconds (default 24h)
-        
+        days: Keep records from last N days
+    
     Returns:
-        Number of records deleted
+        Number of deleted records
     """
     _init_db()
     
-    cutoff = time.time() - max_age_s
+    cutoff = time.time() - (days * 24 * 3600)
     
     with sqlite3.connect(DB) as con:
-        cur = con.execute("DELETE FROM hb WHERE ts < ?", (cutoff,))
+        cur = con.execute("""
+            DELETE FROM heartbeats
+            WHERE timestamp < ?
+        """, (cutoff,))
+        deleted = cur.rowcount
         con.commit()
-        return cur.rowcount
+    
+    return deleted
 
 
 class SwarmOrchestrator:
-    """
-    Orchestrates swarm-based global coherence computation.
+    """High-level swarm orchestration"""
     
-    This enables distributed decision-making where multiple nodes
-    contribute to the global state, and coherence (G) reflects
-    the consensus quality.
-    """
+    def __init__(self, node_id: str = None):
+        self.node_id = node_id or f"node-{os.getpid()}"
+        _init_db()
     
-    def __init__(self, node_id: str = "core-0", role: str = "core"):
-        self.node_id = node_id
-        self.role = role
-        print(f"🐝 Swarm node {node_id} initialized (role={role})")
-    
-    def emit_heartbeat(self, metrics: Dict[str, float]) -> None:
+    def emit_heartbeat(self, metrics: Dict[str, float]) -> bool:
         """Emit heartbeat with current metrics"""
-        heartbeat(self.node_id, metrics, self.role)
+        return heartbeat(self.node_id, metrics)
     
-    def get_global_coherence(self, window_s: float = 60.0) -> float:
-        """Get current global coherence"""
-        return compute_global_coherence(window_s)
-    
-    def get_health(self) -> Dict[str, Any]:
-        """Get swarm health"""
-        return get_swarm_health()
-    
-    def sync_state(self) -> Dict[str, Any]:
-        """
-        Synchronize with swarm and return global state.
+    def get_consensus(self, window_s: float = 60.0) -> Dict[str, Any]:
+        """Get swarm consensus metrics"""
+        state = sample_global_state(window_s)
         
-        Returns:
-            Dict with global metrics
-        """
-        state = sample_global_state(window_s=60.0)
-        health = self.get_health()
+        # Consensus requires minimum participation
+        if state["node_count"] < 2:
+            return {
+                "consensus": False,
+                "reason": "Insufficient nodes",
+                "state": state
+            }
+        
+        # Check metric convergence (low variance = consensus)
+        anomalies = detect_anomalies(threshold_stddev=1.5)
         
         return {
-            "global_state": state,
-            "health": health,
-            "node_id": self.node_id,
-            "timestamp": time.time()
+            "consensus": len(anomalies.get("anomalies", [])) == 0,
+            "anomaly_count": len(anomalies.get("anomalies", [])),
+            "state": state,
+            "stats": anomalies.get("stats", {})
         }
-
-
-# Quick test function
-def quick_swarm_test():
-    """Quick test of swarm functionality"""
-    orch = SwarmOrchestrator("test-node-1", "core")
     
-    # Emit some heartbeats
-    for i in range(5):
-        metrics = {
-            "phi": 0.7 + i * 0.02,
-            "sr": 0.85 + i * 0.01,
-            "ece": 0.005 - i * 0.0001,
-            "rho": 0.9 - i * 0.01
-        }
-        orch.emit_heartbeat(metrics)
-        time.sleep(0.1)
-    
-    # Get global state
-    state = orch.sync_state()
-    print(f"Global state: {state}")
-    
-    # Get health
-    health = orch.get_health()
-    print(f"Swarm health: {health}")
-    
-    return orch
+    def should_promote(self, min_nodes: int = 3, min_consensus: float = 0.8) -> bool:
+        """
+        Decide if swarm agrees on promotion.
+        
+        Args:
+            min_nodes: Minimum participating nodes
+            min_consensus: Minimum consensus metrics
+        
+        Returns:
+            True if swarm agrees on promotion
+        """
+        consensus = self.get_consensus()
+        
+        if not consensus["consensus"]:
+            return False
+        
+        state = consensus["state"]
+        
+        # Non-compensatory checks
+        if state["node_count"] < min_nodes:
+            return False
+        
+        # All critical metrics must be above threshold
+        if state["phi_harmonic"] < min_consensus:
+            return False
+        if state["sr_harmonic"] < min_consensus:
+            return False
+        if state["g_harmonic"] < min_consensus:
+            return False
+        if state["health_min"] < 0.7:
+            return False
+        
+        return True

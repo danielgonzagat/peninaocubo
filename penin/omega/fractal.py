@@ -1,317 +1,249 @@
 """
-Fractal DSL / Auto-Similarity Module
-====================================
+Fractal DSL - Self-Similar Architecture
+========================================
 
-Implements a fractal/self-similar structure for PENIN-Ω modules, where:
-- Core parameters propagate to all child modules (non-compensatory)
-- Each node is a self-contained Omega instance
-- Updates cascade through the tree maintaining consistency
-
-This enables scaling from a single node to arbitrarily deep hierarchies
-while maintaining the same governance rules at every level.
+Implements fractal/self-similar architecture for PENIN-Ω.
+Each node inherits configuration from parent with non-compensatory propagation.
 """
 
 from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional
-from pathlib import Path
 import json
+import os
+import yaml
+from pathlib import Path
 
 
 @dataclass
 class OmegaNode:
-    """
-    A single node in the Omega fractal hierarchy.
-    
-    Each node:
-    - Has its own configuration
-    - Can have children (sub-modules)
-    - Inherits updates from parents (non-compensatory)
-    """
+    """Fractal node in the Omega architecture"""
     id: str
     depth: int
     config: Dict[str, Any]
-    children: List[OmegaNode] = field(default_factory=list)
-    parent: Optional[OmegaNode] = None
+    children: List["OmegaNode"] = field(default_factory=list)
+    health_score: float = 1.0
+    resource_allocation: float = 1.0
     
     def to_dict(self) -> Dict[str, Any]:
+        """Convert node to dictionary representation"""
         return {
             "id": self.id,
             "depth": self.depth,
             "config": self.config,
-            "children": [c.to_dict() for c in self.children]
+            "health_score": self.health_score,
+            "resource_allocation": self.resource_allocation,
+            "children": [c.id for c in self.children]
         }
     
-    def count_nodes(self) -> int:
-        """Count total nodes in subtree"""
-        return 1 + sum(c.count_nodes() for c in self.children)
+    def propagate_health(self) -> float:
+        """Calculate propagated health from children (non-compensatory)"""
+        if not self.children:
+            return self.health_score
+        
+        # Non-compensatory: worst child affects parent
+        child_healths = [c.propagate_health() for c in self.children]
+        min_child = min(child_healths) if child_healths else 1.0
+        
+        # Parent health is weighted combination (70% self, 30% worst child)
+        return 0.7 * self.health_score + 0.3 * min_child
+
+
+def load_fractal_config(config_path: str = "penin/omega/fractal_dsl.yaml") -> Dict[str, Any]:
+    """Load fractal configuration from YAML"""
+    if not os.path.exists(config_path):
+        # Return default config if file doesn't exist
+        return {
+            "version": 1,
+            "depth": 2,
+            "branching": 3,
+            "weights": {"caos": 1.0, "sr": 1.0, "g": 1.0},
+            "sync": {"propagate_core_updates": True, "non_compensatory": True},
+            "replication": {
+                "inherit_thresholds": True,
+                "scale_factor": 0.9,
+                "min_resources": 0.1
+            }
+        }
     
-    def get_all_nodes(self) -> List[OmegaNode]:
-        """Get flattened list of all nodes"""
-        nodes = [self]
-        for child in self.children:
-            nodes.extend(child.get_all_nodes())
-        return nodes
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
 
 
 def build_fractal(
-    root_cfg: Dict[str, Any],
-    depth: int,
-    branching: int,
-    prefix: str = "Ω"
+    root_cfg: Dict[str, Any], 
+    depth: int, 
+    branching: int, 
+    prefix: str = "Ω",
+    scale_factor: float = 0.9
 ) -> OmegaNode:
     """
-    Build a fractal tree of Omega nodes.
+    Build fractal tree structure.
     
     Args:
-        root_cfg: Configuration for root node
-        depth: Number of levels below root (0 = just root)
+        root_cfg: Root configuration dict
+        depth: Tree depth
         branching: Number of children per node
-        prefix: ID prefix for nodes
-        
+        prefix: Node ID prefix
+        scale_factor: Resource scaling per level
+    
     Returns:
         Root OmegaNode with full tree
     """
-    root = OmegaNode(id=f"{prefix}-0", depth=0, config=root_cfg.copy())
-    
-    if depth == 0:
-        return root
+    root = OmegaNode(
+        id=f"{prefix}-0", 
+        depth=0, 
+        config=root_cfg.copy(),
+        resource_allocation=1.0
+    )
     
     # Build tree level by level
     frontier = [root]
-    
     for d in range(1, depth + 1):
         new_frontier = []
+        child_resources = scale_factor ** d
+        
         for node in frontier:
             for i in range(branching):
+                # Each child inherits parent config with scaled resources
+                child_cfg = node.config.copy()
+                child_cfg["resource_scale"] = child_resources
+                
                 child = OmegaNode(
                     id=f"{prefix}-{d}-{i}",
                     depth=d,
-                    config=root_cfg.copy(),
-                    parent=node
+                    config=child_cfg,
+                    resource_allocation=child_resources
                 )
                 node.children.append(child)
                 new_frontier.append(child)
+        
         frontier = new_frontier
     
     return root
 
 
-def propagate_update(
-    root: OmegaNode,
-    patch: Dict[str, Any],
-    non_compensatory: bool = True
-) -> int:
+def propagate_update(root: OmegaNode, patch: Dict[str, Any], non_compensatory: bool = True):
     """
-    Propagate a configuration update through the entire tree.
-    
-    Args:
-        root: Root node to start from
-        patch: Configuration updates to apply
-        non_compensatory: If True, ALL nodes must accept update (fail-closed)
-        
-    Returns:
-        Number of nodes updated
-    """
-    if non_compensatory:
-        # First, check if update would be valid for all nodes
-        all_nodes = root.get_all_nodes()
-        for node in all_nodes:
-            # Here you could add validation logic
-            # For now, we just accept all updates
-            pass
-    
-    # Apply update to all nodes
-    count = 0
-    stack = [root]
-    
-    while stack:
-        node = stack.pop()
-        node.config.update(patch)
-        count += 1
-        stack.extend(node.children)
-    
-    return count
-
-
-def validate_fractal_consistency(root: OmegaNode, key: str) -> bool:
-    """
-    Check if a specific config key is consistent across all nodes.
+    Propagate configuration update through tree.
     
     Args:
         root: Root node
-        key: Configuration key to check
-        
-    Returns:
-        True if all nodes have the same value for key
+        patch: Configuration patch to apply
+        non_compensatory: If True, all nodes must accept update
     """
-    all_nodes = root.get_all_nodes()
+    # Use DFS to propagate updates
+    stack = [root]
+    updated = []
     
-    if not all_nodes:
-        return True
+    while stack:
+        node = stack.pop()
+        
+        # Apply patch to node
+        old_config = node.config.copy()
+        node.config.update(patch)
+        updated.append((node, old_config))
+        
+        # Add children to stack
+        stack.extend(node.children)
     
-    reference_value = all_nodes[0].config.get(key)
-    
-    return all(node.config.get(key) == reference_value for node in all_nodes)
+    # If non-compensatory, validate all updates succeeded
+    if non_compensatory:
+        for node, old_config in updated:
+            # Simple validation: check required keys exist
+            required = ["weights", "sync"]
+            if not all(k in node.config for k in required):
+                # Rollback on failure
+                for n, old in updated:
+                    n.config = old
+                raise ValueError(f"Non-compensatory update failed at node {node.id}")
 
 
-@dataclass
-class FractalDSLConfig:
-    """Configuration for fractal DSL"""
-    version: int = 1
-    depth: int = 2
-    branching: int = 3
-    weights: Dict[str, float] = field(default_factory=lambda: {
-        "caos": 1.0,
-        "sr": 1.0,
-        "g": 1.0
-    })
-    sync: Dict[str, bool] = field(default_factory=lambda: {
-        "propagate_core_updates": True,
-        "non_compensatory": True
-    })
+def find_node(root: OmegaNode, node_id: str) -> Optional[OmegaNode]:
+    """Find node by ID in tree"""
+    if root.id == node_id:
+        return root
     
-    @classmethod
-    def from_yaml(cls, path: Path) -> FractalDSLConfig:
-        """Load from YAML file"""
-        import yaml
-        with open(path) as f:
-            data = yaml.safe_load(f)
-        return cls(
-            version=data.get("version", 1),
-            depth=data.get("depth", 2),
-            branching=data.get("branching", 3),
-            weights=data.get("weights", {}),
-            sync=data.get("sync", {})
-        )
+    for child in root.children:
+        result = find_node(child, node_id)
+        if result:
+            return result
     
-    def to_yaml(self, path: Path) -> None:
-        """Save to YAML file"""
-        import yaml
-        data = {
-            "version": self.version,
-            "depth": self.depth,
-            "branching": self.branching,
-            "weights": self.weights,
-            "sync": self.sync
-        }
-        with open(path, 'w') as f:
-            yaml.dump(data, f, default_flow_style=False)
+    return None
+
+
+def calculate_tree_health(root: OmegaNode) -> Dict[str, float]:
+    """
+    Calculate health metrics for entire tree.
+    
+    Returns:
+        Dict with health metrics
+    """
+    def traverse(node: OmegaNode) -> List[float]:
+        healths = [node.health_score]
+        for child in node.children:
+            healths.extend(traverse(child))
+        return healths
+    
+    all_healths = traverse(root)
+    
+    if not all_healths:
+        return {"avg": 0.0, "min": 0.0, "max": 0.0}
+    
+    return {
+        "avg": sum(all_healths) / len(all_healths),
+        "min": min(all_healths),
+        "max": max(all_healths),
+        "propagated": root.propagate_health()
+    }
 
 
 class FractalOrchestrator:
-    """
-    Orchestrates a fractal hierarchy of Omega modules.
+    """Orchestrates fractal architecture operations"""
     
-    Manages:
-    - Tree construction and maintenance
-    - Update propagation (with non-compensatory option)
-    - Consistency validation
-    - Metrics aggregation from all nodes
-    """
-    
-    def __init__(self, config: FractalDSLConfig = None):
-        self.config = config or FractalDSLConfig()
-        self.root: Optional[OmegaNode] = None
+    def __init__(self, config_path: Optional[str] = None):
+        self.config = load_fractal_config(config_path) if config_path else load_fractal_config()
+        self.root = self._build_tree()
         
-    def initialize(self, base_config: Dict[str, Any]) -> None:
-        """Initialize fractal tree"""
-        self.root = build_fractal(
-            base_config,
-            self.config.depth,
-            self.config.branching
+    def _build_tree(self) -> OmegaNode:
+        """Build tree from configuration"""
+        return build_fractal(
+            root_cfg=self.config,
+            depth=self.config.get("depth", 2),
+            branching=self.config.get("branching", 3),
+            scale_factor=self.config.get("replication", {}).get("scale_factor", 0.9)
         )
-        print(f"🌳 Initialized fractal tree: {self.root.count_nodes()} nodes")
     
-    def update_all(self, patch: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Apply update to all nodes.
-        
-        Returns:
-            Dict with update results
-        """
-        if self.root is None:
-            return {"error": "Not initialized"}
-        
-        non_compensatory = self.config.sync.get("non_compensatory", True)
-        count = propagate_update(self.root, patch, non_compensatory)
+    def update_all(self, patch: Dict[str, Any]) -> bool:
+        """Update all nodes with patch"""
+        try:
+            propagate_update(
+                self.root, 
+                patch, 
+                non_compensatory=self.config.get("sync", {}).get("non_compensatory", True)
+            )
+            return True
+        except Exception as e:
+            print(f"Update failed: {e}")
+            return False
+    
+    def get_health(self) -> Dict[str, float]:
+        """Get tree health metrics"""
+        return calculate_tree_health(self.root)
+    
+    def find(self, node_id: str) -> Optional[OmegaNode]:
+        """Find node by ID"""
+        return find_node(self.root, node_id)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Export tree structure as dict"""
+        def node_to_full_dict(node: OmegaNode) -> Dict[str, Any]:
+            d = node.to_dict()
+            d["children"] = [node_to_full_dict(c) for c in node.children]
+            return d
         
         return {
-            "nodes_updated": count,
-            "non_compensatory": non_compensatory,
-            "patch": patch
+            "config": self.config,
+            "tree": node_to_full_dict(self.root),
+            "health": self.get_health()
         }
-    
-    def validate_consistency(self, keys: List[str] = None) -> Dict[str, bool]:
-        """
-        Validate consistency across nodes.
-        
-        Args:
-            keys: List of config keys to check (None = check all)
-            
-        Returns:
-            Dict mapping keys to consistency status
-        """
-        if self.root is None:
-            return {}
-        
-        if keys is None:
-            # Get all keys from root config
-            keys = list(self.root.config.keys())
-        
-        results = {}
-        for key in keys:
-            results[key] = validate_fractal_consistency(self.root, key)
-        
-        return results
-    
-    def get_metrics(self) -> Dict[str, Any]:
-        """Get aggregated metrics from all nodes"""
-        if self.root is None:
-            return {}
-        
-        all_nodes = self.root.get_all_nodes()
-        
-        return {
-            "total_nodes": len(all_nodes),
-            "depth": self.config.depth,
-            "branching": self.config.branching,
-            "leaf_nodes": sum(1 for n in all_nodes if not n.children),
-            "tree_structure": self.root.to_dict()
-        }
-    
-    def export_structure(self, path: Path) -> None:
-        """Export tree structure to JSON"""
-        if self.root is None:
-            return
-        
-        with open(path, 'w') as f:
-            json.dump(self.root.to_dict(), f, indent=2)
-        
-        print(f"📄 Exported fractal structure to {path}")
-
-
-# Quick test function
-def quick_fractal_test():
-    """Quick test of fractal functionality"""
-    config = FractalDSLConfig(depth=2, branching=3)
-    orch = FractalOrchestrator(config)
-    
-    base_cfg = {
-        "ece_threshold": 0.01,
-        "rho_max": 0.95,
-        "sr_min": 0.80
-    }
-    
-    orch.initialize(base_cfg)
-    print(f"Tree initialized: {orch.get_metrics()}")
-    
-    # Test update propagation
-    update_result = orch.update_all({"ece_threshold": 0.008})
-    print(f"Update result: {update_result}")
-    
-    # Test consistency
-    consistency = orch.validate_consistency()
-    print(f"Consistency check: {consistency}")
-    
-    return orch

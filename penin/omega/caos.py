@@ -230,13 +230,8 @@ def caos_plus(C: float | None = None, A: float | None = None, O: float | None = 
     if S is None and "stability" in kwargs:
         S = kwargs["stability"]
     
-    # Default values
-    C = C or 0.5
-    A = A or 0.5
-    O = O or 0.5
-    S = S or 0.5
-    
-    phi = phi_caos(C, A, O, S, kappa, kappa_max, gamma)
+    # Calculate phi
+    phi = phi_caos(C, A, O, S, kappa=kappa, gamma=gamma, kappa_max=kappa_max)
     
     return {
         "phi": phi,
