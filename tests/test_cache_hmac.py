@@ -20,4 +20,7 @@ def test_cache_hmac_mismatch_raises(tmp_path, monkeypatch):
 
     with pytest.raises(ValueError):
         cache2.get("k")
+    
+    # Ensure proper cleanup
+    cache.l2_db.close()
     cache2.l2_db.close()
