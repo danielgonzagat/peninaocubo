@@ -349,11 +349,10 @@ class MetricsCollector:
 class MetricsServer:
     """Simple HTTP server for Prometheus metrics with basic auth"""
     
-    def __init__(self, collector: MetricsCollector, port: int = 8000, 
-                 auth_token: Optional[str] = None):
+    def __init__(self, collector: MetricsCollector, port: int = 8000, host: str = "127.0.0.1"):
         self.collector = collector
         self.port = port
-        self.auth_token = auth_token
+        self.host = host
         self.server = None
         self.thread = None
     
@@ -401,11 +400,11 @@ class MetricsServer:
             def log_message(self, format, *args):
                 pass  # Suppress request logs
         
-        self.server = HTTPServer(('127.0.0.1', self.port), MetricsHandler)
+        self.server = HTTPServer((self.host, self.port), MetricsHandler)
         self.thread = threading.Thread(target=self.server.serve_forever)
         self.thread.daemon = True
         self.thread.start()
-        print(f"Metrics server started on port {self.port}")
+        print(f"Metrics server started on {self.host}:{self.port}")
     
     def stop(self):
         """Stop metrics server"""

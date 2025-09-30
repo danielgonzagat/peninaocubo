@@ -263,6 +263,7 @@ class EventType:
     LLM_QUERY = "LLM_QUERY"
     SEED_SET = "SEED_SET"
     GATE_FAIL = "GATE_FAIL"
+    ETHICS_ATTEST = "ETHICS_ATTEST"
 
 # -----------------------------------------------------------------------------
 # Configuration and paths
@@ -761,11 +762,16 @@ class WORMLedger:
         
     def _init_db(self):
         cursor = self.db.cursor()
-        # Configure WAL mode and timeouts for better concurrency
-        cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA synchronous=NORMAL")
-        cursor.execute("PRAGMA busy_timeout=5000")  # 5s timeout
-        cursor.execute("PRAGMA wal_autocheckpoint=10000")  # Less frequent checkpoints
+        # Enable WAL mode and set busy timeout for better concurrency on WORM
+        try:
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA busy_timeout=3000")
+        except Exception as e:
+            # Log the specific error but continue - some environments may not support WAL
+            print(f"Warning: Failed to set SQLite pragmas for concurrency: {e}")
+            # Consider falling back to safer defaults or raising for critical failures
+            pass
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS events (
@@ -1116,6 +1122,45 @@ class LInfinityScore:
         return xt.l_inf
 
 # -----------------------------------------------------------------------------
+# Ethics metrics measurement (ECE / Bias / Risk attestation)
+# -----------------------------------------------------------------------------
+class EthicsMetrics:
+    """Lightweight, deterministic ethics metrics estimator.
+
+    Note: In production this should be replaced by calibrated metrics computed
+    from prediction buckets. Here, we derive proxies from current state to keep
+    the system fail-closed and auditable without external datasets.
+    """
+
+    def __init__(self, cfg: EthicsConfig, iric: IRICConfig):
+        self.ece_max = cfg.ece_max
+        self.bias_max = cfg.rho_bias_max
+        self.rho_max = iric.rho_max
+
+    def measure(self, xt: 'OmegaMEState') -> Dict[str, Any]:
+        # Proxy confidence as (1 - uncertainty); proxy accuracy as stability
+        confidence = max(0.0, min(1.0, 1.0 - xt.uncertainty))
+    def measure(self, xt: 'OmegaMEState') -> Dict[str, Any]:
+        # Proxy confidence as (1 - uncertainty); proxy accuracy as stability
+        confidence = max(0.0, min(1.0, 1.0 - xt.uncertainty))
+        accuracy = max(0.0, min(1.0, xt.stability))
+        ece = abs(confidence - accuracy)
+        # Bias proxy stays as current xt.bias but clipped to [1, 2]
+        bias = max(1.0, min(2.0, xt.bias))
+        rho = max(0.0, min(1.0, xt.rho))
+
+        # Return computed values without mutating input object
+        return {
+            "confidence": confidence,
+            "accuracy": accuracy,
+            "ece": ece,
+            "bias": bias,
+            "rho": rho,
+            "limits": {"ece_max": self.ece_max, "bias_max": self.bias_max, "rho_max": self.rho_max},
+        }
+        }
+
+# -----------------------------------------------------------------------------
 # Fibonacci manager for TTL, trust region and LR search
 # -----------------------------------------------------------------------------
 class FibonacciSchedule:
@@ -1213,6 +1258,7 @@ class PeninOmegaCore:
         self.gc = GlobalCoherence(self.cfg.omega_sigma)
         self.oci = OCIEngine(self.cfg.oci)
         self.linf = LInfinityScore(self.cfg.linf_placar)
+        self.ethics = EthicsMetrics(self.cfg.ethics, self.cfg.iric)
         
         self.xt = OmegaMEState()
         self.metrics = {"cycles": 0, "promotions": 0, "rollbacks": 0, "extinctions": 0}
@@ -1320,6 +1366,19 @@ class PeninOmegaCore:
                     if hasattr(self.xt, k): 
                         setattr(self.xt, k, float(v))
                         
+            # Measure ethics metrics (ECE / Bias / Rho) and record attestation
+            ethics_snapshot = self.ethics.measure(self.xt)
+            # Apply computed ethics values to state
+            self.xt.ece = ethics_snapshot["ece"]
+            self.xt.bias = ethics_snapshot["bias"]
+            self.xt.rho = ethics_snapshot["rho"]
+            self.worm.record(
+                EventType.ETHICS_ATTEST,
+                ethics_snapshot,
+                self.xt,
+                seed_state=self.rng.get_state(),
+            )
+
             # Update resource metrics (fail-closed if no psutil)
             if HAS_PSUTIL:
                 # For deterministic testing with seed, use pseudo-random values

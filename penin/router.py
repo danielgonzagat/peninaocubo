@@ -141,28 +141,16 @@ class MultiLLMRouter:
         
         # Latency component (higher is better for lower latency)
         lat = max(0.01, r.latency_s)
-        latency_score = 1.0 / lat
-        
-        # Cost component (lower cost is better)
-        # Normalize cost to [0,1] range, assuming max $1 per request
-        cost_normalized = min(1.0, max(0.0, getattr(r, 'cost_usd', 0.0)))
-        cost_score = 1.0 - cost_normalized  # Invert so lower cost = higher score
-        
-        # Budget penalty - heavily penalize if over budget
-        budget_penalty = 1.0
-        if hasattr(r, 'cost_usd') and r.cost_usd > 0:
-            if not self._check_budget(r.cost_usd):
-                budget_penalty = 0.1  # Severe penalty for budget violation
-                
-        # Combined score
-        content_weight = 0.4
-        latency_weight = 1.0 - self.cost_weight - content_weight
-        
-        score = (content_weight * base + 
-                latency_weight * latency_score + 
-                self.cost_weight * cost_score) * budget_penalty
-                
-        return score
+        latency_component = 1.0 / lat
+        # Penalize cost and token usage to respect budget constraints
+        # Penalize cost and token usage to respect budget constraints
+        budget = max(1e-6, getattr(settings, 'PENIN_BUDGET_DAILY_USD', 1.0))
+        tokens_budget = max(1, getattr(settings, 'PENIN_MAX_TOKENS_PER_ROUND', 1000))
+        cost_norm = r.cost_usd / budget
+        tokens_norm = (r.tokens_in + r.tokens_out) / tokens_budget
+        tokens_norm = (r.tokens_in + r.tokens_out) / tokens_budget
+        # Weights chosen conservatively to keep latency dominant but cost-aware
+        return base + latency_component - 2.0 * cost_norm - 0.5 * tokens_norm
 
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=0.5))
     async def ask(
