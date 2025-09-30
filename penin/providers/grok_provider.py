@@ -33,6 +33,4 @@ class GrokProvider(BaseProvider):
         resp = await asyncio.to_thread(chat.sample)
         text = getattr(resp, "content", "")
         end = time.time()
-        return LLMResponse(
-            content=text, model=self.model, provider=self.name, latency_s=end - start
-        )
+        return LLMResponse(content=text, model=self.model, provider=self.name, latency_s=end - start)

@@ -1,5 +1,7 @@
 import asyncio
 import time
+
+DAY_SECONDS = 86400  # 24 hours
 from typing import Any
 
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -19,7 +21,7 @@ class CostTracker:
     def add_cost(self, cost: float):
         """Add cost and reset daily counter if needed"""
         current_time = time.time()
-        if current_time - self.reset_time > 86400:  # 24 hours
+        if current_time - self.reset_time > DAY_SECONDS:  # 24 hours
             self.daily_spent = 0.0
             self.reset_time = current_time
         self.daily_spent += cost
@@ -83,12 +85,7 @@ class MultiLLMRouter:
             w_cost /= w_sum
             w_tokens /= w_sum
 
-        score = (
-            w_content * base
-            + w_latency * latency_score
-            + w_cost * cost_penalty
-            + w_tokens * token_efficiency
-        )
+        score = w_content * base + w_latency * latency_score + w_cost * cost_penalty + w_tokens * token_efficiency
 
         # Apply budget penalty if over budget
         if self.cost_tracker.is_over_budget():
@@ -104,10 +101,7 @@ class MultiLLMRouter:
         tools: list[dict[str, Any]] | None = None,
         temperature: float = 0.7,
     ) -> LLMResponse:
-        tasks = [
-            p.chat(messages, tools=tools, system=system, temperature=temperature)
-            for p in self.providers
-        ]
+        tasks = [p.chat(messages, tools=tools, system=system, temperature=temperature) for p in self.providers]
         results: list[LLMResponse] = await asyncio.gather(*tasks, return_exceptions=True)
         ok = [r for r in results if isinstance(r, LLMResponse)]
         if not ok:

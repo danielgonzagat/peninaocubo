@@ -224,9 +224,7 @@ def compute_awareness_score(
     return max(0.0, min(1.0, awareness))
 
 
-def compute_autocorrection_score(
-    error_history: list[float], correction_rate: float = 0.7, window: int = 10
-) -> float:
+def compute_autocorrection_score(error_history: list[float], correction_rate: float = 0.7, window: int = 10) -> float:
     """
     Compute self-correction capability based on error reduction.
 
@@ -262,9 +260,7 @@ def compute_autocorrection_score(
     return max(0.0, min(1.0, score))
 
 
-def compute_metacognition_score(
-    reasoning_depth: int, abstraction_level: float, pattern_recognition: float
-) -> float:
+def compute_metacognition_score(reasoning_depth: int, abstraction_level: float, pattern_recognition: float) -> float:
     """
     Compute metacognition score based on higher-order thinking.
 
@@ -314,9 +310,7 @@ class SRTracker:
             Tuple of (current_sr, ema_sr)
         """
         # Compute current SR
-        sr_score, details = compute_sr_omega(
-            awareness, ethics_ok, autocorrection, metacognition, self.config
-        )
+        sr_score, details = compute_sr_omega(awareness, ethics_ok, autocorrection, metacognition, self.config)
 
         # Update EMAs
         if self.awareness_ema is None:
@@ -326,12 +320,8 @@ class SRTracker:
             self.sr_ema = sr_score
         else:
             self.awareness_ema = self.alpha * awareness + (1 - self.alpha) * self.awareness_ema
-            self.autocorrection_ema = (
-                self.alpha * autocorrection + (1 - self.alpha) * self.autocorrection_ema
-            )
-            self.metacognition_ema = (
-                self.alpha * metacognition + (1 - self.alpha) * self.metacognition_ema
-            )
+            self.autocorrection_ema = self.alpha * autocorrection + (1 - self.alpha) * self.autocorrection_ema
+            self.metacognition_ema = self.alpha * metacognition + (1 - self.alpha) * self.metacognition_ema
             self.sr_ema = self.alpha * sr_score + (1 - self.alpha) * self.sr_ema
 
         # Store history

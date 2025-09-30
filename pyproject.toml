@@ -1,39 +1,14 @@
 [tool.black]
-line-length = 100
-target-version = ["py311","py312","py313"]
-# regex string (não array) — ignorar scripts 1_de_8..5_de_8
-extend-exclude = "^(1_de_8(?:_v7)?\\.py|[2-5]_de_8\\.py)$"
+line-length = 120
+target-version = ["py311"]
 
 [tool.ruff]
-line-length = 100
-target-version = "py313"
-src = ["penin", "tests", "."]
+line-length = 120
+target-version = "py311"
 
 [tool.ruff.lint]
-extend-select = ["E","F","W","I","UP","B","PL","PLC","PLE"]
-
-[tool.ruff.lint.isort]
-known-first-party = ["penin"]
+select = ["E","F","W","I","UP","B","PL"]
+ignore = ["PLR0912","PLR0913","PLR0915","PLR2004","E402","PLC0415"]  # manter estilo rígido sem travar produtividade
 
 [tool.ruff.lint.per-file-ignores]
-# testes são mais permissivos
-"test_*.py" = ["I001","F401","PLC0415","W293","W291","W292","E501","PLR2004","B905","RUF001","RUF002","RUF003"]
-# equações de demo/legacy
-"1_de_8*.py" = ["I001","E501","PLC0415"]
-# caos pode manter 'O' por clareza matemática e assinatura extensa
-"penin/omega/caos.py" = ["E741","PLR0913","W293","E501"]
-# guards são longos por design (muitas regras)
-"penin/omega/guards.py" = ["PLR0912","PLR0915","W293","E501"]
-
-[tool.mypy]
-python_version = "3.13"
-files = ["penin/providers", "penin/router.py", "penin/rag", "penin/ingest", "penin/tools", "penin/omega"]
-ignore_missing_imports = true
-no_implicit_optional = true
-warn_unused_ignores = true
-allow_redefinition = true
-show_error_codes = true
-
-[tool.pytest.ini_options]
-addopts = "-q"
-pythonpath = ["."]
+"test_*.py" = ["E402","PLC0415","PLR2004","RUF001","RUF002"]

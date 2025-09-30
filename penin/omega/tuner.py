@@ -145,9 +145,7 @@ class AdaGradState:
         self.accumulated_gradients[param_name] += gradient**2
 
         # Step adaptativo
-        adjusted_lr = learning_rate / (
-            (self.accumulated_gradients[param_name] + self.epsilon) ** 0.5
-        )
+        adjusted_lr = learning_rate / ((self.accumulated_gradients[param_name] + self.epsilon) ** 0.5)
 
         return -adjusted_lr * gradient
 
@@ -221,9 +219,7 @@ class MistralTuner:
             for item in training_data:
                 f.write(json.dumps(item) + "\n")
 
-        logger.info(
-            f"Mistral training data prepared: {output_path} ({len(training_data)} examples)"
-        )
+        logger.info(f"Mistral training data prepared: {output_path} ({len(training_data)} examples)")
         return str(path)
 
     def _generate_assistant_response(self, params: dict, metrics: dict) -> str:
@@ -283,9 +279,7 @@ class MistralTuner:
             "Suggest optimized values."
         )
 
-        response = self.client.chat.complete(
-            model=model_id, messages=[{"role": "user", "content": prompt}]
-        )
+        response = self.client.chat.complete(model=model_id, messages=[{"role": "user", "content": prompt}])
 
         # Parse resposta (simplificado)
         content = response.choices[0].message.content
@@ -311,9 +305,7 @@ class OpenAITuner:
         self.model = model
         self.jobs = []
 
-    def prepare_sft_data(
-        self, cycles: list[dict[str, Any]], output_path: str = "/tmp/openai_sft.jsonl"
-    ) -> str:
+    def prepare_sft_data(self, cycles: list[dict[str, Any]], output_path: str = "/tmp/openai_sft.jsonl") -> str:
         """Prepara dados para Supervised Fine-Tuning."""
         training_data = []
 
@@ -336,9 +328,7 @@ class OpenAITuner:
         logger.info(f"OpenAI SFT data prepared: {output_path}")
         return str(path)
 
-    def prepare_dpo_data(
-        self, cycles: list[dict[str, Any]], output_path: str = "/tmp/openai_dpo.jsonl"
-    ) -> str:
+    def prepare_dpo_data(self, cycles: list[dict[str, Any]], output_path: str = "/tmp/openai_dpo.jsonl") -> str:
         """Prepara dados para Direct Preference Optimization."""
         training_data = []
 
@@ -350,25 +340,17 @@ class OpenAITuner:
             better = sorted_cycles[i + 1]
 
             item = {
-                "input": {
-                    "messages": [
-                        {"role": "user", "content": "Optimize hyperparameters for maximum L∞."}
-                    ]
-                },
+                "input": {"messages": [{"role": "user", "content": "Optimize hyperparameters for maximum L∞."}]},
                 "preferred_output": [
                     {
                         "role": "assistant",
-                        "content": self._format_optimized_params(
-                            better["hyperparams"], better["metrics"]
-                        ),
+                        "content": self._format_optimized_params(better["hyperparams"], better["metrics"]),
                     }
                 ],
                 "non_preferred_output": [
                     {
                         "role": "assistant",
-                        "content": self._format_optimized_params(
-                            worse["hyperparams"], worse["metrics"]
-                        ),
+                        "content": self._format_optimized_params(worse["hyperparams"], worse["metrics"]),
                     }
                 ],
             }
@@ -595,9 +577,7 @@ class AutoTuner:
             delta = self.state.update(param_name, gradient, self.config.learning_rate)
 
             # Clip delta
-            delta = max(
-                -self.config.max_delta_per_cycle, min(self.config.max_delta_per_cycle, delta)
-            )
+            delta = max(-self.config.max_delta_per_cycle, min(self.config.max_delta_per_cycle, delta))
 
             updates[param_name] = delta
 
@@ -618,9 +598,7 @@ class AutoTuner:
             self.config.w_C /= total_w
             self.config.w_L /= total_w
 
-        logger.info(
-            f"Auto-tuned hyperparams (cycle {self.cycle_count}): {self._get_current_hyperparams()}"
-        )
+        logger.info(f"Auto-tuned hyperparams (cycle {self.cycle_count}): {self._get_current_hyperparams()}")
 
         return self._get_current_hyperparams()
 
