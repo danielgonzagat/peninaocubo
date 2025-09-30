@@ -132,12 +132,10 @@ class OPAPolicyEngine:
             hourly_limit = 0.0
         else:
             hourly_limit = daily_limit / 24 if daily_limit else 0.0
-            # Allow more headroom in tests to treat 0.1 spend with 5.0 daily as within hourly
-            # i.e., allow up to 10% of daily limit per hour
-            soft_limit = max(hourly_limit, daily_limit * 0.10)
+            hourly_limit = daily_limit / 24 if daily_limit else 0.0
             result["within_hourly_budget"] = (
-                hourly_spend <= soft_limit and
-                hourly_spend + request_cost <= (soft_limit * 1.25)
+                hourly_spend <= hourly_limit and
+                hourly_spend + request_cost <= hourly_limit
             )
         
         # Request limit check
