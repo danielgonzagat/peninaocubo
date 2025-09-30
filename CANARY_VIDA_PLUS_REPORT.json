@@ -1,0 +1,178 @@
+{
+  "timestamp": 1759246345.667227,
+  "version": "PENIN-Ω Vida+ v1.0",
+  "canary_result": {
+    "cycles": 5,
+    "successful_cycles": 5,
+    "success_rate": 1.0,
+    "avg_alpha_eff": 0.0006820458077450424,
+    "avg_G": 0.9058006301197217,
+    "avg_darwin_score": 0.37800758891347686,
+    "criteria_met": {
+      "success_rate_80": true,
+      "avg_alpha_positive": true,
+      "avg_G_good": true,
+      "avg_darwin_good": true,
+      "no_immunity_triggers": true,
+      "consciousness_below_threshold": true
+    },
+    "all_criteria_met": true,
+    "canary_approved": true,
+    "history": [
+      {
+        "cycle": 0,
+        "duration": 0.0037994384765625,
+        "life_verdict": true,
+        "alpha_eff": 0.0006050948399011544,
+        "G": 0.8666514216022562,
+        "phi_kratos": 0.9254587726306271,
+        "darwin_score": 0.3646413958156411,
+        "immunity_ok": true,
+        "consciousness_ok": false,
+        "consciousness_spi": 0.05086458409023494,
+        "block_hash": "f6551ce1efcbb34d27b914f896ba31886823e0c285243ffd1337d8ec0def079d",
+        "snapshot_path": "/home/ubuntu/.penin_omega/snapshots/canary_cycle_0"
+      },
+      {
+        "cycle": 1,
+        "duration": 0.0028543472290039062,
+        "life_verdict": true,
+        "alpha_eff": 0.000647610411640139,
+        "G": 0.8864312887868172,
+        "phi_kratos": 0.9420917921158842,
+        "darwin_score": 0.37135693340396064,
+        "immunity_ok": true,
+        "consciousness_ok": false,
+        "consciousness_spi": 0.050659702987328935,
+        "block_hash": "212602a3968bb134b4a2e5719b8137d0d67e2d948fa572430435599976f98843",
+        "snapshot_path": "/home/ubuntu/.penin_omega/snapshots/canary_cycle_1"
+      },
+      {
+        "cycle": 2,
+        "duration": 0.0032498836517333984,
+        "life_verdict": true,
+        "alpha_eff": 0.0006858392647642245,
+        "G": 0.9060003377391314,
+        "phi_kratos": 0.9545340917469965,
+        "darwin_score": 0.37803920467704916,
+        "immunity_ok": true,
+        "consciousness_ok": false,
+        "consciousness_spi": 0.05085467206753072,
+        "block_hash": "bf05eaae46cc144525295817bcdf7d0d10af23c021cc395125350949c8951c32",
+        "snapshot_path": "/home/ubuntu/.penin_omega/snapshots/canary_cycle_2"
+      },
+      {
+        "cycle": 3,
+        "duration": 0.0034875869750976562,
+        "life_verdict": true,
+        "alpha_eff": 0.0007202718025763624,
+        "G": 0.9253698853412043,
+        "phi_kratos": 0.963928836215471,
+        "darwin_score": 0.38468988224293504,
+        "immunity_ok": true,
+        "consciousness_ok": false,
+        "consciousness_spi": 0.050669267808589276,
+        "block_hash": "3b50cf0609b04b3926f60de84de92afeacf81e569c0c02da91e163292310a76f",
+        "snapshot_path": "/home/ubuntu/.penin_omega/snapshots/canary_cycle_3"
+      },
+      {
+        "cycle": 4,
+        "duration": 0.003278970718383789,
+        "life_verdict": true,
+        "alpha_eff": 0.0007514127198433318,
+        "G": 0.9445502171291997,
+        "phi_kratos": 0.9710932355174058,
+        "darwin_score": 0.39131052842779845,
+        "immunity_ok": true,
+        "consciousness_ok": false,
+        "consciousness_spi": 0.0506408469429242,
+        "block_hash": "06be70f9b50c4de976e9f76af7f7d3d6e27a9c69916f4e4a89b2c002b684fc01",
+        "snapshot_path": "/home/ubuntu/.penin_omega/snapshots/canary_cycle_4"
+      }
+    ]
+  },
+  "system_health": {
+    "swarm": {
+      "timestamp": 1759246345.6668222,
+      "overall_status": "poor",
+      "health_score": 0.23613755428229993,
+      "nodes": {
+        "total": 4,
+        "active": 1,
+        "inactive": 0,
+        "failed": 3,
+        "active_ratio": 0.25
+      },
+      "global_state": {
+        "phi": 0.9299999999999999,
+        "sr": 0.96,
+        "caos": 0.92,
+        "ethics": 0.97,
+        "cycle": 4.0,
+        "heartbeat_interval": 30.0,
+        "local_time": 1759246345.5626895,
+        "G": 0.9445502171291997
+      },
+      "recommendations": [
+        "Consider adding more active nodes for redundancy",
+        "Investigate 3 failed nodes",
+        "Global coherence is low - check individual node metrics"
+      ]
+    },
+    "neural_chain": {
+      "timestamp": 1759246345.6668265,
+      "total_blocks": 45,
+      "chain_file": "/home/ubuntu/.penin_omega/worm_ledger/neural_chain.jsonl",
+      "file_exists": true,
+      "file_size_bytes": 19822,
+      "latest_block": {
+        "block_id": 44,
+        "timestamp": 1759246345.565922,
+        "hash": "06be70f9b50c4de9...",
+        "cognitive_state": {
+          "phi": 0.9710932355174058,
+          "sr": 0.8609588512313748,
+          "G": 0.9445502171291997,
+          "alpha_eff": 0.0007514127198433318,
+          "life_verdict": true,
+          "ethics_ok": true,
+          "contractive": true,
+          "exploration_factor": 2.0,
+          "swarm_nodes": 1,
+          "market_trades": 0
+        }
+      },
+      "validation": {
+        "valid": true,
+        "error_count": 0
+      }
+    }
+  },
+  "modules_implemented": [
+    "Equação de Vida (+)",
+    "DSL Fractal",
+    "Swarm Cognitivo",
+    "CAOS-KRATOS",
+    "Marketplace Cognitivo",
+    "Blockchain Neural",
+    "API Metabolizer",
+    "Self-RAG Recursivo",
+    "Imunidade Digital",
+    "Checkpoint & Reparo",
+    "GAME + Darwiniano-Auditável",
+    "Zero-Consciousness Proof",
+    "Auto-Docs"
+  ],
+  "gates_operational": [
+    "Σ-Guard (ética)",
+    "IR→IC (contratividade)",
+    "CAOS⁺ threshold",
+    "SR threshold",
+    "ΔL∞ threshold",
+    "G (coerência global)",
+    "Imunidade Digital",
+    "Zero-Consciousness"
+  ],
+  "fail_closed_verified": true,
+  "non_compensatory_verified": true
+}

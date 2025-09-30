@@ -17,11 +17,11 @@ def test_phi_caos_functionality():
     result = caos.phi_caos(0.5, 0.5, 0.5, 0.5)
     assert isinstance(result, float)
     assert 0.0 <= result < 1.0
-    
+
     # Test with edge cases
     result_zero = caos.phi_caos(0.0, 0.0, 0.0, 0.0)
     assert isinstance(result_zero, float)
-    
+
     result_one = caos.phi_caos(1.0, 1.0, 1.0, 1.0)
     assert isinstance(result_one, float)
 
@@ -33,7 +33,7 @@ def test_caos_components_class():
     assert comp.A == 0.4
     assert comp.O == 0.5
     assert comp.S == 0.6
-    
+
     comp_dict = comp.to_dict()
     assert comp_dict["C"] == 0.3
     assert comp_dict["A"] == 0.4
@@ -53,17 +53,17 @@ def test_caos_config_dataclass():
 def test_caos_tracker():
     """Test CAOSTracker functionality"""
     tracker = caos.CAOSTracker()
-    
+
     # Update with values
     phi1, ema1 = tracker.update(0.5, 0.5, 0.5, 0.5)
     assert isinstance(phi1, float)
     assert isinstance(ema1, float)
-    
+
     # Second update
     phi2, ema2 = tracker.update(0.6, 0.6, 0.6, 0.6)
     assert isinstance(phi2, float)
     assert isinstance(ema2, float)
-    
+
     # Check stability
     stability = tracker.get_stability()
     assert isinstance(stability, float)
@@ -73,11 +73,11 @@ def test_caos_tracker():
 def test_caos_plus_engine():
     """Test CAOSPlusEngine functionality"""
     engine = caos.CAOSPlusEngine()
-    
+
     # Test compute method
     phi = engine.compute(0.5, 0.5, 0.5, 0.5)
     assert isinstance(phi, float)
-    
+
     # Test compute_phi with components
     components = caos.CAOSComponents(0.5, 0.5, 0.5, 0.5)
     phi_result, details = engine.compute_phi(components)

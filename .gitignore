@@ -1,3 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+*.log
+*.db
+.DS_Store
+site/
+.pytest_cache/
+*.sqlite
+*.sqlite3
+ledger/worm.log
+
 # Environment variables
 .env
 .env.local

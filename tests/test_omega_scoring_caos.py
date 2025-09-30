@@ -44,4 +44,3 @@ def test_phi_caos_monotonic_and_bounded():
     assert 0.0 <= base < 1.0
     assert 0.0 <= higher < 1.0
     assert higher > base
-

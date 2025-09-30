@@ -54,7 +54,6 @@ dev = [
 penin = "penin.cli:main"
 
 [tool.setuptools]
-packages = ["penin"]
 package-dir = {"penin" = "penin"}
 
 [tool.black]
@@ -71,3 +70,9 @@ ignore = ["PLR0912","PLR0913","PLR0915","PLR2004","E402","PLC0415"]
 
 [tool.ruff.lint.per-file-ignores]
 "test_*.py" = ["E402","PLC0415","PLR2004","RUF001","RUF002"]
+
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["penin","penin.*"]
+namespaces = false

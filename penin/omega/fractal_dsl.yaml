@@ -1,0 +1,6 @@
+version: 1
+depth: 2
+branching: 3
+sync:
+  propagate_core_updates: true
+  non_compensatory: true
