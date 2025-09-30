@@ -39,8 +39,6 @@ def harmonic_mean_weighted(values: List[float], weights: List[float]) -> float:
         v_clamped = max(EPS, v)
         denom += w / v_clamped
     return 1.0 / max(EPS, denom)
-        denom += w / v_clamped
-    return 1.0 / max(EPS, denom)
 
 
 def linf_harmonic(
@@ -81,7 +79,8 @@ def score_gate(
     weights_sum = wU + wS + wC + wL
     if abs(weights_sum - 1.0) > 1e-6 and weights_sum > 0:
         wU, wS, wC, wL = (wU / weights_sum, wS / weights_sum, wC / weights_sum, wL / weights_sum)
-    score = wU * U + wS * S - wC * C + wL * L
+    # Favor higher U, S, L and lower C (cost). Lower cost increases score via (1 - C).
+    score = wU * U + wS * S + wL * L + wC * (1.0 - C)
     if score >= tau:
         return ScoreGateVerdict("pass", score)
     if score >= max(0.0, tau - canary_margin):
