@@ -266,7 +266,7 @@ class WORMLedger:
             # Lock é liberado automaticamente quando arquivo fecha
             pass
 
-    def append_record(self, record: RunRecord,
+    def append_record(self, record: RunRecord | str,
                      artifacts: Optional[Dict[str, Any]] = None) -> str:
         """
         Adiciona record ao ledger (append-only)
@@ -280,6 +280,28 @@ class WORMLedger:
         """
         with self._lock:
             with self._file_lock():
+                # If called with simplified API: append_record(event_type, data_dict)
+                if isinstance(record, str):
+                    simple_payload = {
+                        "etype": record,
+                        "data": artifacts or {},
+                        "ts": time.time(),
+                        "prev": self._tail_hash,
+                    }
+                    record_hash = hashlib.sha256(json.dumps(simple_payload, sort_keys=True).encode()).hexdigest()
+                    with sqlite3.connect(str(self.db_path)) as conn:
+                        c = conn.cursor()
+                        c.execute(
+                            "INSERT INTO run_records (run_id, timestamp, cycle, config_hash, provider_id, candidate_cfg_hash, metrics_json, gates_json, decision_json, artifacts_path, parent_run_id, prev_hash, record_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                            (
+                                str(uuid.uuid4()), time.time(), 0, "simple", "unknown", "simple",
+                                json.dumps({}), json.dumps({}), json.dumps({}), None, None,
+                                self._tail_hash, record_hash, time.time()
+                            )
+                        )
+                        conn.commit()
+                    self._tail_hash = record_hash
+                    return record_hash
                 # Criar diretório do run
                 run_dir = self._create_run_directory(record.run_id)
                 record.artifacts_path = str(run_dir)

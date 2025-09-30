@@ -112,6 +112,14 @@ class SecretRedactor:
         elif isinstance(data, list):
             return cls.redact_list(data)
         else:
+            # Attempt JSON string redaction for string inputs
+            if isinstance(data, str):
+                try:
+                    parsed = json.loads(data)
+                    redacted = cls.redact(parsed)
+                    return json.dumps(redacted)
+                except (json.JSONDecodeError, TypeError):
+                    return data
             return data
 
 

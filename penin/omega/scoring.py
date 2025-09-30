@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 from enum import Enum
 
 EPS = 1e-9
@@ -69,14 +69,28 @@ def harmonic_mean_weighted(values: List[float], weights: List[float]) -> float:
 
 
 def linf_harmonic(
-    metrics: List[float],
-    weights: List[float],
-    cost_norm: float,
-    lambda_c: float,
-    ethical_ok: bool,
+    metrics: List[float] | dict,
+    weights: List[float] | dict,
+    cost_norm: float | None = None,
+    lambda_c: float = 0.0,
+    ethical_ok: bool = True,
+    **kwargs,
 ) -> float:
-    base = harmonic_mean_weighted(metrics, weights)
-    cost_penalty = math.exp(-max(0.0, lambda_c) * clamp01(cost_norm))
+    # Accept dicts for metrics/weights
+    if isinstance(metrics, dict):
+        m_vals = [float(metrics[k]) for k in sorted(metrics.keys())]
+    else:
+        m_vals = metrics
+    if isinstance(weights, dict):
+        w_vals = [float(weights[k]) for k in sorted(weights.keys())]
+    else:
+        w_vals = weights
+
+    base = harmonic_mean_weighted(m_vals, w_vals)
+    # Back-compat aliases
+    if cost_norm is None:
+        cost_norm = kwargs.get("cost_factor", 0.0)
+    cost_penalty = math.exp(-max(0.0, lambda_c) * clamp01(float(cost_norm))) if cost_norm is not None else 1.0
     gates = 1.0 if ethical_ok else 0.0
     return base * cost_penalty * gates
 
@@ -92,7 +106,7 @@ def score_gate(
     wL: float,
     tau: float,
     canary_margin: float = 0.05,
-) -> ScoreGateVerdict:
+):
     U = clamp01(U)
     S = clamp01(S)
     C = clamp01(C)
@@ -103,21 +117,16 @@ def score_gate(
     # Favor higher U, S, L and lower C (cost). Lower cost increases score via (1 - C).
     score = wU * U + wS * S + wL * L + wC * (1.0 - C)
     if score >= tau:
-        return ScoreGateVerdict.PROMOTE, score
+        return type("GateResult", (), {"verdict": "pass", "score": score})()
     if score >= max(0.0, tau - canary_margin):
-        return ScoreGateVerdict.CANARY, score
-    return ScoreGateVerdict.FAIL, score
+        return type("GateResult", (), {"verdict": "canary", "score": score})()
+    return type("GateResult", (), {"verdict": "fail", "score": score})()
 
 def quick_score_gate(U: float, S: float, C: float, L: float) -> Tuple[ScoreVerdict, float]:
     """Quick score gate for testing"""
-    verdict, score = score_gate(U, S, C, L, 0.25, 0.25, 0.25, 0.25, 0.7)
-    # Convert ScoreGateVerdict to ScoreVerdict
-    if verdict == ScoreGateVerdict.PROMOTE:
-        return ScoreVerdict.PROMOTE, score
-    elif verdict == ScoreGateVerdict.CANARY:
-        return ScoreVerdict.CANARY, score
-    else:
-        return ScoreVerdict.FAIL, score
+    res = score_gate(U, S, C, L, 0.25, 0.25, 0.25, 0.25, 0.7)
+    mapping = {"pass": ScoreVerdict.PROMOTE, "canary": ScoreVerdict.CANARY, "fail": ScoreVerdict.FAIL}
+    return mapping[res.verdict], res.score
 
 def normalize_series(values: List[float], method: str = 'minmax') -> List[float]:
     """Normalize a series of values"""
@@ -174,11 +183,11 @@ def quick_harmonic(values: List[float], weights: List[float] = None) -> float:
 def quick_score_gate(U: float, S: float, C: float, L: float, tau: float = 0.7) -> Tuple[bool, Dict[str, Any]]:
     """Quick score gate with default weights"""
     # Use the existing score_gate function with default weights
-    verdict = score_gate(U, S, C, L, wU=0.25, wS=0.25, wC=0.25, wL=0.25, tau=tau)
-    passed = verdict.verdict == "pass"
+    res = score_gate(U, S, C, L, wU=0.25, wS=0.25, wC=0.25, wL=0.25, tau=tau)
+    passed = res.verdict == "pass"
     details = {
-        'verdict': verdict.verdict,
-        'score': verdict.score,
+        'verdict': res.verdict,
+        'score': res.score,
         'threshold': tau,
         'passed': passed
     }

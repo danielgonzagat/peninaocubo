@@ -26,9 +26,7 @@ try:
     from penin.config import settings
     from penin.providers.base import BaseProvider, LLMResponse
 except ImportError:
-    # Fallback for direct execution
-    import sys
-    sys.path.insert(0, '/workspace')
+    # Fallback for direct execution (avoid sys.path hacks in tests)
     from penin.config import settings
     from penin.providers.base import BaseProvider, LLMResponse
 
