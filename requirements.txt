@@ -1,57 +1,46 @@
-# Core dependencies (REQUIRED)
-pydantic>=2.0.0      # Configuration validation (P0 requirement)
-psutil>=5.9.0        # Resource monitoring (P0 requirement - fail-closed)
+# Core
+pydantic>=2.0.0
+pydantic-settings>=2.4.0
+psutil>=5.9.0
+tenacity>=8.2.0
+orjson>=3.10.0
 
-# Optional but recommended
-numpy>=1.24.0        # Numerical operations
-redis>=4.5.0         # L3 cache support
-torch>=2.0.0         # LLM support
-transformers>=4.30.0 # LLM models
+# Observability / logging
+prometheus-client>=0.16.0
+structlog>=23.1.0
+python-json-logger>=2.0.7
 
-# P1 dependencies (observability)
-prometheus-client>=0.16.0  # Metrics export
-structlog>=23.1.0         # Structured logging
-python-json-logger>=2.0.7 # JSON logging
-
-# P2 dependencies (policies and bridge)
-opa-python-client>=1.3.0  # OPA integration
-httpx>=0.24.0            # HTTP client for APIs
-tenacity>=8.2.0          # Retry logic
-cachetools>=5.3.0        # Advanced caching
-
-# Multi-API clients
+# Providers / LLMs
 openai>=1.40.0
 anthropic>=0.40.0
 mistralai>=1.2.4
-google-genai>=0.2.0
-xai-sdk>=0.1.7
+google-genai>=0.3.0
+xai-sdk>=0.2.1
 huggingface_hub>=0.24.0
 kaggle>=1.6.14
-tiktoken>=0.7.0
-sentence-transformers>=2.7.0
+
+# Modeling / Vector / Utils
+numpy>=1.24.0
 faiss-cpu>=1.8.0
+sentence-transformers>=2.7.0
 pandas>=2.2.0
+tiktoken>=0.7.0
 pyyaml>=6.0.1
+redis>=4.5.0
+httpx>=0.24.0
+cachetools>=5.3.0
+transformers>=4.30.0
+torch>=2.0.0
 python-dotenv>=1.0.1
 
-# Development and testing
+# Dev / Test
 pytest>=7.3.0
 pytest-asyncio>=0.21.0
 pytest-cov>=4.1.0
 black>=23.0.0
 mypy>=1.3.0
-ruff>=0.0.270
+ruff>=0.6.0
 
-# Documentation
+# Docs (optional)
 mkdocs>=1.4.0
 mkdocs-material>=9.1.0
-
-# PENIN multi-API adapters
-openai>=1.37.0
-anthropic>=0.34.0
-mistralai>=1.2.2
-google-genai>=0.3.0
-xai-sdk>=0.2.1
-huggingface_hub>=0.24.0
-kaggle>=1.6.14
-pydantic-settings>=2.4.0

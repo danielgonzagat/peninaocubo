@@ -82,7 +82,10 @@ import hashlib
 import asyncio
 import threading
 import multiprocessing
-import pickle
+import hmac
+import hashlib
+import os
+import orjson
 import sqlite3
 import logging
 import signal
@@ -647,8 +650,18 @@ class MultiLevelCache:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_timestamp ON cache(timestamp)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_access ON cache(access_count)')
         self.l2_db.commit()
-    def _serialize(self, obj: Any) -> bytes: return pickle.dumps(obj)
-    def _deserialize(self, b: bytes) -> Any: return pickle.loads(b)
+    def _serialize(self, obj: Any) -> bytes:
+        key = (os.getenv("PENIN_CACHE_HMAC_KEY") or "penin-dev-key").encode()
+        data = orjson.dumps(obj)
+        mac = hmac.new(key, data, hashlib.sha256).digest()
+        return mac + data
+    def _deserialize(self, b: bytes) -> Any:
+        key = (os.getenv("PENIN_CACHE_HMAC_KEY") or "penin-dev-key").encode()
+        mac, data = b[:32], b[32:]
+        calc = hmac.new(key, data, hashlib.sha256).digest()
+        if mac != calc:
+            raise ValueError("L2 cache HMAC mismatch")
+        return orjson.loads(data)
     def _promote_to_l1(self, key: str, value: Any):
         if len(self.l1_cache) >= self.l1_size:
             evicted_key, _ = self.l1_cache.popitem(last=False)
