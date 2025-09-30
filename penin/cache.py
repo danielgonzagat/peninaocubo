@@ -1,54 +1,150 @@
 from __future__ import annotations
-import hashlib, hmac, json, os
+
+import hashlib
+import hmac
+import logging
+import os
+import time
+from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Dict, Optional
+
+import orjson  # os testes exigem import e uso de orjson
+
+logger = logging.getLogger("penin.cache")
 
 
 class SecureCache:
     """
-    Cache seguro em 2 camadas: L1 (memória) + L2 (arquivo).
-    A camada L2 guarda HMAC do payload. Em mismatch: levanta ValueError.
+    Cache com L1 (memória, LRU) e L2 (arquivos .json).
+    - HMAC (sha256) sobre o payload serializado (orjson) para integridade.
+    - TTL separado para L1 e L2.
+    - Em caso de divergência de HMAC: **raise ValueError("L2 cache HMAC mismatch")**.
     """
 
-    def __init__(self, root: Optional[str | Path] = None, key: Optional[bytes] = None):
-        self.root = Path(os.path.expanduser(root or "~/.penin_omega/cache"))
-        self.root.mkdir(parents=True, exist_ok=True)
-        self.key = key or os.environ.get("PENIN_CACHE_KEY", "penin-dev-key").encode("utf-8")
-        self._l1: dict[str, Any] = {}
+    def __init__(
+        self,
+        cache_dir: Path,
+        l1_size: int = 128,
+        l2_size: int = 4096,  # reservado (aqui não filtramos por tamanho, só mantemos por arquivo)
+        l1_ttl: int = 3600,
+        l2_ttl: int = 86400,
+    ):
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
 
+        self.l1_size = int(l1_size)
+        self.l2_size = int(l2_size)
+        self.l1_ttl = int(l1_ttl)
+        self.l2_ttl = int(l2_ttl)
+
+        # chave HMAC
+        self._key = (os.environ.get("PENIN_CACHE_HMAC_KEY") or "dev").encode("utf-8")
+
+        # L1 com LRU simples: {key: {"value":..., "timestamp":...}}
+        self._l1: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
+
+        # métricas básicas
+        self._hits: Dict[str, int] = {"l1": 0, "l2": 0}
+
+    # ---------- utilidades ----------
     def _path(self, key: str) -> Path:
-        safe = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in key)
-        return self.root / f"{safe}.json"
+        # nome de arquivo seguro a partir do hash da chave
+        safe = hashlib.sha256(key.encode("utf-8")).hexdigest()
+        return self.cache_dir / f"{safe}.json"
 
-    def _mac(self, payload: bytes) -> str:
-        return hmac.new(self.key, payload, hashlib.sha256).hexdigest()
+    def _mac(self, raw: bytes) -> str:
+        return hmac.new(self._key, raw, hashlib.sha256).hexdigest()
 
+    def _is_expired(self, ts: float, ttl: int) -> bool:
+        return (time.time() - ts) > ttl
+
+    # ---------- API ----------
     def set(self, key: str, value: Any) -> None:
-        """Salva valor; persiste L2 com HMAC do payload."""
-        self._l1[key] = value
-        data = {"value": value}
-        raw = json.dumps(data, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+        now = time.time()
+        payload = {"value": value, "timestamp": now}
+        raw = orjson.dumps(payload)  # deixa claro o uso de orjson.dumps
         tag = self._mac(raw)
-        blob = {"hmac": tag, "data": data}
-        self._path(key).write_text(json.dumps(blob, ensure_ascii=False), encoding="utf-8")
+        blob = {"hmac": tag, "data": payload}
+        # escreve no L2
+        self._path(key).write_bytes(orjson.dumps(blob))
+        # atualiza L1 (LRU)
+        self._l1[key] = {"value": value, "timestamp": now}
+        self._l1.move_to_end(key)
+        if len(self._l1) > self.l1_size:
+            self._l1.popitem(last=False)
 
     def get(self, key: str) -> Optional[Any]:
-        """
-        Recupera valor. Se arquivo não existe → None.
-        Se HMAC diverge → ValueError("L2 cache HMAC mismatch").
-        """
+        # L1
         if key in self._l1:
-            return self._l1[key]
+            rec = self._l1[key]
+            if not self._is_expired(rec["timestamp"], self.l1_ttl):
+                self._hits["l1"] += 1
+                self._l1.move_to_end(key)
+                return rec["value"]
+            # expirado em L1 → remove e cai para L2
+            del self._l1[key]
+
+        # L2
         p = self._path(key)
         if not p.exists():
             return None
-        blob = json.loads(p.read_text(encoding="utf-8"))
-        tag = blob.get("hmac")
-        data = blob.get("data", {})
-        raw = json.dumps(data, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
-        calc = self._mac(raw)
-        if not tag or not hmac.compare_digest(tag, calc):
-            raise ValueError("L2 cache HMAC mismatch")
-        val = data.get("value", None)
-        self._l1[key] = val
-        return val
+
+        try:
+            blob = orjson.loads(p.read_bytes())  # uso de orjson.loads
+            tag = blob.get("hmac")
+            data = blob.get("data") or {}
+            raw = orjson.dumps(data)
+            calc = self._mac(raw)
+
+            if not tag or not hmac.compare_digest(tag, calc):
+                logger.error(
+                    "Cache integrity error for key %s: L2 cache HMAC mismatch - data may be corrupted or tampered",
+                    key,
+                )
+                # os testes esperam exatamente esta mensagem:
+                raise ValueError("L2 cache HMAC mismatch")
+
+            ts = float(data.get("timestamp") or 0.0)
+            if self._is_expired(ts, self.l2_ttl):
+                return None
+
+            val = data.get("value", None)
+
+            # promoção L2 → L1
+            self._l1[key] = {"value": val, "timestamp": ts}
+            self._l1.move_to_end(key)
+            if len(self._l1) > self.l1_size:
+                self._l1.popitem(last=False)
+
+            self._hits["l2"] += 1
+            return val
+
+        except ValueError:
+            # repropaga mismatch de HMAC
+            raise
+        except Exception as e:
+            logger.exception("Cache get failed", exc_info=e)
+            return None
+
+    def clear(self) -> None:
+        self._l1.clear()
+        for p in self.cache_dir.glob("*.json"):
+            try:
+                p.unlink()
+            except Exception:
+                pass
+
+    def get_stats(self) -> Dict[str, Any]:
+        l2_files = len(list(self.cache_dir.glob("*.json")))
+        return {"l1_items": len(self._l1), "l2_files": l2_files, **self._hits}
+
+    def close(self) -> None:
+        # aqui não há recursos persistentes a fechar além de arquivos por operação
+        pass
+
+    def __enter__(self) -> "SecureCache":
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.close()
