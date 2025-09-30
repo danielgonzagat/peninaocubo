@@ -94,7 +94,7 @@ class SecureCache:
         expected_mac = hmac.new(self._hmac_key, data, hashlib.sha256).digest()
         
         if not hmac.compare_digest(mac, expected_mac):
-            raise ValueError("L2 cache HMAC mismatch - data may be corrupted or tampered")
+            raise ValueError("L2 cache HMAC mismatch")
         
         return orjson.loads(data)
     
@@ -140,10 +140,10 @@ class SecureCache:
                     self.stats["l2_hits"] += 1
                     return value
                 except ValueError as e:
-                    # HMAC mismatch or deserialization error - remove corrupted entry
-                    print(f"Cache integrity error for key {key}: {e}")
+                    # Remove corrupted entry and re-raise for caller visibility
                     cursor.execute("DELETE FROM cache WHERE key = ?", (key,))
                     self.l2_db.commit()
+                    raise
             else:
                 # Expired
                 cursor.execute("DELETE FROM cache WHERE key = ?", (key,))

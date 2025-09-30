@@ -1,3 +1,5 @@
+__version__ = "0.1.0"
+
 """PENIN multi-API orchestration package.
 
 Contains configuration, provider adapters, a multi-LLM router, tool schemas,
