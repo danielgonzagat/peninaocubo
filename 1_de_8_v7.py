@@ -765,7 +765,7 @@ class WORMLedger:
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.execute("PRAGMA busy_timeout=5000")  # 5s timeout
-        cursor.execute("PRAGMA wal_autocheckpoint=1000")
+        cursor.execute("PRAGMA wal_autocheckpoint=10000")  # Less frequent checkpoints
         cursor.execute(
             """
             CREATE TABLE IF NOT EXISTS events (
