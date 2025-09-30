@@ -126,19 +126,24 @@ class SecureCache:
         if row:
             value_bytes, timestamp = row
             if not self._is_expired(timestamp, self.l2_ttl):
-                # Always validate integrity; if it fails, raise to caller
-                value = self._deserialize(value_bytes)
-                # Promote to L1
-                self._promote_to_l1(key, value)
-                # Update access count
-                cursor.execute(
-                    "UPDATE cache SET access_count = access_count + 1 WHERE key = ?",
-                    (key,)
-                )
-                self.l2_db.commit()
-                self.stats["hits"] += 1
-                self.stats["l2_hits"] += 1
-                return value
+                try:
+                    value = self._deserialize(value_bytes)
+                    # Promote to L1
+                    self._promote_to_l1(key, value)
+                    # Update access count
+                    cursor.execute(
+                        "UPDATE cache SET access_count = access_count + 1 WHERE key = ?",
+                        (key,)
+                    )
+                    self.l2_db.commit()
+                    self.stats["hits"] += 1
+                    self.stats["l2_hits"] += 1
+                    return value
+                except ValueError as e:
+                    # HMAC mismatch or deserialization error - remove corrupted entry
+                    print(f"Cache integrity error for key {key}: {e}")
+                    cursor.execute("DELETE FROM cache WHERE key = ?", (key,))
+                    self.l2_db.commit()
             else:
                 # Expired
                 cursor.execute("DELETE FROM cache WHERE key = ?", (key,))
