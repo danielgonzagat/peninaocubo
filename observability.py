@@ -374,7 +374,7 @@ class MetricsServer:
             def log_message(self, format, *args):
                 pass  # Suppress request logs
         
-        # SECURITY: Bind to localhost only to prevent telemetry exposure
+        # SECURITY P0 FIX: Bind to localhost only to prevent telemetry exposure
         self.server = HTTPServer(('127.0.0.1', self.port), MetricsHandler)
         self.thread = threading.Thread(target=self.server.serve_forever)
         self.thread.daemon = True

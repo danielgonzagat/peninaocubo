@@ -6,16 +6,43 @@ from penin.config import settings
 from penin.providers.base import BaseProvider, LLMResponse
 
 
+class CostTracker:
+    """Track costs with daily budget limits"""
+    def __init__(self, daily_budget: float):
+        self.daily_budget = daily_budget
+        self.daily_spent = 0.0
+        self.reset_time = time.time()
+        
+    def add_cost(self, cost: float):
+        """Add cost and reset daily counter if needed"""
+        current_time = time.time()
+        if current_time - self.reset_time > 86400:  # 24 hours
+            self.daily_spent = 0.0
+            self.reset_time = current_time
+        self.daily_spent += cost
+        
+    def is_over_budget(self) -> bool:
+        """Check if over daily budget"""
+        return self.daily_spent >= self.daily_budget
+        
+    def remaining_budget(self) -> float:
+        """Get remaining budget for today"""
+        return max(0, self.daily_budget - self.daily_spent)
+
+
 class MultiLLMRouter:
-    def __init__(self, providers: List[BaseProvider]):
+    def __init__(self, providers: List[BaseProvider], budget_usd: Optional[float] = None):
         self.providers = providers[: settings.PENIN_MAX_PARALLEL_PROVIDERS]
-        self._daily_spent = 0.0
-        self._spending_reset_time = time.time()
+        # Use CostTracker for better budget management
+        daily_budget = budget_usd or getattr(settings, 'PENIN_BUDGET_DAILY_USD', 100.0)
+        self.cost_tracker = CostTracker(daily_budget)
 
     def _score(self, r: LLMResponse) -> float:
         """
-        Score response considering content, latency, and cost.
+        P0 FIX: Score response considering content, latency, and cost.
         Higher score is better.
+        
+        Score = quality + speed - normalized_cost
         """
         # Base score for having content
         base = 1.0 if r.content else 0.0
@@ -60,13 +87,9 @@ class MultiLLMRouter:
             w_tokens * token_efficiency
         )
         
-        # Apply daily budget check if configured
-        daily_budget = getattr(settings, 'DAILY_BUDGET_USD', None)
-        if daily_budget is not None:
-            daily_spent = getattr(self, '_daily_spent', 0.0)
-            if daily_spent + cost > daily_budget:
-                # Heavily penalize if over budget
-                score *= 0.01
+        # Apply budget penalty if over budget
+        if self.cost_tracker.is_over_budget():
+            score *= 0.01  # Heavily penalize if over budget
         
         return score
 
@@ -92,18 +115,7 @@ class MultiLLMRouter:
         best = max(ok, key=self._score)
         
         # Track spending
-        self._update_spending(best)
+        if hasattr(best, 'cost_usd'):
+            self.cost_tracker.add_cost(best.cost_usd)
         
         return best
-    
-    def _update_spending(self, response: LLMResponse):
-        """Update daily spending tracker"""
-        # Reset daily counter if new day
-        current_time = time.time()
-        if current_time - self._spending_reset_time > 86400:  # 24 hours
-            self._daily_spent = 0.0
-            self._spending_reset_time = current_time
-        
-        # Add cost if available
-        if hasattr(response, 'cost_usd'):
-            self._daily_spent += response.cost_usd
