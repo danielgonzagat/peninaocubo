@@ -77,13 +77,17 @@ class MultiLLMRouter:
             with tmp_path.open("w", encoding="utf-8") as handle:
                 json.dump(self.daily_usage, handle, indent=2, sort_keys=True)
             tmp_path.replace(self._usage_path)
-
-    def _reset_daily_budget_if_needed(self) -> None:
-        today = date.today().isoformat()
-        if today != self._current_day:
-            self._current_day = today
-            self.daily_usage[today] = {"cost_usd": 0.0, "tokens": 0, "requests": 0}
-            self._daily_spend = 0.0
+    def _save_daily_usage(self) -> None:
+        with self._usage_lock:
+            tmp_path = self._usage_path.with_suffix(".tmp")
+            try:
+                with tmp_path.open("w", encoding="utf-8") as handle:
+                    json.dump(self.daily_usage, handle, indent=2, sort_keys=True)
+                tmp_path.replace(self._usage_path)
+            except (OSError, json.JSONEncodeError) as e:
+                if tmp_path.exists():
+                    tmp_path.unlink()
+                raise RuntimeError(f"Failed to save budget usage: {e}") from e
             self._total_tokens = 0
             self._request_count = 0
             self._save_daily_usage()
