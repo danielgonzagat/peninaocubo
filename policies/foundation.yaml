@@ -1,0 +1,11 @@
+thresholds:
+  rho_max: 0.999
+  ece_max: 0.01
+  rho_bias_max: 1.05
+  sr_min: 0.80
+  caos_plus_min: 1.0
+  agape_min: 0.70
+  league_fp_max: 0.05
+  util_min: 0.90
+fail_closed: true
+

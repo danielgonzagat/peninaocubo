@@ -204,7 +204,7 @@ class CAOSPlusEngine:
 
 
 def caos_plus(C: float | None = None, A: float | None = None, O: float | None = None, S: float | None = None, 
-              kappa: float = 0.1, gamma: float = 0.5, kappa_max: float = 1.0, **kwargs) -> Dict[str, Any]:
+              kappa: float = 0.1, gamma: float = 0.5, kappa_max: float = 1.0, **kwargs) -> float:
     """
     Computa CAOS⁺ com saturação log-space
     
@@ -224,13 +224,30 @@ def caos_plus(C: float | None = None, A: float | None = None, O: float | None = 
     if C is None and "coherence" in kwargs:
         C = kwargs["coherence"]
     if A is None and "awareness" in kwargs:
-    
-    return {
-        "phi": phi,
-        "components": {"C": C, "A": A, "O": O, "S": S},
-        "caos_product": C * A,
-        "openness_stability": O * S,
-        "kappa": kappa,
-        "gamma": gamma,
-        "risk_level": "low" if phi < 0.5 else "medium" if phi < 0.8 else "high"
-    }
+        A = kwargs["awareness"]
+    if O is None and "openness" in kwargs:
+        O = kwargs["openness"]
+    if S is None and "stability" in kwargs:
+        S = kwargs["stability"]
+
+    # Defaults if still None
+    C = 0.0 if C is None else float(C)
+    A = 0.0 if A is None else float(A)
+    O = 0.0 if O is None else float(O)
+    S = 0.0 if S is None else float(S)
+
+    # Clamp kappa/gamma
+    kappa = max(0.0, min(kappa_max, float(kappa)))
+    gamma = max(0.0, float(gamma))
+
+    phi = phi_caos(
+        C,
+        A,
+        O,
+        S,
+        kappa=max(1.0, kappa_max if kappa_max > 1.0 else 1.0),
+        kappa_max=max(1.0, kappa_max),
+        gamma=max(0.1, min(2.0, gamma)),
+    )
+
+    return float(phi)
