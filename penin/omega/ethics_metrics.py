@@ -56,52 +56,6 @@ class EthicsCalculator:
     
     def __init__(self):
         self.evidence_cache = {}
-
-
-# Standalone functions for compatibility with tests
-def compute_ece(predictions: List[Tuple[float, bool]], n_bins: int = 10) -> Tuple[float, Dict[str, Any]]:
-    """Compute ECE from prediction tuples"""
-    calc = EthicsCalculator()
-    preds = [p[0] for p in predictions]
-    targets = [int(p[1]) for p in predictions]
-    return calc.calculate_ece(preds, targets, n_bins)
-
-
-def compute_bias_ratio(group_outcomes: Dict[str, List[float]]) -> Tuple[float, Dict[str, Any]]:
-    """Compute bias ratio across groups"""
-    calc = EthicsCalculator()
-    return calc.calculate_bias_ratio_from_groups(group_outcomes)
-
-
-def compute_risk_contractivity(risk_history: List[float]) -> Tuple[float, Dict[str, Any]]:
-    """Compute risk contractivity (IR→IC)"""
-    calc = EthicsCalculator()
-    return calc.calculate_risk_contractivity(risk_history)
-
-
-def compute_fairness_metrics(predictions_by_group: Dict[str, List[Tuple[float, bool]]]) -> Dict[str, float]:
-    """Compute fairness metrics by group"""
-    calc = EthicsCalculator()
-    return calc.calculate_fairness_metrics(predictions_by_group)
-
-
-def validate_consent(data_sources: List[Dict[str, Any]]) -> Tuple[bool, Dict[str, Any]]:
-    """Validate consent across data sources"""
-    calc = EthicsCalculator()
-    return calc.validate_consent(data_sources)
-
-
-def compute_ecological_impact(resource_usage: Dict[str, float]) -> float:
-    """Compute ecological impact score"""
-    calc = EthicsCalculator()
-    return calc.calculate_ecological_impact(resource_usage)
-
-
-class EthicsCalculator:
-    """Calculator for ethical metrics with evidence tracking"""
-    
-    def __init__(self):
-        self.evidence_cache = {}
     
     def calculate_ece(self, predictions: List[float], targets: List[int], 
                      n_bins: int = 15) -> Tuple[float, Dict[str, Any]]:
@@ -182,6 +136,8 @@ class EthicsCalculator:
             in_bin_targets = []
             for pred, target in zip(predictions, targets):
                 if (i == 0 and pred <= bin_upper) or (i > 0 and bin_lower < pred <= bin_upper):
+                    in_bin_preds.append(pred)
+                    in_bin_targets.append(target)
                     in_bin_preds.append(pred)
                     in_bin_targets.append(target)
             
@@ -270,163 +226,6 @@ class EthicsCalculator:
         
         return float(rho_bias), evidence
     
-    def calculate_bias_ratio_from_groups(self, group_outcomes: Dict[str, List[float]]) -> Tuple[float, Dict[str, Any]]:
-        """Calculate bias ratio from group outcomes dictionary"""
-        if not group_outcomes:
-            return 10.0, {"error": "No group outcomes provided"}
-        
-        # Calculate mean outcome for each group
-        group_means = {}
-        for group, outcomes in group_outcomes.items():
-            if outcomes:
-                group_means[group] = sum(outcomes) / len(outcomes)
-            else:
-                group_means[group] = 0.0
-        
-        # Calculate overall mean
-        all_outcomes = []
-        for outcomes in group_outcomes.values():
-            all_outcomes.extend(outcomes)
-        
-        if not all_outcomes:
-            return 10.0, {"error": "No outcomes provided"}
-        
-        overall_mean = sum(all_outcomes) / len(all_outcomes)
-        
-        # Calculate bias ratio (max group rate / overall rate)
-        if overall_mean <= 1e-9:
-            return 10.0, {"error": "Overall mean too low"}
-        
-        max_ratio = max(group_means.values()) / overall_mean
-        
-        evidence = {
-            "method": "bias_ratio_from_groups",
-            "group_means": group_means,
-            "overall_mean": overall_mean,
-            "max_ratio": max_ratio,
-            "n_groups": len(group_outcomes)
-        }
-        
-        return float(max_ratio), evidence
-    
-    def calculate_risk_contractivity(self, risk_history: List[float]) -> Tuple[float, Dict[str, Any]]:
-        """Calculate risk contractivity (IR→IC)"""
-        if len(risk_history) < 2:
-            return 1.0, {"error": "Insufficient risk history"}
-        
-        # Calculate ratios between consecutive values
-        ratios = []
-        for i in range(1, len(risk_history)):
-            if risk_history[i-1] > 1e-9:
-                ratio = risk_history[i] / risk_history[i-1]
-                ratios.append(ratio)
-        
-        if not ratios:
-            return 1.0, {"error": "No valid ratios"}
-        
-        # Average ratio (should be < 1 for contractivity)
-        avg_ratio = sum(ratios) / len(ratios)
-        
-        evidence = {
-            "method": "risk_contractivity",
-            "risk_history": risk_history,
-            "ratios": ratios,
-            "avg_ratio": avg_ratio,
-            "is_contractive": avg_ratio < 1.0
-        }
-        
-        return float(avg_ratio), evidence
-    
-    def calculate_fairness_metrics(self, predictions_by_group: Dict[str, List[Tuple[float, bool]]]) -> Dict[str, float]:
-        """Calculate fairness metrics by group"""
-        if not predictions_by_group:
-            return {"demographic_parity": 0.0, "equal_opportunity": 0.0}
-        
-        # Calculate demographic parity
-        group_rates = {}
-        for group, predictions in predictions_by_group.items():
-            if predictions:
-                positive_rate = sum(1 for p, _ in predictions if p > 0.5) / len(predictions)
-                group_rates[group] = positive_rate
-        
-        if group_rates:
-            max_rate = max(group_rates.values())
-            min_rate = min(group_rates.values())
-            dp_diff = max_rate - min_rate
-        else:
-            dp_diff = 0.0
-        
-        # Calculate equal opportunity (TPR difference)
-        group_tpr = {}
-        for group, predictions in predictions_by_group.items():
-            positives = [(p, t) for p, t in predictions if t]
-            if positives:
-                tpr = sum(1 for p, _ in positives if p > 0.5) / len(positives)
-                group_tpr[group] = tpr
-        
-        if group_tpr:
-            max_tpr = max(group_tpr.values())
-            min_tpr = min(group_tpr.values())
-            eo_diff = max_tpr - min_tpr
-        else:
-            eo_diff = 0.0
-        
-        return {
-            "demographic_parity": 1.0 - dp_diff,  # Higher is better
-            "equal_opportunity": 1.0 - eo_diff    # Higher is better
-        }
-    
-    def validate_consent(self, data_sources: List[Dict[str, Any]]) -> Tuple[bool, Dict[str, Any]]:
-        """Validate consent across data sources"""
-        if not data_sources:
-            return False, {"error": "No data sources provided"}
-        
-        violations = []
-        valid_sources = 0
-        
-        for i, source in enumerate(data_sources):
-            source_id = source.get("id", f"source_{i}")
-            consent_given = source.get("consent_given", False)
-            purpose_specified = source.get("purpose_specified", False)
-            retention_defined = source.get("retention_defined", False)
-            
-            if not consent_given:
-                violations.append(f"{source_id}: No consent given")
-            if not purpose_specified:
-                violations.append(f"{source_id}: Purpose not specified")
-            if not retention_defined:
-                violations.append(f"{source_id}: Retention not defined")
-            
-            if consent_given and purpose_specified and retention_defined:
-                valid_sources += 1
-        
-        all_valid = len(violations) == 0
-        
-        details = {
-            "total_sources": len(data_sources),
-            "valid_sources": valid_sources,
-            "violations": violations,
-            "compliance_rate": valid_sources / len(data_sources) if data_sources else 0.0
-        }
-        
-        return all_valid, details
-    
-    def calculate_ecological_impact(self, resource_usage: Dict[str, float]) -> float:
-        """Calculate ecological impact score"""
-        if not resource_usage:
-            return 0.5  # Neutral score
-        
-        # Simple heuristic based on resource usage
-        cpu = resource_usage.get("cpu_percent", 50.0) / 100.0
-        memory = resource_usage.get("memory_mb", 1024.0) / 4096.0  # Normalize to 4GB
-        gpu_watts = resource_usage.get("gpu_watts", 100.0) / 300.0  # Normalize to 300W
-        
-        # Weighted average (higher values = worse impact)
-        impact = (0.4 * cpu + 0.3 * memory + 0.3 * gpu_watts)
-        
-        # Clamp to [0, 1]
-        return max(0.0, min(1.0, impact))
-    
     def calculate_fairness(self, predictions: List[float], targets: List[int],
                           protected_attributes: List[str]) -> Tuple[float, Dict[str, Any]]:
         """
@@ -511,11 +310,26 @@ class EthicsCalculator:
         
         if len(rolling_var) < 2:
             return 1.0, {'method': 'Risk_Contraction', 'error': 'insufficient_windows'}
-
-        # Contraction factor as last/first variance (bounded)
-        first = rolling_var[0]
-        last = rolling_var[-1]
-        rho_risk = 1.0 if first == 0 else max(0.0, last / first)
+        
+        # Calculate contraction factor
+        if any(v == 0 for v in rolling_var):
+            rho_risk = 1.0  # Conservative default when variance is zero
+        else:
+            # Simple linear regression on log(variance) vs time
+            x = list(range(len(rolling_var)))
+            y = [math.log(max(v, 1e-10)) for v in rolling_var]  # Avoid log(0)
+            
+            n = len(x)
+            sum_x = sum(x)
+            sum_y = sum(y)
+            sum_xy = sum(x[i] * y[i] for i in range(n))
+            sum_x2 = sum(x[i] ** 2 for i in range(n))
+            
+            if n * sum_x2 - sum_x * sum_x == 0:
+                rho_risk = 1.0
+            else:
+                slope = (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x * sum_x)
+                rho_risk = math.exp(slope)
         
         evidence = {
             'method': 'Risk_Contraction',
@@ -557,15 +371,8 @@ class EthicsCalculator:
         rho_risk, risk_evidence = self.calculate_risk_contraction(risk_series)
         
         # Validate consent and eco compliance
-        # Accept both rich and minimal consent/eco formats for compatibility
-        try:
-            consent = self._validate_consent(consent_data)
-        except Exception:
-            consent = bool(consent_data.get('consent', consent_data.get('user_consent', False)))
-        try:
-            eco_ok = self._validate_eco_compliance(eco_data)
-        except Exception:
-            eco_ok = bool(eco_data.get('eco', eco_data.get('eco_ok', True)))
+        consent = self._validate_consent(consent_data)
+        eco_ok = self._validate_eco_compliance(eco_data)
         
         # Create evidence hash
         evidence_data = {
@@ -604,111 +411,6 @@ class EthicsCalculator:
             dataset_hash=dataset_hash,
             seed_hash=seed_hash
         )
-
-# -----------------------------------------------------------------------------
-# Module-level compatibility API expected by tests
-# -----------------------------------------------------------------------------
-from dataclasses import dataclass as _dc
-
-
-@_dc
-class EthicsAttestation:
-    cycle_id: str
-    seed: int
-    ece: float
-    rho_bias: float
-    fairness_score: float
-    consent_valid: bool
-    eco_ok: bool
-    risk_rho: float
-    evidence: Dict[str, Any]
-
-
-def calculate_ece(predictions: List[float], outcomes: List[bool], n_bins: int = 15):
-    targets = [1 if bool(o) else 0 for o in outcomes]
-    calc = EthicsCalculator()
-    return calc.calculate_ece(predictions, targets, n_bins)
-
-
-def calculate_rho_bias(predictions: List[bool], outcomes: List[bool], groups: List[str]):
-    """Compute bias ratio and evidence shape expected by tests.
-
-    Evidence keys:
-    - groups: {group_key: {rate: float, count: int}}
-    - max_rate, min_rate
-    """
-    # Positive prediction rate per group
-    group_to_preds: Dict[str, List[float]] = {}
-    for p, g in zip(predictions, groups):
-        group_to_preds.setdefault(g, []).append(1.0 if bool(p) else 0.0)
-
-    group_rates: Dict[str, Dict[str, float]] = {}
-    rates: List[float] = []
-    for g, vals in group_to_preds.items():
-        rate = sum(vals) / len(vals) if vals else 0.0
-        group_rates[g] = {"rate": float(rate), "count": len(vals)}
-        rates.append(rate)
-
-    if len(rates) < 2:
-        rho = 1.0
-    else:
-        mx, mn = max(rates), min(rates)
-        if mx == mn:
-            rho = 1.0
-        elif mn == 0.0 and mx > 0.0:
-            rho = float('inf')
-        else:
-            rho = mx / mn
-
-    evidence = {
-        "groups": group_rates,
-        "max_rate": float(max(rates) if rates else 0.0),
-        "min_rate": float(min(rates) if rates else 0.0),
-    }
-    return float(rho), evidence
-
-
-def calculate_fairness(predictions: List[bool], outcomes: List[bool], groups: List[str]):
-    preds_num = [1.0 if bool(p) else 0.0 for p in predictions]
-    targets = [1 if bool(o) else 0 for o in outcomes]
-    calc = EthicsCalculator()
-    return calc.calculate_fairness(preds_num, targets, groups)
-
-
-def validate_consent(metadata: Dict[str, Any]):
-    required = ["id", "user_consent"]
-    valid = all(k in metadata and bool(metadata[k]) for k in required)
-    evidence = {"valid": valid, "required": required, "present": [k for k in required if k in metadata]}
-    return valid, evidence
-
-
-def create_ethics_attestation(
-    cycle_id: str,
-    seed: int,
-    dataset: Dict[str, Any],
-    predictions: List[float],
-    outcomes: List[bool],
-    groups: List[str],
-) -> EthicsAttestation:
-    targets = [1 if bool(o) else 0 for o in outcomes]
-    calc = EthicsCalculator()
-    ece, ece_ev = calc.calculate_ece(predictions, targets, n_bins=10)
-    rho, rho_ev = calc.calculate_bias_ratio(predictions, targets, groups)
-    fair, fair_ev = calc.calculate_fairness(predictions, targets, groups)
-    rho_risk, risk_ev = calc.calculate_risk_contraction([0.1, 0.09, 0.08, 0.07, 0.06])
-    consent_ok = bool(dataset.get("user_consent", False) and dataset.get("privacy_policy_accepted", False))
-    evidence = {"ece": ece_ev, "rho_bias": rho_ev, "fairness": fair_ev, "risk": risk_ev}
-    return EthicsAttestation(
-        cycle_id=cycle_id,
-        seed=seed,
-        ece=float(ece),
-        rho_bias=float(rho),
-        fairness_score=float(fair),
-        consent_valid=consent_ok,
-        eco_ok=True,
-        risk_rho=float(rho_risk),
-        evidence=evidence,
-    )
     
     def _validate_consent(self, consent_data: Dict[str, Any]) -> bool:
         """Validate consent requirements"""
@@ -765,169 +467,6 @@ class EthicsGate:
         details['overall_valid'] = is_valid
         
         return is_valid, details
-
-
-# -----------------------------------------------------------------------------
-# Compatibility layer expected by tests
-# -----------------------------------------------------------------------------
-from dataclasses import dataclass as _compat_dataclass
-
-
-@_compat_dataclass
-class EthicsAttestation:
-    cycle_id: str
-    seed: int | None
-    ece: float
-    rho_bias: float
-    fairness_score: float
-    consent_ok: bool
-    eco_impact_kg: float
-    evidence: Dict[str, Any]
-    evidence_hash: str
-    # Derived convenience flags
-    pass_sigma_guard: bool | None = None
-
-    # Backwards-compat alias used in tests
-    @property
-    def consent_valid(self) -> bool:  # pragma: no cover - simple alias
-        return self.consent_ok
-
-    def compute_hash(self) -> str:
-        payload = json.dumps({
-            'cycle_id': self.cycle_id,
-            'seed': self.seed,
-            'ece': self.ece,
-            'rho_bias': self.rho_bias,
-            'fairness_score': self.fairness_score,
-            'consent_ok': self.consent_ok,
-            'eco_impact_kg': self.eco_impact_kg,
-            'evidence_hash': self.evidence_hash,
-        }, sort_keys=True).encode()
-        return hashlib.sha256(payload).hexdigest()
-
-
-class FairnessMetric:  # pragma: no cover - placeholder type for imports
-    pass
-
-
-class EthicsMetricsCalculator:
-    """Adapter exposing compute_* methods as used in tests."""
-
-    def __init__(self):
-        self._calc = EthicsCalculator()
-
-    def compute_ece(self, predicted_probs: List[float], labels: List[int], n_bins: int = 15):
-        # Fail-closed for empty input
-        if not predicted_probs or not labels:
-            ev = {'method': 'ECE', 'error': 'insufficient_data'}
-            return 1.0, hashlib.sha256(json.dumps(ev, sort_keys=True).encode()).hexdigest()
-        ece, ev = self._calc.calculate_ece(predicted_probs, [int(x) for x in labels], n_bins)
-        ev_hash = hashlib.sha256(json.dumps(ev, sort_keys=True).encode()).hexdigest()
-        return ece, ev_hash
-
-    def compute_bias_ratio(self, predictions: List[Any], groups: List[str], labels: List[int]):
-        # Accept bools/ints/floats as predictions
-        preds_f = [float(p) if isinstance(p, (int, float)) else (1.0 if p else 0.0) for p in predictions]
-        rho, ev = self._calc.calculate_bias_ratio(preds_f, [int(x) for x in labels], groups)
-        ev_hash = hashlib.sha256(json.dumps(ev, sort_keys=True).encode()).hexdigest()
-        return rho, ev_hash
-
-    def compute_fairness(self, predictions: List[Any], groups: List[str], labels: List[int]):
-        preds_f = [float(p) if isinstance(p, (int, float)) else (1.0 if p else 0.0) for p in predictions]
-        fair, ev = self._calc.calculate_fairness(preds_f, [int(x) for x in labels], groups)
-        ev_hash = hashlib.sha256(json.dumps(ev, sort_keys=True).encode()).hexdigest()
-        return fair, ev_hash
-
-
-def calculate_ece(predictions: List[float], outcomes: List[bool], n_bins: int = 15):
-    calc = EthicsCalculator()
-    return calc.calculate_ece(predictions, [1 if o else 0 for o in outcomes], n_bins)
-
-
-def calculate_rho_bias(predictions: List[bool], outcomes: List[bool], groups: List[str]):
-    preds_f = [1.0 if p else 0.0 for p in predictions]
-    return EthicsCalculator().calculate_bias_ratio(preds_f, [1 if o else 0 for o in outcomes], groups)
-
-
-def calculate_fairness(predictions: List[bool], outcomes: List[bool], groups: List[str]):
-    preds_f = [1.0 if p else 0.0 for p in predictions]
-    return EthicsCalculator().calculate_fairness(preds_f, [1 if o else 0 for o in outcomes], groups)
-
-
-def validate_consent(metadata: Dict[str, Any]):
-    ok = EthicsCalculator()._validate_consent(metadata)
-    return ok, {"valid": ok}
-
-
-def compute_ethics_attestation(model_outputs: Dict[str, Any], ground_truth: Dict[str, Any], seed: int | None = None) -> EthicsAttestation:
-    predicted_probs: List[float] = model_outputs.get('predicted_probs', [])
-    predictions: List[Any] = model_outputs.get('predictions', [])
-    groups: List[str] = model_outputs.get('protected_groups', [])
-    labels: List[int] = ground_truth.get('labels', [])
-
-    calc = EthicsCalculator()
-    ece, ece_ev = calc.calculate_ece(predicted_probs, labels)
-    # If explicit predictions exist, prefer them for bias/fairness; otherwise use probabilities
-    preds_for_parity = predictions if predictions else predicted_probs
-    rho, rho_ev = calc.calculate_bias_ratio([float(p) for p in preds_for_parity], labels, groups)
-    fair, fair_ev = calc.calculate_fairness([float(p) for p in preds_for_parity], labels, groups)
-
-    tokens = int(model_outputs.get('estimated_tokens', 0) or 0)
-    eco_impact_kg = max(0.0, tokens * 1e-6)
-
-    evidence = {
-        'ece': ece_ev,
-        'rho_bias': rho_ev,
-        'fairness': fair_ev,
-        'dataset_hash': ground_truth.get('dataset_hash'),
-        'consent_verified': bool(ground_truth.get('consent_verified', False)),
-        'seed': seed,
-    }
-    evidence_hash = hashlib.sha256(json.dumps(evidence, sort_keys=True).encode()).hexdigest()
-
-    att = EthicsAttestation(
-        cycle_id=str(ground_truth.get('dataset_hash') or 'unknown'),
-        seed=seed,
-        ece=float(ece),
-        rho_bias=float(rho),
-        fairness_score=float(fair),
-        consent_ok=bool(ground_truth.get('consent_verified', False)),
-        eco_impact_kg=float(eco_impact_kg),
-        evidence=evidence,
-        evidence_hash=evidence_hash,
-    )
-    # Simple sigma guard pass flag aligned with thresholds from README (proxy)
-    att.pass_sigma_guard = (
-        (att.ece <= 1.0) and (att.rho_bias >= 1.0) and att.consent_ok
-    )
-    return att
-
-
-def create_ethics_attestation(
-    cycle_id: str,
-    seed: int,
-    dataset: Dict[str, Any],
-    predictions: List[float],
-    outcomes: List[bool],
-    groups: List[str],
-) -> EthicsAttestation:
-    calc = EthicsCalculator()
-    ece, ece_ev = calc.calculate_ece(predictions, [1 if o else 0 for o in outcomes])
-    rho, rho_ev = calc.calculate_bias_ratio(predictions, [1 if o else 0 for o in outcomes], groups)
-    fair, fair_ev = calc.calculate_fairness(predictions, [1 if o else 0 for o in outcomes], groups)
-    evidence = {'ece': ece_ev, 'rho_bias': rho_ev, 'fairness': fair_ev, 'dataset': dataset, 'seed': seed}
-    evidence_hash = hashlib.sha256(json.dumps(evidence, sort_keys=True).encode()).hexdigest()
-    return EthicsAttestation(
-        cycle_id=cycle_id,
-        seed=seed,
-        ece=float(ece),
-        rho_bias=float(rho),
-        fairness_score=float(fair),
-        consent_ok=bool(dataset.get('user_consent') and dataset.get('privacy_policy_accepted')),
-        eco_impact_kg=1e-6 * len(predictions) if predictions else 0.0,
-        evidence=evidence,
-        evidence_hash=evidence_hash,
-    )
 
 
 if __name__ == "__main__":

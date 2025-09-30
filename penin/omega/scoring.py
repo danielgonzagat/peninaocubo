@@ -162,3 +162,25 @@ class LInfinityScorer:
         """Score using harmonic mean"""
         return harmonic_mean_weighted(metrics, self.weights)
 
+
+# Quick utility functions for easy usage
+def quick_harmonic(values: List[float], weights: List[float] = None) -> float:
+    """Quick harmonic mean calculation"""
+    if weights is None:
+        weights = [1.0] * len(values)
+    return harmonic_mean_weighted(values, weights)
+
+
+def quick_score_gate(U: float, S: float, C: float, L: float, tau: float = 0.7) -> Tuple[bool, Dict[str, Any]]:
+    """Quick score gate with default weights"""
+    # Use the existing score_gate function with default weights
+    verdict = score_gate(U, S, C, L, wU=0.25, wS=0.25, wC=0.25, wL=0.25, tau=tau)
+    passed = verdict.verdict == "pass"
+    details = {
+        'verdict': verdict.verdict,
+        'score': verdict.score,
+        'threshold': tau,
+        'passed': passed
+    }
+    return passed, details
+
