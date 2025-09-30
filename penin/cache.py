@@ -3,13 +3,14 @@ import hashlib, hmac, json, os
 from pathlib import Path
 from typing import Any, Optional
 
+
 class SecureCache:
     """
     Cache seguro em 2 camadas: L1 (memória) + L2 (arquivo).
     A camada L2 guarda HMAC do payload. Em mismatch: levanta ValueError.
     """
 
-    def __init__(self, root: Optional[str|Path]=None, key: Optional[bytes]=None):
+    def __init__(self, root: Optional[str | Path] = None, key: Optional[bytes] = None):
         self.root = Path(os.path.expanduser(root or "~/.penin_omega/cache"))
         self.root.mkdir(parents=True, exist_ok=True)
         self.key = key or os.environ.get("PENIN_CACHE_KEY", "penin-dev-key").encode("utf-8")
