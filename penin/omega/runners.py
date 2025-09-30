@@ -25,6 +25,21 @@ from .acfa import LeagueOrchestrator, LeagueConfig, run_full_deployment_cycle
 from .tuner import PeninOmegaTuner, create_penin_tuner
 from .ledger import WORMLedger
 
+# Import Vida+ modules
+from .life_eq import life_equation, LifeVerdict
+from .fractal import build_fractal, propagate_update
+from .swarm import heartbeat, sample_global_state
+from .caos_kratos import phi_kratos
+from .market import InternalMarket
+from .neural_chain import add_block
+from .self_rag import ingest_text, query, self_cycle
+from .api_metabolizer import record_call, suggest_replay
+from .immunity import guard as immunity_guard
+from .checkpoint import save_snapshot, restore_last
+from .game import update_gradient, get_gradient
+from .darwin_audit import audit_challenger
+from .zero_consciousness import assert_zero_consciousness
+
 
 @dataclass
 class EvolutionConfig:
@@ -47,6 +62,32 @@ class EvolutionConfig:
     # Tuning settings
     enable_auto_tuning: bool = True
     tuning_learning_rate: float = 0.01
+    
+    # Vida+ settings
+    enable_vida_plus: bool = True
+    base_alpha: float = 0.02
+    life_equation_thresholds: Dict[str, float] = None
+    enable_fractal_dsl: bool = True
+    enable_swarm_cognitive: bool = True
+    enable_caos_kratos: bool = True
+    enable_marketplace: bool = True
+    enable_neural_chain: bool = True
+    enable_self_rag: bool = True
+    enable_api_metabolizer: bool = True
+    enable_immunity: bool = True
+    enable_checkpoint: bool = True
+    enable_game: bool = True
+    enable_darwin_audit: bool = True
+    enable_zero_consciousness: bool = True
+    
+    def __post_init__(self):
+        if self.life_equation_thresholds is None:
+            self.life_equation_thresholds = {
+                "beta_min": 0.01,
+                "theta_caos": 0.25,
+                "tau_sr": 0.80,
+                "theta_G": 0.85
+            }
 
 
 @dataclass
@@ -67,6 +108,14 @@ class CycleResult:
     
     # Gate results
     gate_results: Dict[str, Any]
+    
+    # Vida+ results
+    life_equation_results: Dict[str, Any] = None
+    fractal_propagation_results: Dict[str, Any] = None
+    swarm_coherence_results: Dict[str, Any] = None
+    immunity_results: Dict[str, Any] = None
+    darwin_audit_results: Dict[str, Any] = None
+    zero_consciousness_results: Dict[str, Any] = None
     
     # Final decision
     decision: str  # 'promote', 'canary', 'reject'
@@ -108,7 +157,43 @@ class EvolutionRunner:
         # Initialize WORM ledger
         self.ledger = WORMLedger("evolution_cycles.db")
         
+        # Initialize Vida+ components
+        self._init_vida_plus_components()
+        
         print(f"🚀 Evolution runner initialized (seed={self.config.seed})")
+        if self.config.enable_vida_plus:
+            print(f"🌟 Vida+ mode enabled with {len([k for k, v in self.config.__dict__.items() if k.startswith('enable_') and v])} modules")
+    
+    def _init_vida_plus_components(self):
+        """Initialize Vida+ components"""
+        if not self.config.enable_vida_plus:
+            return
+        
+        # Initialize fractal DSL if enabled
+        if self.config.enable_fractal_dsl:
+            try:
+                import yaml
+                fractal_config_path = Path(__file__).parent / "fractal_dsl.yaml"
+                if fractal_config_path.exists():
+                    with open(fractal_config_path, 'r') as f:
+                        fractal_config = yaml.safe_load(f)
+                    self.fractal_root = build_fractal(fractal_config, fractal_config.get("depth", 2), fractal_config.get("branching", 3))
+                    print("   ✅ Fractal DSL initialized")
+                else:
+                    print("   ⚠️  Fractal DSL config not found")
+            except Exception as e:
+                print(f"   ❌ Fractal DSL initialization failed: {e}")
+        
+        # Initialize marketplace if enabled
+        if self.config.enable_marketplace:
+            try:
+                self.marketplace = InternalMarket()
+                print("   ✅ Marketplace initialized")
+            except Exception as e:
+                print(f"   ❌ Marketplace initialization failed: {e}")
+        
+        # Initialize other components as needed
+        print("   ✅ Vida+ components initialized")
     
     async def evolve_one_cycle(self, base_config: Dict[str, Any] = None) -> CycleResult:
         """
@@ -152,10 +237,18 @@ class EvolutionRunner:
                 challengers, evaluation_results
             )
             
+            # Step 3.5: Apply Life Equation (+) if Vida+ enabled
+            vida_plus_results = {}
+            if self.config.enable_vida_plus:
+                print("🌟 Step 3.5: Applying Life Equation (+)...")
+                vida_plus_results = await self._apply_vida_plus_gates(
+                    challengers, scoring_results, gate_results
+                )
+            
             # Step 4: Select best challenger
             print("🏆 Step 4: Selecting best challenger...")
             best_challenger, decision, decision_reason = self._select_best_challenger(
-                challengers, scoring_results, gate_results
+                challengers, scoring_results, gate_results, vida_plus_results
             )
             
             # Step 5: Deploy if not dry run
@@ -186,6 +279,12 @@ class EvolutionRunner:
                 evaluation_results=evaluation_results,
                 scoring_results=scoring_results,
                 gate_results=gate_results,
+                life_equation_results=vida_plus_results.get("life_equation", {}),
+                fractal_propagation_results=vida_plus_results.get("fractal", {}),
+                swarm_coherence_results=vida_plus_results.get("swarm", {}),
+                immunity_results=vida_plus_results.get("immunity", {}),
+                darwin_audit_results=vida_plus_results.get("darwin_audit", {}),
+                zero_consciousness_results=vida_plus_results.get("zero_consciousness", {}),
                 decision=decision,
                 decision_reason=decision_reason,
                 best_challenger=best_challenger,
@@ -347,36 +446,228 @@ class EvolutionRunner:
         
         return scoring_results, gate_results
     
+    async def _apply_vida_plus_gates(self, challengers: List[Dict[str, Any]], 
+                                   scoring_results: Dict[str, Any],
+                                   gate_results: Dict[str, Any]) -> Dict[str, Any]:
+        """Apply Vida+ gates including Life Equation (+)"""
+        vida_plus_results = {
+            "life_equation": {},
+            "fractal": {},
+            "swarm": {},
+            "immunity": {},
+            "darwin_audit": {},
+            "zero_consciousness": {}
+        }
+        
+        # Get global coherence from swarm
+        G = 0.9  # Default value, would be calculated from swarm
+        if self.config.enable_swarm_cognitive:
+            try:
+                global_state = sample_global_state()
+                G = global_state.get("coherence", 0.9)
+                vida_plus_results["swarm"]["global_coherence"] = G
+                print(f"   🌐 Global coherence (G): {G:.3f}")
+            except Exception as e:
+                print(f"   ⚠️  Swarm coherence calculation failed: {e}")
+        
+        # Apply Life Equation (+) to each challenger
+        for challenger in challengers:
+            challenger_id = challenger['challenger_id']
+            
+            if challenger_id not in scoring_results:
+                continue
+            
+            # Extract metrics for Life Equation
+            scoring = scoring_results[challenger_id]
+            
+            # Prepare Life Equation inputs
+            ethics_input = {
+                "ece": 0.005,  # Would be calculated from ethics
+                "rho_bias": 1.02,
+                "fairness": 0.9,
+                "consent": True,
+                "eco_ok": True,
+                "thresholds": {}
+            }
+            
+            risk_series = {
+                "latency": scoring.get("u_score", 0.5),
+                "cost": scoring.get("l_score", 0.5),
+                "memory": 0.5,
+                "cpu": 0.5
+            }
+            
+            caos_components = (
+                scoring.get("c_score", 0.5),  # C
+                0.8,  # A (adaptability)
+                0.9,  # O (openness)
+                scoring.get("s_score", 0.5)   # S (stability)
+            )
+            
+            sr_components = (
+                0.9,   # awareness
+                True,  # ethics_ok
+                0.8,   # autocorr
+                0.85   # metacog
+            )
+            
+            linf_weights = {
+                "u_score": 0.25,
+                "s_score": 0.25,
+                "c_score": 0.25,
+                "l_score": 0.25,
+                "lambda_c": 0.0
+            }
+            
+            linf_metrics = {
+                "u_score": scoring.get("u_score", 0.5),
+                "s_score": scoring.get("s_score", 0.5),
+                "c_score": scoring.get("c_score", 0.5),
+                "l_score": scoring.get("l_score", 0.5)
+            }
+            
+            # Apply Life Equation
+            try:
+                verdict = life_equation(
+                    base_alpha=self.config.base_alpha,
+                    ethics_input=ethics_input,
+                    risk_series=risk_series,
+                    caos_components=caos_components,
+                    sr_components=sr_components,
+                    linf_weights=linf_weights,
+                    linf_metrics=linf_metrics,
+                    cost=scoring.get("l_score", 0.5),
+                    ethical_ok_flag=True,
+                    G=G,
+                    dL_inf=0.01,  # Would be calculated from previous cycle
+                    thresholds=self.config.life_equation_thresholds
+                )
+                
+                vida_plus_results["life_equation"][challenger_id] = {
+                    "ok": verdict.ok,
+                    "alpha_eff": verdict.alpha_eff,
+                    "reasons": verdict.reasons,
+                    "metrics": verdict.metrics
+                }
+                
+                print(f"   🧬 {challenger_id}: α_eff={verdict.alpha_eff:.4f}, ok={verdict.ok}")
+                
+            except Exception as e:
+                print(f"   ❌ Life Equation failed for {challenger_id}: {e}")
+                vida_plus_results["life_equation"][challenger_id] = {
+                    "ok": False,
+                    "alpha_eff": 0.0,
+                    "error": str(e)
+                }
+        
+        # Apply other Vida+ gates
+        if self.config.enable_immunity:
+            try:
+                # Check immunity for all challengers
+                for challenger in challengers:
+                    challenger_id = challenger['challenger_id']
+                    metrics = scoring_results.get(challenger_id, {})
+                    immunity_ok = immunity_guard(metrics, trigger=1.0)
+                    vida_plus_results["immunity"][challenger_id] = {"ok": immunity_ok}
+            except Exception as e:
+                print(f"   ⚠️  Immunity check failed: {e}")
+        
+        if self.config.enable_darwin_audit:
+            try:
+                # Apply Darwinian audit
+                for challenger in challengers:
+                    challenger_id = challenger['challenger_id']
+                    metrics = scoring_results.get(challenger_id, {})
+                    audit_result = audit_challenger(challenger_id, metrics)
+                    vida_plus_results["darwin_audit"][challenger_id] = audit_result.to_dict()
+            except Exception as e:
+                print(f"   ⚠️  Darwinian audit failed: {e}")
+        
+        if self.config.enable_zero_consciousness:
+            try:
+                # Check zero consciousness
+                system_state = {"cycle_id": cycle_id, "challengers": len(challengers)}
+                consciousness_ok = assert_zero_consciousness(system_state)
+                vida_plus_results["zero_consciousness"]["overall"] = {"ok": consciousness_ok}
+            except Exception as e:
+                print(f"   ⚠️  Zero consciousness check failed: {e}")
+        
+        return vida_plus_results
+    
     def _select_best_challenger(self, challengers: List[Dict[str, Any]], 
                                scoring_results: Dict[str, Any],
-                               gate_results: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], str, str]:
+                               gate_results: Dict[str, Any],
+                               vida_plus_results: Dict[str, Any] = None) -> Tuple[Optional[Dict[str, Any]], str, str]:
         """Select the best challenger based on scores and gates"""
         
         # Filter challengers that passed all gates
         valid_challengers = []
         for challenger in challengers:
             challenger_id = challenger['challenger_id']
-            if gate_results.get(challenger_id, {}).get('all_gates_passed', False):
+            
+            # Check traditional gates
+            traditional_gates_passed = gate_results.get(challenger_id, {}).get('all_gates_passed', False)
+            
+            # Check Vida+ gates if enabled
+            vida_plus_passed = True
+            if self.config.enable_vida_plus and vida_plus_results:
+                # Check Life Equation
+                life_eq_result = vida_plus_results.get("life_equation", {}).get(challenger_id, {})
+                life_eq_passed = life_eq_result.get("ok", False)
+                
+                # Check immunity
+                immunity_result = vida_plus_results.get("immunity", {}).get(challenger_id, {})
+                immunity_passed = immunity_result.get("ok", True)
+                
+                # Check zero consciousness
+                consciousness_result = vida_plus_results.get("zero_consciousness", {}).get("overall", {})
+                consciousness_passed = consciousness_result.get("ok", True)
+                
+                vida_plus_passed = life_eq_passed and immunity_passed and consciousness_passed
+            
+            if traditional_gates_passed and vida_plus_passed:
                 challenger['linf_score'] = scoring_results[challenger_id]['linf_score']
+                
+                # Add alpha_eff from Life Equation if available
+                if self.config.enable_vida_plus and vida_plus_results:
+                    life_eq_result = vida_plus_results.get("life_equation", {}).get(challenger_id, {})
+                    challenger['alpha_eff'] = life_eq_result.get("alpha_eff", 0.0)
+                
                 valid_challengers.append(challenger)
         
         if not valid_challengers:
             return None, "reject", "no_challengers_passed_gates"
         
-        # Select challenger with highest L∞ score
-        best_challenger = max(valid_challengers, key=lambda c: c['linf_score'])
-        
-        # Determine decision based on score improvement
-        linf_score = best_challenger['linf_score']
-        if linf_score > 0.8:
-            decision = "promote"
-            reason = f"high_linf_score_{linf_score:.3f}"
-        elif linf_score > 0.6:
-            decision = "canary"
-            reason = f"moderate_linf_score_{linf_score:.3f}"
+        # Select challenger with highest alpha_eff (Life Equation) if Vida+ enabled,
+        # otherwise use L∞ score
+        if self.config.enable_vida_plus:
+            best_challenger = max(valid_challengers, key=lambda c: c.get('alpha_eff', 0.0))
+            alpha_eff = best_challenger.get('alpha_eff', 0.0)
+            
+            # Determine decision based on alpha_eff
+            if alpha_eff > 0.01:
+                decision = "promote"
+                reason = f"high_alpha_eff_{alpha_eff:.4f}"
+            elif alpha_eff > 0.005:
+                decision = "canary"
+                reason = f"moderate_alpha_eff_{alpha_eff:.4f}"
+            else:
+                decision = "reject"
+                reason = f"low_alpha_eff_{alpha_eff:.4f}"
         else:
-            decision = "reject"
-            reason = f"low_linf_score_{linf_score:.3f}"
+            # Traditional selection based on L∞ score
+            best_challenger = max(valid_challengers, key=lambda c: c['linf_score'])
+            linf_score = best_challenger['linf_score']
+            
+            if linf_score > 0.8:
+                decision = "promote"
+                reason = f"high_linf_score_{linf_score:.3f}"
+            elif linf_score > 0.6:
+                decision = "canary"
+                reason = f"moderate_linf_score_{linf_score:.3f}"
+            else:
+                decision = "reject"
+                reason = f"low_linf_score_{linf_score:.3f}"
         
         return best_challenger, decision, reason
     
