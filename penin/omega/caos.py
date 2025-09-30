@@ -123,7 +123,8 @@ class CAOSConfig:
     gamma: float = 0.7            # <- teste espera 0.7
     kappa_max: float = 10.0       # <- teste espera 10.0
     exploration_factor: float = 2.0
-    ema_beta: float = 0.9         # para EMA do tracker
+    ema_beta: float = 0.9
+    use_log_space: bool = False         # para EMA do tracker
 
 
 class CAOSTracker:
