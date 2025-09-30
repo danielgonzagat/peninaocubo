@@ -10,7 +10,8 @@ Implementa:
 """
 
 import time
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List, Optional
+from typing_extensions import Tuple
 from dataclasses import dataclass
 from enum import Enum
 
@@ -723,3 +724,10 @@ def full_guard_check(state_dict: Dict[str, Any],
         "evidence": evidence,
         "summary": orchestrator.get_guard_summary()
     }
+
+
+def quick_sigma_guard_check_simple(ece: float, rho_bias: float, fairness: float,
+                                  consent: bool, eco_ok: bool) -> bool:
+    """Verificação rápida e simples do Σ-Guard"""
+    return (ece <= 0.01 and rho_bias <= 1.05 and fairness >= 0.8 and 
+            consent and eco_ok)
