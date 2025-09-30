@@ -1,9 +1,13 @@
 """
-Swarm Cognitivo - Gossip e Agregação Global
-============================================
+Swarm Cognitive Module - Gossip Protocol & Global State Aggregation
+===================================================================
 
-Sistema de heartbeat e gossip entre nós cognitivos.
-Persistência em SQLite, agregação de métricas globais (G).
+Implements a lightweight swarm intelligence system where:
+- Multiple logical nodes share state via heartbeat/gossip
+- Global coherence (G) is computed from swarm consensus
+- Uses local SQLite for persistence (single-node PoC, extensible to multi-node)
+
+This enables distributed cognition while maintaining auditability.
 """
 
 import os
@@ -11,83 +15,79 @@ import sqlite3
 import time
 import json
 from pathlib import Path
-from typing import Dict, Any, List
-from dataclasses import dataclass
+from typing import Dict, Any, List, Optional
+from dataclasses import dataclass, asdict
 
 
+# Root directory for PENIN state
 ROOT = Path(os.getenv("PENIN_ROOT", Path.home() / ".penin_omega"))
 DB = ROOT / "state" / "heartbeats.db"
-DB.parent.mkdir(parents=True, exist_ok=True)
 
 
 @dataclass
-class HeartbeatMessage:
-    """Mensagem de heartbeat de um nó"""
-    node: str
+class SwarmNode:
+    """Represents a node in the swarm"""
+    node_id: str
+    role: str  # "core", "explorer", "validator", etc.
+    metrics: Dict[str, float]
     timestamp: float
-    payload: Dict[str, Any]
     
     def to_dict(self) -> Dict[str, Any]:
         return {
-            "node": self.node,
-            "timestamp": self.timestamp,
-            "payload": self.payload
+            "node_id": self.node_id,
+            "role": self.role,
+            "metrics": self.metrics,
+            "timestamp": self.timestamp
         }
-    
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "HeartbeatMessage":
-        return cls(
-            node=data["node"],
-            timestamp=data["timestamp"],
-            payload=data["payload"]
-        )
 
 
 def _init_db():
-    """Inicializa banco de dados de heartbeats"""
+    """Initialize swarm database"""
+    DB.parent.mkdir(parents=True, exist_ok=True)
+    
     with sqlite3.connect(DB) as con:
         con.execute("""
             CREATE TABLE IF NOT EXISTS hb (
                 node TEXT,
                 ts REAL,
-                payload TEXT
+                payload TEXT,
+                role TEXT DEFAULT 'core'
             )
         """)
-        con.execute("CREATE INDEX IF NOT EXISTS idx_hb_ts ON hb(ts)")
-        con.execute("CREATE INDEX IF NOT EXISTS idx_hb_node ON hb(node)")
         con.commit()
 
 
-def heartbeat(node: str, payload: Dict[str, Any]) -> None:
+def heartbeat(node: str, payload: Dict[str, Any], role: str = "core") -> None:
     """
-    Envia heartbeat de um nó.
+    Record a heartbeat from a node.
     
     Args:
-        node: Identificador do nó
-        payload: Dicionário com métricas/estado
+        node: Node identifier
+        payload: Metrics payload (should contain phi, sr, G, etc.)
+        role: Node role (core, explorer, validator)
     """
     _init_db()
-    ts = time.time()
     
     with sqlite3.connect(DB) as con:
         con.execute(
-            "INSERT INTO hb(node, ts, payload) VALUES(?, ?, ?)",
-            (node, ts, json.dumps(payload))
+            "INSERT INTO hb(node, ts, payload, role) VALUES(?, ?, ?, ?)",
+            (node, time.time(), json.dumps(payload), role)
         )
         con.commit()
 
 
 def sample_global_state(window_s: float = 60.0) -> Dict[str, float]:
     """
-    Agrega estado global de todos os nós na janela temporal.
+    Sample global state from recent heartbeats.
     
     Args:
-        window_s: Janela de tempo em segundos
+        window_s: Time window in seconds
         
     Returns:
-        Dict com médias das métricas dos nós
+        Dict with aggregated metrics (mean over window)
     """
     _init_db()
+    
     t0 = time.time() - window_s
     
     with sqlite3.connect(DB) as con:
@@ -97,160 +97,217 @@ def sample_global_state(window_s: float = 60.0) -> Dict[str, float]:
     if not data:
         return {}
     
-    # Agregação simples (média de métricas)
+    # Aggregate metrics (simple mean for now)
     agg = {}
-    for p in data:
-        for k, v in p.items():
+    counts = {}
+    
+    for payload in data:
+        for k, v in payload.items():
             try:
-                agg[k] = agg.get(k, 0.0) + float(v)
-            except (TypeError, ValueError):
+                v_float = float(v)
+                agg[k] = agg.get(k, 0.0) + v_float
+                counts[k] = counts.get(k, 0) + 1
+            except (ValueError, TypeError):
                 pass
     
-    n = max(1, len(data))
-    return {k: (v / n) for k, v in agg.items()}
-
-
-def get_nodes(window_s: float = 60.0) -> List[str]:
-    """
-    Retorna lista de nós ativos na janela temporal.
+    # Calculate means
+    result = {}
+    for k, total in agg.items():
+        result[k] = total / max(1, counts[k])
     
-    Args:
-        window_s: Janela de tempo em segundos
-        
-    Returns:
-        Lista de identificadores de nós
-    """
-    _init_db()
-    t0 = time.time() - window_s
-    
-    with sqlite3.connect(DB) as con:
-        cur = con.execute("SELECT DISTINCT node FROM hb WHERE ts >= ?", (t0,))
-        return [r[0] for r in cur.fetchall()]
-
-
-def get_node_history(node: str, window_s: float = 60.0) -> List[HeartbeatMessage]:
-    """
-    Retorna histórico de heartbeats de um nó.
-    
-    Args:
-        node: Identificador do nó
-        window_s: Janela de tempo em segundos
-        
-    Returns:
-        Lista de HeartbeatMessage
-    """
-    _init_db()
-    t0 = time.time() - window_s
-    
-    with sqlite3.connect(DB) as con:
-        cur = con.execute(
-            "SELECT node, ts, payload FROM hb WHERE node = ? AND ts >= ? ORDER BY ts DESC",
-            (node, t0)
-        )
-        
-        messages = []
-        for row in cur.fetchall():
-            msg = HeartbeatMessage(
-                node=row[0],
-                timestamp=row[1],
-                payload=json.loads(row[2])
-            )
-            messages.append(msg)
-        
-        return messages
-
-
-def cleanup_old_heartbeats(max_age_s: float = 3600.0) -> int:
-    """
-    Remove heartbeats antigos.
-    
-    Args:
-        max_age_s: Idade máxima em segundos
-        
-    Returns:
-        Número de registros removidos
-    """
-    _init_db()
-    t0 = time.time() - max_age_s
-    
-    with sqlite3.connect(DB) as con:
-        cur = con.execute("DELETE FROM hb WHERE ts < ?", (t0,))
-        con.commit()
-        return cur.rowcount
-
-
-class SwarmCoordinator:
-    """Coordenador do swarm cognitivo"""
-    
-    def __init__(self, node_id: str, heartbeat_interval: float = 5.0):
-        self.node_id = node_id
-        self.heartbeat_interval = heartbeat_interval
-        self.last_heartbeat = 0.0
-    
-    def send_heartbeat(self, metrics: Dict[str, Any]) -> None:
-        """Envia heartbeat com métricas atuais"""
-        heartbeat(self.node_id, metrics)
-        self.last_heartbeat = time.time()
-    
-    def should_send_heartbeat(self) -> bool:
-        """Verifica se deve enviar heartbeat"""
-        return (time.time() - self.last_heartbeat) >= self.heartbeat_interval
-    
-    def get_global_metrics(self, window_s: float = 60.0) -> Dict[str, float]:
-        """Obtém métricas globais agregadas"""
-        return sample_global_state(window_s)
-    
-    def get_active_nodes(self, window_s: float = 60.0) -> List[str]:
-        """Obtém lista de nós ativos"""
-        return get_nodes(window_s)
-    
-    def get_swarm_size(self, window_s: float = 60.0) -> int:
-        """Retorna tamanho do swarm"""
-        return len(self.get_active_nodes(window_s))
-    
-    def get_consensus_estimate(self, key: str, window_s: float = 60.0) -> float:
-        """
-        Estima consenso para uma métrica específica.
-        
-        Args:
-            key: Chave da métrica
-            window_s: Janela de tempo
-            
-        Returns:
-            Valor médio da métrica no swarm
-        """
-        global_state = self.get_global_metrics(window_s)
-        return global_state.get(key, 0.0)
+    return result
 
 
 def compute_global_coherence(window_s: float = 60.0) -> float:
     """
-    Computa coerência global G do swarm.
+    Compute global coherence (G) from swarm state.
     
-    G é a média harmônica das métricas chave dos nós.
+    G is computed as the harmonic mean of key metrics across all nodes.
     
     Args:
-        window_s: Janela de tempo
+        window_s: Time window in seconds
         
     Returns:
-        Coerência global [0, 1]
+        Global coherence score [0, 1]
     """
-    global_state = sample_global_state(window_s)
+    state = sample_global_state(window_s)
     
-    if not global_state:
-        return 0.5  # Neutral quando não há dados
-    
-    # Métricas chave para coerência
-    key_metrics = ["phi", "sr", "accuracy", "stability"]
+    # Extract key metrics for coherence
+    key_metrics = ["phi", "sr", "ece", "rho"]
     
     values = []
-    for key in key_metrics:
-        if key in global_state:
-            values.append(max(0.01, global_state[key]))
+    for metric in key_metrics:
+        if metric in state:
+            # Normalize to [0, 1] if needed
+            val = state[metric]
+            if metric == "ece":
+                val = max(0.0, 1.0 - val / 0.01)  # Lower ECE is better
+            elif metric == "rho":
+                val = max(0.0, 1.0 - val)  # Lower rho is better
+            
+            values.append(max(1e-9, min(1.0, val)))
     
     if not values:
-        return 0.5
+        return 0.0
     
-    # Média harmônica
-    harmonic = len(values) / sum(1.0 / v for v in values)
-    return max(0.0, min(1.0, harmonic))
+    # Harmonic mean (non-compensatory)
+    return len(values) / sum(1.0 / v for v in values)
+
+
+def get_swarm_health() -> Dict[str, Any]:
+    """
+    Get overall swarm health metrics.
+    
+    Returns:
+        Dict with health indicators
+    """
+    _init_db()
+    
+    with sqlite3.connect(DB) as con:
+        # Count nodes
+        cur = con.execute("SELECT COUNT(DISTINCT node) FROM hb WHERE ts >= ?", 
+                         (time.time() - 300,))
+        active_nodes = cur.fetchone()[0]
+        
+        # Get roles distribution
+        cur = con.execute(
+            "SELECT role, COUNT(DISTINCT node) FROM hb WHERE ts >= ? GROUP BY role",
+            (time.time() - 300,)
+        )
+        roles = dict(cur.fetchall())
+        
+        # Get total heartbeats
+        cur = con.execute("SELECT COUNT(*) FROM hb WHERE ts >= ?",
+                         (time.time() - 300,))
+        total_hb = cur.fetchone()[0]
+    
+    G = compute_global_coherence(window_s=300)
+    
+    return {
+        "active_nodes": active_nodes,
+        "roles": roles,
+        "total_heartbeats": total_hb,
+        "global_coherence": G,
+        "healthy": G >= 0.85 and active_nodes > 0
+    }
+
+
+def get_node_history(node: str, limit: int = 100) -> List[Dict[str, Any]]:
+    """
+    Get heartbeat history for a specific node.
+    
+    Args:
+        node: Node identifier
+        limit: Maximum number of records
+        
+    Returns:
+        List of heartbeat records
+    """
+    _init_db()
+    
+    with sqlite3.connect(DB) as con:
+        cur = con.execute(
+            "SELECT ts, payload, role FROM hb WHERE node = ? ORDER BY ts DESC LIMIT ?",
+            (node, limit)
+        )
+        
+        records = []
+        for ts, payload, role in cur.fetchall():
+            records.append({
+                "timestamp": ts,
+                "payload": json.loads(payload),
+                "role": role
+            })
+    
+    return records
+
+
+def cleanup_old_heartbeats(max_age_s: float = 86400) -> int:
+    """
+    Clean up old heartbeat records.
+    
+    Args:
+        max_age_s: Maximum age in seconds (default 24h)
+        
+    Returns:
+        Number of records deleted
+    """
+    _init_db()
+    
+    cutoff = time.time() - max_age_s
+    
+    with sqlite3.connect(DB) as con:
+        cur = con.execute("DELETE FROM hb WHERE ts < ?", (cutoff,))
+        con.commit()
+        return cur.rowcount
+
+
+class SwarmOrchestrator:
+    """
+    Orchestrates swarm-based global coherence computation.
+    
+    This enables distributed decision-making where multiple nodes
+    contribute to the global state, and coherence (G) reflects
+    the consensus quality.
+    """
+    
+    def __init__(self, node_id: str = "core-0", role: str = "core"):
+        self.node_id = node_id
+        self.role = role
+        print(f"🐝 Swarm node {node_id} initialized (role={role})")
+    
+    def emit_heartbeat(self, metrics: Dict[str, float]) -> None:
+        """Emit heartbeat with current metrics"""
+        heartbeat(self.node_id, metrics, self.role)
+    
+    def get_global_coherence(self, window_s: float = 60.0) -> float:
+        """Get current global coherence"""
+        return compute_global_coherence(window_s)
+    
+    def get_health(self) -> Dict[str, Any]:
+        """Get swarm health"""
+        return get_swarm_health()
+    
+    def sync_state(self) -> Dict[str, Any]:
+        """
+        Synchronize with swarm and return global state.
+        
+        Returns:
+            Dict with global metrics
+        """
+        state = sample_global_state(window_s=60.0)
+        health = self.get_health()
+        
+        return {
+            "global_state": state,
+            "health": health,
+            "node_id": self.node_id,
+            "timestamp": time.time()
+        }
+
+
+# Quick test function
+def quick_swarm_test():
+    """Quick test of swarm functionality"""
+    orch = SwarmOrchestrator("test-node-1", "core")
+    
+    # Emit some heartbeats
+    for i in range(5):
+        metrics = {
+            "phi": 0.7 + i * 0.02,
+            "sr": 0.85 + i * 0.01,
+            "ece": 0.005 - i * 0.0001,
+            "rho": 0.9 - i * 0.01
+        }
+        orch.emit_heartbeat(metrics)
+        time.sleep(0.1)
+    
+    # Get global state
+    state = orch.sync_state()
+    print(f"Global state: {state}")
+    
+    # Get health
+    health = orch.get_health()
+    print(f"Swarm health: {health}")
+    
+    return orch

@@ -1,8 +1,8 @@
 """
-Checkpoint & Reparo
-===================
+Checkpoint & Repair - State Snapshotting
+========================================
 
-Salvamento de snapshots e restauração de estado.
+Enables system rollback by saving/restoring state snapshots.
 """
 
 from pathlib import Path
@@ -10,11 +10,9 @@ import time
 from typing import Dict, Any, Optional
 
 try:
-    import orjson
-    HAS_ORJSON = True
+    import orjson as json_lib
 except ImportError:
-    import json
-    HAS_ORJSON = False
+    import json as json_lib
 
 
 SNAP = Path.home() / ".penin_omega" / "snapshots"
@@ -23,94 +21,104 @@ SNAP.mkdir(parents=True, exist_ok=True)
 
 def save_snapshot(state: Dict[str, Any]) -> str:
     """
-    Salva snapshot do estado.
+    Save a state snapshot.
     
     Args:
-        state: Estado do sistema
+        state: State to save
         
     Returns:
-        Path do snapshot salvo
+        Path to snapshot file
     """
-    fn = SNAP / f"snap_{int(time.time())}.json"
+    filename = f"snap_{int(time.time())}.json"
+    path = SNAP / filename
     
-    if HAS_ORJSON:
-        fn.write_bytes(orjson.dumps(state, option=orjson.OPT_INDENT_2))
+    if hasattr(json_lib, 'dumps'):
+        data = json_lib.dumps(state)
     else:
-        fn.write_text(json.dumps(state, indent=2, ensure_ascii=False), encoding="utf-8")
+        import json
+        data = json.dumps(state).encode()
     
-    return str(fn)
+    path.write_bytes(data)
+    
+    print(f"💾 Saved snapshot: {filename}")
+    return str(path)
 
 
 def restore_last() -> Optional[Dict[str, Any]]:
     """
-    Restaura último snapshot.
+    Restore the most recent snapshot.
     
     Returns:
-        Estado restaurado ou None se não houver snapshots
+        State dict or None if no snapshots
     """
     snaps = sorted(SNAP.glob("snap_*.json"))
     
     if not snaps:
         return None
     
-    last = snaps[-1]
+    latest = snaps[-1]
     
-    if HAS_ORJSON:
-        return orjson.loads(last.read_bytes())
+    if hasattr(json_lib, 'loads'):
+        state = json_lib.loads(latest.read_bytes())
     else:
-        return json.loads(last.read_text(encoding="utf-8"))
-
-
-def restore_specific(timestamp: int) -> Optional[Dict[str, Any]]:
-    """
-    Restaura snapshot específico.
+        import json
+        state = json.loads(latest.read_text())
     
-    Args:
-        timestamp: Timestamp do snapshot
-        
-    Returns:
-        Estado restaurado ou None se não encontrar
-    """
-    fn = SNAP / f"snap_{timestamp}.json"
-    
-    if not fn.exists():
-        return None
-    
-    if HAS_ORJSON:
-        return orjson.loads(fn.read_bytes())
-    else:
-        return json.loads(fn.read_text(encoding="utf-8"))
+    print(f"📥 Restored snapshot: {latest.name}")
+    return state
 
 
 def list_snapshots() -> list:
-    """
-    Lista todos os snapshots disponíveis.
-    
-    Returns:
-        Lista de timestamps
-    """
-    snaps = sorted(SNAP.glob("snap_*.json"))
-    return [int(s.stem.split("_")[1]) for s in snaps]
+    """List all available snapshots"""
+    return sorted(SNAP.glob("snap_*.json"))
 
 
-def cleanup_old_snapshots(keep_last: int = 10) -> int:
+class CheckpointManager:
     """
-    Remove snapshots antigos, mantendo apenas os N mais recentes.
+    Manages system checkpoints.
     
-    Args:
-        keep_last: Número de snapshots a manter
-        
-    Returns:
-        Número de snapshots removidos
+    Automatically saves before risky operations.
     """
-    snaps = sorted(SNAP.glob("snap_*.json"))
     
-    if len(snaps) <= keep_last:
-        return 0
+    def __init__(self):
+        self.last_snapshot: Optional[str] = None
+        print("💾 Checkpoint Manager initialized")
     
-    to_remove = snaps[:-keep_last]
+    def save(self, state: Dict[str, Any]) -> str:
+        """Save checkpoint"""
+        path = save_snapshot(state)
+        self.last_snapshot = path
+        return path
     
-    for snap in to_remove:
-        snap.unlink()
+    def restore(self) -> Optional[Dict[str, Any]]:
+        """Restore last checkpoint"""
+        return restore_last()
     
-    return len(to_remove)
+    def get_stats(self) -> Dict[str, Any]:
+        """Get checkpoint statistics"""
+        snaps = list_snapshots()
+        return {
+            "total_snapshots": len(snaps),
+            "last_snapshot": self.last_snapshot,
+            "oldest": snaps[0].name if snaps else None,
+            "newest": snaps[-1].name if snaps else None
+        }
+
+
+# Quick test
+def quick_checkpoint_test():
+    """Quick test of checkpoint system"""
+    mgr = CheckpointManager()
+    
+    # Save checkpoint
+    state = {"phi": 0.7, "sr": 0.85, "cycle": 42}
+    mgr.save(state)
+    
+    # Restore
+    restored = mgr.restore()
+    print(f"\n📥 Restored: {restored}")
+    
+    stats = mgr.get_stats()
+    print(f"\n📊 Stats: {stats}")
+    
+    return mgr
