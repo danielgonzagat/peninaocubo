@@ -1,5 +1,5 @@
 version: 1
-depth: 2            # levels below the core
+depth: 2            # levels below core
 branching: 3        # children per node
 weights:
   caos: 1.0
@@ -8,15 +8,3 @@ weights:
 sync:
   propagate_core_updates: true
   non_compensatory: true
-  
-# Fractal replication parameters
-replication:
-  inherit_thresholds: true
-  scale_factor: 0.9  # Each level gets 90% of parent's resources
-  min_resources: 0.1 # Minimum resource allocation
-  
-# Node health monitoring
-health:
-  heartbeat_interval_s: 10
-  timeout_s: 30
-  min_health_score: 0.7

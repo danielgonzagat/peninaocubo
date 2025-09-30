@@ -1,34 +1,27 @@
 """
-Darwinian Audit - Evolutionary Selection with Auditability
-===========================================================
-
-Implements Darwinian selection mechanisms with full audit trail.
+Darwinian Audit - Evolution scoring with non-compensatory selection
+Implements fitness evaluation for variant selection
 """
 
-from typing import Dict, Any, List, Optional, Tuple
-from dataclasses import dataclass, asdict
+from typing import Dict, List, Tuple, Optional, Any
+from dataclasses import dataclass
 import time
 
 
 @dataclass
 class Variant:
-    """Evolutionary variant"""
+    """Evolutionary variant with fitness metrics"""
     id: str
     generation: int
-    fitness: float
-    traits: Dict[str, Any]
+    fitness_score: float
+    life_ok: bool
+    caos_phi: float
+    sr: float
+    G: float
+    L_inf: float
+    mutations: List[str]
     parent_id: Optional[str] = None
-    mutations: List[str] = None
-    created_at: float = None
-    
-    def __post_init__(self):
-        if self.created_at is None:
-            self.created_at = time.time()
-        if self.mutations is None:
-            self.mutations = []
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return asdict(self)
+    timestamp: float = 0.0
 
 
 def darwinian_score(
@@ -39,339 +32,395 @@ def darwinian_score(
     L_inf: float
 ) -> float:
     """
-    Calculate Darwinian fitness score (non-compensatory).
+    Compute Darwinian fitness score (non-compensatory)
     
-    Args:
-        life_ok: Life Equation verdict
-        caos_phi: CAOS⁺ value
-        sr: SR-Ω∞ value
-        G: Global coherence
-        L_inf: L∞ score
+    If Life Equation fails, score is 0 (variant dies).
+    Otherwise, score is the product of key metrics with min dominance.
+    
+    Parameters:
+    -----------
+    life_ok: Life Equation gate result
+    caos_phi: CAOS⁺ phi value
+    sr: Self-reflexivity score
+    G: Global coherence
+    L_inf: L∞ performance metric
     
     Returns:
-        Darwinian fitness score
+    --------
+    Darwinian fitness score [0, 1]
     """
     if not life_ok:
         return 0.0
     
-    # Non-compensatory: dominance by worst component
+    # Non-compensatory: dominated by worst component
     min_component = min(caos_phi, sr, G)
     
-    # Scale by L∞
+    # Scale by performance
     return min_component * L_inf
 
 
-class Population:
-    """Manages population of variants"""
+def select_survivors(
+    variants: List[Variant],
+    survival_rate: float = 0.5,
+    min_fitness: float = 0.3
+) -> List[Variant]:
+    """
+    Select surviving variants based on fitness
     
-    def __init__(self, max_size: int = 100):
-        self.max_size = max_size
-        self.variants: List[Variant] = []
-        self.generation = 0
-        self.history: List[Dict[str, Any]] = []
-        
-    def add_variant(self, variant: Variant) -> bool:
-        """Add a variant to the population"""
-        # Check if we need to make room
-        if len(self.variants) >= self.max_size:
-            # Remove weakest variant
-            self.variants.sort(key=lambda v: v.fitness)
-            self.variants.pop(0)
-        
-        self.variants.append(variant)
-        
-        # Record in history
-        self.history.append({
-            "action": "add",
-            "variant_id": variant.id,
-            "generation": self.generation,
-            "timestamp": time.time()
-        })
-        
-        return True
+    Parameters:
+    -----------
+    variants: List of variants to evaluate
+    survival_rate: Fraction of variants to keep
+    min_fitness: Minimum fitness threshold
     
-    def select_parents(self, n: int = 2) -> List[Variant]:
-        """
-        Select parents for reproduction (fitness-proportional).
-        
-        Args:
-            n: Number of parents to select
-        
-        Returns:
-            List of selected variants
-        """
-        if len(self.variants) < n:
-            return self.variants.copy()
-        
-        # Sort by fitness
-        sorted_variants = sorted(self.variants, key=lambda v: v.fitness, reverse=True)
-        
-        # Tournament selection
-        selected = []
-        for _ in range(n):
-            # Take top 20% for tournament
-            tournament_size = max(2, len(sorted_variants) // 5)
-            tournament = sorted_variants[:tournament_size]
-            
-            # Select from tournament
-            import random
-            selected.append(random.choice(tournament))
-        
-        return selected
+    Returns:
+    --------
+    List of surviving variants
+    """
+    # Filter by minimum fitness
+    viable = [v for v in variants if v.fitness_score >= min_fitness]
     
-    def evolve(self) -> Optional[Variant]:
-        """
-        Evolve the population by one generation.
-        
-        Returns:
-            Best new variant or None
-        """
-        if len(self.variants) < 2:
-            return None
-        
-        # Select parents
-        parents = self.select_parents(2)
-        
-        # Create offspring
-        offspring_traits = {}
-        
-        # Crossover
-        for key in parents[0].traits:
-            if key in parents[1].traits:
-                # Average for numeric traits
-                if isinstance(parents[0].traits[key], (int, float)):
-                    offspring_traits[key] = (
-                        parents[0].traits[key] + parents[1].traits[key]
-                    ) / 2
-                else:
-                    # Random selection for non-numeric
-                    import random
-                    offspring_traits[key] = random.choice([
-                        parents[0].traits[key],
-                        parents[1].traits[key]
-                    ])
-            else:
-                offspring_traits[key] = parents[0].traits[key]
-        
-        # Mutation
-        mutations = []
+    if not viable:
+        return []
+    
+    # Sort by fitness (descending)
+    viable.sort(key=lambda v: v.fitness_score, reverse=True)
+    
+    # Keep top fraction
+    n_survivors = max(1, int(len(viable) * survival_rate))
+    
+    return viable[:n_survivors]
+
+
+def tournament_selection(
+    variants: List[Variant],
+    tournament_size: int = 3,
+    n_winners: int = 1
+) -> List[Variant]:
+    """
+    Tournament selection for breeding
+    
+    Parameters:
+    -----------
+    variants: Pool of variants
+    tournament_size: Number of variants per tournament
+    n_winners: Number of winners to select
+    
+    Returns:
+    --------
+    Tournament winners
+    """
+    if len(variants) <= n_winners:
+        return variants
+    
+    winners = []
+    
+    for _ in range(n_winners):
+        # Random tournament
         import random
-        for key in offspring_traits:
-            if random.random() < 0.1:  # 10% mutation rate
-                if isinstance(offspring_traits[key], (int, float)):
-                    # Gaussian mutation
-                    offspring_traits[key] *= random.gauss(1.0, 0.1)
-                    mutations.append(f"mutated_{key}")
+        tournament = random.sample(variants, min(tournament_size, len(variants)))
         
-        # Create new variant
-        offspring = Variant(
-            id=f"gen{self.generation}_var{len(self.variants)}",
-            generation=self.generation,
-            fitness=0.0,  # Will be evaluated externally
-            traits=offspring_traits,
-            parent_id=parents[0].id,
-            mutations=mutations
-        )
-        
-        self.generation += 1
-        
-        # Record evolution
-        self.history.append({
-            "action": "evolve",
-            "generation": self.generation,
-            "parents": [p.id for p in parents],
-            "offspring": offspring.id,
-            "mutations": mutations,
-            "timestamp": time.time()
-        })
-        
-        return offspring
+        # Winner is highest fitness
+        winner = max(tournament, key=lambda v: v.fitness_score)
+        winners.append(winner)
     
-    def cull_weak(self, threshold: float = 0.5):
-        """Remove variants below fitness threshold"""
-        before_count = len(self.variants)
-        self.variants = [v for v in self.variants if v.fitness >= threshold]
-        culled = before_count - len(self.variants)
-        
-        if culled > 0:
-            self.history.append({
-                "action": "cull",
-                "culled_count": culled,
-                "threshold": threshold,
-                "generation": self.generation,
-                "timestamp": time.time()
-            })
-        
-        return culled
+    return winners
+
+
+def fitness_pressure(
+    generation: int,
+    initial_pressure: float = 0.3,
+    max_pressure: float = 0.9,
+    generations_to_max: int = 100
+) -> float:
+    """
+    Compute adaptive fitness pressure that increases over time
     
-    def get_best(self) -> Optional[Variant]:
-        """Get the fittest variant"""
-        if not self.variants:
-            return None
-        return max(self.variants, key=lambda v: v.fitness)
+    Parameters:
+    -----------
+    generation: Current generation number
+    initial_pressure: Starting selection pressure
+    max_pressure: Maximum selection pressure
+    generations_to_max: Generations to reach maximum
     
-    def get_stats(self) -> Dict[str, Any]:
-        """Get population statistics"""
-        if not self.variants:
-            return {
-                "size": 0,
-                "generation": self.generation,
-                "avg_fitness": 0.0,
-                "max_fitness": 0.0,
-                "min_fitness": 0.0
-            }
+    Returns:
+    --------
+    Current fitness pressure [initial, max]
+    """
+    if generation >= generations_to_max:
+        return max_pressure
+    
+    # Linear increase
+    t = generation / generations_to_max
+    return initial_pressure + (max_pressure - initial_pressure) * t
+
+
+def diversity_bonus(
+    variant: Variant,
+    population: List[Variant],
+    diversity_weight: float = 0.1
+) -> float:
+    """
+    Compute diversity bonus for maintaining variation
+    
+    Parameters:
+    -----------
+    variant: Variant to evaluate
+    population: Current population
+    diversity_weight: Weight for diversity bonus
+    
+    Returns:
+    --------
+    Adjusted fitness with diversity bonus
+    """
+    if len(population) <= 1:
+        return variant.fitness_score
+    
+    # Compute distance from population mean
+    mean_phi = sum(v.caos_phi for v in population) / len(population)
+    mean_sr = sum(v.sr for v in population) / len(population)
+    mean_G = sum(v.G for v in population) / len(population)
+    
+    # Distance from mean (normalized)
+    distance = (
+        abs(variant.caos_phi - mean_phi) +
+        abs(variant.sr - mean_sr) +
+        abs(variant.G - mean_G)
+    ) / 3.0
+    
+    # Add diversity bonus
+    bonus = distance * diversity_weight
+    
+    return min(1.0, variant.fitness_score + bonus)
+
+
+def lineage_trace(
+    variant: Variant,
+    population: Dict[str, Variant],
+    max_depth: int = 10
+) -> List[str]:
+    """
+    Trace lineage of a variant back through parents
+    
+    Parameters:
+    -----------
+    variant: Variant to trace
+    population: Dictionary of all variants by ID
+    max_depth: Maximum generations to trace back
+    
+    Returns:
+    --------
+    List of ancestor IDs from variant to root
+    """
+    lineage = [variant.id]
+    current = variant
+    
+    for _ in range(max_depth):
+        if current.parent_id is None:
+            break
         
-        fitnesses = [v.fitness for v in self.variants]
-        
+        if current.parent_id in population:
+            current = population[current.parent_id]
+            lineage.append(current.id)
+        else:
+            break
+    
+    return lineage
+
+
+def mutation_impact_analysis(
+    variant: Variant,
+    parent: Optional[Variant]
+) -> Dict[str, float]:
+    """
+    Analyze impact of mutations from parent to variant
+    
+    Parameters:
+    -----------
+    variant: Current variant
+    parent: Parent variant (if exists)
+    
+    Returns:
+    --------
+    Dictionary of metric changes
+    """
+    if parent is None:
         return {
-            "size": len(self.variants),
-            "generation": self.generation,
-            "avg_fitness": sum(fitnesses) / len(fitnesses),
-            "max_fitness": max(fitnesses),
-            "min_fitness": min(fitnesses),
-            "diversity": len(set(str(v.traits) for v in self.variants)) / len(self.variants)
+            "fitness_delta": 0.0,
+            "phi_delta": 0.0,
+            "sr_delta": 0.0,
+            "G_delta": 0.0,
+            "L_inf_delta": 0.0,
+            "improvement": False
         }
+    
+    return {
+        "fitness_delta": variant.fitness_score - parent.fitness_score,
+        "phi_delta": variant.caos_phi - parent.caos_phi,
+        "sr_delta": variant.sr - parent.sr,
+        "G_delta": variant.G - parent.G,
+        "L_inf_delta": variant.L_inf - parent.L_inf,
+        "improvement": variant.fitness_score > parent.fitness_score
+    }
 
 
-class DarwinianAuditor:
-    """Auditable Darwinian selection system"""
+class EvolutionTracker:
+    """Track evolutionary progress across generations"""
     
     def __init__(self):
-        self.population = Population()
-        self.audit_trail: List[Dict[str, Any]] = []
-        self.selection_history: List[Tuple[str, float]] = []
+        self.generations: List[List[Variant]] = []
+        self.best_ever: Optional[Variant] = None
+        self.statistics: List[Dict[str, float]] = []
+    
+    def add_generation(self, variants: List[Variant]):
+        """Add a new generation"""
+        self.generations.append(variants)
         
-    def evaluate_variant(
-        self,
-        variant: Variant,
-        life_ok: bool,
-        metrics: Dict[str, float]
-    ) -> float:
+        # Update best ever
+        if variants:
+            gen_best = max(variants, key=lambda v: v.fitness_score)
+            if self.best_ever is None or gen_best.fitness_score > self.best_ever.fitness_score:
+                self.best_ever = gen_best
+        
+        # Compute statistics
+        if variants:
+            stats = {
+                "generation": len(self.generations) - 1,
+                "population_size": len(variants),
+                "mean_fitness": sum(v.fitness_score for v in variants) / len(variants),
+                "max_fitness": max(v.fitness_score for v in variants),
+                "min_fitness": min(v.fitness_score for v in variants),
+                "survival_rate": sum(1 for v in variants if v.life_ok) / len(variants),
+                "mean_phi": sum(v.caos_phi for v in variants) / len(variants),
+                "mean_sr": sum(v.sr for v in variants) / len(variants),
+                "mean_G": sum(v.G for v in variants) / len(variants)
+            }
+            self.statistics.append(stats)
+    
+    def get_trend(self, metric: str = "mean_fitness", window: int = 5) -> str:
         """
-        Evaluate a variant's fitness.
+        Get trend for a metric (improving/stable/degrading)
         
-        Args:
-            variant: Variant to evaluate
-            life_ok: Life Equation result
-            metrics: Performance metrics
+        Parameters:
+        -----------
+        metric: Metric to analyze
+        window: Number of generations to consider
         
         Returns:
-            Fitness score
+        --------
+        Trend description
         """
-        fitness = darwinian_score(
-            life_ok=life_ok,
-            caos_phi=metrics.get("phi", 0.0),
-            sr=metrics.get("sr", 0.0),
-            G=metrics.get("G", 0.0),
-            L_inf=metrics.get("L_inf", 0.0)
+        if len(self.statistics) < 2:
+            return "insufficient_data"
+        
+        recent_stats = self.statistics[-window:]
+        if len(recent_stats) < 2:
+            return "insufficient_data"
+        
+        values = [s.get(metric, 0) for s in recent_stats]
+        
+        # Check trend
+        if all(values[i] >= values[i-1] for i in range(1, len(values))):
+            return "improving"
+        elif all(values[i] <= values[i-1] for i in range(1, len(values))):
+            return "degrading"
+        else:
+            # Check if relatively stable
+            mean_val = sum(values) / len(values)
+            variance = sum((v - mean_val) ** 2 for v in values) / len(values)
+            
+            if variance < 0.001:
+                return "stable"
+            else:
+                return "oscillating"
+
+
+def quick_test():
+    """Quick test of Darwinian audit system"""
+    # Create test variants
+    variants = [
+        Variant(
+            id="v1",
+            generation=1,
+            fitness_score=0.0,  # Will be computed
+            life_ok=True,
+            caos_phi=0.7,
+            sr=0.8,
+            G=0.85,
+            L_inf=0.6,
+            mutations=["init"],
+            timestamp=time.time()
+        ),
+        Variant(
+            id="v2",
+            generation=1,
+            fitness_score=0.0,
+            life_ok=True,
+            caos_phi=0.8,
+            sr=0.75,
+            G=0.9,
+            L_inf=0.65,
+            mutations=["mut_A"],
+            parent_id="v1",
+            timestamp=time.time()
+        ),
+        Variant(
+            id="v3",
+            generation=1,
+            fitness_score=0.0,
+            life_ok=False,  # Failed Life Equation
+            caos_phi=0.9,
+            sr=0.7,
+            G=0.8,
+            L_inf=0.7,
+            mutations=["mut_B"],
+            parent_id="v1",
+            timestamp=time.time()
         )
-        
-        variant.fitness = fitness
-        
-        # Audit trail
-        self.audit_trail.append({
-            "action": "evaluate",
-            "variant_id": variant.id,
-            "life_ok": life_ok,
-            "metrics": metrics,
-            "fitness": fitness,
-            "timestamp": time.time()
-        })
-        
-        return fitness
+    ]
     
-    def select_for_promotion(self, min_fitness: float = 0.7) -> Optional[Variant]:
-        """
-        Select a variant for promotion.
-        
-        Args:
-            min_fitness: Minimum fitness for promotion
-        
-        Returns:
-            Selected variant or None
-        """
-        best = self.population.get_best()
-        
-        if best and best.fitness >= min_fitness:
-            self.selection_history.append((best.id, best.fitness))
-            
-            self.audit_trail.append({
-                "action": "select_promotion",
-                "variant_id": best.id,
-                "fitness": best.fitness,
-                "threshold": min_fitness,
-                "timestamp": time.time()
-            })
-            
-            return best
-        
-        self.audit_trail.append({
-            "action": "reject_promotion",
-            "reason": "insufficient_fitness",
-            "best_fitness": best.fitness if best else 0.0,
-            "threshold": min_fitness,
-            "timestamp": time.time()
-        })
-        
-        return None
+    # Compute fitness scores
+    for v in variants:
+        v.fitness_score = darwinian_score(v.life_ok, v.caos_phi, v.sr, v.G, v.L_inf)
     
-    def evolve_population(self) -> Optional[Variant]:
-        """Evolve the population and return new variant"""
-        new_variant = self.population.evolve()
-        
-        if new_variant:
-            self.audit_trail.append({
-                "action": "evolution",
-                "new_variant": new_variant.id,
-                "generation": self.population.generation,
-                "timestamp": time.time()
-            })
-        
-        return new_variant
+    # Test selection
+    survivors = select_survivors(variants, survival_rate=0.5)
     
-    def get_audit_report(self, limit: int = 100) -> Dict[str, Any]:
-        """Get audit report"""
-        recent_trail = self.audit_trail[-limit:] if len(self.audit_trail) > limit else self.audit_trail
-        
-        # Count actions
-        action_counts = {}
-        for entry in self.audit_trail:
-            action = entry.get("action", "unknown")
-            action_counts[action] = action_counts.get(action, 0) + 1
-        
-        return {
-            "total_actions": len(self.audit_trail),
-            "action_counts": action_counts,
-            "recent_trail": recent_trail,
-            "population_stats": self.population.get_stats(),
-            "selection_history": self.selection_history[-10:]
-        }
+    # Test tournament
+    winners = tournament_selection(variants, tournament_size=2, n_winners=1)
     
-    def rollback(self, generations: int = 1) -> bool:
-        """
-        Rollback evolution by N generations.
-        
-        Args:
-            generations: Number of generations to rollback
-        
-        Returns:
-            True if successful
-        """
-        target_gen = max(0, self.population.generation - generations)
-        
-        # Remove variants from newer generations
-        self.population.variants = [
-            v for v in self.population.variants
-            if v.generation <= target_gen
-        ]
-        
-        self.population.generation = target_gen
-        
-        self.audit_trail.append({
-            "action": "rollback",
-            "generations": generations,
-            "new_generation": target_gen,
-            "timestamp": time.time()
-        })
-        
-        return True
+    # Test evolution tracker
+    tracker = EvolutionTracker()
+    tracker.add_generation(variants)
+    
+    # Test mutation impact
+    impact = mutation_impact_analysis(variants[1], variants[0])
+    
+    # Test fitness pressure
+    pressure_early = fitness_pressure(10)
+    pressure_late = fitness_pressure(90)
+    
+    return {
+        "variant_count": len(variants),
+        "v3_fitness": variants[2].fitness_score,  # Should be 0 (life_ok=False)
+        "survivors": len(survivors),
+        "best_fitness": max(v.fitness_score for v in variants),
+        "tournament_winner": winners[0].id if winners else None,
+        "fitness_improvement": impact["improvement"],
+        "pressure_early": pressure_early,
+        "pressure_late": pressure_late,
+        "trend": tracker.get_trend("mean_fitness")
+    }
+
+
+if __name__ == "__main__":
+    result = quick_test()
+    print("Darwinian Audit Test:")
+    print(f"  Variants: {result['variant_count']}")
+    print(f"  V3 fitness (life_ok=False): {result['v3_fitness']}")
+    print(f"  Survivors: {result['survivors']}")
+    print(f"  Best fitness: {result['best_fitness']:.3f}")
+    print(f"  Tournament winner: {result['tournament_winner']}")
+    print(f"  Fitness improved: {result['fitness_improvement']}")
+    print(f"  Selection pressure: early={result['pressure_early']:.2f}, late={result['pressure_late']:.2f}")
+    print(f"  Trend: {result['trend']}")

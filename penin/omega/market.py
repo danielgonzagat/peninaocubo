@@ -1,24 +1,10 @@
 """
-Cognitive Marketplace - Internal Resource Allocation
-=====================================================
-
-Implements internal marketplace for cognitive resources (CPU time, memory, tokens).
-Uses simple matching algorithm with price discovery.
+Cognitive Marketplace - Internal resource allocation with Ω-tokens
+Implements matching between resource needs and offers
 """
 
 from dataclasses import dataclass
 from typing import List, Dict, Any, Tuple, Optional
-from enum import Enum
-import time
-
-
-class ResourceType(Enum):
-    """Types of cognitive resources"""
-    CPU_TIME = "cpu_time"
-    MEMORY = "memory"
-    TOKENS = "tokens"
-    NEURONS = "neurons"
-    BANDWIDTH = "bandwidth"
 
 
 @dataclass
@@ -28,12 +14,7 @@ class Need:
     resource: str
     qty: float
     max_price: float
-    priority: int = 5  # 1-10, higher is more important
-    timestamp: float = None
-    
-    def __post_init__(self):
-        if self.timestamp is None:
-            self.timestamp = time.time()
+    priority: float = 1.0
 
 
 @dataclass
@@ -43,279 +24,267 @@ class Offer:
     resource: str
     qty: float
     price: float
-    min_qty: float = 0.0  # Minimum quantity to sell
-    timestamp: float = None
-    
-    def __post_init__(self):
-        if self.timestamp is None:
-            self.timestamp = time.time()
+    quality: float = 1.0
 
 
 @dataclass
 class Trade:
-    """Executed trade record"""
-    need: Need
-    offer: Offer
+    """Completed trade record"""
+    buyer: str
+    seller: str
+    resource: str
     qty: float
     price: float
-    timestamp: float = None
-    
-    def __post_init__(self):
-        if self.timestamp is None:
-            self.timestamp = time.time()
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "buyer": self.need.agent,
-            "seller": self.offer.agent,
-            "resource": self.need.resource,
-            "qty": self.qty,
-            "price": self.price,
-            "total_cost": self.qty * self.price,
-            "timestamp": self.timestamp
-        }
+    timestamp: float = 0.0
 
 
 class InternalMarket:
-    """Simple internal market with price discovery"""
+    """
+    Internal cognitive marketplace for resource allocation
+    Resources can be: CPU time, memory, attention slots, inference tokens, etc.
+    """
     
     def __init__(self):
-        self.trade_history: List[Trade] = []
+        self.trades_history: List[Trade] = []
         self.price_history: Dict[str, List[float]] = {}
-        
-    def match(self, needs: List[Need], offers: List[Offer]) -> List[Trade]:
+    
+    def match(self, needs: List[Need], offers: List[Offer]) -> List[Tuple[Need, Offer, float]]:
         """
-        Match needs with offers using simple greedy algorithm.
+        Match needs with offers using simple price-priority matching
         
-        Args:
-            needs: List of resource needs
-            offers: List of resource offers
+        Parameters:
+        -----------
+        needs: List of resource needs
+        offers: List of resource offers
         
         Returns:
-            List of executed trades
+        --------
+        List of (need, offer, quantity) tuples for matched trades
         """
         trades = []
         
-        # Sort needs by priority (high to low) then by max_price (high to low)
-        needs = sorted(needs, key=lambda n: (-n.priority, -n.max_price))
+        # Sort needs by priority (descending) and max_price (descending)
+        sorted_needs = sorted(needs, key=lambda n: (-n.priority, -n.max_price))
         
-        # Process each need
-        for need in needs:
-            if need.qty <= 0:
-                continue
-                
-            # Find matching offers
-            matching_offers = [
-                o for o in offers
+        # Sort offers by price (ascending) and quality (descending)
+        sorted_offers = sorted(offers, key=lambda o: (o.price, -o.quality))
+        
+        # Match greedily
+        for need in sorted_needs:
+            # Find compatible offers
+            compatible = [
+                o for o in sorted_offers
                 if o.resource == need.resource
                 and o.price <= need.max_price
                 and o.qty > 0
             ]
             
-            if not matching_offers:
+            if not compatible:
                 continue
             
-            # Sort offers by price (low to high)
-            matching_offers = sorted(matching_offers, key=lambda o: o.price)
+            # Take the best offer (already sorted by price/quality)
+            offer = compatible[0]
             
-            # Execute trades with best offers first
-            for offer in matching_offers:
-                if need.qty <= 0:
-                    break
-                    
-                # Calculate trade quantity
-                trade_qty = min(need.qty, offer.qty)
+            # Determine trade quantity
+            qty = min(need.qty, offer.qty)
+            
+            if qty > 0:
+                trades.append((need, offer, qty))
+                need.qty -= qty
+                offer.qty -= qty
                 
-                # Check minimum quantity constraint
-                if trade_qty < offer.min_qty:
-                    continue
-                
-                # Execute trade
+                # Record trade
                 trade = Trade(
-                    need=need,
-                    offer=offer,
-                    qty=trade_qty,
+                    buyer=need.agent,
+                    seller=offer.agent,
+                    resource=need.resource,
+                    qty=qty,
                     price=offer.price
                 )
-                trades.append(trade)
+                self.trades_history.append(trade)
                 
-                # Update quantities
-                need.qty -= trade_qty
-                offer.qty -= trade_qty
-                
-                # Record price for history
+                # Update price history
                 if need.resource not in self.price_history:
                     self.price_history[need.resource] = []
                 self.price_history[need.resource].append(offer.price)
-        
-        # Store trades in history
-        self.trade_history.extend(trades)
-        
-        # Keep history bounded
-        if len(self.trade_history) > 10000:
-            self.trade_history = self.trade_history[-5000:]
         
         return trades
     
     def get_market_price(self, resource: str, window: int = 10) -> Optional[float]:
         """
-        Get recent average price for a resource.
+        Get current market price for a resource
         
-        Args:
-            resource: Resource type
-            window: Number of recent trades to average
+        Parameters:
+        -----------
+        resource: Resource name
+        window: Number of recent trades to consider
         
         Returns:
-            Average price or None if no history
+        --------
+        Average price from recent trades, or None if no history
         """
         if resource not in self.price_history:
             return None
-            
-        prices = self.price_history[resource][-window:]
-        if not prices:
+        
+        history = self.price_history[resource]
+        if not history:
             return None
-            
-        return sum(prices) / len(prices)
+        
+        recent = history[-window:] if len(history) > window else history
+        return sum(recent) / len(recent)
     
-    def get_stats(self) -> Dict[str, Any]:
-        """Get market statistics"""
-        total_volume = sum(t.qty * t.price for t in self.trade_history)
+    def compute_liquidity(self, resource: str) -> float:
+        """
+        Compute liquidity score for a resource (0=illiquid, 1=very liquid)
         
-        resource_volumes = {}
-        for trade in self.trade_history:
-            if trade.need.resource not in resource_volumes:
-                resource_volumes[trade.need.resource] = 0
-            resource_volumes[trade.need.resource] += trade.qty * trade.price
+        Parameters:
+        -----------
+        resource: Resource name
         
-        return {
-            "total_trades": len(self.trade_history),
-            "total_volume": total_volume,
-            "resource_volumes": resource_volumes,
-            "avg_prices": {
-                r: self.get_market_price(r)
-                for r in self.price_history.keys()
-            }
-        }
-
-
-class MarketMaker:
-    """
-    Automated market maker for providing liquidity.
-    Sets prices based on supply/demand dynamics.
-    """
+        Returns:
+        --------
+        Liquidity score based on trade frequency
+        """
+        if resource not in self.price_history:
+            return 0.0
+        
+        trade_count = len(self.price_history[resource])
+        
+        # Simple liquidity metric: saturates at 100 trades
+        return min(1.0, trade_count / 100.0)
     
-    def __init__(self, base_prices: Dict[str, float] = None):
-        self.base_prices = base_prices or {
-            ResourceType.CPU_TIME.value: 1.0,
-            ResourceType.MEMORY.value: 0.5,
-            ResourceType.TOKENS.value: 0.1,
-            ResourceType.NEURONS.value: 2.0,
-            ResourceType.BANDWIDTH.value: 0.3,
-        }
-        self.price_adjustments = {r: 1.0 for r in self.base_prices}
-        self.inventory = {r: 100.0 for r in self.base_prices}  # Initial inventory
+    def price_discovery(
+        self,
+        resource: str,
+        base_price: float,
+        demand_supply_ratio: float
+    ) -> float:
+        """
+        Discover new price based on demand/supply dynamics
         
-    def update_prices(self, trades: List[Trade]):
-        """Update prices based on recent trades"""
-        # Count buy/sell pressure for each resource
-        buy_pressure = {}
-        sell_pressure = {}
+        Parameters:
+        -----------
+        resource: Resource name
+        base_price: Base price for the resource
+        demand_supply_ratio: Ratio of total demand to total supply
         
-        for trade in trades:
-            resource = trade.need.resource
-            if resource not in buy_pressure:
-                buy_pressure[resource] = 0
-                sell_pressure[resource] = 0
+        Returns:
+        --------
+        Adjusted price based on market dynamics
+        """
+        # Get historical market price if available
+        market_price = self.get_market_price(resource)
+        
+        if market_price is not None:
+            # Blend with historical price
+            base_price = 0.7 * base_price + 0.3 * market_price
+        
+        # Adjust based on demand/supply
+        # High demand (ratio > 1) increases price
+        # Low demand (ratio < 1) decreases price
+        adjustment = 1.0 + 0.2 * (demand_supply_ratio - 1.0)
+        adjustment = max(0.5, min(2.0, adjustment))  # Cap adjustment
+        
+        return base_price * adjustment
+    
+    def clear_market(
+        self,
+        needs: List[Need],
+        offers: List[Offer],
+        iterations: int = 3
+    ) -> Dict[str, Any]:
+        """
+        Run multiple rounds of market clearing with price discovery
+        
+        Parameters:
+        -----------
+        needs: Initial needs
+        offers: Initial offers
+        iterations: Number of clearing rounds
+        
+        Returns:
+        --------
+        Market clearing results with statistics
+        """
+        total_trades = []
+        unmatched_needs = list(needs)
+        unmatched_offers = list(offers)
+        
+        for round_num in range(iterations):
+            # Match current needs and offers
+            trades = self.match(unmatched_needs, unmatched_offers)
+            total_trades.extend(trades)
             
-            buy_pressure[resource] += trade.qty
-            sell_pressure[resource] += trade.qty
-        
-        # Adjust prices based on pressure
-        for resource in self.base_prices:
-            if resource in buy_pressure:
-                # More buying than selling -> increase price
-                ratio = buy_pressure[resource] / max(sell_pressure[resource], 1.0)
-                adjustment = 1.0 + 0.1 * (ratio - 1.0)  # 10% adjustment per unit imbalance
-                adjustment = max(0.5, min(2.0, adjustment))  # Cap adjustments
-                self.price_adjustments[resource] *= adjustment
+            # Update unmatched lists
+            unmatched_needs = [n for n in unmatched_needs if n.qty > 0]
+            unmatched_offers = [o for o in unmatched_offers if o.qty > 0]
+            
+            # Price discovery for next round
+            for resource in set(n.resource for n in unmatched_needs):
+                demand = sum(n.qty for n in unmatched_needs if n.resource == resource)
+                supply = sum(o.qty for o in unmatched_offers if o.resource == resource)
                 
-                # Keep adjustments bounded
-                self.price_adjustments[resource] = max(0.1, min(10.0, self.price_adjustments[resource]))
-    
-    def get_price(self, resource: str) -> float:
-        """Get current price for a resource"""
-        base = self.base_prices.get(resource, 1.0)
-        adjustment = self.price_adjustments.get(resource, 1.0)
-        return base * adjustment
-    
-    def create_offers(self, resources: List[str] = None) -> List[Offer]:
-        """Create market maker offers for liquidity"""
-        if resources is None:
-            resources = list(self.base_prices.keys())
+                if supply > 0:
+                    ratio = demand / supply
+                    base_price = self.get_market_price(resource) or 1.0
+                    new_price = self.price_discovery(resource, base_price, ratio)
+                    
+                    # Update offer prices for next round
+                    for offer in unmatched_offers:
+                        if offer.resource == resource:
+                            offer.price = new_price
         
-        offers = []
-        for resource in resources:
-            if self.inventory.get(resource, 0) > 0:
-                offers.append(Offer(
-                    agent="market_maker",
-                    resource=resource,
-                    qty=min(10.0, self.inventory[resource]),
-                    price=self.get_price(resource),
-                    min_qty=0.1
-                ))
-        
-        return offers
-    
-    def restock(self, resource: str, qty: float):
-        """Restock inventory"""
-        if resource not in self.inventory:
-            self.inventory[resource] = 0
-        self.inventory[resource] += qty
-
-
-class CognitiveMarketplace:
-    """High-level marketplace orchestrator"""
-    
-    def __init__(self):
-        self.market = InternalMarket()
-        self.maker = MarketMaker()
-        self.pending_needs: List[Need] = []
-        self.pending_offers: List[Offer] = []
-        
-    def submit_need(self, need: Need):
-        """Submit a resource need"""
-        self.pending_needs.append(need)
-        
-    def submit_offer(self, offer: Offer):
-        """Submit a resource offer"""
-        self.pending_offers.append(offer)
-        
-    def execute_round(self) -> Dict[str, Any]:
-        """Execute a trading round"""
-        # Add market maker offers for liquidity
-        maker_offers = self.maker.create_offers()
-        all_offers = self.pending_offers + maker_offers
-        
-        # Execute trades
-        trades = self.market.match(self.pending_needs, all_offers)
-        
-        # Update market maker prices
-        self.maker.update_prices(trades)
-        
-        # Clear pending orders
-        self.pending_needs = [n for n in self.pending_needs if n.qty > 0]
-        self.pending_offers = [o for o in self.pending_offers if o.qty > 0]
+        # Compute statistics
+        total_volume = sum(qty for _, _, qty in total_trades)
+        total_value = sum(offer.price * qty for _, offer, qty in total_trades)
+        fulfillment_rate = 1.0 - (len(unmatched_needs) / len(needs)) if needs else 1.0
         
         return {
-            "trades": [t.to_dict() for t in trades],
-            "unfilled_needs": len(self.pending_needs),
-            "remaining_offers": len(self.pending_offers),
-            "market_stats": self.market.get_stats()
+            "trades": total_trades,
+            "unmatched_needs": unmatched_needs,
+            "unmatched_offers": unmatched_offers,
+            "total_volume": total_volume,
+            "total_value": total_value,
+            "fulfillment_rate": fulfillment_rate,
+            "rounds": iterations
         }
+
+
+def quick_test():
+    """Quick test of marketplace"""
+    market = InternalMarket()
     
-    def get_price_quote(self, resource: str) -> float:
-        """Get current price quote for a resource"""
-        market_price = self.market.get_market_price(resource)
-        if market_price:
-            return market_price
-        return self.maker.get_price(resource)
+    # Create some needs
+    needs = [
+        Need("agent-1", "cpu", 10.0, 2.0, priority=2.0),
+        Need("agent-2", "memory", 5.0, 1.5, priority=1.0),
+        Need("agent-3", "cpu", 8.0, 1.8, priority=1.5),
+    ]
+    
+    # Create some offers
+    offers = [
+        Offer("provider-1", "cpu", 15.0, 1.5, quality=0.9),
+        Offer("provider-2", "memory", 10.0, 1.0, quality=0.95),
+        Offer("provider-3", "cpu", 5.0, 1.7, quality=0.85),
+    ]
+    
+    # Run market clearing
+    result = market.clear_market(needs, offers, iterations=2)
+    
+    return {
+        "trades_count": len(result["trades"]),
+        "total_volume": result["total_volume"],
+        "fulfillment_rate": result["fulfillment_rate"],
+        "cpu_price": market.get_market_price("cpu"),
+        "memory_price": market.get_market_price("memory")
+    }
+
+
+if __name__ == "__main__":
+    result = quick_test()
+    print("Cognitive Marketplace Test:")
+    print(f"  Trades executed: {result['trades_count']}")
+    print(f"  Total volume: {result['total_volume']:.1f}")
+    print(f"  Fulfillment rate: {result['fulfillment_rate']:.1%}")
+    print(f"  CPU market price: {result['cpu_price']:.2f}" if result['cpu_price'] else "  CPU: no price history")
+    print(f"  Memory market price: {result['memory_price']:.2f}" if result['memory_price'] else "  Memory: no price history")

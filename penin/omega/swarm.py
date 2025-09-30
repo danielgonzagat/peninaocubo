@@ -1,9 +1,6 @@
 """
-Swarm Cognitive - Local Gossip Protocol
-========================================
-
-Implements local gossip/heartbeat protocol for swarm intelligence.
-Uses SQLite for persistence and aggregates global state.
+Swarm Cognitive - Gossip protocol for distributed cognition
+Local SQLite-based gossip between logical nodes with heartbeat aggregation
 """
 
 import os
@@ -13,360 +10,319 @@ import random
 import json
 from pathlib import Path
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, asdict
 
 
+# Root directory for PENIN state
 ROOT = Path(os.getenv("PENIN_ROOT", Path.home() / ".penin_omega"))
 DB = ROOT / "state" / "heartbeats.db"
 DB.parent.mkdir(parents=True, exist_ok=True)
 
 
-@dataclass
-class Heartbeat:
-    """Heartbeat data from a swarm node"""
-    node: str
-    timestamp: float
-    phi: float  # CAOS⁺ value
-    sr: float   # SR-Ω∞ value
-    g: float    # Global coherence
-    health: float  # Node health
-    metadata: Dict[str, Any] = None
-    
-    def to_dict(self) -> Dict[str, Any]:
-        d = asdict(self)
-        if self.metadata is None:
-            d["metadata"] = {}
-        return d
-
-
-def _init_db():
-    """Initialize database schema"""
+def _init():
+    """Initialize the heartbeat database"""
     with sqlite3.connect(DB) as con:
         con.execute("""
-            CREATE TABLE IF NOT EXISTS heartbeats (
+            CREATE TABLE IF NOT EXISTS hb (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 node TEXT NOT NULL,
-                timestamp REAL NOT NULL,
-                phi REAL,
-                sr REAL,
-                g REAL,
-                health REAL,
-                payload TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                ts REAL NOT NULL,
+                payload TEXT NOT NULL
             )
         """)
-        con.execute("""
-            CREATE INDEX IF NOT EXISTS idx_timestamp 
-            ON heartbeats(timestamp DESC)
-        """)
-        con.execute("""
-            CREATE INDEX IF NOT EXISTS idx_node 
-            ON heartbeats(node)
-        """)
+        # Create index for faster queries
+        con.execute("CREATE INDEX IF NOT EXISTS idx_ts ON hb(ts)")
+        con.execute("CREATE INDEX IF NOT EXISTS idx_node ON hb(node)")
         con.commit()
 
 
-def heartbeat(node: str, payload: Dict[str, Any]) -> bool:
+def heartbeat(node: str, payload: dict) -> None:
     """
-    Record a heartbeat from a node.
+    Record a heartbeat from a node
     
-    Args:
-        node: Node identifier
-        payload: Metrics payload (should contain phi, sr, g, health)
-    
-    Returns:
-        True if successfully recorded
+    Parameters:
+    -----------
+    node: Node identifier
+    payload: Metrics/state dictionary
     """
-    _init_db()
-    
-    try:
-        hb = Heartbeat(
-            node=node,
-            timestamp=time.time(),
-            phi=float(payload.get("phi", 0.0)),
-            sr=float(payload.get("sr", 0.0)),
-            g=float(payload.get("g", 0.0)),
-            health=float(payload.get("health", 1.0)),
-            metadata=payload.get("metadata", {})
+    _init()
+    with sqlite3.connect(DB) as con:
+        con.execute(
+            "INSERT INTO hb(node, ts, payload) VALUES(?, ?, ?)",
+            (node, time.time(), json.dumps(payload))
         )
-        
-        with sqlite3.connect(DB) as con:
-            con.execute("""
-                INSERT INTO heartbeats(node, timestamp, phi, sr, g, health, payload)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                hb.node, hb.timestamp, hb.phi, hb.sr, hb.g, hb.health,
-                json.dumps(hb.to_dict())
-            ))
-            con.commit()
-        
-        return True
-    except Exception as e:
-        print(f"Heartbeat error: {e}")
-        return False
+        con.commit()
 
 
 def sample_global_state(window_s: float = 60.0) -> Dict[str, float]:
     """
-    Sample and aggregate global state from recent heartbeats.
+    Sample and aggregate global state from recent heartbeats
     
-    Args:
-        window_s: Time window in seconds
+    Parameters:
+    -----------
+    window_s: Time window in seconds to consider
     
     Returns:
-        Aggregated metrics dict
+    --------
+    Aggregated metrics dictionary
     """
-    _init_db()
-    
+    _init()
     t0 = time.time() - window_s
     
     with sqlite3.connect(DB) as con:
-        cur = con.execute("""
-            SELECT phi, sr, g, health, payload
-            FROM heartbeats
-            WHERE timestamp >= ?
-            ORDER BY timestamp DESC
-        """, (t0,))
-        
-        rows = cur.fetchall()
+        cur = con.execute(
+            "SELECT payload FROM hb WHERE ts >= ?",
+            (t0,)
+        )
+        data = [json.loads(r[0]) for r in cur.fetchall()]
     
-    if not rows:
-        return {
-            "phi_avg": 0.0,
-            "sr_avg": 0.0,
-            "g_avg": 0.0,
-            "health_avg": 0.0,
-            "node_count": 0,
-            "window_s": window_s
-        }
+    if not data:
+        return {}
     
-    # Aggregate metrics
-    phi_vals = [r[0] for r in rows if r[0] is not None]
-    sr_vals = [r[1] for r in rows if r[1] is not None]
-    g_vals = [r[2] for r in rows if r[2] is not None]
-    health_vals = [r[3] for r in rows if r[3] is not None]
+    # Simple aggregation (mean of numeric values)
+    agg = {}
+    counts = {}
     
-    def safe_avg(vals: List[float]) -> float:
-        return sum(vals) / len(vals) if vals else 0.0
+    for payload in data:
+        for key, value in payload.items():
+            try:
+                val = float(value)
+                agg[key] = agg.get(key, 0.0) + val
+                counts[key] = counts.get(key, 0) + 1
+            except (ValueError, TypeError):
+                pass
     
-    # Non-compensatory: use harmonic mean for critical metrics
-    def harmonic_mean(vals: List[float]) -> float:
-        if not vals or any(v <= 0 for v in vals):
-            return 0.0
-        return len(vals) / sum(1.0 / v for v in vals)
+    # Compute means
+    result = {}
+    for key in agg:
+        if counts[key] > 0:
+            result[key] = agg[key] / counts[key]
     
-    return {
-        "phi_avg": safe_avg(phi_vals),
-        "phi_harmonic": harmonic_mean(phi_vals),
-        "sr_avg": safe_avg(sr_vals),
-        "sr_harmonic": harmonic_mean(sr_vals),
-        "g_avg": safe_avg(g_vals),
-        "g_harmonic": harmonic_mean(g_vals),
-        "health_avg": safe_avg(health_vals),
-        "health_min": min(health_vals) if health_vals else 0.0,
-        "node_count": len(set(r[4] for r in rows)),  # Unique nodes
-        "sample_count": len(rows),
-        "window_s": window_s
-    }
+    return result
 
 
 def get_node_history(node: str, limit: int = 100) -> List[Dict[str, Any]]:
     """
-    Get heartbeat history for a specific node.
+    Get heartbeat history for a specific node
     
-    Args:
-        node: Node identifier
-        limit: Maximum number of records
+    Parameters:
+    -----------
+    node: Node identifier
+    limit: Maximum number of records to return
     
     Returns:
-        List of heartbeat records
+    --------
+    List of heartbeat records
     """
-    _init_db()
-    
+    _init()
     with sqlite3.connect(DB) as con:
-        cur = con.execute("""
-            SELECT timestamp, phi, sr, g, health, payload
-            FROM heartbeats
-            WHERE node = ?
-            ORDER BY timestamp DESC
-            LIMIT ?
-        """, (node, limit))
-        
-        rows = cur.fetchall()
-    
-    return [
-        {
-            "timestamp": r[0],
-            "phi": r[1],
-            "sr": r[2],
-            "g": r[3],
-            "health": r[4],
-            "payload": json.loads(r[5]) if r[5] else {}
-        }
-        for r in rows
-    ]
+        cur = con.execute(
+            "SELECT ts, payload FROM hb WHERE node = ? ORDER BY ts DESC LIMIT ?",
+            (node, limit)
+        )
+        return [
+            {"ts": r[0], "payload": json.loads(r[1])}
+            for r in cur.fetchall()
+        ]
 
 
-def detect_anomalies(threshold_stddev: float = 2.0) -> Dict[str, Any]:
+def gossip_consensus(metric: str, window_s: float = 60.0, threshold: float = 0.1) -> Optional[float]:
     """
-    Detect anomalies in swarm metrics.
+    Compute consensus value for a metric using gossip protocol
     
-    Args:
-        threshold_stddev: Number of standard deviations for anomaly
+    Parameters:
+    -----------
+    metric: Metric name to compute consensus for
+    window_s: Time window for consideration
+    threshold: Maximum standard deviation for consensus
     
     Returns:
-        Dict with anomaly information
+    --------
+    Consensus value if nodes agree within threshold, None otherwise
     """
-    _init_db()
-    
-    # Get recent data (last 5 minutes)
-    window_s = 300
+    _init()
     t0 = time.time() - window_s
     
     with sqlite3.connect(DB) as con:
-        cur = con.execute("""
-            SELECT node, phi, sr, g, health
-            FROM heartbeats
-            WHERE timestamp >= ?
-        """, (t0,))
-        
-        rows = cur.fetchall()
+        cur = con.execute(
+            "SELECT payload FROM hb WHERE ts >= ?",
+            (t0,)
+        )
+        data = [json.loads(r[0]) for r in cur.fetchall()]
     
-    if len(rows) < 10:
-        return {"anomalies": [], "message": "Insufficient data"}
+    if not data:
+        return None
     
-    # Calculate statistics
-    import statistics
+    # Collect metric values
+    values = []
+    for payload in data:
+        if metric in payload:
+            try:
+                values.append(float(payload[metric]))
+            except (ValueError, TypeError):
+                pass
     
-    phi_vals = [r[1] for r in rows if r[1] is not None]
-    sr_vals = [r[2] for r in rows if r[2] is not None]
-    g_vals = [r[3] for r in rows if r[3] is not None]
-    health_vals = [r[4] for r in rows if r[4] is not None]
+    if len(values) < 2:
+        return values[0] if values else None
     
-    anomalies = []
+    # Compute mean and standard deviation
+    mean_val = sum(values) / len(values)
+    variance = sum((x - mean_val) ** 2 for x in values) / len(values)
+    std_dev = variance ** 0.5
     
-    for metric_name, vals in [
-        ("phi", phi_vals),
-        ("sr", sr_vals),
-        ("g", g_vals),
-        ("health", health_vals)
-    ]:
-        if len(vals) < 2:
-            continue
-            
-        mean = statistics.mean(vals)
-        stddev = statistics.stdev(vals)
-        
-        if stddev > 0:
-            for i, v in enumerate(vals):
-                z_score = abs(v - mean) / stddev
-                if z_score > threshold_stddev:
-                    anomalies.append({
-                        "metric": metric_name,
-                        "value": v,
-                        "z_score": z_score,
-                        "node": rows[i][0] if i < len(rows) else "unknown"
-                    })
+    # Check if consensus is reached
+    if std_dev <= threshold:
+        return mean_val
     
-    return {
-        "anomalies": anomalies,
-        "stats": {
-            "phi": {"mean": statistics.mean(phi_vals), "stddev": statistics.stdev(phi_vals)} if len(phi_vals) > 1 else {},
-            "sr": {"mean": statistics.mean(sr_vals), "stddev": statistics.stdev(sr_vals)} if len(sr_vals) > 1 else {},
-            "g": {"mean": statistics.mean(g_vals), "stddev": statistics.stdev(g_vals)} if len(g_vals) > 1 else {},
-            "health": {"mean": statistics.mean(health_vals), "stddev": statistics.stdev(health_vals)} if len(health_vals) > 1 else {},
-        }
-    }
+    return None  # No consensus
+
+
+def broadcast_update(update: Dict[str, Any], ttl: int = 3) -> None:
+    """
+    Broadcast an update to the swarm (simulated via DB)
+    
+    Parameters:
+    -----------
+    update: Update dictionary to broadcast
+    ttl: Time-to-live (hops) for the update
+    """
+    _init()
+    
+    # Add metadata
+    update["_broadcast"] = True
+    update["_ttl"] = ttl
+    update["_origin"] = f"node-{os.getpid()}"
+    update["_ts"] = time.time()
+    
+    # Store as special broadcast entry
+    with sqlite3.connect(DB) as con:
+        con.execute(
+            "INSERT INTO hb(node, ts, payload) VALUES(?, ?, ?)",
+            ("_broadcast", time.time(), json.dumps(update))
+        )
+        con.commit()
+
+
+def receive_broadcasts(since_ts: float = None) -> List[Dict[str, Any]]:
+    """
+    Receive broadcast updates from the swarm
+    
+    Parameters:
+    -----------
+    since_ts: Timestamp to receive broadcasts from (default: last 60s)
+    
+    Returns:
+    --------
+    List of broadcast updates
+    """
+    _init()
+    
+    if since_ts is None:
+        since_ts = time.time() - 60.0
+    
+    with sqlite3.connect(DB) as con:
+        cur = con.execute(
+            "SELECT payload FROM hb WHERE node = '_broadcast' AND ts >= ? ORDER BY ts",
+            (since_ts,)
+        )
+        return [json.loads(r[0]) for r in cur.fetchall()]
+
+
+def compute_swarm_coherence(window_s: float = 60.0) -> float:
+    """
+    Compute overall swarm coherence (how aligned nodes are)
+    
+    Parameters:
+    -----------
+    window_s: Time window to consider
+    
+    Returns:
+    --------
+    Coherence score [0, 1] where 1 is perfect alignment
+    """
+    state = sample_global_state(window_s)
+    
+    if not state:
+        return 0.0
+    
+    # Check key metrics for coherence
+    coherence_metrics = ["phi", "sr", "G", "alpha_eff"]
+    coherence_scores = []
+    
+    for metric in coherence_metrics:
+        consensus = gossip_consensus(metric, window_s, threshold=0.1)
+        if consensus is not None and metric in state:
+            # Score based on how close consensus is to mean
+            diff = abs(consensus - state[metric])
+            score = max(0, 1.0 - diff)
+            coherence_scores.append(score)
+    
+    if not coherence_scores:
+        return 0.0
+    
+    return sum(coherence_scores) / len(coherence_scores)
 
 
 def cleanup_old_heartbeats(days: int = 7) -> int:
     """
-    Clean up old heartbeat records.
+    Clean up old heartbeat records
     
-    Args:
-        days: Keep records from last N days
+    Parameters:
+    -----------
+    days: Number of days to keep
     
     Returns:
-        Number of deleted records
+    --------
+    Number of records deleted
     """
-    _init_db()
-    
+    _init()
     cutoff = time.time() - (days * 24 * 3600)
     
     with sqlite3.connect(DB) as con:
-        cur = con.execute("""
-            DELETE FROM heartbeats
-            WHERE timestamp < ?
-        """, (cutoff,))
+        cur = con.execute("DELETE FROM hb WHERE ts < ?", (cutoff,))
         deleted = cur.rowcount
         con.commit()
     
     return deleted
 
 
-class SwarmOrchestrator:
-    """High-level swarm orchestration"""
+def quick_test():
+    """Quick test of swarm system"""
+    # Send some heartbeats
+    nodes = ["node-A", "node-B", "node-C"]
     
-    def __init__(self, node_id: str = None):
-        self.node_id = node_id or f"node-{os.getpid()}"
-        _init_db()
-    
-    def emit_heartbeat(self, metrics: Dict[str, float]) -> bool:
-        """Emit heartbeat with current metrics"""
-        return heartbeat(self.node_id, metrics)
-    
-    def get_consensus(self, window_s: float = 60.0) -> Dict[str, Any]:
-        """Get swarm consensus metrics"""
-        state = sample_global_state(window_s)
-        
-        # Consensus requires minimum participation
-        if state["node_count"] < 2:
-            return {
-                "consensus": False,
-                "reason": "Insufficient nodes",
-                "state": state
-            }
-        
-        # Check metric convergence (low variance = consensus)
-        anomalies = detect_anomalies(threshold_stddev=1.5)
-        
-        return {
-            "consensus": len(anomalies.get("anomalies", [])) == 0,
-            "anomaly_count": len(anomalies.get("anomalies", [])),
-            "state": state,
-            "stats": anomalies.get("stats", {})
+    for i, node in enumerate(nodes):
+        payload = {
+            "phi": 0.7 + i * 0.05,
+            "sr": 0.85 - i * 0.02,
+            "G": 0.9,
+            "alpha_eff": 0.001 * (1 + i * 0.1)
         }
+        heartbeat(node, payload)
     
-    def should_promote(self, min_nodes: int = 3, min_consensus: float = 0.8) -> bool:
-        """
-        Decide if swarm agrees on promotion.
-        
-        Args:
-            min_nodes: Minimum participating nodes
-            min_consensus: Minimum consensus metrics
-        
-        Returns:
-            True if swarm agrees on promotion
-        """
-        consensus = self.get_consensus()
-        
-        if not consensus["consensus"]:
-            return False
-        
-        state = consensus["state"]
-        
-        # Non-compensatory checks
-        if state["node_count"] < min_nodes:
-            return False
-        
-        # All critical metrics must be above threshold
-        if state["phi_harmonic"] < min_consensus:
-            return False
-        if state["sr_harmonic"] < min_consensus:
-            return False
-        if state["g_harmonic"] < min_consensus:
-            return False
-        if state["health_min"] < 0.7:
-            return False
-        
-        return True
+    # Sample global state
+    state = sample_global_state(window_s=60.0)
+    
+    # Check consensus
+    phi_consensus = gossip_consensus("phi", window_s=60.0)
+    
+    # Compute coherence
+    coherence = compute_swarm_coherence(window_s=60.0)
+    
+    # Broadcast test
+    broadcast_update({"action": "test", "value": 42})
+    broadcasts = receive_broadcasts()
+    
+    return {
+        "state": state,
+        "phi_consensus": phi_consensus,
+        "coherence": coherence,
+        "broadcast_count": len(broadcasts)
+    }
+
+
+if __name__ == "__main__":
+    result = quick_test()
+    print(f"Swarm state: {result['state']}")
+    print(f"Phi consensus: {result['phi_consensus']:.3f}" if result['phi_consensus'] else "No consensus")
+    print(f"Swarm coherence: {result['coherence']:.3f}")
+    print(f"Broadcasts received: {result['broadcast_count']}")
