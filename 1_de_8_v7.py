@@ -1419,7 +1419,18 @@ class PeninOmegaCore:
             result["metrics"]["L∞"] = l_score
             result["metrics"]["ΔL∞"] = self.xt.delta_linf
             # Optional informational score gate from penin.omega.scoring (does not affect decision yet)
-            import importlib.util as _il
+            try:
+                from penin.omega.scoring import score_gate
+                u = max(0.0, min(1.0, self.xt.rsi))
+                s = max(0.0, min(1.0, 1.0 - self.xt.ece))
+                c = max(0.0, min(1.0, self.xt.cost))
+                l = max(0.0, min(1.0, self.xt.novelty))
+                verdict, score = score_gate(u, s, c, l, {"U": 0.35, "S": 0.35, "C": 0.2, "L": 0.1}, tau=0.6)
+                result["metrics"]["USCL_score"] = score
+                result["metrics"]["USCL_verdict"] = verdict
+            except ImportError:
+                # penin.omega.scoring not available, skip scoring
+                pass
             if _il.find_spec("penin.omega.scoring") is not None:
                 from penin.omega.scoring import score_gate
                 u = max(0.0, min(1.0, self.xt.rsi))
