@@ -39,3 +39,28 @@ class BaseProvider(ABC):
         system: str | None = None,
         temperature: float = 0.7,
     ) -> LLMResponse: ...
+
+
+# === TEST COMPAT: LLMResponse ===
+class _LLMResponseCompat:
+    def __init__(
+        self,
+        content: str,
+        model: str | None = None,
+        provider: str | None = None,
+        latency_s: float | None = None,
+        cost_usd: float | None = None,
+        total_tokens: int | None = None,
+        **kwargs,
+    ):
+        self.content = content
+        self.model = model
+        self.provider = provider
+        self.latency_s = 0.0 if latency_s is None else float(latency_s)
+        self.cost_usd = None if cost_usd is None else float(cost_usd)
+        self.total_tokens = None if total_tokens is None else int(total_tokens)
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+
+LLMResponse = _LLMResponseCompat

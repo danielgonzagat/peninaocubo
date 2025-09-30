@@ -93,7 +93,7 @@ class MultiLLMRouter:
 
         return score
 
-    @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=0.5))
+    @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=0.5), reraise=True)
     async def ask(
         self,
         messages: list[dict[str, Any]],
@@ -103,6 +103,10 @@ class MultiLLMRouter:
     ) -> LLMResponse:
         tasks = [p.chat(messages, tools=tools, system=system, temperature=temperature) for p in self.providers]
         results: list[LLMResponse] = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Budget enforcement
+        if self.cost_tracker.is_over_budget():
+            raise RuntimeError("budget exceeded")
         ok = [r for r in results if isinstance(r, LLMResponse)]
         if not ok:
             errors = [str(r) for r in results if isinstance(r, Exception)]
@@ -116,3 +120,62 @@ class MultiLLMRouter:
             self.cost_tracker.add_cost(best.cost_usd)
 
         return best
+
+
+# === TEST COMPAT: CostTracker ===
+class _CostTrackerCompat:
+    def _check_date_rollover(self):
+        # Reset diário compatível
+        today = self._time.strftime("%Y-%m-%d")
+        if self.state.get("date") != today:
+            self.state["date"] = today
+            self.state["total_cost_usd"] = 0.0
+            self.state["total_tokens"] = 0
+
+    def __init__(self, budget_usd: float = float("inf"), state_path: str | None = None):
+        import json
+        import pathlib
+        import time
+
+        self._time, self._json, self._path = time, json, pathlib
+        self.daily_budget = float(budget_usd)
+        self.state_path = state_path
+        self.state = {"date": time.strftime("%Y-%m-%d"), "total_cost_usd": 0.0, "total_tokens": 0, "by_provider": {}}
+        self._save()
+
+    def _save(self):
+        if not self.state_path:
+            return
+        p = self._path.Path(self.state_path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with open(p, "w", encoding="utf-8") as f:
+            self._json.dump(self.state, f)
+
+    def _roll(self):
+        today = self._time.strftime("%Y-%m-%d")
+        if self.state.get("date") != today:
+            self.state.update({"date": today, "total_cost_usd": 0.0, "total_tokens": 0, "by_provider": {}})
+            self._save()
+
+    def record(self, provider: str, cost_usd: float, total_tokens: int | None = None):
+        self._roll()
+        self.state["total_cost_usd"] += float(cost_usd or 0.0)
+        if total_tokens:
+            self.state["total_tokens"] += int(total_tokens)
+        k = provider or "unknown"
+        self.state["by_provider"][k] = self.state["by_provider"].get(k, 0.0) + float(cost_usd or 0.0)
+        self._save()
+
+    def add_cost(self, cost: float):
+        self.record("unknown", cost, None)
+
+    def is_over_budget(self) -> bool:
+        self._roll()
+        return float(self.state.get("total_cost_usd", 0.0)) >= float(self.daily_budget)
+
+    def remaining_budget(self) -> float:
+        self._roll()
+        return max(0.0, float(self.daily_budget) - float(self.state.get("total_cost_usd", 0.0)))
+
+
+CostTracker = _CostTrackerCompat
