@@ -161,9 +161,7 @@ def compute_caos_harmony(C: float, A: float, O: float, S: float, epsilon: float 
     return 4.0 / denominator
 
 
-def caos_gradient(
-    C: float, A: float, O: float, S: float, kappa: float, delta: float = 0.001
-) -> dict[str, float]:
+def caos_gradient(C: float, A: float, O: float, S: float, kappa: float, delta: float = 0.001) -> dict[str, float]:
     """
     Compute numerical gradient of CAOS⁺ with respect to each component.
 
@@ -230,9 +228,7 @@ class CAOSTracker:
             self.S_ema = self.alpha * S + (1 - self.alpha) * self.S_ema
 
         # Compute CAOS⁺ with EMA values
-        caos_value, details = compute_caos_plus(
-            self.C_ema, self.A_ema, self.O_ema, self.S_ema, kappa
-        )
+        caos_value, details = compute_caos_plus(self.C_ema, self.A_ema, self.O_ema, self.S_ema, kappa)
 
         if self.caos_ema is None:
             self.caos_ema = caos_value

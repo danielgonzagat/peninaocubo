@@ -135,9 +135,7 @@ def ema(values: list[float], alpha: float = 0.3, init_value: float | None = None
     return ema_values
 
 
-def harmonic_mean(
-    values: list[float], weights: list[float] | None = None, epsilon: float = 1e-8
-) -> float:
+def harmonic_mean(values: list[float], weights: list[float] | None = None, epsilon: float = 1e-8) -> float:
     """
     Compute weighted harmonic mean (non-compensatory).
 
@@ -294,9 +292,7 @@ def score_gate(
     return verdict, score, details
 
 
-def compute_delta_linf(
-    current: float, previous: float, min_delta: float = 0.01
-) -> tuple[float, bool]:
+def compute_delta_linf(current: float, previous: float, min_delta: float = 0.01) -> tuple[float, bool]:
     """
     Compute ΔL∞ and check if it meets minimum threshold.
 
@@ -313,9 +309,7 @@ def compute_delta_linf(
     return delta, meets_threshold
 
 
-def aggregate_scores(
-    scores: list[float], method: str = "harmonic", weights: list[float] | None = None
-) -> float:
+def aggregate_scores(scores: list[float], method: str = "harmonic", weights: list[float] | None = None) -> float:
     """
     Aggregate multiple scores using specified method.
 

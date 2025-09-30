@@ -49,9 +49,4 @@ def is_safe_kaggle_query(q: str) -> bool:
     return bool(SAFE_QUERY_PATTERN.fullmatch(q))
 
 
-# exporta símbolos esperados pelos testes
-try:
-    __all__  # type: ignore[name-defined]
-except NameError:  # pragma: no cover
-    __all__ = ["SAFE_QUERY_PATTERN", "is_safe_kaggle_query"]
 __all__ = ["SAFE_QUERY_PATTERN", "is_safe_kaggle_query"]

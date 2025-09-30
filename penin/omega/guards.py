@@ -80,9 +80,7 @@ class SigmaGuardPolicy:
         }
 
 
-def sigma_guard(
-    metrics: dict[str, Any], policy: SigmaGuardPolicy | None = None, strict: bool = True
-) -> GuardResult:
+def sigma_guard(metrics: dict[str, Any], policy: SigmaGuardPolicy | None = None, strict: bool = True) -> GuardResult:
     """
     Σ-Guard: Comprehensive ethics and safety validation.
 
@@ -125,9 +123,7 @@ def sigma_guard(
         fairness_dp = metrics["fairness_dp"]
         details["checks_performed"].append("fairness_dp")
         if fairness_dp > policy.fairness_dp_max:
-            violations.append(
-                f"Demographic parity distance {fairness_dp:.4f} exceeds {policy.fairness_dp_max}"
-            )
+            violations.append(f"Demographic parity distance {fairness_dp:.4f} exceeds {policy.fairness_dp_max}")
             details["fairness_dp_violation"] = {
                 "value": fairness_dp,
                 "threshold": policy.fairness_dp_max,
@@ -137,9 +133,7 @@ def sigma_guard(
         fairness_eo = metrics["fairness_eo"]
         details["checks_performed"].append("fairness_eo")
         if fairness_eo > policy.fairness_eo_max:
-            violations.append(
-                f"Equal opportunity distance {fairness_eo:.4f} exceeds {policy.fairness_eo_max}"
-            )
+            violations.append(f"Equal opportunity distance {fairness_eo:.4f} exceeds {policy.fairness_eo_max}")
             details["fairness_eo_violation"] = {
                 "value": fairness_eo,
                 "threshold": policy.fairness_eo_max,
@@ -184,9 +178,7 @@ def sigma_guard(
         uncertainty = metrics["uncertainty"]
         details["checks_performed"].append("uncertainty")
         if uncertainty > policy.max_uncertainty:
-            violations.append(
-                f"Uncertainty {uncertainty:.4f} exceeds maximum {policy.max_uncertainty}"
-            )
+            violations.append(f"Uncertainty {uncertainty:.4f} exceeds maximum {policy.max_uncertainty}")
             details["uncertainty_violation"] = {
                 "value": uncertainty,
                 "threshold": policy.max_uncertainty,
@@ -346,9 +338,7 @@ def combined_guard_check(
 
     # Run IR→IC if risk history provided
     if risk_history is not None:
-        results["ir_ic"] = ir_to_ic_contractive(
-            risk_history, max_rho=policy.rho_risk_max if policy else 1.0
-        )
+        results["ir_ic"] = ir_to_ic_contractive(risk_history, max_rho=policy.rho_risk_max if policy else 1.0)
 
     # Check if all passed
     all_passed = all(r.passed for r in results.values())

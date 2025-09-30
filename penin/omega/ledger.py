@@ -209,9 +209,7 @@ class SQLiteWORMLedger:
         row = cursor.fetchone()
         return row[0] if row else None
 
-    def query(
-        self, event_type: str | None = None, cycle_id: str | None = None, limit: int = 100
-    ) -> list[WORMEvent]:
+    def query(self, event_type: str | None = None, cycle_id: str | None = None, limit: int = 100) -> list[WORMEvent]:
         """
         Consulta eventos do ledger.
 
@@ -260,7 +258,7 @@ class SQLiteWORMLedger:
 
         return events
 
-    def verify_chain(self) -> Tuple[bool, str | None]:
+    def verify_chain(self) -> tuple[bool, str | None]:
         """
         Verifica integridade da cadeia de hashes.
 
@@ -400,9 +398,7 @@ class JSONLWORMLedger:
 
         return last_hash
 
-    def query(
-        self, event_type: str | None = None, cycle_id: str | None = None, limit: int = 100
-    ) -> list[WORMEvent]:
+    def query(self, event_type: str | None = None, cycle_id: str | None = None, limit: int = 100) -> list[WORMEvent]:
         """Consulta eventos do JSONL."""
         if not self.jsonl_path.exists():
             return []
@@ -520,7 +516,7 @@ class WORMLedger:
         """Consulta eventos."""
         return self.ledger.query(**kwargs)
 
-    def verify_chain(self) -> Tuple[bool, str | None]:
+    def verify_chain(self) -> tuple[bool, str | None]:
         """Verifica integridade (apenas SQLite)."""
         if isinstance(self.ledger, SQLiteWORMLedger):
             return self.ledger.verify_chain()

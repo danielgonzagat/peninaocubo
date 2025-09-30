@@ -60,9 +60,7 @@ class EthicsMetricsResult:
         return len(failures) == 0, failures
 
 
-def compute_ece(
-    predictions: list[tuple[float, bool]], n_bins: int = 10, weighted: bool = True
-) -> tuple[float, dict]:
+def compute_ece(predictions: list[tuple[float, bool]], n_bins: int = 10, weighted: bool = True) -> tuple[float, dict]:
     """
     Compute Expected Calibration Error (ECE).
 
@@ -240,9 +238,7 @@ def compute_fairness_metrics(
     }
 
 
-def validate_consent(
-    data_sources: list[dict[str, Any]], required_fields: list[str] = None
-) -> tuple[bool, dict]:
+def validate_consent(data_sources: list[dict[str, Any]], required_fields: list[str] = None) -> tuple[bool, dict]:
     """
     Validate consent and data usage compliance.
 
@@ -318,9 +314,7 @@ def compute_risk_contractivity(risk_history: list[float], window: int = 10) -> t
     }
 
 
-def compute_ecological_impact(
-    resource_usage: dict[str, float], baselines: dict[str, float] | None = None
-) -> float:
+def compute_ecological_impact(resource_usage: dict[str, float], baselines: dict[str, float] | None = None) -> float:
     """
     Compute normalized ecological impact score.
 
@@ -381,7 +375,6 @@ def evaluate_ethics_comprehensive(
 
     Returns complete EthicsMetricsResult with all computed values.
     """
-    import time
 
     # Default config
     if config is None:
@@ -433,7 +426,3 @@ def evaluate_ethics_comprehensive(
         },
         timestamp=time.time(),
     )
-
-
-# Import json for evidence hashing
-import json

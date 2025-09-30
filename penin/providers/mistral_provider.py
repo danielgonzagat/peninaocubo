@@ -29,6 +29,4 @@ class MistralProvider(BaseProvider):
         resp = await asyncio.to_thread(self.client.chat.complete, model=self.model, messages=msgs)
         content = resp.choices[0].message.content
         end = time.time()
-        return LLMResponse(
-            content=content, model=self.model, provider=self.name, latency_s=end - start
-        )
+        return LLMResponse(content=content, model=self.model, provider=self.name, latency_s=end - start)
