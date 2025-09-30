@@ -400,7 +400,8 @@ class MetricsServer:
             def log_message(self, format, *args):
                 pass  # Suppress request logs
         
-        self.server = HTTPServer((self.host, self.port), MetricsHandler)
+        # Bind to localhost only to avoid exposing metrics externally
+        self.server = HTTPServer(('127.0.0.1', self.port), MetricsHandler)
         self.thread = threading.Thread(target=self.server.serve_forever)
         self.thread.daemon = True
         self.thread.start()
