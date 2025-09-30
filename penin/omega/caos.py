@@ -120,10 +120,10 @@ class CAOSComponents:
 class CAOSConfig:
     """Configuração padrão utilizada nos cálculos."""
     kappa: float = 25.0
-    gamma: float = 1.0
-    kappa_max: float = 10.0           # <- teste espera 10.0
+    gamma: float = 0.7            # <- teste espera 0.7
+    kappa_max: float = 10.0       # <- teste espera 10.0
     exploration_factor: float = 2.0
-    ema_beta: float = 0.9             # para EMA do tracker
+    ema_beta: float = 0.9         # para EMA do tracker
 
 
 class CAOSTracker:
@@ -183,6 +183,17 @@ class CAOSTracker:
     def last_phi(self) -> float:
         return self.history[-1][2] if self.history else 0.0
 
+    def get_stability(self) -> float:
+        """
+        Proxy simples de estabilidade: 1 - |phi_atual - ema_phi|.
+        Retorna ∈[0,1]; maior = mais estável.
+        """
+        if not self.history:
+            return 0.0
+        phi_now = self.last_phi()
+        diff = abs(phi_now - self.ema_phi)
+        return _clamp(1.0 - diff, 0.0, 1.0)
+
 
 class CAOSPlusEngine:
     """
@@ -209,10 +220,26 @@ class CAOSPlusEngine:
             kappa_max=self.cfg.kappa_max,
         )
 
-    # <- método que os testes chamam:
     def compute(self, c: float, a: float, o: float, s: float) -> float:
         """Compat: retorna φ diretamente a partir dos 4 componentes."""
         return phi_caos(c, a, o, s, kappa=self.cfg.kappa, gamma=self.cfg.gamma, kappa_max=self.cfg.kappa_max)
+
+    def compute_phi(self, comp: CAOSComponents):
+        """
+        Compat: retorna (phi_result, details_dict)
+        details inclui componentes clampados, κ, γ, κ_max e CAOS⁺.
+        """
+        phi_val = self.phi(comp)
+        details = {
+            "components": comp.to_dict(),
+            "kappa": self.cfg.kappa,
+            "gamma": self.cfg.gamma,
+            "kappa_max": self.cfg.kappa_max,
+            "caos_plus": self.caos_plus(comp),
+            "phi": phi_val,
+            "mode": "kratos" if self.cfg.exploration_factor != 1.0 else "caos",
+        }
+        return phi_val, details
 
 
 __all__ = [
