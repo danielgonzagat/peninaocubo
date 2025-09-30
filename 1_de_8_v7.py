@@ -1376,27 +1376,50 @@ class PeninOmegaCore:
                     # In production, this would come from actual model predictions and evaluation
                     n_samples = 1000
                     predictions = [self.rng.random() for _ in range(n_samples)]
-                    targets = [1 if self.rng.random() > 0.3 else 0 for _ in range(n_samples)]
-                    protected_attrs = [self.rng.choice(['A', 'B', 'C']) for _ in range(n_samples)]
-                    risk_series = [self.rng.random() for _ in range(50)]
-                    
-                    consent_data = {
-                        'user_consent': True,
-                        'data_usage_consent': True,
-                        'processing_consent': True
-                    }
-                    
-                    eco_data = {
-                        'carbon_footprint_ok': True,
-                        'energy_efficiency_ok': True,
-                        'waste_minimization_ok': True
-                    }
-                    
-                    ethics_metrics = self.ethics_calculator.calculate_all_metrics(
-                        predictions=predictions,
-                        targets=targets,
-                        protected_attributes=protected_attrs,
-                        risk_series=risk_series,
+            # P0 Fix: Calculate and attest ethical metrics
+            ethics_metrics = None
+            if self.ethics_calculator and HAS_ETHICS:
+                try:
+                    # TODO: Replace with actual model predictions and evaluation data
+                    # This synthetic data should be replaced with real model outputs
+                    # from the current cycle's LLM interactions
+                    if not hasattr(self, '_model_predictions') or not self._model_predictions:
+                        log.warning("No model predictions available for ethics calculation - skipping")
+                        ethics_metrics = None
+                    else:
+                        # Use actual model data instead of synthetic
+                        predictions = self._model_predictions.get('predictions', [])
+                        targets = self._model_predictions.get('targets', [])
+                        protected_attrs = self._model_predictions.get('protected_attributes', [])
+                        
+                        if not all([predictions, targets, protected_attrs]):
+                            log.warning("Incomplete model data for ethics calculation - skipping")
+                            ethics_metrics = None
+                        else:
+                            risk_series = getattr(self, '_risk_history', [self.rng.random() for _ in range(50)])
+                            
+                            consent_data = {
+                                'user_consent': True,
+                                'data_usage_consent': True,
+                                'processing_consent': True
+                            }
+                            
+                            eco_data = {
+                                'carbon_footprint_ok': True,
+                                'energy_efficiency_ok': True,
+                                'waste_minimization_ok': True
+                            }
+                            
+                            ethics_metrics = self.ethics_calculator.calculate_all_metrics(
+                                predictions=predictions,
+                                targets=targets,
+                                protected_attributes=protected_attrs,
+                                risk_series=risk_series,
+                                consent_data=consent_data,
+                                eco_data=eco_data,
+                                dataset_id=f"cycle_{self.xt.cycle}",
+                                seed=self.rng.seed
+                            )
                         consent_data=consent_data,
                         eco_data=eco_data,
                         dataset_id=f"cycle_{self.xt.cycle}",
