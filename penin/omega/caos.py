@@ -236,7 +236,7 @@ def caos_plus(C: float | None = None, A: float | None = None, O: float | None = 
     O = O if O is not None else 0.5
     S = S if S is not None else 0.5
     
-    # Calculate phi
+    # Compute phi
     phi = phi_caos(C, A, O, S, kappa, gamma, kappa_max)
     
     return {
