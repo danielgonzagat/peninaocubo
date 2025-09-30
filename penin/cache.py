@@ -88,6 +88,7 @@ class SecureCache:
         # L2
         p = self._path(key)
         if not p.exists():
+            self._hits["misses"] = self._hits.get("misses", 0) + 1
             return None
 
         try:
@@ -136,8 +137,19 @@ class SecureCache:
                 pass
 
     def get_stats(self) -> Dict[str, Any]:
+        """Get cache statistics."""
         l2_files = len(list(self.cache_dir.glob("*.json")))
-        return {"l1_items": len(self._l1), "l2_files": l2_files, **self._hits}
+        hits_l1 = self._hits.get("l1", 0)
+        hits_l2 = self._hits.get("l2", 0)
+        misses = self._hits.get("misses", 0)
+        return {
+            "hits": hits_l1 + hits_l2,
+            "misses": misses,
+            "l1": hits_l1,
+            "l2": hits_l2,
+            "l1_items": len(self._l1),
+            "l2_files": l2_files,
+        }
 
     def close(self) -> None:
         # aqui não há recursos persistentes a fechar além de arquivos por operação
