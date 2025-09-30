@@ -8,8 +8,7 @@ não-compensatório onde uma dimensão baixa compromete o score total.
 """
 
 import math
-from typing import Dict, Any, List, Optional
-from typing_extensions import Tuple
+from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
 

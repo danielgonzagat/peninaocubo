@@ -224,6 +224,19 @@ def caos_plus(C: float | None = None, A: float | None = None, O: float | None = 
     if C is None and "coherence" in kwargs:
         C = kwargs["coherence"]
     if A is None and "awareness" in kwargs:
+        A = kwargs["awareness"]
+    if O is None and "openness" in kwargs:
+        O = kwargs["openness"]
+    if S is None and "stability" in kwargs:
+        S = kwargs["stability"]
+    
+    # Default values
+    C = C or 0.5
+    A = A or 0.5
+    O = O or 0.5
+    S = S or 0.5
+    
+    phi = phi_caos(C, A, O, S, kappa, kappa_max, gamma)
     
     return {
         "phi": phi,
