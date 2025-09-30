@@ -115,8 +115,8 @@ class MultiLLMRouter:
         self.daily_usage: Dict[str, Dict[str, float | int]] = self._load_daily_usage()
         self._current_day = date.today().isoformat()
         self._ensure_day_entry(self._current_day)
-        if reset_on_init:
-            self.daily_usage[self._current_day] = {"cost_usd": 0.0, "tokens": 0, "requests": 0}
+        self.providers = providers[: settings.PENIN_MAX_PARALLEL_PROVIDERS]
+        self.daily_budget_usd = daily_budget_usd or settings.PENIN_BUDGET_DAILY_USD
             self._save_daily_usage()
 
         entry = self.daily_usage[self._current_day]
