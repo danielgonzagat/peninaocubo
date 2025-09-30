@@ -33,6 +33,10 @@ def harmonic_mean_weighted(values: List[float], weights: List[float]) -> float:
         denom += w / v
     if denom <= EPS:
         return 0.0
+    return sum(weights) / denom  # Use sum of weights for proper normalization
+        denom += w / v
+    if denom <= EPS:
+        return 0.0
     return 1.0 / denom
 
 
