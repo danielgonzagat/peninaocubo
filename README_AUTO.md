@@ -1,5 +1,5 @@
 # PENIN-Ω — VIDA+
-_Gerado em 2025-09-30T21:09:27.942313Z_
+_Gerado em 2025-09-30T21:09:40.790066Z_
 
 ## Equação de Vida (+) — Gate não-compensatório
 - Implementada em `penin/omega/life_eq.py`.
