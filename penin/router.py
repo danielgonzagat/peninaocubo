@@ -104,8 +104,17 @@ class MultiLLMRouter:
         if budget_usd is not None and daily_budget_usd is None:
             daily_budget_usd = budget_usd
         self.daily_budget_usd = daily_budget_usd or settings.PENIN_BUDGET_DAILY_USD
-        self.cost_weight = cost_weight
-        self.latency_weight = latency_weight
+    def __init__(
+        self,
+        providers: List[BaseProvider],
+        daily_budget_usd: Optional[float] = None,
+        *,
+        cost_weight: float = 0.3,
+        latency_weight: float = 0.3,
+        quality_weight: float = 0.4,
+        usage_path: Path | None = None,
+        reset_on_init: bool = True,
+    ):
         self.quality_weight = quality_weight
 
         self._usage_path = usage_path or Path.home() / ".peninaocubo" / "budget_usage.json"
