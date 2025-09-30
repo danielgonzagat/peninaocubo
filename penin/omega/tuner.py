@@ -13,7 +13,9 @@ class AdaGradTuner:
         updated: Dict[str, float] = {}
         for k, v in params.items():
             g = float(grads.get(k, 0.0))
-            self.g2[k] = self.g2.get(k, 0.0) + g * g
+            # Use exponential decay to prevent indefinite accumulation
+            decay_rate = 0.999
+            self.g2[k] = decay_rate * self.g2.get(k, 0.0) + (1 - decay_rate) * g * g
             step = self.lr * g / (1e-8 + self.g2[k] ** 0.5)
             # clip
             if step > self.delta_clip:
