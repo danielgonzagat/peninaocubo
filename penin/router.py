@@ -152,14 +152,19 @@ class MultiLLMRouter:
         if not ok:
             errors = [str(r) for r in results if isinstance(r, Exception)]
             raise RuntimeError(f"All providers failed. Errors: {errors}")
-            
+
         # Select best response
         best_response = max(ok, key=self._score)
-        
-        # Record usage
-        if hasattr(best_response, 'cost_usd') and best_response.cost_usd > 0:
-            self._add_usage(best_response.cost_usd)
-            
+
+        # Record usage for all successful providers
+        total_cost = sum(getattr(r, "cost_usd", 0.0) or 0.0 for r in ok)
+        total_tokens = sum(
+            int((getattr(r, "tokens_in", 0) or 0) + (getattr(r, "tokens_out", 0) or 0))
+            for r in ok
+        )
+        if total_cost > 0 or total_tokens > 0:
+            self._add_usage(total_cost, total_tokens)
+
         return best_response
         
     def get_budget_status(self) -> Dict[str, Any]:
