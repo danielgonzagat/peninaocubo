@@ -1,11 +1,6 @@
 import asyncio
-import time
-import json
-from datetime import datetime, date, timedelta
-from pathlib import Path
-from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
-from tenacity import retry, stop_after_attempt, wait_exponential
+from datetime import date, datetime
+from typing import Any
 
 try:
     from penin.config import settings
@@ -19,7 +14,7 @@ from penin.providers.base import BaseProvider, LLMResponse
 
 class CostTracker:
     """Daily cost tracker with rollover and simple persistence-less state."""
-    def __init__(self, budget_usd: float = 5.0, state_path: Optional[str] = None):
+    def __init__(self, budget_usd: float = 5.0, state_path: str | None = None):
         self.budget_usd = float(budget_usd)
         self.state_path = state_path
         self.state = {
@@ -54,16 +49,15 @@ class CostTracker:
 
 
 class MultiLLMRouter:
-    """
-    Multi-LLM router with cost-aware selection and budget tracking.
-    
+    """Multi-LLM router with cost-aware selection and budget tracking.
+
     P0-4: Includes cost/budget in scoring to prevent overspending.
     """
-    
+
     def __init__(
         self,
-        providers: List[BaseProvider],
-        daily_budget_usd: Optional[float] = None,
+        providers: list[BaseProvider],
+        daily_budget_usd: float | None = None,
         cost_weight: float = 0.3,
         latency_weight: float = 0.3,
         quality_weight: float = 0.4,
@@ -78,13 +72,13 @@ class MultiLLMRouter:
         self.cost_weight = cost_weight
         self.latency_weight = latency_weight
         self.quality_weight = quality_weight
-        
+
         # P0-4: Budget tracking
         self._daily_spend = 0.0
         self._last_reset = datetime.now().date()
         self._total_tokens = 0
         self._request_count = 0
-    
+
     def _reset_daily_budget_if_needed(self):
         """Reset daily budget tracker at midnight"""
         today = datetime.now().date()
@@ -93,20 +87,20 @@ class MultiLLMRouter:
             self._total_tokens = 0
             self._request_count = 0
             self._last_reset = today
-    
+
     def _get_today_usage(self) -> float:
         """Get today's total usage in USD"""
         self._reset_daily_budget_if_needed()
         return self._daily_spend
-    
+
     def _add_usage(self, cost_usd: float, tokens: int = 0):
         """Add usage for today"""
         self._reset_daily_budget_if_needed()
         self._daily_spend += cost_usd
         self._total_tokens += tokens
         self._request_count += 1
-    
-    def get_usage_stats(self) -> Dict[str, Any]:
+
+    def get_usage_stats(self) -> dict[str, Any]:
         """Get current usage statistics"""
         self._reset_daily_budget_if_needed()
         return {
@@ -117,12 +111,12 @@ class MultiLLMRouter:
             "request_count": self._request_count,
             "avg_cost_per_request": self._daily_spend / max(1, self._request_count),
         }
-    
+
     def _score(self, r: LLMResponse) -> float:
         """Score response considering content, latency, and cost"""
         # Base score for having content
         base = 1.0 if r.content else 0.0
-        
+
         # Latency component (higher is better for lower latency)
         lat = max(0.01, r.latency_s)
         # P0 Fix: Include cost in scoring (higher cost = lower score)
@@ -142,31 +136,54 @@ class MultiLLMRouter:
         current_usage = self._get_today_usage()
         if not force_budget_override and current_usage >= self.daily_budget_usd:
             raise RuntimeError(f"Daily budget exceeded: ${current_usage:.2f} >= ${self.daily_budget_usd:.2f}")
-        
+
         tasks = [
             p.chat(messages, tools=tools, system=system, temperature=temperature)
             for p in self.providers
         ]
-        results: List[LLMResponse] = await asyncio.gather(*tasks, return_exceptions=True)
+        results: list[LLMResponse] = await asyncio.gather(*tasks, return_exceptions=True)
         ok = [r for r in results if isinstance(r, LLMResponse)]
         if not ok:
             errors = [str(r) for r in results if isinstance(r, Exception)]
             raise RuntimeError(f"All providers failed. Errors: {errors}")
-            
+
         # Select best response
         best_response = max(ok, key=self._score)
-        
-        # Record usage
-        if hasattr(best_response, 'cost_usd') and best_response.cost_usd > 0:
-            self._add_usage(best_response.cost_usd)
-            
+
+        total_cost = 0.0
+        total_tokens = 0
+        for response in ok:
+            cost = getattr(response, "cost_usd", 0.0) or 0.0
+            try:
+                cost = float(cost)
+            except (TypeError, ValueError):
+                cost = 0.0
+            if cost < 0:
+                cost = 0.0
+            total_cost += cost
+
+            tokens_in = getattr(response, "tokens_in", 0) or 0
+            tokens_out = getattr(response, "tokens_out", 0) or 0
+            try:
+                tokens_in = int(tokens_in)
+            except (TypeError, ValueError):
+                tokens_in = 0
+            try:
+                tokens_out = int(tokens_out)
+            except (TypeError, ValueError):
+                tokens_out = 0
+            total_tokens += max(0, tokens_in) + max(0, tokens_out)
+
+        if ok:
+            self._add_usage(total_cost, total_tokens)
+
         return best_response
-        
-    def get_budget_status(self) -> Dict[str, Any]:
+
+    def get_budget_status(self) -> dict[str, Any]:
         """Get current budget status"""
         current_usage = self._get_today_usage()
         remaining = max(0.0, self.daily_budget_usd - current_usage)
-        
+
         return {
             "daily_budget_usd": self.daily_budget_usd,
             "current_usage_usd": current_usage,
@@ -175,8 +192,8 @@ class MultiLLMRouter:
             "budget_exceeded": current_usage >= self.daily_budget_usd,
             "date": date.today().isoformat()
         }
-        
-    def reset_daily_budget(self, new_budget: Optional[float] = None):
+
+    def reset_daily_budget(self, new_budget: float | None = None):
         """Reset daily budget counters (for new day or manual reset)"""
         if new_budget is not None:
             self.daily_budget_usd = float(new_budget)

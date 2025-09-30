@@ -5,6 +5,7 @@ from typing import Any
 from openai import OpenAI
 
 from penin.config import settings
+from penin.providers.pricing import estimate_cost, usage_value
 
 from .base import BaseProvider, LLMResponse, Message, Tool
 
@@ -53,8 +54,9 @@ class OpenAIProvider(BaseProvider):
                     tool_calls.append(call.model_dump())
 
         usage = getattr(resp, "usage", None)
-        tokens_in = getattr(usage, "prompt_tokens", 0) if usage else 0
-        tokens_out = getattr(usage, "completion_tokens", 0) if usage else 0
+        tokens_in = usage_value(usage, "prompt_tokens")
+        tokens_out = usage_value(usage, "completion_tokens")
+        cost_usd = estimate_cost(self.name, self.model, tokens_in, tokens_out)
         end = time.time()
         return LLMResponse(
             content=content,
@@ -63,5 +65,6 @@ class OpenAIProvider(BaseProvider):
             tokens_out=tokens_out,
             tool_calls=tool_calls,
             provider=self.name,
+            cost_usd=cost_usd,
             latency_s=end - start,
         )

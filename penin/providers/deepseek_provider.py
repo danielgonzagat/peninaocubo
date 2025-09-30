@@ -4,6 +4,7 @@ import time
 from openai import OpenAI
 
 from penin.config import settings
+from penin.providers.pricing import estimate_cost, usage_value
 
 from .base import BaseProvider, LLMResponse, Message, Tool
 
@@ -41,14 +42,18 @@ class DeepSeekProvider(BaseProvider):
         choice = resp.choices[0]
         content = getattr(choice.message, "content", "") if hasattr(choice, "message") else ""
         tool_calls = getattr(choice.message, "tool_calls", []) if hasattr(choice, "message") else []
-        usage = getattr(resp, "usage", {}) or {}
+        usage = getattr(resp, "usage", None)
+        tokens_in = usage_value(usage, "prompt_tokens")
+        tokens_out = usage_value(usage, "completion_tokens")
+        cost_usd = estimate_cost(self.name, self.model, tokens_in, tokens_out)
         end = time.time()
         return LLMResponse(
             content=content,
             model=self.model,
-            tokens_in=usage.get("prompt_tokens", 0),
-            tokens_out=usage.get("completion_tokens", 0),
+            tokens_in=tokens_in,
+            tokens_out=tokens_out,
             tool_calls=tool_calls,
             provider=self.name,
+            cost_usd=cost_usd,
             latency_s=end - start,
         )
