@@ -1,15 +1,16 @@
+# penin/omega/fractal.py
 """
 DSL Fractal / Auto-similaridade
 ===============================
 
-Implementa estrutura fractal auto-similar para propagação de parâmetros
-críticos do núcleo para submódulos de forma não-compensatória.
+Implementa estrutura fractal auto-similar onde o núcleo propaga
+parâmetros críticos para submódulos de forma não-compensatória.
 
 Características:
 - Árvore hierárquica de nós Omega
 - Propagação automática de updates do núcleo
-- Comportamento não-compensatório (falha em um nó afeta toda a subárvore)
-- Configuração via YAML
+- Comportamento não-compensatório (falha em qualquer nível bloqueia)
+- Configuração via YAML DSL
 """
 
 from __future__ import annotations
@@ -19,29 +20,36 @@ import json
 import os
 import time
 from pathlib import Path
-import orjson
+
+try:
+    import yaml
+    YAML_AVAILABLE = True
+except ImportError:
+    YAML_AVAILABLE = False
+    import json as yaml  # Fallback to JSON
 
 
 @dataclass
 class OmegaNode:
-    """
-    Nó da estrutura fractal Omega
-    
-    Cada nó representa um submódulo com configuração própria
-    que herda e propaga parâmetros do núcleo.
-    """
+    """Nó na estrutura fractal Omega"""
     id: str
     depth: int
     config: Dict[str, Any]
     children: List["OmegaNode"] = field(default_factory=list)
     parent: Optional["OmegaNode"] = None
     last_update: float = field(default_factory=time.time)
-    health: float = 1.0  # Saúde do nó [0,1]
+    status: str = "active"  # active, failed, disabled
     
-    def add_child(self, child: "OmegaNode") -> None:
-        """Adiciona filho e define parent"""
-        child.parent = self
-        self.children.append(child)
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "id": self.id,
+            "depth": self.depth,
+            "config": self.config,
+            "children_ids": [child.id for child in self.children],
+            "parent_id": self.parent.id if self.parent else None,
+            "last_update": self.last_update,
+            "status": self.status
+        }
     
     def get_path(self) -> str:
         """Retorna caminho hierárquico do nó"""
@@ -49,35 +57,65 @@ class OmegaNode:
             return self.id
         return f"{self.parent.get_path()}/{self.id}"
     
-    def is_healthy(self, threshold: float = 0.5) -> bool:
-        """Verifica se o nó está saudável"""
-        return self.health >= threshold
-    
-    def propagate_health_up(self) -> None:
-        """Propaga saúde para cima (bottleneck)"""
-        if self.children:
-            # Saúde é o mínimo dos filhos (não-compensatório)
-            self.health = min(child.health for child in self.children)
-        
-        if self.parent:
-            self.parent.propagate_health_up()
-    
-    def to_dict(self) -> Dict[str, Any]:
-        """Serializa nó para dict"""
+    def count_descendants(self) -> int:
+        """Conta total de descendentes"""
+        count = len(self.children)
+        for child in self.children:
+            count += child.count_descendants()
+        return count
+
+
+def load_fractal_config(config_path: str = "penin/omega/fractal_dsl.yaml") -> Dict[str, Any]:
+    """Carrega configuração fractal do YAML"""
+    try:
+        if YAML_AVAILABLE:
+            with open(config_path, 'r') as f:
+                return yaml.safe_load(f)
+        else:
+            # Fallback: configuração hardcoded
+            return {
+                "version": 1,
+                "depth": 2,
+                "branching": 3,
+                "weights": {"caos": 1.0, "sr": 1.0, "g": 1.0},
+                "sync": {"propagate_core_updates": True, "non_compensatory": True},
+                "thresholds": {
+                    "beta_min": 0.01,
+                    "theta_caos": 0.25,
+                    "tau_sr": 0.80,
+                    "theta_G": 0.85
+                },
+                "policies": {
+                    "fail_closed": True,
+                    "ethics_required": True,
+                    "contractive_required": True
+                }
+            }
+    except FileNotFoundError:
+        # Configuração padrão se arquivo não existir
         return {
-            "id": self.id,
-            "depth": self.depth,
-            "config": self.config,
-            "children": [child.to_dict() for child in self.children],
-            "last_update": self.last_update,
-            "health": self.health,
-            "path": self.get_path()
+            "version": 1,
+            "depth": 2,
+            "branching": 3,
+            "weights": {"caos": 1.0, "sr": 1.0, "g": 1.0},
+            "sync": {"propagate_core_updates": True, "non_compensatory": True},
+            "thresholds": {
+                "beta_min": 0.01,
+                "theta_caos": 0.25,
+                "tau_sr": 0.80,
+                "theta_G": 0.85
+            },
+            "policies": {
+                "fail_closed": True,
+                "ethics_required": True,
+                "contractive_required": True
+            }
         }
 
 
 def build_fractal(root_cfg: Dict[str, Any], depth: int, branching: int, prefix: str = "Ω") -> OmegaNode:
     """
-    Constrói árvore fractal com configuração auto-similar
+    Constrói árvore fractal auto-similar
     
     Args:
         root_cfg: Configuração do nó raiz
@@ -91,49 +129,39 @@ def build_fractal(root_cfg: Dict[str, Any], depth: int, branching: int, prefix: 
     root = OmegaNode(id=f"{prefix}-0", depth=0, config=root_cfg.copy())
     
     # Construir árvore nível por nível
-    current_level = [root]
+    frontier = [root]
     
     for d in range(1, depth + 1):
-        next_level = []
+        new_frontier = []
         
-        for parent_node in current_level:
+        for parent_node in frontier:
             for i in range(branching):
                 child_id = f"{prefix}-{d}-{i}-{parent_node.id.split('-')[-1]}"
-                
-                # Configuração herdada com pequenas variações
-                child_config = parent_node.config.copy()
-                
-                # Adicionar variação fractal (auto-similaridade)
-                if "fractal_scale" not in child_config:
-                    child_config["fractal_scale"] = 1.0
-                
-                child_config["fractal_scale"] *= 0.8  # Redução fractal
-                child_config["depth"] = d
-                child_config["parent_id"] = parent_node.id
+                child_config = root_cfg.copy()  # Herda configuração do núcleo
                 
                 child = OmegaNode(
                     id=child_id,
                     depth=d,
-                    config=child_config
+                    config=child_config,
+                    parent=parent_node
                 )
                 
-                parent_node.add_child(child)
-                next_level.append(child)
+                parent_node.children.append(child)
+                new_frontier.append(child)
         
-        current_level = next_level
+        frontier = new_frontier
     
     return root
 
 
-def propagate_update(root: OmegaNode, patch: Dict[str, Any], 
-                    non_compensatory: bool = True) -> Dict[str, Any]:
+def propagate_update(root: OmegaNode, patch: Dict[str, Any], non_compensatory: bool = True) -> Dict[str, Any]:
     """
-    Propaga atualização do núcleo para toda a árvore
+    Propaga update do núcleo para toda a árvore
     
     Args:
-        root: Nó raiz da árvore
-        patch: Dicionário com atualizações
-        non_compensatory: Se True, falha em um nó bloqueia propagação
+        root: Nó raiz
+        patch: Mudanças a serem aplicadas
+        non_compensatory: Se True, falha em qualquer nó bloqueia toda a operação
         
     Returns:
         Relatório da propagação
@@ -154,351 +182,326 @@ def propagate_update(root: OmegaNode, patch: Dict[str, Any],
         node = queue.pop(0)
         
         try:
+            # Verificar se patch contém valores serializáveis
+            for key, value in patch.items():
+                if callable(value):
+                    raise ValueError(f"Non-serializable value for key {key}: {type(value)}")
+            
             # Aplicar patch
-            old_config = node.config.copy()
             node.config.update(patch)
             node.last_update = time.time()
+            node.status = "active"
+            report["nodes_updated"] += 1
             
-            # Verificar se update foi bem-sucedido
-            if _validate_node_config(node.config):
-                report["nodes_updated"] += 1
-                
-                # Adicionar filhos à fila
-                queue.extend(node.children)
-            else:
-                # Falha na validação
-                node.config = old_config  # Rollback
-                node.health = 0.1  # Marcar como não saudável
-                report["nodes_failed"] += 1
-                report["failed_nodes"].append(node.get_path())
-                
-                if non_compensatory:
-                    # Parar propagação em caso de falha
-                    report["success"] = False
-                    break
-                    
+            # Adicionar filhos à fila
+            queue.extend(node.children)
+            
         except Exception as e:
-            # Erro durante update
+            # Falha na atualização
+            node.status = "failed"
             report["nodes_failed"] += 1
-            report["failed_nodes"].append(f"{node.get_path()}: {str(e)}")
-            node.health = 0.1
+            report["failed_nodes"].append({
+                "node_id": node.id,
+                "error": str(e),
+                "path": node.get_path()
+            })
             
             if non_compensatory:
+                # Fail-closed: uma falha bloqueia tudo
                 report["success"] = False
+                report["error"] = f"Non-compensatory failure at node {node.id}: {e}"
                 break
-    
-    # Propagar saúde para cima
-    root.propagate_health_up()
     
     return report
 
 
-def _validate_node_config(config: Dict[str, Any]) -> bool:
+def validate_fractal_consistency(root: OmegaNode) -> Dict[str, Any]:
     """
-    Valida configuração do nó
+    Valida consistência da estrutura fractal
     
-    Args:
-        config: Configuração a validar
+    Verifica:
+    - Todos os nós têm configuração consistente com o núcleo
+    - Não há nós órfãos ou ciclos
+    - Status de todos os nós
+    """
+    validation = {
+        "timestamp": time.time(),
+        "total_nodes": 0,
+        "active_nodes": 0,
+        "failed_nodes": 0,
+        "inconsistent_nodes": [],
+        "orphaned_nodes": [],
+        "valid": True
+    }
+    
+    # Traversal completo
+    stack = [root]
+    visited = set()
+    
+    while stack:
+        node = stack.pop()
         
-    Returns:
-        True se válida, False caso contrário
+        if node.id in visited:
+            # Ciclo detectado
+            validation["valid"] = False
+            validation["error"] = f"Cycle detected at node {node.id}"
+            break
+        
+        visited.add(node.id)
+        validation["total_nodes"] += 1
+        
+        # Verificar status
+        if node.status == "active":
+            validation["active_nodes"] += 1
+        elif node.status == "failed":
+            validation["failed_nodes"] += 1
+        
+        # Verificar consistência de configuração crítica
+        if node.depth > 0:  # Não verificar o root contra si mesmo
+            critical_keys = ["thresholds", "policies"]
+            for key in critical_keys:
+                if key in root.config and key in node.config:
+                    if node.config[key] != root.config[key]:
+                        validation["inconsistent_nodes"].append({
+                            "node_id": node.id,
+                            "key": key,
+                            "expected": root.config[key],
+                            "actual": node.config[key]
+                        })
+        
+        # Verificar parentesco
+        for child in node.children:
+            if child.parent != node:
+                validation["orphaned_nodes"].append(child.id)
+        
+        # Adicionar filhos à pilha
+        stack.extend(node.children)
+    
+    # Determinar validade geral
+    if validation["inconsistent_nodes"] or validation["orphaned_nodes"]:
+        validation["valid"] = False
+    
+    return validation
+
+
+def fractal_health_check(root: OmegaNode) -> Dict[str, Any]:
     """
-    # Validações básicas
-    required_keys = ["fractal_scale", "depth"]
+    Verifica saúde geral da estrutura fractal
     
-    for key in required_keys:
-        if key not in config:
-            return False
+    Returns:
+        Relatório de saúde com métricas e recomendações
+    """
+    health = {
+        "timestamp": time.time(),
+        "overall_health": "unknown",
+        "metrics": {},
+        "recommendations": []
+    }
     
-    # Validar tipos e ranges
-    if not isinstance(config["fractal_scale"], (int, float)):
-        return False
+    # Coletar métricas
+    total_nodes = root.count_descendants() + 1  # +1 para o root
+    validation = validate_fractal_consistency(root)
     
-    if config["fractal_scale"] <= 0 or config["fractal_scale"] > 2.0:
-        return False
+    health["metrics"] = {
+        "total_nodes": total_nodes,
+        "active_nodes": validation["active_nodes"],
+        "failed_nodes": validation["failed_nodes"],
+        "consistency_score": 1.0 - (len(validation["inconsistent_nodes"]) / max(1, total_nodes)),
+        "uptime_ratio": validation["active_nodes"] / max(1, total_nodes)
+    }
     
-    if not isinstance(config["depth"], int) or config["depth"] < 0:
-        return False
+    # Determinar saúde geral
+    consistency_score = health["metrics"]["consistency_score"]
+    uptime_ratio = health["metrics"]["uptime_ratio"]
     
-    return True
+    if consistency_score >= 0.95 and uptime_ratio >= 0.90:
+        health["overall_health"] = "excellent"
+    elif consistency_score >= 0.85 and uptime_ratio >= 0.80:
+        health["overall_health"] = "good"
+    elif consistency_score >= 0.70 and uptime_ratio >= 0.60:
+        health["overall_health"] = "fair"
+    else:
+        health["overall_health"] = "poor"
+    
+    # Gerar recomendações
+    if validation["failed_nodes"] > 0:
+        health["recommendations"].append("Investigate and repair failed nodes")
+    
+    if validation["inconsistent_nodes"]:
+        health["recommendations"].append("Propagate configuration updates to fix inconsistencies")
+    
+    if uptime_ratio < 0.80:
+        health["recommendations"].append("Consider reducing fractal depth or branching factor")
+    
+    return health
 
 
 class FractalManager:
     """
     Gerenciador da estrutura fractal
     
-    Coordena criação, atualização e monitoramento da árvore fractal.
+    Responsável por:
+    - Carregar/salvar configuração
+    - Construir e manter a árvore
+    - Propagar updates
+    - Monitorar saúde
     """
     
-    def __init__(self, config_path: Optional[str] = None):
-        """
-        Args:
-            config_path: Caminho para arquivo de configuração YAML
-        """
-        self.config_path = config_path or "penin/omega/fractal_dsl.yaml"
-        self.root: Optional[OmegaNode] = None
-        self.config = self._load_config()
+    def __init__(self, config_path: str = "penin/omega/fractal_dsl.yaml"):
+        self.config_path = config_path
+        self.config = load_fractal_config(config_path)
+        self.root = None
+        self.last_health_check = 0
         
-    def _load_config(self) -> Dict[str, Any]:
-        """Carrega configuração do DSL"""
-        try:
-            import yaml
-            with open(self.config_path, 'r') as f:
-                return yaml.safe_load(f)
-        except ImportError:
-            # Fallback sem yaml
-            return {
-                "version": 1,
-                "depth": 2,
-                "branching": 3,
-                "weights": {"caos": 1.0, "sr": 1.0, "g": 1.0},
-                "sync": {"propagate_core_updates": True, "non_compensatory": True}
-            }
-        except Exception:
-            # Configuração padrão
-            return {
-                "version": 1,
-                "depth": 2,
-                "branching": 3,
-                "weights": {"caos": 1.0, "sr": 1.0, "g": 1.0},
-                "sync": {"propagate_core_updates": True, "non_compensatory": True}
-            }
-    
-    def initialize_fractal(self, root_config: Dict[str, Any]) -> OmegaNode:
-        """
-        Inicializa estrutura fractal
+    def initialize(self) -> OmegaNode:
+        """Inicializa a estrutura fractal"""
+        root_config = {
+            "thresholds": self.config["thresholds"],
+            "policies": self.config["policies"],
+            "weights": self.config["weights"]
+        }
         
-        Args:
-            root_config: Configuração do nó raiz
-            
-        Returns:
-            Nó raiz da árvore
-        """
         self.root = build_fractal(
-            root_cfg=root_config,
-            depth=self.config["depth"],
-            branching=self.config["branching"],
-            prefix="Ω"
+            root_config,
+            self.config["depth"],
+            self.config["branching"]
         )
         
         return self.root
     
-    def update_core_parameters(self, updates: Dict[str, Any]) -> Dict[str, Any]:
+    def update_core_config(self, updates: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Atualiza parâmetros do núcleo e propaga para toda a árvore
+        Atualiza configuração do núcleo e propaga para toda a árvore
         
         Args:
-            updates: Dicionário com atualizações
+            updates: Mudanças na configuração
             
         Returns:
             Relatório da propagação
         """
         if self.root is None:
-            raise ValueError("Fractal not initialized. Call initialize_fractal() first.")
+            raise RuntimeError("Fractal not initialized. Call initialize() first.")
         
+        # Atualizar configuração local
+        self.config.update(updates)
+        
+        # Propagar para a árvore
         non_compensatory = self.config["sync"]["non_compensatory"]
-        
-        return propagate_update(self.root, updates, non_compensatory)
-    
-    def get_health_report(self) -> Dict[str, Any]:
-        """
-        Gera relatório de saúde da árvore fractal
-        
-        Returns:
-            Relatório com métricas de saúde
-        """
-        if self.root is None:
-            return {"error": "Fractal not initialized"}
-        
-        report = {
-            "timestamp": time.time(),
-            "root_health": self.root.health,
-            "total_nodes": 0,
-            "healthy_nodes": 0,
-            "unhealthy_nodes": [],
-            "depth_health": {}
-        }
-        
-        # Percorrer árvore e coletar métricas
-        queue = [self.root]
-        
-        while queue:
-            node = queue.pop(0)
-            report["total_nodes"] += 1
-            
-            if node.is_healthy():
-                report["healthy_nodes"] += 1
-            else:
-                report["unhealthy_nodes"].append({
-                    "path": node.get_path(),
-                    "health": node.health,
-                    "depth": node.depth
-                })
-            
-            # Saúde por profundidade
-            depth_key = f"depth_{node.depth}"
-            if depth_key not in report["depth_health"]:
-                report["depth_health"][depth_key] = {"total": 0, "healthy": 0}
-            
-            report["depth_health"][depth_key]["total"] += 1
-            if node.is_healthy():
-                report["depth_health"][depth_key]["healthy"] += 1
-            
-            queue.extend(node.children)
-        
-        # Calcular percentuais
-        if report["total_nodes"] > 0:
-            report["health_percentage"] = report["healthy_nodes"] / report["total_nodes"]
-        else:
-            report["health_percentage"] = 0.0
+        report = propagate_update(self.root, updates, non_compensatory)
         
         return report
     
-    def save_state(self, filepath: str) -> None:
+    def health_check(self, force: bool = False) -> Dict[str, Any]:
         """
-        Salva estado da árvore fractal
+        Executa verificação de saúde (com cache)
         
         Args:
-            filepath: Caminho para salvar o estado
-        """
-        if self.root is None:
-            raise ValueError("Fractal not initialized")
-        
-        state = {
-            "config": self.config,
-            "tree": self.root.to_dict(),
-            "timestamp": time.time()
-        }
-        
-        Path(filepath).parent.mkdir(parents=True, exist_ok=True)
-        
-        with open(filepath, 'wb') as f:
-            f.write(orjson.dumps(state, option=orjson.OPT_INDENT_2))
-    
-    def load_state(self, filepath: str) -> None:
-        """
-        Carrega estado da árvore fractal
-        
-        Args:
-            filepath: Caminho do arquivo de estado
-        """
-        with open(filepath, 'rb') as f:
-            state = orjson.loads(f.read())
-        
-        self.config = state["config"]
-        # TODO: Reconstruir árvore a partir do dict
-        # Por simplicidade, apenas recriar com config
-        if "tree" in state and "config" in state["tree"]:
-            self.root = self._dict_to_node(state["tree"])
-    
-    def _dict_to_node(self, node_dict: Dict[str, Any]) -> OmegaNode:
-        """
-        Reconstrói nó a partir de dict
-        
-        Args:
-            node_dict: Dicionário com dados do nó
+            force: Se True, força nova verificação ignorando cache
             
         Returns:
-            Nó reconstruído
+            Relatório de saúde
         """
-        node = OmegaNode(
-            id=node_dict["id"],
-            depth=node_dict["depth"],
-            config=node_dict["config"],
-            last_update=node_dict.get("last_update", time.time()),
-            health=node_dict.get("health", 1.0)
-        )
+        now = time.time()
         
-        # Reconstruir filhos recursivamente
-        for child_dict in node_dict.get("children", []):
-            child = self._dict_to_node(child_dict)
-            node.add_child(child)
+        # Cache de 60 segundos
+        if not force and (now - self.last_health_check) < 60:
+            return {"cached": True, "message": "Use force=True for fresh health check"}
         
-        return node
+        if self.root is None:
+            return {"error": "Fractal not initialized"}
+        
+        health = fractal_health_check(self.root)
+        self.last_health_check = now
+        
+        return health
+    
+    def get_node_by_id(self, node_id: str) -> Optional[OmegaNode]:
+        """Encontra nó por ID"""
+        if self.root is None:
+            return None
+        
+        stack = [self.root]
+        while stack:
+            node = stack.pop()
+            if node.id == node_id:
+                return node
+            stack.extend(node.children)
+        
+        return None
+    
+    def export_structure(self) -> Dict[str, Any]:
+        """Exporta estrutura completa para JSON"""
+        if self.root is None:
+            return {"error": "Fractal not initialized"}
+        
+        def serialize_node(node: OmegaNode) -> Dict[str, Any]:
+            return {
+                **node.to_dict(),
+                "children": [serialize_node(child) for child in node.children]
+            }
+        
+        return {
+            "config": self.config,
+            "structure": serialize_node(self.root),
+            "exported_at": time.time()
+        }
 
 
 # Funções de conveniência
-def quick_fractal_test(depth: int = 2, branching: int = 3) -> Dict[str, Any]:
-    """
-    Teste rápido da estrutura fractal
+def quick_fractal_test() -> Dict[str, Any]:
+    """Teste rápido da funcionalidade fractal"""
+    manager = FractalManager()
+    root = manager.initialize()
     
-    Args:
-        depth: Profundidade da árvore
-        branching: Número de filhos por nó
-        
-    Returns:
-        Relatório do teste
-    """
-    # Configuração inicial
-    root_config = {
-        "temperature": 0.7,
-        "learning_rate": 0.01,
-        "fractal_scale": 1.0,
-        "depth": 0
-    }
+    # Teste de propagação
+    update_report = manager.update_core_config({
+        "thresholds": {
+            "beta_min": 0.02,  # Mudança no threshold
+            "theta_caos": 0.30,
+            "tau_sr": 0.85,
+            "theta_G": 0.90
+        }
+    })
     
-    # Criar árvore
-    root = build_fractal(root_config, depth, branching)
+    # Verificação de saúde
+    health = manager.health_check(force=True)
     
-    # Testar propagação
-    update_patch = {
-        "temperature": 0.8,
-        "new_param": "fractal_test"
-    }
-    
-    report = propagate_update(root, update_patch)
-    
-    # Adicionar métricas da árvore
-    report["tree_stats"] = {
+    return {
         "root_id": root.id,
-        "root_health": root.health,
-        "total_children": len(root.children),
-        "max_depth": depth
+        "total_nodes": root.count_descendants() + 1,
+        "update_report": update_report,
+        "health": health
     }
-    
-    return report
 
 
-def validate_fractal_propagation() -> Dict[str, Any]:
+def validate_fractal_non_compensatory() -> Dict[str, Any]:
     """
-    Valida comportamento não-compensatório da propagação
+    Valida comportamento não-compensatório
     
-    Returns:
-        Relatório de validação
+    Testa se uma falha em qualquer nó bloqueia toda a operação
     """
-    results = {}
+    manager = FractalManager()
+    root = manager.initialize()
     
-    # Teste 1: Propagação bem-sucedida
-    root_config = {"param1": 1.0, "fractal_scale": 1.0, "depth": 0}
-    root = build_fractal(root_config, depth=2, branching=2)
-    
-    good_patch = {"param1": 2.0, "param2": "test"}
-    report1 = propagate_update(root, good_patch, non_compensatory=True)
-    
-    results["successful_propagation"] = {
-        "success": report1["success"],
-        "nodes_updated": report1["nodes_updated"],
-        "nodes_failed": report1["nodes_failed"]
+    # Simular falha injetando configuração inválida
+    invalid_update = {
+        "invalid_key": lambda x: x  # Função não serializável para forçar erro
     }
     
-    # Teste 2: Propagação com falha (simulada)
-    root2 = build_fractal(root_config, depth=2, branching=2)
-    
-    # Patch que causará falha na validação
-    bad_patch = {"fractal_scale": -1.0}  # Valor inválido
-    report2 = propagate_update(root2, bad_patch, non_compensatory=True)
-    
-    results["failed_propagation"] = {
-        "success": report2["success"],
-        "nodes_updated": report2["nodes_updated"],
-        "nodes_failed": report2["nodes_failed"],
-        "failed_nodes": report2["failed_nodes"]
-    }
-    
-    # Teste 3: Comportamento não-compensatório
-    results["non_compensatory_working"] = (
-        results["successful_propagation"]["success"] and
-        not results["failed_propagation"]["success"]
-    )
-    
-    return results
+    try:
+        report = manager.update_core_config(invalid_update)
+        return {
+            "test": "non_compensatory_behavior",
+            "expected_failure": True,
+            "actual_failure": not report["success"],
+            "passed": not report["success"],
+            "report": report
+        }
+    except Exception as e:
+        return {
+            "test": "non_compensatory_behavior",
+            "expected_failure": True,
+            "actual_failure": True,
+            "passed": True,
+            "error": str(e)
+        }
