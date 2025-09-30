@@ -9,9 +9,10 @@ class LLMResponse:
     def __init__(
         self,
         content: str,
-        model: str,
+        model: str = "",
         tokens_in: int = 0,
         tokens_out: int = 0,
+        total_tokens: int | None = None,
         tool_calls: list[dict[str, Any]] | None = None,
         cost_usd: float = 0.0,
         latency_s: float = 0.0,
@@ -25,6 +26,7 @@ class LLMResponse:
         self.cost_usd = cost_usd
         self.latency_s = latency_s
         self.provider = provider
+        self.total_tokens = total_tokens if total_tokens is not None else tokens_in + tokens_out
 
 
 class BaseProvider(ABC):

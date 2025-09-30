@@ -18,9 +18,10 @@ import sqlite3
 import hashlib
 import threading
 import uuid
+from dataclasses import dataclass, field
 from pathlib import Path
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Tuple as TypingTuple, Union
 from typing_extensions import Tuple
 from contextlib import contextmanager
 
@@ -33,6 +34,24 @@ except ImportError:
 
 from pydantic import BaseModel, Field, validator
 from dataclasses import asdict
+
+
+@dataclass(frozen=True)
+class WORMEvent:
+    """Simple event structure appended to the WORM ledgers."""
+
+    event_type: str
+    cycle_id: str
+    data: Dict[str, Any]
+    timestamp: float = field(default_factory=time.time)
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "event_type": self.event_type,
+            "cycle_id": self.cycle_id,
+            "data": self.data,
+            "timestamp": self.timestamp,
+        }
 
 
 class RunMetrics(BaseModel):
@@ -578,3 +597,279 @@ def quick_ledger_append(ledger: WORMLedger,
     )
     
     return ledger.append_record(record, artifacts)
+
+# ---------------------------------------------------------------------------
+# Legacy compatibility layer (P0 regression expectations)
+# ---------------------------------------------------------------------------
+
+def _canonical_json(payload: Dict[str, Any]) -> str:
+    """Return a deterministic JSON encoding used for hashing."""
+
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+
+
+class SQLiteWORMLedger:
+    """Minimal SQLite-backed ledger compatible with the legacy API."""
+
+    def __init__(self, db_path: Union[str, Path], enable_wal: bool = True):
+        self.db_path = Path(db_path)
+        self.enable_wal = enable_wal
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.RLock()
+        self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        self._conn.row_factory = sqlite3.Row
+        if self.enable_wal:
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+        self._conn.execute("PRAGMA busy_timeout=5000")
+        self._conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS worm_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_type TEXT NOT NULL,
+                cycle_id TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                timestamp REAL NOT NULL,
+                prev_hash TEXT,
+                hash TEXT NOT NULL
+            )
+            """
+        )
+        self._conn.commit()
+
+    def _get_connection(self) -> sqlite3.Connection:
+        return self._conn
+
+    def _get_last_hash(self) -> Optional[str]:
+        cursor = self._conn.execute("SELECT hash FROM worm_events ORDER BY id DESC LIMIT 1")
+        row = cursor.fetchone()
+        return row["hash"] if row else None
+
+    def append(self, event: WORMEvent) -> str:
+        payload = event.to_dict()
+        canonical = _canonical_json(payload)
+        with self._lock:
+            prev_hash = self._get_last_hash() or "GENESIS"
+            computed = hashlib.sha256(f"{prev_hash}:{canonical}".encode("utf-8")).hexdigest()
+            self._conn.execute(
+                "INSERT INTO worm_events (event_type, cycle_id, payload, timestamp, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?)",
+                (event.event_type, event.cycle_id, canonical, event.timestamp, prev_hash, computed),
+            )
+            self._conn.commit()
+        return computed
+
+    def query(self, limit: int = 100) -> List[WORMEvent]:
+        cursor = self._conn.execute(
+            "SELECT event_type, cycle_id, payload, timestamp FROM worm_events ORDER BY id ASC LIMIT ?",
+            (limit,),
+        )
+        events: List[WORMEvent] = []
+        for row in cursor.fetchall():
+            data = json.loads(row["payload"])
+            events.append(WORMEvent(row["event_type"], row["cycle_id"], data, row["timestamp"]))
+        return events
+
+    def verify_chain(self) -> TypingTuple[bool, str]:
+        cursor = self._conn.execute("SELECT prev_hash, hash, payload FROM worm_events ORDER BY id ASC")
+        prev = "GENESIS"
+        for row in cursor.fetchall():
+            canonical = row["payload"]
+            expected = hashlib.sha256(f"{prev}:{canonical}".encode("utf-8")).hexdigest()
+            if row["hash"] != expected:
+                return False, f"hash mismatch at {row['hash']}"
+            prev = row["hash"]
+        return True, "ok"
+
+    def close(self) -> None:
+        self._conn.close()
+
+
+class JSONLWORMLedger:
+    """Append-only JSONL ledger for lightweight scenarios."""
+
+    def __init__(self, path: Union[str, Path]):
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.RLock()
+        if not self.path.exists():
+            self.path.touch()
+
+    def _iter_entries(self) -> List[Dict[str, Any]]:
+        entries: List[Dict[str, Any]] = []
+        with self.path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                entries.append(json.loads(line))
+        return entries
+
+    def append(self, event: WORMEvent) -> str:
+        payload = event.to_dict()
+        canonical = _canonical_json(payload)
+        with self._lock:
+            entries = self._iter_entries()
+            prev_hash = entries[-1]["hash"] if entries else "GENESIS"
+            computed = hashlib.sha256(f"{prev_hash}:{canonical}".encode("utf-8")).hexdigest()
+            entry = {
+                **payload,
+                "prev_hash": prev_hash,
+                "hash": computed,
+            }
+            with self.path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        return computed
+
+    def query(self, limit: int = 100) -> List[WORMEvent]:
+        entries = self._iter_entries()
+        tail = entries[-limit:]
+        return [
+            WORMEvent(item["event_type"], item["cycle_id"], item["data"], item.get("timestamp", time.time()))
+            for item in tail
+        ]
+
+    def verify_chain(self) -> TypingTuple[bool, str]:
+        prev = "GENESIS"
+        for entry in self._iter_entries():
+            canonical = _canonical_json({
+                "event_type": entry["event_type"],
+                "cycle_id": entry["cycle_id"],
+                "data": entry["data"],
+                "timestamp": entry["timestamp"],
+            })
+            expected = hashlib.sha256(f"{prev}:{canonical}".encode("utf-8")).hexdigest()
+            if entry["hash"] != expected:
+                return False, f"hash mismatch at {entry['hash']}"
+            prev = entry["hash"]
+        return True, "ok"
+
+    def close(self) -> None:
+        return None
+
+
+# ---------------------------------------------------------------------------
+# Legacy compatibility layer (P0 regression expectations)
+# ---------------------------------------------------------------------------
+
+def _canonical_json(payload: Dict[str, Any]) -> str:
+    """Return a deterministic JSON encoding used for hashing."""
+
+    return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=False, default=str)
+
+
+class SQLiteWORMLedger:
+    """Minimal SQLite-backed ledger compatible with the legacy API."""
+
+    def __init__(self, db_path: Union[str, Path], enable_wal: bool = True):
+        self.db_path = Path(db_path)
+        self.enable_wal = enable_wal
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.RLock()
+        self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+        self._conn.row_factory = sqlite3.Row
+        if self.enable_wal:
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+        self._conn.execute("PRAGMA busy_timeout=5000")
+        self._conn.execute("""
+            CREATE TABLE IF NOT EXISTS worm_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_type TEXT NOT NULL,
+                cycle_id TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                timestamp REAL NOT NULL,
+                prev_hash TEXT,
+                hash TEXT NOT NULL
+            )
+            """)
+        self._conn.commit()
+
+    def _get_connection(self) -> sqlite3.Connection:
+        return self._conn
+
+    def _get_last_hash(self) -> Optional[str]:
+        cursor = self._conn.execute("SELECT hash FROM worm_events ORDER BY id DESC LIMIT 1")
+        row = cursor.fetchone()
+        return row["hash"] if row else None
+
+    def append(self, event: WORMEvent) -> str:
+        payload = event.to_dict()
+        canonical = _canonical_json(payload)
+        with self._lock:
+            prev_hash = self._get_last_hash() or "GENESIS"
+            computed = hashlib.sha256(f"{prev_hash}:{canonical}".encode("utf-8")).hexdigest()
+            self._conn.execute("INSERT INTO worm_events (event_type, cycle_id, payload, timestamp, prev_hash, hash) VALUES (?, ?, ?, ?, ?, ?)",
+                                (event.event_type, event.cycle_id, canonical, event.timestamp, prev_hash, computed))
+            self._conn.commit()
+        return computed
+
+    def query(self, limit: int = 100) -> List[WORMEvent]:
+        cursor = self._conn.execute("SELECT event_type, cycle_id, payload, timestamp FROM worm_events ORDER BY id ASC LIMIT ?", (limit,))
+        events: List[WORMEvent] = []
+        for row in cursor.fetchall():
+            data = json.loads(row["payload"])
+            events.append(WORMEvent(row["event_type"], row["cycle_id"], data, row["timestamp"]))
+        return events
+
+    def verify_chain(self) -> TypingTuple[bool, str]:
+        cursor = self._conn.execute("SELECT prev_hash, hash, payload FROM worm_events ORDER BY id ASC")
+        prev = "GENESIS"
+        for row in cursor.fetchall():
+            canonical = row["payload"]
+            expected = hashlib.sha256(f"{prev}:{canonical}".encode("utf-8")).hexdigest()
+            if row["hash"] != expected:
+                return False, f"hash mismatch at {row['hash']}"
+            prev = row["hash"]
+        return True, "ok"
+
+    def close(self) -> None:
+        self._conn.close()
+
+
+class JSONLWORMLedger:
+    """Append-only JSONL ledger for lightweight scenarios."""
+
+    def __init__(self, path: Union[str, Path]):
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._lock = threading.RLock()
+        if not self.path.exists():
+            self.path.touch()
+
+    def _iter_entries(self) -> List[Dict[str, Any]]:
+        entries: List[Dict[str, Any]] = []
+        with self.path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                if not line.strip():
+                    continue
+                entries.append(json.loads(line))
+        return entries
+
+    def append(self, event: WORMEvent) -> str:
+        payload = event.to_dict()
+        canonical = _canonical_json(payload)
+        with self._lock:
+            entries = self._iter_entries()
+            prev_hash = entries[-1]["hash"] if entries else "GENESIS"
+            computed = hashlib.sha256(f"{prev_hash}:{canonical}".encode("utf-8")).hexdigest()
+            entry = {**payload, "prev_hash": prev_hash, "hash": computed}
+            with self.path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        return computed
+
+    def query(self, limit: int = 100) -> List[WORMEvent]:
+        entries = self._iter_entries()
+        tail = entries[-limit:]
+        return [WORMEvent(item["event_type"], item["cycle_id"], item["data"], item.get("timestamp", time.time())) for item in tail]
+
+    def verify_chain(self) -> TypingTuple[bool, str]:
+        prev = "GENESIS"
+        for entry in self._iter_entries():
+            canonical = _canonical_json({"event_type": entry["event_type"], "cycle_id": entry["cycle_id"], "data": entry["data"], "timestamp": entry["timestamp"]})
+            expected = hashlib.sha256(f"{prev}:{canonical}".encode("utf-8")).hexdigest()
+            if entry["hash"] != expected:
+                return False, f"hash mismatch at {entry['hash']}"
+            prev = entry["hash"]
+        return True, "ok"
+
+    def close(self) -> None:
+        return None

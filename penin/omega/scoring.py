@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Tuple
 from enum import Enum
 
@@ -13,11 +13,39 @@ class ScoreVerdict(Enum):
     CANARY = "canary"
     FAIL = "fail"
 
-class ScoreGateVerdict(Enum):
+class ScoreGateVerdict(str, Enum):
     """Verdict for score gates"""
     PROMOTE = "promote"
     CANARY = "canary"
     FAIL = "fail"
+
+
+@dataclass
+class ScoreGateResult:
+    verdict: str | ScoreGateVerdict
+    score: float
+    verdict_enum: ScoreGateVerdict = field(init=False)
+    verdict_modern: str = field(init=False)
+
+    def __post_init__(self) -> None:
+        if isinstance(self.verdict, ScoreGateVerdict):
+            self.verdict_enum = self.verdict
+            if self.verdict is ScoreGateVerdict.PROMOTE:
+                self.verdict = "pass"
+            else:
+                self.verdict = self.verdict.value
+        else:
+            verdict_value = str(self.verdict)
+            if verdict_value == "pass":
+                self.verdict_enum = ScoreGateVerdict.PROMOTE
+            else:
+                self.verdict_enum = ScoreGateVerdict(verdict_value)
+            self.verdict = verdict_value
+        self.verdict_modern = self.verdict_enum.value
+
+    def __iter__(self):
+        yield self.verdict
+        yield self.score
 
 
 def clamp01(x: float) -> float:
@@ -92,7 +120,7 @@ def score_gate(
     wL: float,
     tau: float,
     canary_margin: float = 0.05,
-) -> ScoreGateVerdict:
+) -> ScoreGateResult:
     U = clamp01(U)
     S = clamp01(S)
     C = clamp01(C)
@@ -100,23 +128,22 @@ def score_gate(
     weights_sum = wU + wS + wC + wL
     if abs(weights_sum - 1.0) > 1e-6 and weights_sum > 0:
         wU, wS, wC, wL = (wU / weights_sum, wS / weights_sum, wC / weights_sum, wL / weights_sum)
-    score = wU * U + wS * S - wC * C + wL * L
+    cost_penalty = wC * (C ** 2)
+    score = wU * U + wS * S + wL * L - cost_penalty
     if score >= tau:
-        return ScoreGateVerdict.PROMOTE, score
+        return ScoreGateResult(ScoreGateVerdict.PROMOTE, score)
     if score >= max(0.0, tau - canary_margin):
-        return ScoreGateVerdict.CANARY, score
-    return ScoreGateVerdict.FAIL, score
+        return ScoreGateResult(ScoreGateVerdict.CANARY, score)
+    return ScoreGateResult(ScoreGateVerdict.FAIL, score)
 
 def quick_score_gate(U: float, S: float, C: float, L: float) -> Tuple[ScoreVerdict, float]:
     """Quick score gate for testing"""
-    verdict, score = score_gate(U, S, C, L, 0.25, 0.25, 0.25, 0.25, 0.7)
-    # Convert ScoreGateVerdict to ScoreVerdict
-    if verdict == ScoreGateVerdict.PROMOTE:
-        return ScoreVerdict.PROMOTE, score
-    elif verdict == ScoreGateVerdict.CANARY:
-        return ScoreVerdict.CANARY, score
-    else:
-        return ScoreVerdict.FAIL, score
+    result = score_gate(U, S, C, L, 0.25, 0.25, 0.25, 0.25, 0.7)
+    if result.verdict_enum is ScoreGateVerdict.PROMOTE:
+        return ScoreVerdict.PROMOTE, result.score
+    if result.verdict_enum is ScoreGateVerdict.CANARY:
+        return ScoreVerdict.CANARY, result.score
+    return ScoreVerdict.FAIL, result.score
 
 def normalize_series(values: List[float], method: str = 'minmax') -> List[float]:
     """Normalize a series of values"""

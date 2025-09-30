@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Dict, Any, Tuple
+from typing import Any, Dict, Tuple
 
 EPS = 1e-9
 
@@ -14,19 +14,6 @@ def clamp01(x: float) -> float:
     return x
 
 
-def phi_caos(
-    C: float,
-    A: float,
-    O: float,
-    S: float,
-    kappa: float = 2.0,
-    kappa_max: float = 10.0,
-    gamma: float = 0.7,
-) -> float:
-    C = clamp01(C)
-    A = clamp01(A)
-    O = clamp01(O)
-    S = clamp01(S)
 def phi_caos(
     C: float,
     A: float,
@@ -73,14 +60,14 @@ def validate_caos_stability(C: float, A: float, O: float, S: float) -> Dict[str,
 
 class CAOSComponents:
     """CAOS components for testing"""
-    
-    def __init__(self, C: float = 0.5, A: float = 0.5, O: float = 0.5, S: float = 0.5):
+
     def __init__(self, C: float = 0.5, A: float = 0.5, O: float = 0.5, S: float = 0.5):
         # Validate and clamp CAOS components to [0, 1] range
         self.C = max(0.0, min(1.0, C))
         self.A = max(0.0, min(1.0, A))
         self.O = max(0.0, min(1.0, O))
         self.S = max(0.0, min(1.0, S))
+
     def to_dict(self) -> Dict[str, float]:
         """Convert to dictionary"""
         return {"C": self.C, "A": self.A, "O": self.O, "S": self.S}

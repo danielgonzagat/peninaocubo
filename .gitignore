@@ -1,14 +1,31 @@
+# Byte-compiled / cache
 __pycache__/
 *.py[cod]
+*.pyo
+*.pyd
 
-# --- PENIN hygiene ---
-__pycache__/
-*.pyc
+# Virtual environments
 .venv/
-.env
-.DS_Store
-dist/
-build/
 
-__pycache__/
-*.pyc
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Tool caches
+.mypy_cache/
+.pytest_cache/
+
+# Databases and stateful artifacts
+*.db
+*.sqlite
+*.sqlite3
+ledger_*.jsonl
+
+# Build artifacts
+build/
+dist/
+site/
+
+# OS / editor
+.DS_Store

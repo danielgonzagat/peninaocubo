@@ -45,10 +45,10 @@ import uuid
 import math
 import random
 import hashlib
+import hmac
 import asyncio
 import threading
 import multiprocessing
-import pickle
 import sqlite3
 import logging
 import signal
@@ -60,6 +60,25 @@ from collections import deque, defaultdict, OrderedDict
 from functools import lru_cache
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor, as_completed
 from enum import Enum
+
+try:
+    import orjson  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover
+    orjson = None
+
+
+def _cache_dumps(obj: Any) -> bytes:
+    if orjson is not None:
+        return orjson.dumps(obj)
+    return json.dumps(obj, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+
+
+def _cache_loads(data: bytes) -> Any:
+    if orjson is not None:
+        return orjson.loads(data)
+    if isinstance(data, (bytes, bytearray)):
+        return json.loads(data.decode("utf-8"))
+    return json.loads(data)
 
 # Pydantic for config validation
 try:
@@ -590,6 +609,8 @@ class MultiLevelCache:
                 self.l3_redis = None
         self.stats = defaultdict(lambda: {"hits": 0, "misses": 0, "evictions": 0})
         self._lock = threading.RLock()
+        self._hmac_key = (os.getenv("PENIN_CACHE_HMAC_KEY") or "penin-dev-key").encode("utf-8")
+        self._digest_size = hashlib.sha256().digest_size
         
     def _init_l2_db(self):
         cursor = self.l2_db.cursor()
@@ -610,11 +631,20 @@ class MultiLevelCache:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_access ON cache(access_count)')
         self.l2_db.commit()
         
-    def _serialize(self, obj: Any) -> bytes: 
-        return pickle.dumps(obj)
-        
-    def _deserialize(self, b: bytes) -> Any: 
-        return pickle.loads(b)
+    def _serialize(self, obj: Any) -> bytes:
+        payload = _cache_dumps(obj)
+        mac = hmac.new(self._hmac_key, payload, hashlib.sha256).digest()
+        return mac + payload
+
+    def _deserialize(self, b: bytes) -> Any:
+        if len(b) < self._digest_size:
+            raise ValueError("L2 cache payload truncated")
+        mac = b[: self._digest_size]
+        payload = b[self._digest_size :]
+        expected = hmac.new(self._hmac_key, payload, hashlib.sha256).digest()
+        if not hmac.compare_digest(mac, expected):
+            raise ValueError("L2 cache HMAC mismatch")
+        return _cache_loads(payload)
         
     def _promote_to_l1(self, key: str, value: Any):
         if len(self.l1_cache) >= self.l1_size:
@@ -1165,7 +1195,6 @@ class EthicsMetrics:
             "rho": rho,
             "limits": {"ece_max": self.ece_max, "bias_max": self.bias_max, "rho_max": self.rho_max},
         }
-        }
 
 # -----------------------------------------------------------------------------
 # Fibonacci manager for TTL, trust region and LR search
@@ -1425,14 +1454,6 @@ class PeninOmegaCore:
             ethics_metrics = None
             if self.ethics_calculator and HAS_ETHICS:
                 try:
-                    # Generate synthetic test data for demonstration
-                    # In production, this would come from actual model predictions and evaluation
-                    n_samples = 1000
-                    predictions = [self.rng.random() for _ in range(n_samples)]
-            # P0 Fix: Calculate and attest ethical metrics
-            ethics_metrics = None
-            if self.ethics_calculator and HAS_ETHICS:
-                try:
                     # TODO: Replace with actual model predictions and evaluation data
                     # This synthetic data should be replaced with real model outputs
                     # from the current cycle's LLM interactions
@@ -1462,7 +1483,7 @@ class PeninOmegaCore:
                                 'energy_efficiency_ok': True,
                                 'waste_minimization_ok': True
                             }
-                            
+
                             ethics_metrics = self.ethics_calculator.calculate_all_metrics(
                                 predictions=predictions,
                                 targets=targets,
@@ -1473,11 +1494,6 @@ class PeninOmegaCore:
                                 dataset_id=f"cycle_{self.xt.cycle}",
                                 seed=self.rng.seed
                             )
-                        consent_data=consent_data,
-                        eco_data=eco_data,
-                        dataset_id=f"cycle_{self.xt.cycle}",
-                        seed=self.rng.seed
-                    )
                     
                     # Log ethics metrics to WORM
                     self.worm.record(
