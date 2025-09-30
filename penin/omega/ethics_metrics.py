@@ -314,9 +314,10 @@ class EthicsCalculator:
         if rolling_var[0] == 0:
             rho_risk = 1.0
         else:
-            # Linear regression on log variance
-            x = list(range(len(rolling_var)))
-            y = [math.log(v + 1e-10) for v in rolling_var]  # Add small epsilon to avoid log(0)
+        # Calculate contraction factor
+        if any(v == 0 for v in rolling_var):
+            rho_risk = 1.0  # Conservative default when variance is zero
+        else:
             
             # Simple linear regression
             n = len(x)
