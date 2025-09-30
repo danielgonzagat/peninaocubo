@@ -143,9 +143,13 @@ class MultiLLMRouter:
         lat = max(0.01, r.latency_s)
         # Penalize higher cost and long latency; favor non-empty content
         cost = max(0.0, r.cost_usd)
-        # Budget-aware soft penalty
-        budget = max(0.01, settings.PENIN_BUDGET_DAILY_USD)
+        # Budget-aware soft penalty with fallback
+        try:
+            budget = max(0.01, settings.PENIN_BUDGET_DAILY_USD)
+        except (AttributeError, NameError):
+            budget = 1.0  # Default budget fallback
         cost_penalty = 1.0 / (1.0 + cost / budget)
+        return base + (1.0 / lat) * cost_penalty
         return base + (1.0 / lat) * cost_penalty
 
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=0.5))
