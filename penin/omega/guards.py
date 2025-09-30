@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 # Import do módulo de métricas éticas
-from .ethics_metrics import EthicsCalculator, EthicsMetrics
+from .ethics_metrics import EthicsCalculator, EthicsMetrics, calculate_and_validate_ethics
 
 
 class GuardResultType(Enum):
