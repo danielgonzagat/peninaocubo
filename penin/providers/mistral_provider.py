@@ -1,22 +1,24 @@
-import time
 import asyncio
-from typing import List, Optional
+import time
+
 from mistralai import Mistral
-from .base import BaseProvider, LLMResponse, Message, Tool
+
 from penin.config import settings
+
+from .base import BaseProvider, LLMResponse, Message, Tool
 
 
 class MistralProvider(BaseProvider):
-    def __init__(self, model: Optional[str] = None):
+    def __init__(self, model: str | None = None):
         self.name = "mistral"
         self.model = model or settings.MISTRAL_MODEL
         self.client = Mistral(api_key=settings.MISTRAL_API_KEY)
 
     async def chat(
         self,
-        messages: List[Message],
-        tools: Optional[List[Tool]] = None,
-        system: Optional[str] = None,
+        messages: list[Message],
+        tools: list[Tool] | None = None,
+        system: str | None = None,
         temperature: float = 0.3,
     ) -> LLMResponse:
         start = time.time()
@@ -27,4 +29,6 @@ class MistralProvider(BaseProvider):
         resp = await asyncio.to_thread(self.client.chat.complete, model=self.model, messages=msgs)
         content = resp.choices[0].message.content
         end = time.time()
-        return LLMResponse(content=content, model=self.model, provider=self.name, latency_s=end - start)
+        return LLMResponse(
+            content=content, model=self.model, provider=self.name, latency_s=end - start
+        )

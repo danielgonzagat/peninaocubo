@@ -1,8 +1,6 @@
-import os
 import glob
-from typing import List
+import os
 
 
-def list_pdfs(folder: str) -> List[str]:
+def list_pdfs(folder: str) -> list[str]:
     return glob.glob(os.path.join(folder, "*.pdf"))
-

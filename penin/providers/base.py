@@ -1,9 +1,8 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-
-Message = Dict[str, Any]
-Tool = Dict[str, Any]
+Message = dict[str, Any]
+Tool = dict[str, Any]
 
 
 class LLMResponse:
@@ -13,7 +12,7 @@ class LLMResponse:
         model: str,
         tokens_in: int = 0,
         tokens_out: int = 0,
-        tool_calls: Optional[List[Dict[str, Any]]] = None,
+        tool_calls: list[dict[str, Any]] | None = None,
         cost_usd: float = 0.0,
         latency_s: float = 0.0,
         provider: str = "",
@@ -35,9 +34,8 @@ class BaseProvider(ABC):
     @abstractmethod
     async def chat(
         self,
-        messages: List[Message],
-        tools: Optional[List[Tool]] = None,
-        system: Optional[str] = None,
+        messages: list[Message],
+        tools: list[Tool] | None = None,
+        system: str | None = None,
         temperature: float = 0.7,
-    ) -> LLMResponse:
-        ...
+    ) -> LLMResponse: ...

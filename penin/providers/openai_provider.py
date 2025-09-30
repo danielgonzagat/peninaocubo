@@ -1,6 +1,6 @@
 import asyncio
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from openai import OpenAI
 
@@ -10,25 +10,25 @@ from .base import BaseProvider, LLMResponse, Message, Tool
 
 
 class OpenAIProvider(BaseProvider):
-    def __init__(self, model: Optional[str] = None):
+    def __init__(self, model: str | None = None):
         self.name = "openai"
         self.model = model or settings.OPENAI_MODEL
         self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
     async def chat(
         self,
-        messages: List[Message],
-        tools: Optional[List[Tool]] = None,
-        system: Optional[str] = None,
+        messages: list[Message],
+        tools: list[Tool] | None = None,
+        system: str | None = None,
         temperature: float = 0.7,
     ) -> LLMResponse:
         start = time.time()
-        msgs: List[Message] = []
+        msgs: list[Message] = []
         if system:
             msgs.append({"role": "system", "content": system})
         msgs.extend(messages)
 
-        kwargs: Dict[str, Any] = {
+        kwargs: dict[str, Any] = {
             "model": self.model,
             "messages": msgs,
             "temperature": temperature,
@@ -42,7 +42,7 @@ class OpenAIProvider(BaseProvider):
         content = getattr(message, "content", "") if message else ""
         raw_tool_calls = getattr(message, "tool_calls", None) if message else None
 
-        tool_calls: List[Dict[str, Any]] = []
+        tool_calls: list[dict[str, Any]] = []
         if raw_tool_calls:
             for call in raw_tool_calls:
                 if isinstance(call, dict):
