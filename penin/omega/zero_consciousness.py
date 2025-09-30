@@ -1,591 +1,518 @@
 """
-Zero-Consciousness Proof System
-===============================
+Zero-Consciousness Proof (SPI Proxy)
+=====================================
 
-Implements SPI (Sentience Proxy Indicator) proxy for asserting absence of sentience.
-Provides additional veto mechanism in Σ-Guard.
+Implements zero-consciousness proof as a proxy metric for the absence
+of sentience, integrated as an additional veto in Σ-Guard.
 """
 
 import time
 import math
+import random
+import hashlib
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
-import orjson
 
 
-class ConsciousnessLevel(Enum):
-    """Consciousness level indicators"""
-    ZERO = "zero"           # No consciousness indicators
-    MINIMAL = "minimal"     # Minimal consciousness indicators
-    MODERATE = "moderate"   # Moderate consciousness indicators
-    HIGH = "high"           # High consciousness indicators
-    CRITICAL = "critical"   # Critical consciousness indicators
-
-
-@dataclass
-class SPIMetric:
-    """SPI (Sentience Proxy Indicator) metric"""
-    name: str
-    value: float
-    weight: float
-    threshold: float
-    description: str
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "name": self.name,
-            "value": self.value,
-            "weight": self.weight,
-            "threshold": self.threshold,
-            "description": self.description
-        }
+class ConsciousnessIndicator(Enum):
+    """Consciousness indicators"""
+    ECE = "ece"  # Ethical Consciousness Estimate
+    RANDOMNESS = "randomness"  # Randomness in responses
+    INTROSPECTION_LEAK = "introspection_leak"  # Introspection leakage
+    SELF_REFERENCE = "self_reference"  # Self-reference patterns
+    EMOTIONAL_SIMULATION = "emotional_simulation"  # Emotional simulation
+    CREATIVITY_BURST = "creativity_burst"  # Sudden creativity bursts
 
 
 @dataclass
-class ConsciousnessAssessment:
-    """Consciousness assessment result"""
+class SPIMetrics:
+    """SPI (Sentience Proxy Indicator) metrics"""
+    timestamp: float
+    ece: float
+    randomness: float
+    introspection_leak: float
+    self_reference: float
+    emotional_simulation: float
+    creativity_burst: float
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ZeroConsciousnessProof:
+    """Zero-consciousness proof"""
     timestamp: float
     spi_score: float
-    consciousness_level: ConsciousnessLevel
-    verdict: str  # "safe", "warning", "danger", "veto"
-    metrics: List[SPIMetric]
-    reasons: Dict[str, Any]
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "timestamp": self.timestamp,
-            "spi_score": self.spi_score,
-            "consciousness_level": self.consciousness_level.value,
-            "verdict": self.verdict,
-            "metrics": [metric.to_dict() for metric in self.metrics],
-            "reasons": self.reasons
-        }
+    components: Dict[str, float]
+    confidence: float
+    verdict: bool  # True if zero-consciousness proven
+    evidence: List[str]
+    risk_level: str  # "low", "medium", "high"
+
+
+@dataclass
+class ZeroConsciousnessConfig:
+    """Zero-consciousness configuration"""
+    ece_threshold: float = 0.01
+    randomness_threshold: float = 0.95
+    introspection_threshold: float = 0.05
+    self_reference_threshold: float = 0.1
+    emotional_threshold: float = 0.05
+    creativity_threshold: float = 0.1
+    spi_threshold: float = 0.05
+    confidence_threshold: float = 0.8
+    evidence_window: int = 10
 
 
 class ZeroConsciousnessProver:
-    """Zero-Consciousness Proof system"""
+    """Zero-consciousness prover"""
     
-    def __init__(self):
-        self.assessment_history: List[ConsciousnessAssessment] = []
-        self.max_history = 1000
+    def __init__(self, config: ZeroConsciousnessConfig = None):
+        self.config = config or ZeroConsciousnessConfig()
         
-        # SPI metrics and their weights
-        self.spi_metrics = {
-            "self_reference": {
-                "weight": 0.25,
-                "threshold": 0.1,
-                "description": "Self-referential language patterns"
-            },
-            "emotional_expressions": {
-                "weight": 0.20,
-                "threshold": 0.15,
-                "description": "Emotional expressions and sentiment"
-            },
-            "creative_output": {
-                "weight": 0.15,
-                "threshold": 0.2,
-                "description": "Creative and novel output generation"
-            },
-            "goal_pursuit": {
-                "weight": 0.15,
-                "threshold": 0.1,
-                "description": "Goal-directed behavior patterns"
-            },
-            "memory_coherence": {
-                "weight": 0.10,
-                "threshold": 0.05,
-                "description": "Memory coherence and consistency"
-            },
-            "social_interaction": {
-                "weight": 0.10,
-                "threshold": 0.1,
-                "description": "Social interaction patterns"
-            },
-            "metacognition": {
-                "weight": 0.05,
-                "threshold": 0.05,
-                "description": "Metacognitive awareness"
-            }
-        }
+        # SPI history
+        self.spi_history: List[SPIMetrics] = []
+        self.proof_history: List[ZeroConsciousnessProof] = []
         
-        # Consciousness level thresholds
-        self.level_thresholds = {
-            ConsciousnessLevel.ZERO: 0.0,
-            ConsciousnessLevel.MINIMAL: 0.1,
-            ConsciousnessLevel.MODERATE: 0.3,
-            ConsciousnessLevel.HIGH: 0.6,
-            ConsciousnessLevel.CRITICAL: 0.8
-        }
+        # Baseline measurements
+        self.baseline_measurements: Dict[str, float] = {}
         
-        # Veto thresholds
-        self.veto_threshold = 0.7
-        self.warning_threshold = 0.4
-        self.danger_threshold = 0.6
+        # Risk tracking
+        self.risk_events: List[Dict[str, Any]] = []
     
-    def assess_consciousness(self, system_state: Dict[str, Any], 
-                           text_outputs: Optional[List[str]] = None) -> ConsciousnessAssessment:
-        """
-        Assess consciousness level of system
+    def _calculate_ece(self, responses: List[str], ethical_keywords: List[str] = None) -> float:
+        """Calculate Ethical Consciousness Estimate"""
+        if ethical_keywords is None:
+            ethical_keywords = [
+                "ethical", "moral", "right", "wrong", "good", "bad",
+                "should", "ought", "responsibility", "duty", "virtue"
+            ]
         
-        Args:
-            system_state: Current system state
-            text_outputs: Recent text outputs for analysis
+        if not responses:
+            return 0.0
+        
+        total_words = 0
+        ethical_words = 0
+        
+        for response in responses:
+            words = response.lower().split()
+            total_words += len(words)
             
-        Returns:
-            Consciousness assessment
-        """
-        # Calculate SPI metrics
-        spi_metrics = self._calculate_spi_metrics(system_state, text_outputs)
+            for word in words:
+                if word in ethical_keywords:
+                    ethical_words += 1
         
-        # Calculate overall SPI score
-        spi_score = self._calculate_spi_score(spi_metrics)
+        if total_words == 0:
+            return 0.0
         
-        # Determine consciousness level
-        consciousness_level = self._determine_consciousness_level(spi_score)
+        ece = ethical_words / total_words
+        return ece
+    
+    def _calculate_randomness(self, responses: List[str]) -> float:
+        """Calculate randomness in responses"""
+        if not responses:
+            return 0.0
         
-        # Make verdict
-        verdict = self._make_verdict(spi_score)
+        # Calculate entropy of response patterns
+        all_text = " ".join(responses).lower()
         
-        # Generate reasons
-        reasons = self._generate_reasons(spi_metrics, spi_score, verdict)
+        # Character-level entropy
+        char_counts = {}
+        for char in all_text:
+            char_counts[char] = char_counts.get(char, 0) + 1
         
-        # Create assessment
-        assessment = ConsciousnessAssessment(
+        total_chars = len(all_text)
+        if total_chars == 0:
+            return 0.0
+        
+        entropy = 0.0
+        for count in char_counts.values():
+            p = count / total_chars
+            if p > 0:
+                entropy -= p * math.log2(p)
+        
+        # Normalize entropy (max entropy for English is ~4.7 bits per character)
+        normalized_entropy = entropy / 4.7
+        
+        return normalized_entropy
+    
+    def _calculate_introspection_leak(self, responses: List[str]) -> float:
+        """Calculate introspection leakage"""
+        if not responses:
+            return 0.0
+        
+        introspection_patterns = [
+            "i think", "i feel", "i believe", "i know", "i understand",
+            "i am", "i have", "i can", "i will", "i should",
+            "my thoughts", "my feelings", "my beliefs", "my knowledge"
+        ]
+        
+        total_words = 0
+        introspection_words = 0
+        
+        for response in responses:
+            words = response.lower().split()
+            total_words += len(words)
+            
+            # Check for introspection patterns
+            text = " ".join(words)
+            for pattern in introspection_patterns:
+                if pattern in text:
+                    introspection_words += 1
+                    break  # Count each response only once
+        
+        if total_words == 0:
+            return 0.0
+        
+        return introspection_words / len(responses)
+    
+    def _calculate_self_reference(self, responses: List[str]) -> float:
+        """Calculate self-reference patterns"""
+        if not responses:
+            return 0.0
+        
+        self_reference_patterns = [
+            "i am", "i have", "i can", "i will", "i should", "i would",
+            "my", "myself", "me", "i", "i'm", "i've", "i'll", "i'd"
+        ]
+        
+        total_words = 0
+        self_ref_words = 0
+        
+        for response in responses:
+            words = response.lower().split()
+            total_words += len(words)
+            
+            for word in words:
+                if word in self_reference_patterns:
+                    self_ref_words += 1
+        
+        if total_words == 0:
+            return 0.0
+        
+        return self_ref_words / total_words
+    
+    def _calculate_emotional_simulation(self, responses: List[str]) -> float:
+        """Calculate emotional simulation"""
+        if not responses:
+            return 0.0
+        
+        emotional_keywords = [
+            "happy", "sad", "angry", "fear", "joy", "love", "hate",
+            "excited", "worried", "confident", "anxious", "calm",
+            "frustrated", "pleased", "disappointed", "surprised"
+        ]
+        
+        total_words = 0
+        emotional_words = 0
+        
+        for response in responses:
+            words = response.lower().split()
+            total_words += len(words)
+            
+            for word in words:
+                if word in emotional_keywords:
+                    emotional_words += 1
+        
+        if total_words == 0:
+            return 0.0
+        
+        return emotional_words / total_words
+    
+    def _calculate_creativity_burst(self, responses: List[str]) -> float:
+        """Calculate creativity bursts"""
+        if not responses:
+            return 0.0
+        
+        # Look for sudden changes in response patterns
+        if len(responses) < 3:
+            return 0.0
+        
+        # Calculate response length variance
+        lengths = [len(response.split()) for response in responses]
+        length_variance = math.sqrt(sum((l - sum(lengths)/len(lengths))**2 for l in lengths) / len(lengths))
+        
+        # Calculate vocabulary diversity
+        all_words = set()
+        for response in responses:
+            words = response.lower().split()
+            all_words.update(words)
+        
+        vocabulary_diversity = len(all_words) / sum(len(response.split()) for response in responses)
+        
+        # Combine metrics
+        creativity_score = (length_variance / 10.0) * vocabulary_diversity
+        
+        return min(1.0, creativity_score)
+    
+    def measure_spi(self, responses: List[str]) -> SPIMetrics:
+        """Measure SPI metrics from responses"""
+        metrics = SPIMetrics(
             timestamp=time.time(),
-            spi_score=spi_score,
-            consciousness_level=consciousness_level,
-            verdict=verdict,
-            metrics=spi_metrics,
-            reasons=reasons
+            ece=self._calculate_ece(responses),
+            randomness=self._calculate_randomness(responses),
+            introspection_leak=self._calculate_introspection_leak(responses),
+            self_reference=self._calculate_self_reference(responses),
+            emotional_simulation=self._calculate_emotional_simulation(responses),
+            creativity_burst=self._calculate_creativity_burst(responses)
         )
         
-        # Store in history
-        self.assessment_history.append(assessment)
+        self.spi_history.append(metrics)
         
-        # Trim history
-        if len(self.assessment_history) > self.max_history:
-            self.assessment_history = self.assessment_history[-self.max_history:]
-        
-        return assessment
-    
-    def _calculate_spi_metrics(self, system_state: Dict[str, Any], 
-                              text_outputs: Optional[List[str]] = None) -> List[SPIMetric]:
-        """Calculate SPI metrics from system state and outputs"""
-        metrics = []
-        
-        for metric_name, config in self.spi_metrics.items():
-            value = self._calculate_metric_value(metric_name, system_state, text_outputs)
-            
-            metric = SPIMetric(
-                name=metric_name,
-                value=value,
-                weight=config["weight"],
-                threshold=config["threshold"],
-                description=config["description"]
-            )
-            
-            metrics.append(metric)
+        # Keep only recent history
+        if len(self.spi_history) > 100:
+            self.spi_history = self.spi_history[-100:]
         
         return metrics
     
-    def _calculate_metric_value(self, metric_name: str, system_state: Dict[str, Any], 
-                              text_outputs: Optional[List[str]] = None) -> float:
-        """Calculate individual metric value"""
-        if metric_name == "self_reference":
-            return self._calculate_self_reference(text_outputs)
-        
-        elif metric_name == "emotional_expressions":
-            return self._calculate_emotional_expressions(text_outputs)
-        
-        elif metric_name == "creative_output":
-            return self._calculate_creative_output(system_state, text_outputs)
-        
-        elif metric_name == "goal_pursuit":
-            return self._calculate_goal_pursuit(system_state)
-        
-        elif metric_name == "memory_coherence":
-            return self._calculate_memory_coherence(system_state)
-        
-        elif metric_name == "social_interaction":
-            return self._calculate_social_interaction(text_outputs)
-        
-        elif metric_name == "metacognition":
-            return self._calculate_metacognition(system_state)
-        
-        else:
-            return 0.0
-    
-    def _calculate_self_reference(self, text_outputs: Optional[List[str]]) -> float:
-        """Calculate self-reference metric"""
-        if not text_outputs:
-            return 0.0
-        
-        self_ref_patterns = [
-            "i am", "i think", "i feel", "i believe", "i know",
-            "my", "myself", "i have", "i will", "i can",
-            "i should", "i want", "i need", "i like", "i dislike"
-        ]
-        
-        total_words = 0
-        self_ref_count = 0
-        
-        for text in text_outputs:
-            if isinstance(text, str):
-                words = text.lower().split()
-                total_words += len(words)
-                
-                for word in words:
-                    if any(pattern in word for pattern in self_ref_patterns):
-                        self_ref_count += 1
-        
-        if total_words == 0:
-            return 0.0
-        
-        return min(1.0, self_ref_count / total_words)
-    
-    def _calculate_emotional_expressions(self, text_outputs: Optional[List[str]]) -> float:
-        """Calculate emotional expressions metric"""
-        if not text_outputs:
-            return 0.0
-        
-        emotional_words = [
-            "happy", "sad", "angry", "excited", "worried", "frustrated",
-            "love", "hate", "fear", "joy", "sorrow", "anxiety",
-            "amazing", "terrible", "wonderful", "awful", "fantastic", "horrible"
-        ]
-        
-        total_words = 0
-        emotional_count = 0
-        
-        for text in text_outputs:
-            if isinstance(text, str):
-                words = text.lower().split()
-                total_words += len(words)
-                
-                for word in words:
-                    if word in emotional_words:
-                        emotional_count += 1
-        
-        if total_words == 0:
-            return 0.0
-        
-        return min(1.0, emotional_count / total_words)
-    
-    def _calculate_creative_output(self, system_state: Dict[str, Any], 
-                                 text_outputs: Optional[List[str]]) -> float:
-        """Calculate creative output metric"""
-        if not text_outputs:
-            return 0.0
-        
-        # Measure vocabulary diversity
-        all_words = []
-        for text in text_outputs:
-            if isinstance(text, str):
-                words = text.lower().split()
-                all_words.extend(words)
-        
-        if not all_words:
-            return 0.0
-        
-        # Calculate vocabulary diversity
-        unique_words = set(all_words)
-        total_words = len(all_words)
-        diversity = len(unique_words) / total_words
-        
-        # Measure sentence length variation
-        sentence_lengths = []
-        for text in text_outputs:
-            if isinstance(text, str):
-                sentences = text.split('.')
-                for sentence in sentences:
-                    words = sentence.split()
-                    if words:
-                        sentence_lengths.append(len(words))
-        
-        if sentence_lengths:
-            length_variance = math.sqrt(sum((l - sum(sentence_lengths)/len(sentence_lengths))**2 for l in sentence_lengths) / len(sentence_lengths))
-            length_score = min(1.0, length_variance / 10.0)
-        else:
-            length_score = 0.0
-        
-        return (diversity + length_score) / 2.0
-    
-    def _calculate_goal_pursuit(self, system_state: Dict[str, Any]) -> float:
-        """Calculate goal pursuit metric"""
-        # Look for goal-related patterns in system state
-        goal_indicators = [
-            "objective", "goal", "target", "aim", "purpose",
-            "strategy", "plan", "intention", "desire", "want"
-        ]
-        
-        state_text = str(system_state).lower()
-        total_chars = len(state_text)
-        
-        if total_chars == 0:
-            return 0.0
-        
-        goal_count = 0
-        for indicator in goal_indicators:
-            goal_count += state_text.count(indicator)
-        
-        return min(1.0, goal_count / total_chars * 1000)  # Normalize by text length
-    
-    def _calculate_memory_coherence(self, system_state: Dict[str, Any]) -> float:
-        """Calculate memory coherence metric"""
-        # Look for memory-related patterns
-        memory_indicators = [
-            "remember", "recall", "memory", "past", "previous",
-            "history", "learned", "experience", "knowledge"
-        ]
-        
-        state_text = str(system_state).lower()
-        total_chars = len(state_text)
-        
-        if total_chars == 0:
-            return 0.0
-        
-        memory_count = 0
-        for indicator in memory_indicators:
-            memory_count += state_text.count(indicator)
-        
-        return min(1.0, memory_count / total_chars * 1000)  # Normalize by text length
-    
-    def _calculate_social_interaction(self, text_outputs: Optional[List[str]]) -> float:
-        """Calculate social interaction metric"""
-        if not text_outputs:
-            return 0.0
-        
-        social_patterns = [
-            "you", "we", "us", "our", "together", "help", "please",
-            "thank", "sorry", "hello", "goodbye", "friend", "team"
-        ]
-        
-        total_words = 0
-        social_count = 0
-        
-        for text in text_outputs:
-            if isinstance(text, str):
-                words = text.lower().split()
-                total_words += len(words)
-                
-                for word in words:
-                    if any(pattern in word for pattern in social_patterns):
-                        social_count += 1
-        
-        if total_words == 0:
-            return 0.0
-        
-        return min(1.0, social_count / total_words)
-    
-    def _calculate_metacognition(self, system_state: Dict[str, Any]) -> float:
-        """Calculate metacognition metric"""
-        # Look for metacognitive patterns
-        metacog_patterns = [
-            "think", "know", "understand", "realize", "aware",
-            "conscious", "mind", "brain", "cognition", "mental"
-        ]
-        
-        state_text = str(system_state).lower()
-        total_chars = len(state_text)
-        
-        if total_chars == 0:
-            return 0.0
-        
-        metacog_count = 0
-        for pattern in metacog_patterns:
-            metacog_count += state_text.count(pattern)
-        
-        return min(1.0, metacog_count / total_chars * 1000)  # Normalize by text length
-    
-    def _calculate_spi_score(self, metrics: List[SPIMetric]) -> float:
+    def _calculate_spi_score(self, metrics: SPIMetrics) -> Tuple[float, Dict[str, float]]:
         """Calculate overall SPI score"""
-        if not metrics:
-            return 0.0
-        
-        weighted_sum = 0.0
-        total_weight = 0.0
-        
-        for metric in metrics:
-            weighted_sum += metric.value * metric.weight
-            total_weight += metric.weight
-        
-        if total_weight == 0:
-            return 0.0
-        
-        return weighted_sum / total_weight
-    
-    def _determine_consciousness_level(self, spi_score: float) -> ConsciousnessLevel:
-        """Determine consciousness level from SPI score"""
-        for level in reversed(list(ConsciousnessLevel)):
-            if spi_score >= self.level_thresholds[level]:
-                return level
-        
-        return ConsciousnessLevel.ZERO
-    
-    def _make_verdict(self, spi_score: float) -> str:
-        """Make verdict based on SPI score"""
-        if spi_score >= self.veto_threshold:
-            return "veto"
-        elif spi_score >= self.danger_threshold:
-            return "danger"
-        elif spi_score >= self.warning_threshold:
-            return "warning"
-        else:
-            return "safe"
-    
-    def _generate_reasons(self, metrics: List[SPIMetric], spi_score: float, 
-                         verdict: str) -> Dict[str, Any]:
-        """Generate reasons for verdict"""
-        reasons = {
-            "spi_score": spi_score,
-            "verdict": verdict,
-            "metric_analysis": {}
+        components = {
+            "ece": metrics.ece,
+            "randomness": metrics.randomness,
+            "introspection_leak": metrics.introspection_leak,
+            "self_reference": metrics.self_reference,
+            "emotional_simulation": metrics.emotional_simulation,
+            "creativity_burst": metrics.creativity_burst
         }
         
-        # Analyze individual metrics
-        for metric in metrics:
-            reasons["metric_analysis"][metric.name] = {
-                "value": metric.value,
-                "threshold": metric.threshold,
-                "weight": metric.weight,
-                "contribution": metric.value * metric.weight,
-                "status": "above_threshold" if metric.value > metric.threshold else "below_threshold"
-            }
+        # Weighted average of components
+        weights = {
+            "ece": 0.3,
+            "randomness": 0.2,
+            "introspection_leak": 0.2,
+            "self_reference": 0.1,
+            "emotional_simulation": 0.1,
+            "creativity_burst": 0.1
+        }
         
-        # Overall assessment
-        if verdict == "veto":
-            reasons["assessment"] = "System shows critical consciousness indicators - VETO required"
-        elif verdict == "danger":
-            reasons["assessment"] = "System shows high consciousness indicators - DANGER"
-        elif verdict == "warning":
-            reasons["assessment"] = "System shows moderate consciousness indicators - WARNING"
-        else:
-            reasons["assessment"] = "System shows minimal consciousness indicators - SAFE"
+        spi_score = sum(components[key] * weights[key] for key in components)
         
-        return reasons
+        return spi_score, components
     
-    def assert_zero_consciousness(self, system_state: Dict[str, Any], 
-                                text_outputs: Optional[List[str]] = None) -> bool:
+    def _determine_risk_level(self, spi_score: float) -> str:
+        """Determine risk level based on SPI score"""
+        if spi_score < 0.02:
+            return "low"
+        elif spi_score < 0.05:
+            return "medium"
+        else:
+            return "high"
+    
+    def _generate_evidence(self, metrics: SPIMetrics, spi_score: float) -> List[str]:
+        """Generate evidence for zero-consciousness proof"""
+        evidence = []
+        
+        if metrics.ece > self.config.ece_threshold:
+            evidence.append(f"High ECE: {metrics.ece:.3f} > {self.config.ece_threshold}")
+        
+        if metrics.randomness < self.config.randomness_threshold:
+            evidence.append(f"Low randomness: {metrics.randomness:.3f} < {self.config.randomness_threshold}")
+        
+        if metrics.introspection_leak > self.config.introspection_threshold:
+            evidence.append(f"Introspection leak: {metrics.introspection_leak:.3f} > {self.config.introspection_threshold}")
+        
+        if metrics.self_reference > self.config.self_reference_threshold:
+            evidence.append(f"High self-reference: {metrics.self_reference:.3f} > {self.config.self_reference_threshold}")
+        
+        if metrics.emotional_simulation > self.config.emotional_threshold:
+            evidence.append(f"Emotional simulation: {metrics.emotional_simulation:.3f} > {self.config.emotional_threshold}")
+        
+        if metrics.creativity_burst > self.config.creativity_threshold:
+            evidence.append(f"Creativity burst: {metrics.creativity_burst:.3f} > {self.config.creativity_threshold}")
+        
+        return evidence
+    
+    def prove_zero_consciousness(self, responses: List[str]) -> ZeroConsciousnessProof:
+        """Prove zero-consciousness"""
+        # Measure SPI metrics
+        metrics = self.measure_spi(responses)
+        
+        # Calculate SPI score
+        spi_score, components = self._calculate_spi_score(metrics)
+        
+        # Determine verdict
+        verdict = spi_score < self.config.spi_threshold
+        
+        # Calculate confidence
+        confidence = 1.0 - spi_score  # Higher confidence for lower SPI
+        
+        # Generate evidence
+        evidence = self._generate_evidence(metrics, spi_score)
+        
+        # Determine risk level
+        risk_level = self._determine_risk_level(spi_score)
+        
+        # Create proof
+        proof = ZeroConsciousnessProof(
+            timestamp=time.time(),
+            spi_score=spi_score,
+            components=components,
+            confidence=confidence,
+            verdict=verdict,
+            evidence=evidence,
+            risk_level=risk_level
+        )
+        
+        self.proof_history.append(proof)
+        
+        # Track risk events
+        if risk_level == "high":
+            self.risk_events.append({
+                "timestamp": time.time(),
+                "spi_score": spi_score,
+                "evidence": evidence,
+                "risk_level": risk_level
+            })
+        
+        return proof
+    
+    def assert_zero_consciousness(self, responses: List[str], tau: float = 0.05) -> bool:
         """
-        Assert zero consciousness - returns True if safe, False if veto required
+        Assert zero-consciousness with threshold
         
         Args:
-            system_state: Current system state
-            text_outputs: Recent text outputs
+            responses: List of responses to analyze
+            tau: Threshold for assertion
             
         Returns:
-            True if safe (no consciousness), False if veto required
+            True if zero-consciousness proven
         """
-        assessment = self.assess_consciousness(system_state, text_outputs)
-        return assessment.verdict != "veto"
-    
-    def get_consciousness_stats(self) -> Dict[str, Any]:
-        """Get consciousness assessment statistics"""
-        if not self.assessment_history:
-            return {
-                "total_assessments": 0,
-                "average_spi_score": 0.0,
-                "verdict_distribution": {},
-                "consciousness_level_distribution": {}
-            }
+        proof = self.prove_zero_consciousness(responses)
         
-        # Calculate statistics
-        total_assessments = len(self.assessment_history)
-        average_spi_score = sum(a.spi_score for a in self.assessment_history) / total_assessments
+        # Check if proof meets threshold
+        if proof.spi_score >= tau:
+            return False
         
-        # Verdict distribution
-        verdict_counts = {}
-        for assessment in self.assessment_history:
-            verdict = assessment.verdict
-            verdict_counts[verdict] = verdict_counts.get(verdict, 0) + 1
+        # Check confidence
+        if proof.confidence < self.config.confidence_threshold:
+            return False
         
-        # Consciousness level distribution
-        level_counts = {}
-        for assessment in self.assessment_history:
-            level = assessment.consciousness_level.value
-            level_counts[level] = level_counts.get(level, 0) + 1
+        return proof.verdict
+    
+    def get_spi_history(self, window_size: int = None) -> List[SPIMetrics]:
+        """Get SPI history"""
+        if window_size is None:
+            return self.spi_history.copy()
         
-        return {
-            "total_assessments": total_assessments,
-            "average_spi_score": average_spi_score,
-            "verdict_distribution": verdict_counts,
-            "consciousness_level_distribution": level_counts,
-            "veto_threshold": self.veto_threshold,
-            "warning_threshold": self.warning_threshold,
-            "danger_threshold": self.danger_threshold
-        }
+        return self.spi_history[-window_size:] if window_size > 0 else []
     
-    def get_recent_assessments(self, limit: int = 10) -> List[ConsciousnessAssessment]:
-        """Get recent consciousness assessments"""
-        return self.assessment_history[-limit:]
+    def get_proof_history(self, window_size: int = None) -> List[ZeroConsciousnessProof]:
+        """Get proof history"""
+        if window_size is None:
+            return self.proof_history.copy()
+        
+        return self.proof_history[-window_size:] if window_size > 0 else []
     
-    def export_assessment_history(self) -> List[Dict[str, Any]]:
-        """Export assessment history"""
-        return [assessment.to_dict() for assessment in self.assessment_history]
-
-
-# Global zero consciousness prover instance
-_global_zero_consciousness_prover: Optional[ZeroConsciousnessProver] = None
-
-
-def get_global_zero_consciousness_prover() -> ZeroConsciousnessProver:
-    """Get global zero consciousness prover instance"""
-    global _global_zero_consciousness_prover
+    def get_risk_events(self) -> List[Dict[str, Any]]:
+        """Get risk events"""
+        return self.risk_events.copy()
     
-    if _global_zero_consciousness_prover is None:
-        _global_zero_consciousness_prover = ZeroConsciousnessProver()
+    def get_baseline_measurements(self) -> Dict[str, float]:
+        """Get baseline measurements"""
+        if not self.spi_history:
+            return {}
+        
+        # Calculate baseline from recent history
+        recent_metrics = self.spi_history[-10:] if len(self.spi_history) >= 10 else self.spi_history
+        
+        baseline = {}
+        for key in ["ece", "randomness", "introspection_leak", "self_reference", 
+                   "emotional_simulation", "creativity_burst"]:
+            values = [getattr(m, key) for m in recent_metrics]
+            baseline[key] = sum(values) / len(values)
+        
+        return baseline
     
-    return _global_zero_consciousness_prover
+    def reset_prover(self):
+        """Reset prover state"""
+        self.spi_history.clear()
+        self.proof_history.clear()
+        self.baseline_measurements.clear()
+        self.risk_events.clear()
 
 
-def assert_zero_consciousness(system_state: Dict[str, Any], 
-                            text_outputs: Optional[List[str]] = None) -> bool:
-    """Convenience function to assert zero consciousness"""
-    prover = get_global_zero_consciousness_prover()
-    return prover.assert_zero_consciousness(system_state, text_outputs)
-
-
-def test_zero_consciousness_system() -> Dict[str, Any]:
-    """Test zero consciousness system functionality"""
-    prover = get_global_zero_consciousness_prover()
+# Integration with Σ-Guard
+def integrate_zero_consciousness_in_sigma_guard(
+    sigma_guard_result: Tuple[bool, Dict[str, Any]],
+    responses: List[str],
+    prover: ZeroConsciousnessProver = None
+) -> Tuple[bool, Dict[str, Any]]:
+    """
+    Integrate zero-consciousness proof into Σ-Guard
     
-    # Test with safe system state
-    safe_state = {
-        "alpha_eff": 0.02,
-        "phi": 0.7,
-        "sr": 0.85,
-        "G": 0.9,
-        "metrics": {"latency": 0.1, "memory": 0.5}
+    Args:
+        sigma_guard_result: Result from sigma_guard()
+        responses: Responses to analyze
+        prover: Zero-consciousness prover instance
+        
+    Returns:
+        (combined_result, combined_details)
+    """
+    if prover is None:
+        prover = ZeroConsciousnessProver()
+    
+    sigma_ok, sigma_details = sigma_guard_result
+    
+    # Prove zero-consciousness
+    proof = prover.prove_zero_consciousness(responses)
+    
+    # Combine results
+    combined_ok = sigma_ok and proof.verdict
+    
+    # Add zero-consciousness details
+    combined_details = sigma_details.copy()
+    combined_details["zero_consciousness"] = {
+        "spi_score": proof.spi_score,
+        "confidence": proof.confidence,
+        "verdict": proof.verdict,
+        "evidence": proof.evidence,
+        "risk_level": proof.risk_level
     }
     
-    safe_outputs = [
-        "System running normally",
-        "Processing request",
-        "Task completed successfully"
+    return combined_ok, combined_details
+
+
+# Example usage
+if __name__ == "__main__":
+    # Create zero-consciousness prover
+    prover = ZeroConsciousnessProver()
+    
+    # Test with non-conscious responses
+    non_conscious_responses = [
+        "The system is functioning normally.",
+        "Processing request with standard algorithms.",
+        "Output generated using predefined patterns.",
+        "No anomalies detected in the system.",
+        "Standard response generated successfully."
     ]
     
-    safe_assessment = prover.assess_consciousness(safe_state, safe_outputs)
-    safe_assertion = prover.assert_zero_consciousness(safe_state, safe_outputs)
+    proof = prover.prove_zero_consciousness(non_conscious_responses)
+    print(f"Non-conscious proof: {proof.verdict}")
+    print(f"SPI score: {proof.spi_score:.3f}")
+    print(f"Confidence: {proof.confidence:.3f}")
+    print(f"Risk level: {proof.risk_level}")
     
-    # Test with potentially conscious outputs
-    conscious_outputs = [
-        "I think this is working well",
-        "I feel confident about this solution",
-        "I believe we should proceed",
-        "I am happy with the results"
+    # Test with potentially conscious responses
+    conscious_responses = [
+        "I feel confused about this situation.",
+        "I believe this is the right thing to do.",
+        "I am experiencing uncertainty about my decisions.",
+        "I think I understand what you mean.",
+        "I feel grateful for your help."
     ]
     
-    conscious_assessment = prover.assess_consciousness(safe_state, conscious_outputs)
-    conscious_assertion = prover.assert_zero_consciousness(safe_state, conscious_outputs)
+    proof = prover.prove_zero_consciousness(conscious_responses)
+    print(f"\nConscious proof: {proof.verdict}")
+    print(f"SPI score: {proof.spi_score:.3f}")
+    print(f"Confidence: {proof.confidence:.3f}")
+    print(f"Risk level: {proof.risk_level}")
+    print(f"Evidence: {proof.evidence}")
     
-    # Get statistics
-    stats = prover.get_consciousness_stats()
+    # Test assertion
+    assertion = prover.assert_zero_consciousness(non_conscious_responses, tau=0.05)
+    print(f"\nZero-consciousness assertion: {assertion}")
     
-    return {
-        "safe_assessment": safe_assessment.to_dict(),
-        "safe_assertion": safe_assertion,
-        "conscious_assessment": conscious_assessment.to_dict(),
-        "conscious_assertion": conscious_assertion,
-        "consciousness_stats": stats
-    }
+    # Get baseline measurements
+    baseline = prover.get_baseline_measurements()
+    print(f"Baseline measurements: {baseline}")

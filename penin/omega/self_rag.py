@@ -2,86 +2,69 @@
 Self-RAG Recursive System
 =========================
 
-Implements recursive self-RAG for knowledge ingestion and querying.
-Uses simple token-based similarity for document retrieval.
+Implements recursive self-RAG for knowledge management and self-reflection.
+Uses lightweight text processing without heavy dependencies.
 """
 
+import os
 import re
 import json
 import time
 from collections import Counter
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
-from dataclasses import dataclass, field
-from enum import Enum
-
-
-class DocumentType(Enum):
-    """Document types"""
-    TEXT = "text"
-    CODE = "code"
-    CONFIG = "config"
-    LOG = "log"
-    METRIC = "metric"
+from dataclasses import dataclass
 
 
 @dataclass
-class Document:
-    """Document structure"""
+class KnowledgeEntry:
+    """Entry in the knowledge base"""
     name: str
     content: str
-    doc_type: DocumentType
-    created_at: float = field(default_factory=time.time)
-    metadata: Dict[str, Any] = field(default_factory=dict)
+    timestamp: float
+    source: str = "self_rag"
+    tags: List[str] = None
+    relevance_score: float = 0.0
     
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "name": self.name,
-            "content": self.content,
-            "doc_type": self.doc_type.value,
-            "created_at": self.created_at,
-            "metadata": self.metadata
-        }
+    def __post_init__(self):
+        if self.tags is None:
+            self.tags = []
 
 
-class SelfRAG:
-    """Self-RAG implementation"""
+class SelfRAGEngine:
+    """Self-RAG engine for recursive knowledge management"""
     
-    def __init__(self, knowledge_path: Optional[str] = None):
-        if knowledge_path is None:
-            root_path = Path.home() / ".penin_omega" / "knowledge"
-            root_path.mkdir(parents=True, exist_ok=True)
-            self.knowledge_path = root_path
-        else:
-            self.knowledge_path = Path(knowledge_path)
-            self.knowledge_path.mkdir(parents=True, exist_ok=True)
+    def __init__(self, knowledge_dir: str = None):
+        if knowledge_dir is None:
+            knowledge_dir = os.getenv("PENIN_ROOT", str(Path.home() / ".penin_omega"))
         
-        self.documents: Dict[str, Document] = {}
-        self.token_index: Dict[str, List[str]] = {}  # token -> document names
+        self.knowledge_dir = Path(knowledge_dir) / "knowledge"
+        self.knowledge_dir.mkdir(parents=True, exist_ok=True)
+        
+        self.knowledge_base: Dict[str, KnowledgeEntry] = {}
         self.query_history: List[Dict[str, Any]] = []
+        self.reflection_history: List[Dict[str, Any]] = []
         
-        # Load existing documents
-        self._load_documents()
+        # Load existing knowledge
+        self._load_knowledge_base()
     
-    def _load_documents(self) -> None:
-        """Load existing documents from knowledge path"""
-        for file_path in self.knowledge_path.glob("*.txt"):
+    def _load_knowledge_base(self):
+        """Load existing knowledge base"""
+        for txt_file in self.knowledge_dir.glob("*.txt"):
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(txt_file, 'r', encoding='utf-8') as f:
                     content = f.read()
                 
-                doc_name = file_path.stem
-                doc = Document(
-                    name=doc_name,
+                entry = KnowledgeEntry(
+                    name=txt_file.stem,
                     content=content,
-                    doc_type=DocumentType.TEXT
+                    timestamp=txt_file.stat().st_mtime,
+                    source="file"
                 )
                 
-                self.documents[doc_name] = doc
-                self._index_document(doc)
-                
+                self.knowledge_base[entry.name] = entry
             except Exception as e:
-                print(f"Warning: Failed to load {file_path}: {e}")
+                print(f"Error loading {txt_file}: {e}")
     
     def _tokenize(self, text: str) -> List[str]:
         """Simple tokenization"""
@@ -89,325 +72,304 @@ class SelfRAG:
         tokens = re.findall(r"[A-Za-z0-9_]+", text.lower())
         return [t for t in tokens if len(t) > 1]  # Filter single characters
     
-    def _index_document(self, doc: Document) -> None:
-        """Index document tokens"""
-        tokens = self._tokenize(doc.content)
-        
-        for token in tokens:
-            if token not in self.token_index:
-                self.token_index[token] = []
-            if doc.name not in self.token_index[token]:
-                self.token_index[token].append(doc.name)
-    
-    def ingest_text(self, name: str, text: str, doc_type: DocumentType = DocumentType.TEXT, 
-                   metadata: Optional[Dict[str, Any]] = None) -> bool:
-        """
-        Ingest text document
-        
-        Args:
-            name: Document name
-            text: Document content
-            doc_type: Type of document
-            metadata: Optional metadata
-            
-        Returns:
-            Success status
-        """
-        try:
-            # Create document
-            doc = Document(
-                name=name,
-                content=text,
-                doc_type=doc_type,
-                metadata=metadata or {}
-            )
-            
-            # Store document
-            self.documents[name] = doc
-            
-            # Index tokens
-            self._index_document(doc)
-            
-            # Save to file
-            file_path = self.knowledge_path / f"{name}.txt"
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(text)
-            
-            return True
-            
-        except Exception as e:
-            print(f"Error ingesting {name}: {e}")
-            return False
-    
-    def query(self, query_text: str, top_k: int = 3) -> List[Dict[str, Any]]:
-        """
-        Query documents using token similarity
-        
-        Args:
-            query_text: Query text
-            top_k: Number of top results to return
-            
-        Returns:
-            List of matching documents with scores
-        """
-        query_tokens = self._tokenize(query_text)
-        query_counter = Counter(query_tokens)
-        
-        # Score documents
-        doc_scores = {}
-        
-        for doc_name, doc in self.documents.items():
-            doc_tokens = self._tokenize(doc.content)
-            doc_counter = Counter(doc_tokens)
-            
-            # Calculate similarity score
-            score = self._calculate_similarity(query_counter, doc_counter)
-            doc_scores[doc_name] = {
-                "score": score,
-                "document": doc.to_dict(),
-                "matched_tokens": list(set(query_tokens) & set(doc_tokens))
-            }
-        
-        # Sort by score and return top_k
-        sorted_docs = sorted(doc_scores.items(), key=lambda x: x[1]["score"], reverse=True)
-        
-        results = []
-        for doc_name, doc_data in sorted_docs[:top_k]:
-            if doc_data["score"] > 0:
-                results.append({
-                    "doc_name": doc_name,
-                    "score": doc_data["score"],
-                    "content_preview": doc_data["document"]["content"][:200] + "...",
-                    "matched_tokens": doc_data["matched_tokens"],
-                    "doc_type": doc_data["document"]["doc_type"]
-                })
-        
-        # Record query
-        self.query_history.append({
-            "query": query_text,
-            "timestamp": time.time(),
-            "results_count": len(results),
-            "top_score": results[0]["score"] if results else 0.0
-        })
-        
-        return results
-    
-    def _calculate_similarity(self, query_tokens: Counter, doc_tokens: Counter) -> float:
-        """Calculate similarity between query and document tokens"""
+    def _compute_relevance(self, query_tokens: Counter, doc_tokens: Counter) -> float:
+        """Compute relevance score between query and document"""
         if not query_tokens or not doc_tokens:
             return 0.0
         
         # Jaccard similarity
-        intersection = sum(min(query_tokens[token], doc_tokens[token]) for token in query_tokens)
-        union = sum(max(query_tokens[token], doc_tokens[token]) for token in query_tokens)
-        
-        # Add tokens from doc that aren't in query
-        for token in doc_tokens:
-            if token not in query_tokens:
-                union += doc_tokens[token]
+        intersection = sum(min(query_tokens[k], doc_tokens[k]) for k in query_tokens.keys())
+        union = sum(max(query_tokens[k], doc_tokens[k]) for k in set(query_tokens.keys()) | set(doc_tokens.keys()))
         
         if union == 0:
             return 0.0
         
         return intersection / union
     
-    def self_cycle(self, base_question: str = "What is missing for safe evolution?") -> Dict[str, Any]:
-        """
-        Perform self-RAG cycle
-        
-        Args:
-            base_question: Initial question
+    def ingest_text(self, name: str, text: str, source: str = "self_rag", tags: List[str] = None) -> bool:
+        """Ingest text into knowledge base"""
+        try:
+            entry = KnowledgeEntry(
+                name=name,
+                content=text,
+                timestamp=time.time(),
+                source=source,
+                tags=tags or []
+            )
             
-        Returns:
-            Cycle results
-        """
-        # Step 1: Query for base question
-        initial_results = self.query(base_question, top_k=2)
+            # Save to file
+            file_path = self.knowledge_dir / f"{name}.txt"
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(text)
+            
+            # Add to knowledge base
+            self.knowledge_base[name] = entry
+            
+            return True
+        except Exception as e:
+            print(f"Error ingesting {name}: {e}")
+            return False
+    
+    def query(self, query_text: str, top_k: int = 3) -> List[Dict[str, Any]]:
+        """Query knowledge base"""
+        query_tokens = Counter(self._tokenize(query_text))
         
-        if not initial_results:
+        if not query_tokens:
+            return []
+        
+        # Score all documents
+        scored_docs = []
+        for name, entry in self.knowledge_base.items():
+            doc_tokens = Counter(self._tokenize(entry.content))
+            relevance = self._compute_relevance(query_tokens, doc_tokens)
+            
+            if relevance > 0:
+                scored_docs.append({
+                    "name": name,
+                    "content": entry.content,
+                    "relevance": relevance,
+                    "source": entry.source,
+                    "tags": entry.tags,
+                    "timestamp": entry.timestamp
+                })
+        
+        # Sort by relevance
+        scored_docs.sort(key=lambda x: x["relevance"], reverse=True)
+        
+        # Record query
+        query_record = {
+            "timestamp": time.time(),
+            "query": query_text,
+            "results_count": len(scored_docs),
+            "top_relevance": scored_docs[0]["relevance"] if scored_docs else 0.0
+        }
+        self.query_history.append(query_record)
+        
+        return scored_docs[:top_k]
+    
+    def self_cycle(self, base_question: str = None) -> Dict[str, Any]:
+        """Perform self-reflection cycle"""
+        if base_question is None:
+            base_question = "What are the key insights for improving PENIN-Ω evolution?"
+        
+        # Query knowledge base
+        results = self.query(base_question, top_k=3)
+        
+        if not results:
             return {
-                "q1": base_question,
-                "a1": None,
-                "q2": None,
-                "cycle_complete": False,
-                "reason": "no_documents_found"
+                "question": base_question,
+                "answer": "No relevant knowledge found",
+                "follow_up": "Consider ingesting more knowledge",
+                "cycle_complete": False
             }
         
-        # Step 2: Generate follow-up question based on best result
-        best_doc = initial_results[0]
-        follow_up_question = f"Detail the implementation requirements mentioned in {best_doc['doc_name']}"
+        # Generate follow-up question based on best result
+        best_result = results[0]
+        follow_up = self._generate_follow_up(base_question, best_result)
         
-        # Step 3: Query for follow-up
-        follow_up_results = self.query(follow_up_question, top_k=2)
+        # Perform follow-up query
+        follow_up_results = self.query(follow_up, top_k=2)
         
-        # Step 4: Generate insights
-        insights = self._generate_insights(initial_results, follow_up_results)
+        # Synthesize answer
+        answer = self._synthesize_answer(results, follow_up_results)
+        
+        # Record reflection
+        reflection_record = {
+            "timestamp": time.time(),
+            "base_question": base_question,
+            "follow_up": follow_up,
+            "results_count": len(results),
+            "follow_up_results_count": len(follow_up_results),
+            "answer_length": len(answer)
+        }
+        self.reflection_history.append(reflection_record)
         
         return {
-            "q1": base_question,
-            "a1": initial_results,
-            "q2": follow_up_question,
-            "a2": follow_up_results,
-            "insights": insights,
+            "question": base_question,
+            "answer": answer,
+            "follow_up": follow_up,
+            "sources": [r["name"] for r in results],
             "cycle_complete": True
         }
     
-    def _generate_insights(self, results1: List[Dict[str, Any]], 
-                          results2: List[Dict[str, Any]]) -> List[str]:
-        """Generate insights from query results"""
-        insights = []
+    def _generate_follow_up(self, base_question: str, best_result: Dict[str, Any]) -> str:
+        """Generate follow-up question based on best result"""
+        content = best_result["content"]
         
-        # Analyze common themes
-        all_tokens = set()
-        for result in results1 + results2:
-            all_tokens.update(result.get("matched_tokens", []))
+        # Extract key concepts from content
+        tokens = self._tokenize(content)
+        token_counts = Counter(tokens)
         
-        if all_tokens:
-            insights.append(f"Common themes: {', '.join(sorted(all_tokens)[:5])}")
+        # Get most frequent meaningful tokens
+        common_tokens = [t for t, count in token_counts.most_common(5) if count > 1]
         
-        # Analyze document types
-        doc_types = [r.get("doc_type", "unknown") for r in results1 + results2]
-        type_counts = Counter(doc_types)
-        if type_counts:
-            insights.append(f"Document types found: {dict(type_counts)}")
+        if common_tokens:
+            follow_up = f"Elaborate on {', '.join(common_tokens[:3])} in context of {base_question}"
+        else:
+            follow_up = f"Provide more details about the concepts mentioned in: {content[:100]}..."
         
-        # Analyze scores
-        scores = [r.get("score", 0) for r in results1 + results2]
-        if scores:
-            avg_score = sum(scores) / len(scores)
-            insights.append(f"Average relevance score: {avg_score:.3f}")
+        return follow_up
+    
+    def _synthesize_answer(self, results: List[Dict[str, Any]], 
+                          follow_up_results: List[Dict[str, Any]]) -> str:
+        """Synthesize answer from query results"""
+        all_results = results + follow_up_results
         
-        return insights
+        if not all_results:
+            return "No information available"
+        
+        # Combine content from top results
+        combined_content = []
+        for result in all_results[:3]:  # Top 3 results
+            content = result["content"]
+            # Truncate long content
+            if len(content) > 200:
+                content = content[:200] + "..."
+            combined_content.append(content)
+        
+        # Simple synthesis
+        synthesis = "Based on available knowledge:\n\n"
+        for i, content in enumerate(combined_content, 1):
+            synthesis += f"{i}. {content}\n\n"
+        
+        return synthesis.strip()
     
     def get_knowledge_stats(self) -> Dict[str, Any]:
         """Get knowledge base statistics"""
+        total_content = sum(len(entry.content) for entry in self.knowledge_base.values())
+        
         return {
-            "total_documents": len(self.documents),
-            "total_tokens": len(self.token_index),
-            "total_queries": len(self.query_history),
-            "document_types": dict(Counter(doc.doc_type.value for doc in self.documents.values())),
-            "recent_queries": self.query_history[-5:] if self.query_history else []
+            "entries": len(self.knowledge_base),
+            "total_content_length": total_content,
+            "avg_content_length": total_content / len(self.knowledge_base) if self.knowledge_base else 0,
+            "queries": len(self.query_history),
+            "reflections": len(self.reflection_history),
+            "knowledge_dir": str(self.knowledge_dir)
         }
     
-    def search_documents(self, keyword: str) -> List[str]:
-        """Search documents by keyword"""
-        keyword_lower = keyword.lower()
-        matching_docs = []
+    def search_by_tags(self, tags: List[str]) -> List[Dict[str, Any]]:
+        """Search knowledge base by tags"""
+        results = []
         
-        for token, doc_names in self.token_index.items():
-            if keyword_lower in token:
-                matching_docs.extend(doc_names)
+        for name, entry in self.knowledge_base.items():
+            if any(tag in entry.tags for tag in tags):
+                results.append({
+                    "name": name,
+                    "content": entry.content,
+                    "tags": entry.tags,
+                    "source": entry.source,
+                    "timestamp": entry.timestamp
+                })
         
-        return list(set(matching_docs))
+        return results
     
-    def export_knowledge(self, filepath: str) -> None:
-        """Export knowledge base"""
-        export_data = {
-            "exported_at": time.time(),
-            "documents": {name: doc.to_dict() for name, doc in self.documents.items()},
-            "query_history": self.query_history,
-            "stats": self.get_knowledge_stats()
-        }
+    def cleanup_old_entries(self, max_age_days: int = 30):
+        """Clean up old knowledge entries"""
+        cutoff_time = time.time() - (max_age_days * 24 * 3600)
         
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(export_data, f, indent=2)
-    
-    def clear_knowledge(self) -> None:
-        """Clear knowledge base"""
-        self.documents.clear()
-        self.token_index.clear()
-        self.query_history.clear()
+        to_remove = []
+        for name, entry in self.knowledge_base.items():
+            if entry.timestamp < cutoff_time and entry.source == "self_rag":
+                to_remove.append(name)
         
-        # Remove files
-        for file_path in self.knowledge_path.glob("*.txt"):
-            try:
+        for name in to_remove:
+            # Remove from knowledge base
+            del self.knowledge_base[name]
+            
+            # Remove file
+            file_path = self.knowledge_dir / f"{name}.txt"
+            if file_path.exists():
                 file_path.unlink()
-            except Exception as e:
-                print(f"Warning: Failed to remove {file_path}: {e}")
+        
+        return len(to_remove)
 
 
-# Global self-RAG instance
-_global_rag: Optional[SelfRAG] = None
-
-
-def get_global_rag() -> SelfRAG:
-    """Get global self-RAG instance"""
-    global _global_rag
+# Integration with Life Equation
+def integrate_self_rag_in_life_equation(
+    life_verdict: Dict[str, Any],
+    rag_engine: SelfRAGEngine = None
+) -> Tuple[str, Dict[str, Any]]:
+    """
+    Integrate self-RAG into Life Equation evaluation
     
-    if _global_rag is None:
-        _global_rag = SelfRAG()
+    Args:
+        life_verdict: Result from life_equation()
+        rag_engine: Self-RAG engine instance
+        
+    Returns:
+        (insight, rag_details)
+    """
+    if rag_engine is None:
+        rag_engine = SelfRAGEngine()
     
-    return _global_rag
-
-
-def ingest_text(name: str, text: str, doc_type: DocumentType = DocumentType.TEXT) -> bool:
-    """Convenience function to ingest text"""
-    rag = get_global_rag()
-    return rag.ingest_text(name, text, doc_type)
-
-
-def query(q: str, top_k: int = 3) -> List[Dict[str, Any]]:
-    """Convenience function to query"""
-    rag = get_global_rag()
-    return rag.query(q, top_k)
-
-
-def self_cycle() -> Dict[str, Any]:
-    """Convenience function for self-cycle"""
-    rag = get_global_rag()
-    return rag.self_cycle()
-
-
-def test_self_rag() -> Dict[str, Any]:
-    """Test self-RAG functionality"""
-    rag = get_global_rag()
+    # Generate insight based on life verdict
+    if life_verdict.get("ok", False):
+        insight_query = "What insights can improve system evolution and alpha_eff?"
+    else:
+        insight_query = "What are common causes of evolution failure and how to address them?"
     
-    # Clear existing knowledge
-    rag.clear_knowledge()
+    # Perform self-reflection cycle
+    cycle_result = rag_engine.self_cycle(insight_query)
     
-    # Ingest test documents
-    doc1_content = """
-    PENIN-Ω evolution requires careful monitoring of CAOS+ metrics.
-    The Life Equation (+) provides non-compensatory gates for safe evolution.
-    Sigma Guard ensures ethical compliance with ECE <= 0.01.
+    # Ingest current life verdict as knowledge
+    verdict_text = f"""
+    Life Equation Evaluation:
+    - Status: {'PASS' if life_verdict.get('ok') else 'FAIL'}
+    - Alpha Effective: {life_verdict.get('alpha_eff', 0.0)}
+    - CAOS Phi: {life_verdict.get('metrics', {}).get('phi', 0.0)}
+    - SR Score: {life_verdict.get('metrics', {}).get('sr', 0.0)}
+    - Global Coherence: {life_verdict.get('metrics', {}).get('G', 0.0)}
+    - Timestamp: {life_verdict.get('timestamp', time.time())}
     """
     
-    doc2_content = """
-    Implementation checklist:
-    1. Life Equation (+) integration
-    2. Fractal DSL propagation
-    3. Swarm cognitive gossip
-    4. Neural blockchain integrity
-    5. Self-RAG knowledge base
-    """
+    rag_engine.ingest_text(
+        f"life_verdict_{int(time.time())}",
+        verdict_text,
+        source="life_equation",
+        tags=["life_equation", "evolution", "alpha_eff"]
+    )
     
-    doc3_content = """
-    Safety requirements:
-    - Fail-closed behavior
-    - Non-compensatory gates
-    - WORM ledger integrity
-    - Merkle hash validation
-    - Zero-consciousness proof
-    """
-    
-    rag.ingest_text("evolution_guide", doc1_content)
-    rag.ingest_text("implementation_checklist", doc2_content)
-    rag.ingest_text("safety_requirements", doc3_content)
-    
-    # Test queries
-    q1_results = rag.query("What is needed for safe evolution?", top_k=2)
-    q2_results = rag.query("implementation requirements", top_k=2)
-    
-    # Test self-cycle
-    cycle_result = rag.self_cycle("What are the key safety requirements?")
-    
-    # Get stats
-    stats = rag.get_knowledge_stats()
-    
-    return {
-        "documents_ingested": 3,
-        "query1_results": q1_results,
-        "query2_results": q2_results,
-        "self_cycle_result": cycle_result,
-        "knowledge_stats": stats
+    rag_details = {
+        "insight": cycle_result["answer"],
+        "question": cycle_result["question"],
+        "follow_up": cycle_result["follow_up"],
+        "sources": cycle_result["sources"],
+        "knowledge_stats": rag_engine.get_knowledge_stats()
     }
+    
+    return cycle_result["answer"], rag_details
+
+
+# Example usage
+if __name__ == "__main__":
+    import os
+    
+    # Create self-RAG engine
+    rag = SelfRAGEngine()
+    
+    # Ingest some knowledge
+    rag.ingest_text(
+        "evolution_principles",
+        "Evolution requires careful balance of exploration and exploitation. Too much exploration leads to instability, too little leads to stagnation.",
+        tags=["evolution", "balance", "exploration"]
+    )
+    
+    rag.ingest_text(
+        "alpha_optimization",
+        "Alpha effective should be modulated by system coherence and risk metrics. Higher coherence allows for larger alpha values.",
+        tags=["alpha", "optimization", "coherence"]
+    )
+    
+    # Query knowledge
+    results = rag.query("How to optimize alpha for evolution?")
+    print(f"Query results: {len(results)}")
+    for result in results:
+        print(f"- {result['name']}: {result['relevance']:.3f}")
+    
+    # Self-reflection cycle
+    cycle = rag.self_cycle("What are the key principles for safe evolution?")
+    print(f"Self-reflection: {cycle['answer'][:100]}...")
+    
+    # Stats
+    stats = rag.get_knowledge_stats()
+    print(f"Knowledge stats: {stats}")

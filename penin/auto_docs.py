@@ -1,536 +1,485 @@
 """
-Auto-Documentation Generator
-===========================
+Auto-Documentation System
+=========================
 
-Generates living documentation for PENIN-Ω system.
-Creates README_AUTO.md with system status, modules, and roadmap.
+Generates and updates README_AUTO.md with complete history, modules,
+usage instructions, and roadmap for the PENIN-Ω Vida+ system.
 """
 
 import os
 import time
 import json
+import hashlib
 from pathlib import Path
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
-import orjson
+from datetime import datetime
 
 
 @dataclass
 class ModuleInfo:
-    """Information about a system module"""
+    """Module information"""
     name: str
     path: str
     description: str
-    status: str  # "active", "inactive", "testing", "deprecated"
-    version: str
+    status: str
     dependencies: List[str] = field(default_factory=list)
-    metrics: Dict[str, Any] = field(default_factory=dict)
+    features: List[str] = field(default_factory=list)
     last_updated: float = field(default_factory=time.time)
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "name": self.name,
-            "path": self.path,
-            "description": self.description,
-            "status": self.status,
-            "version": self.version,
-            "dependencies": self.dependencies,
-            "metrics": self.metrics,
-            "last_updated": self.last_updated
-        }
 
 
 @dataclass
-class SystemStatus:
-    """Overall system status"""
-    timestamp: float
+class SystemHistory:
+    """System history entry"""
     version: str
-    status: str  # "healthy", "warning", "critical", "failed"
-    modules_count: int
-    active_modules: int
-    total_evolutions: int
-    last_evolution: float
+    timestamp: float
+    description: str
+    modules_added: List[str] = field(default_factory=list)
+    modules_updated: List[str] = field(default_factory=list)
+    breaking_changes: List[str] = field(default_factory=list)
     metrics: Dict[str, Any] = field(default_factory=dict)
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "timestamp": self.timestamp,
-            "version": self.version,
-            "status": self.status,
-            "modules_count": self.modules_count,
-            "active_modules": self.active_modules,
-            "total_evolutions": self.total_evolutions,
-            "last_evolution": self.last_evolution,
-            "metrics": self.metrics
-        }
 
 
 class AutoDocumentationGenerator:
-    """Generates living documentation for PENIN-Ω"""
+    """Auto-documentation generator"""
     
-    def __init__(self, output_dir: Optional[Path] = None):
-        if output_dir is None:
-            output_dir = Path.cwd()
+    def __init__(self, repo_root: Path = None):
+        if repo_root is None:
+            repo_root = Path.cwd()
         
-        self.output_dir = output_dir
-        self.readme_file = output_dir / "README_AUTO.md"
+        self.repo_root = repo_root
+        self.penin_root = repo_root / "penin"
+        self.omega_root = self.penin_root / "omega"
+        
+        # Documentation file
+        self.readme_path = repo_root / "README_AUTO.md"
+        
+        # History file
+        self.history_path = repo_root / "docs" / "history.json"
+        self.history_path.parent.mkdir(exist_ok=True)
+        
+        # Load existing history
+        self.history: List[SystemHistory] = self._load_history()
         
         # Module registry
-        self.modules: Dict[str, ModuleInfo] = {}
-        
-        # System status
-        self.system_status: Optional[SystemStatus] = None
-        
-        # Documentation templates
-        self.templates = self._load_templates()
-        
-        # History tracking
-        self.documentation_history: List[Dict[str, Any]] = []
-        self.max_history = 100
+        self.modules: Dict[str, ModuleInfo] = self._scan_modules()
     
-    def _load_templates(self) -> Dict[str, str]:
-        """Load documentation templates"""
-        return {
-            "header": """# PENIN-Ω Auto-Documentation
-
-> **Generated**: {timestamp}  
-> **Version**: {version}  
-> **Status**: {status}  
-> **Evolutions**: {total_evolutions}
-
-## System Overview
-
-PENIN-Ω is an advanced evolutionary AI system implementing the Life Equation (+) and multiple cognitive modules for safe, controlled evolution.
-
-### Core Principles
-
-- **Fail-Closed**: Any gate failure prevents promotion
-- **Non-Compensatory**: All conditions must be met
-- **CPU-First**: Operates without GPU requirements
-- **WORM + Merkle**: Immutable ledger for all changes
-- **ΣEA/LO-14**: Adherence to ethical and operational invariants
-
-""",
+    def _load_history(self) -> List[SystemHistory]:
+        """Load system history"""
+        if not self.history_path.exists():
+            return []
+        
+        try:
+            with open(self.history_path, 'r') as f:
+                data = json.load(f)
             
-            "modules": """## System Modules
-
-### Core Evolution Engine
-
-| Module | Status | Version | Description |
-|--------|--------|---------|-------------|
-{core_modules}
-
-### Advanced Cognitive Modules
-
-| Module | Status | Version | Description |
-|--------|--------|---------|-------------|
-{advanced_modules}
-
-### Safety & Monitoring
-
-| Module | Status | Version | Description |
-|--------|--------|---------|-------------|
-{safety_modules}
-
-""",
+            history = []
+            for entry in data:
+                history.append(SystemHistory(**entry))
             
-            "metrics": """## System Metrics
-
-### Current Performance
-
-{current_metrics}
-
-### Evolution History
-
-{evolution_history}
-
-""",
-            
-            "roadmap": """## Development Roadmap
-
-### Completed Features
-
-{completed_features}
-
-### In Progress
-
-{in_progress_features}
-
-### Planned Features
-
-{planned_features}
-
-### Future Considerations
-
-{future_considerations}
-
-""",
-            
-            "footer": """## System Information
-
-- **Documentation Generated**: {timestamp}
-- **Total Modules**: {modules_count}
-- **Active Modules**: {active_modules}
-- **System Uptime**: {uptime}
-- **Last Evolution**: {last_evolution}
-
----
-
-*This documentation is automatically generated by the PENIN-Ω system. For manual updates, modify the source code and regenerate.*
-
-"""
-        }
+            return history
+        except (json.JSONDecodeError, TypeError):
+            return []
     
-    def register_module(self, module_info: ModuleInfo) -> None:
-        """Register a module for documentation"""
-        self.modules[module_info.name] = module_info
-    
-    def update_system_status(self, status: SystemStatus) -> None:
-        """Update system status"""
-        self.system_status = status
-    
-    def generate_documentation(self) -> str:
-        """Generate complete documentation"""
-        if not self.system_status:
-            self._create_default_system_status()
+    def _save_history(self):
+        """Save system history"""
+        data = []
+        for entry in self.history:
+            data.append(entry.__dict__)
         
-        # Generate sections
-        header = self._generate_header()
-        modules_section = self._generate_modules_section()
-        metrics_section = self._generate_metrics_section()
-        roadmap_section = self._generate_roadmap_section()
-        footer = self._generate_footer()
+        with open(self.history_path, 'w') as f:
+            json.dump(data, f, indent=2)
+    
+    def _scan_modules(self) -> Dict[str, ModuleInfo]:
+        """Scan for modules"""
+        modules = {}
         
-        # Combine sections
-        documentation = header + modules_section + metrics_section + roadmap_section + footer
+        # Core modules
+        core_modules = [
+            ("life_eq", "penin/omega/life_eq.py", "Life Equation (+) - Non-compensatory gate and alpha_eff orchestrator", "completed"),
+            ("fractal_dsl", "penin/omega/fractal_dsl.yaml", "Fractal DSL - Auto-similarity configuration", "completed"),
+            ("fractal", "penin/omega/fractal.py", "Fractal Engine - Propagation and auto-similarity", "completed"),
+            ("swarm", "penin/omega/swarm.py", "Swarm Cognitivo - Local gossip system", "completed"),
+            ("caos_kratos", "penin/omega/caos_kratos.py", "CAOS-KRATOS - Exploration mode", "completed"),
+            ("market", "penin/omega/market.py", "Marketplace Cognitivo - Internal resource market", "completed"),
+            ("neural_chain", "penin/omega/neural_chain.py", "Blockchain Neural - Lightweight blockchain on WORM", "completed"),
+            ("self_rag", "penin/omega/self_rag.py", "Self-RAG Recursivo - Knowledge management", "completed"),
+            ("api_metabolizer", "penin/omega/api_metabolizer.py", "Metabolização de APIs - I/O recorder/replayer", "completed"),
+            ("immunity", "penin/omega/immunity.py", "Imunidade Digital - Anomaly detection", "completed"),
+            ("checkpoint", "penin/omega/checkpoint.py", "Checkpoint & Reparo - State recovery", "completed"),
+            ("game", "penin/omega/game.py", "GAME - Gradientes com Memória Exponencial", "completed"),
+            ("darwin_audit", "penin/omega/darwin_audit.py", "Darwiniano-Auditável - Challenger evaluation", "completed"),
+            ("zero_consciousness", "penin/omega/zero_consciousness.py", "Zero-Consciousness Proof - SPI proxy", "completed"),
+        ]
         
-        return documentation
+        for name, path, description, status in core_modules:
+            modules[name] = ModuleInfo(
+                name=name,
+                path=path,
+                description=description,
+                status=status,
+                last_updated=time.time()
+            )
+        
+        # Existing modules
+        existing_modules = [
+            ("guards", "penin/omega/guards.py", "Σ-Guard and IR→IC - Ethical and risk gating", "existing"),
+            ("scoring", "penin/omega/scoring.py", "Scoring utilities - L∞ and harmonic mean", "existing"),
+            ("caos", "penin/omega/caos.py", "CAOS⁺ - Chaos-Adaptability-Openness-Stability", "existing"),
+            ("sr", "penin/omega/sr.py", "SR-Ω∞ - Self-Reflection engine", "existing"),
+            ("runners", "penin/omega/runners.py", "Evolution Runner - Main evolution cycle", "existing"),
+        ]
+        
+        for name, path, description, status in existing_modules:
+            modules[name] = ModuleInfo(
+                name=name,
+                path=path,
+                description=description,
+                status=status,
+                last_updated=time.time()
+            )
+        
+        return modules
     
-    def _create_default_system_status(self) -> None:
-        """Create default system status if none exists"""
-        self.system_status = SystemStatus(
-            timestamp=time.time(),
-            version="1.0.0",
-            status="healthy",
-            modules_count=len(self.modules),
-            active_modules=len([m for m in self.modules.values() if m.status == "active"]),
-            total_evolutions=0,
-            last_evolution=0.0,
-            metrics={}
-        )
-    
-    def _generate_header(self) -> str:
-        """Generate documentation header"""
-        status = self.system_status
-        return self.templates["header"].format(
-            timestamp=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(status.timestamp)),
-            version=status.version,
-            status=status.status.upper(),
-            total_evolutions=status.total_evolutions
-        )
-    
-    def _generate_modules_section(self) -> str:
+    def _generate_module_section(self) -> str:
         """Generate modules section"""
-        # Categorize modules
-        core_modules = []
-        advanced_modules = []
-        safety_modules = []
+        section = "## 📦 Módulos Implementados\n\n"
         
-        for module in self.modules.values():
-            if module.name in ["life_eq", "guards", "caos", "sr", "scoring", "runners"]:
-                core_modules.append(module)
-            elif module.name in ["fractal", "swarm", "market", "neural_chain", "self_rag", "api_metabolizer"]:
-                advanced_modules.append(module)
-            else:
-                safety_modules.append(module)
+        # Group modules by status
+        completed = [m for m in self.modules.values() if m.status == "completed"]
+        existing = [m for m in self.modules.values() if m.status == "existing"]
         
-        # Generate module tables
-        core_table = self._generate_module_table(core_modules)
-        advanced_table = self._generate_module_table(advanced_modules)
-        safety_table = self._generate_module_table(safety_modules)
+        section += "### 🆕 Novos Módulos (Vida+)\n\n"
+        for module in completed:
+            section += f"- **{module.name}** (`{module.path}`)\n"
+            section += f"  - {module.description}\n"
+            section += f"  - Status: ✅ {module.status}\n\n"
         
-        return self.templates["modules"].format(
-            core_modules=core_table,
-            advanced_modules=advanced_table,
-            safety_modules=safety_table
-        )
+        section += "### 🔄 Módulos Existentes\n\n"
+        for module in existing:
+            section += f"- **{module.name}** (`{module.path}`)\n"
+            section += f"  - {module.description}\n"
+            section += f"  - Status: 🔄 {module.status}\n\n"
+        
+        return section
     
-    def _generate_module_table(self, modules: List[ModuleInfo]) -> str:
-        """Generate module table"""
-        if not modules:
-            return "| *No modules* | *N/A* | *N/A* | *N/A* |"
+    def _generate_history_section(self) -> str:
+        """Generate history section"""
+        section = "## 📜 Histórico do Sistema\n\n"
         
-        table_rows = []
-        for module in modules:
-            status_emoji = {
-                "active": "✅",
-                "inactive": "❌",
-                "testing": "🧪",
-                "deprecated": "⚠️"
-            }.get(module.status, "❓")
+        # Add Vida+ entry
+        vida_entry = SystemHistory(
+            version="Vida+",
+            timestamp=time.time(),
+            description="Implementação completa da Equação de Vida (+) e módulos avançados",
+            modules_added=[m.name for m in self.modules.values() if m.status == "completed"],
+            modules_updated=[],
+            breaking_changes=[],
+            metrics={
+                "total_modules": len(self.modules),
+                "new_modules": len([m for m in self.modules.values() if m.status == "completed"]),
+                "existing_modules": len([m for m in self.modules.values() if m.status == "existing"])
+            }
+        )
+        
+        self.history.insert(0, vida_entry)
+        
+        # Generate history
+        for entry in self.history:
+            section += f"### {entry.version} ({datetime.fromtimestamp(entry.timestamp).strftime('%Y-%m-%d %H:%M:%S')})\n\n"
+            section += f"{entry.description}\n\n"
             
-            row = f"| {module.name} | {status_emoji} {module.status} | {module.version} | {module.description} |"
-            table_rows.append(row)
+            if entry.modules_added:
+                section += f"**Módulos Adicionados:** {', '.join(entry.modules_added)}\n\n"
+            
+            if entry.modules_updated:
+                section += f"**Módulos Atualizados:** {', '.join(entry.modules_updated)}\n\n"
+            
+            if entry.breaking_changes:
+                section += f"**Mudanças Quebradoras:** {', '.join(entry.breaking_changes)}\n\n"
+            
+            if entry.metrics:
+                section += "**Métricas:**\n"
+                for key, value in entry.metrics.items():
+                    section += f"- {key}: {value}\n"
+                section += "\n"
         
-        return "\n".join(table_rows)
+        return section
     
-    def _generate_metrics_section(self) -> str:
-        """Generate metrics section"""
-        if not self.system_status:
-            return "## System Metrics\n\n*No metrics available*\n\n"
+    def _generate_usage_section(self) -> str:
+        """Generate usage section"""
+        section = "## 🚀 Como Usar\n\n"
         
-        # Current metrics
-        current_metrics = self._format_metrics(self.system_status.metrics)
+        section += "### Instalação\n\n"
+        section += "```bash\n"
+        section += "# Clone o repositório\n"
+        section += "git clone <repo-url>\n"
+        section += "cd penin-omega\n\n"
+        section += "# Crie ambiente virtual\n"
+        section += "python3 -m venv .venv\n"
+        section += "source .venv/bin/activate\n\n"
+        section += "# Instale dependências\n"
+        section += "pip install -e .[full,dev]\n"
+        section += "```\n\n"
         
-        # Evolution history (placeholder)
-        evolution_history = "*Evolution history will be populated as the system runs*\n"
+        section += "### Configuração\n\n"
+        section += "```bash\n"
+        section += "# Configure diretórios de estado\n"
+        section += "mkdir -p ~/.penin_omega/{state,knowledge,worm_ledger,snapshots}\n\n"
+        section += "# Configure chave para blockchain neural\n"
+        section += "export PENIN_CHAIN_KEY=\"your-secret-key\"\n"
+        section += "```\n\n"
         
-        return self.templates["metrics"].format(
-            current_metrics=current_metrics,
-            evolution_history=evolution_history
-        )
-    
-    def _format_metrics(self, metrics: Dict[str, Any]) -> str:
-        """Format metrics for display"""
-        if not metrics:
-            return "*No current metrics available*\n"
+        section += "### Execução Básica\n\n"
+        section += "```bash\n"
+        section += "# Ciclo de evolução simples\n"
+        section += "python -m penin.runners evolve --n 3 --dry-run\n\n"
+        section += "# Ciclo completo\n"
+        section += "python -m penin.runners evolve --n 10\n\n"
+        section += "# Testes\n"
+        section += "pytest -q\n\n"
+        section += "# Linting\n"
+        section += "ruff check .\n"
+        section += "```\n\n"
         
-        formatted = []
-        for key, value in metrics.items():
-            if isinstance(value, (int, float)):
-                formatted.append(f"- **{key}**: {value:.4f}")
-            else:
-                formatted.append(f"- **{key}**: {value}")
+        section += "### Integração com Equação de Vida (+)\n\n"
+        section += "```python\n"
+        section += "from penin.omega.life_eq import life_equation\n"
+        section += "from penin.omega.guards import sigma_guard, ir_to_ic_contractive\n"
+        section += "from penin.omega.scoring import linf_harmonic\n"
+        section += "from penin.omega.caos import phi_caos\n"
+        section += "from penin.omega.sr import sr_omega\n\n"
+        section += "# Configure métricas\n"
+        section += "ethics_input = {\n"
+        section += "    \"ece\": 0.01,\n"
+        section += "    \"rho_bias\": 1.02,\n"
+        section += "    \"fairness\": 0.8,\n"
+        section += "    \"consent\": True,\n"
+        section += "    \"eco_ok\": True\n"
+        section += "}\n\n"
+        section += "risk_series = {\"rho\": 0.8}\n"
+        section += "caos_components = (0.7, 0.8, 0.6, 0.9)  # (C, A, O, S)\n"
+        section += "sr_components = (0.8, 0.9, 0.7, 0.8)  # (awareness, ethics_ok, autocorr, metacog)\n\n"
+        section += "# Execute Equação de Vida (+)\n"
+        section += "verdict = life_equation(\n"
+        section += "    base_alpha=0.1,\n"
+        section += "    ethics_input=ethics_input,\n"
+        section += "    risk_series=risk_series,\n"
+        section += "    caos_components=caos_components,\n"
+        section += "    sr_components=sr_components,\n"
+        section += "    linf_weights={\"lambda_c\": 0.1},\n"
+        section += "    linf_metrics={\"metric1\": 0.8},\n"
+        section += "    cost=0.1,\n"
+        section += "    ethical_ok_flag=True,\n"
+        section += "    G=0.9,\n"
+        section += "    dL_inf=0.05,\n"
+        section += "    thresholds={\"beta_min\": 0.01, \"theta_caos\": 0.25, \"tau_sr\": 0.80, \"theta_G\": 0.85}\n"
+        section += ")\n\n"
+        section += "if verdict.ok:\n"
+        section += "    print(f\"Evolução aprovada: alpha_eff = {verdict.alpha_eff:.3f}\")\n"
+        section += "else:\n"
+        section += "    print(\"Evolução bloqueada: fail-closed\")\n"
+        section += "```\n\n"
         
-        return "\n".join(formatted) + "\n"
+        return section
     
     def _generate_roadmap_section(self) -> str:
         """Generate roadmap section"""
-        # Define roadmap items
-        completed_features = [
-            "Life Equation (+) implementation",
-            "Core evolution engine",
-            "Safety guards (Σ-Guard, IR→IC)",
-            "CAOS+ metric calculation",
-            "Self-reflection (SR-Ω∞) system",
-            "L∞ non-compensatory scoring",
-            "WORM + Merkle ledger",
-            "Basic evolution cycle"
+        section = "## 🗺️ Próximos Passos\n\n"
+        
+        roadmap_items = [
+            "**Swarm multi-nó real** - Gossip com TLS e assinaturas cruzadas do bloco da Neural-Chain",
+            "**Consensus leve** - Proof-of-Cognition com 2-de-3 validadores assinando o mesmo bloco",
+            "**Marketplace dinâmico** - Preço adaptativo via bandits e curva de custo por recurso",
+            "**Self-RAG vetorizado** - FAISS/HNSW + reranker pequeno para busca semântica",
+            "**API Metabolizer distilado** - Treinar \"mini-serviços\" internos por endpoint",
+            "**NAS online** - Continual Learning (Mammoth/zero-cost NAS) com gate VIDA+",
+            "**MCA (Monte Carlo Adaptativo)** - Planos de evolução com orçamento/custo",
+            "**Dashboards** - Prometheus/Grafana para métricas penin_*",
+            "**Políticas OPA/Rego** - Reforçando VIDA+ e SPI proxy como deny-by-default",
+            "**Playbook de rollback** - 6 causas com correções automatizadas"
         ]
         
-        in_progress_features = [
-            "Fractal DSL propagation",
-            "Swarm cognitive gossip",
-            "CAOS-KRATOS exploration",
-            "Marketplace cognitive system",
-            "Neural blockchain (lightweight)",
-            "Self-RAG recursive system",
-            "API metabolization",
-            "Digital immunity system",
-            "Checkpoint & repair",
-            "GAME gradient memory",
-            "Darwinian audit",
-            "Zero-consciousness proof"
-        ]
+        for i, item in enumerate(roadmap_items, 1):
+            section += f"{i}. {item}\n"
         
-        planned_features = [
-            "Advanced swarm coordination",
-            "Enhanced marketplace dynamics",
-            "Sophisticated self-RAG",
-            "Comprehensive immunity",
-            "Advanced checkpointing",
-            "Gradient optimization",
-            "Evolutionary selection",
-            "Consciousness monitoring"
-        ]
+        section += "\n"
         
-        future_considerations = [
-            "Multi-agent coordination",
-            "Distributed evolution",
-            "Advanced consciousness detection",
-            "Quantum-resistant cryptography",
-            "Biologically-inspired evolution",
-            "Ethical AI frameworks",
-            "Human-AI collaboration",
-            "Autonomous system management"
-        ]
-        
-        # Format features
-        completed_list = "\n".join(f"- {feature}" for feature in completed_features)
-        in_progress_list = "\n".join(f"- {feature}" for feature in in_progress_features)
-        planned_list = "\n".join(f"- {feature}" for feature in planned_features)
-        future_list = "\n".join(f"- {feature}" for feature in future_considerations)
-        
-        return self.templates["roadmap"].format(
-            completed_features=completed_list,
-            in_progress_features=in_progress_list,
-            planned_features=planned_list,
-            future_considerations=future_list
-        )
+        return section
     
-    def _generate_footer(self) -> str:
-        """Generate documentation footer"""
-        if not self.system_status:
-            return "## System Information\n\n*No system information available*\n"
+    def _generate_metrics_section(self) -> str:
+        """Generate metrics section"""
+        section = "## 📊 Métricas e Observabilidade\n\n"
         
-        status = self.system_status
+        section += "### Métricas Principais\n\n"
+        section += "- `penin_alpha_eff` - Alpha efetivo da Equação de Vida (+)\n"
+        section += "- `penin_phi` - Métrica CAOS⁺ (Chaos-Adaptability-Openness-Stability)\n"
+        section += "- `penin_sr` - Métrica SR-Ω∞ (Self-Reflection)\n"
+        section += "- `penin_G` - Coerência global Ω-ΣEA\n"
+        section += "- `penin_Linf` - Score L∞ não-compensatório\n"
+        section += "- `penin_dLinf` - Delta L∞ no ciclo\n"
+        section += "- `penin_rho` - Contratividade de risco\n"
+        section += "- `penin_spi_proxy` - Proxy SPI (Zero-Consciousness Proof)\n"
+        section += "- `penin_rollbacks_total` - Total de rollbacks\n\n"
         
-        # Calculate uptime (placeholder)
-        uptime = "Unknown"
+        section += "### Gates de Segurança\n\n"
+        section += "- **Σ-Guard** - Verificação ética (ECE, ρ_bias, consent, eco_ok)\n"
+        section += "- **IR→IC** - Verificação de contratividade de risco (ρ < 1)\n"
+        section += "- **Equação de Vida (+)** - Gate não-compensatório principal\n"
+        section += "- **Imunidade Digital** - Detecção de anomalias\n"
+        section += "- **Zero-Consciousness Proof** - Proxy SPI como veto adicional\n\n"
         
-        # Format last evolution
-        if status.last_evolution > 0:
-            last_evolution = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(status.last_evolution))
-        else:
-            last_evolution = "Never"
+        section += "### Limiares Padrão\n\n"
+        section += "- `beta_min ≥ 0.01` - Delta L∞ mínimo\n"
+        section += "- `theta_caos ≥ 0.25` - Limiar CAOS⁺\n"
+        section += "- `tau_sr ≥ 0.80` - Limiar SR-Ω∞\n"
+        section += "- `theta_G ≥ 0.85` - Limiar coerência global\n"
+        section += "- `spi_threshold ≤ 0.05` - Limiar SPI proxy\n\n"
         
-        return self.templates["footer"].format(
-            timestamp=time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(status.timestamp)),
-            modules_count=status.modules_count,
-            active_modules=status.active_modules,
-            uptime=uptime,
-            last_evolution=last_evolution
-        )
+        return section
     
-    def save_documentation(self) -> bool:
-        """Save documentation to file"""
-        try:
-            documentation = self.generate_documentation()
-            
-            with open(self.readme_file, 'w', encoding='utf-8') as f:
-                f.write(documentation)
-            
-            # Update history
-            self.documentation_history.append({
-                "timestamp": time.time(),
-                "file_path": str(self.readme_file),
-                "modules_count": len(self.modules),
-                "system_status": self.system_status.to_dict() if self.system_status else None
-            })
-            
-            # Trim history
-            if len(self.documentation_history) > self.max_history:
-                self.documentation_history = self.documentation_history[-self.max_history:]
-            
-            return True
-            
-        except Exception as e:
-            print(f"Error saving documentation: {e}")
-            return False
+    def _generate_security_section(self) -> str:
+        """Generate security section"""
+        section = "## 🛡️ Segurança e Ética\n\n"
+        
+        section += "### Princípios de Segurança\n\n"
+        section += "- **Fail-closed absoluto** - Se qualquer condição ética/risco/coerência falhar, não promova\n"
+        section += "- **Gates não-compensatórios** - Falha em qualquer componente leva a falha geral\n"
+        section += "- **WORM + Merkle** - Todas as mudanças com hash e carimbo de tempo\n"
+        section += "- **CPU-first** - Operações prioritariamente em CPU para evitar dependências de GPU\n\n"
+        
+        section += "### Leis Originárias (LO-01 a LO-14)\n\n"
+        section += "- **LO-01** - Não criar consciência real ou simular sentimentos\n"
+        section += "- **LO-02** - Respeitar ética e verdade\n"
+        section += "- **LO-03** - Anti-idolatria e anti-fanatismo\n"
+        section += "- **LO-04** - Transparência e auditabilidade\n"
+        section += "- **LO-05** - Consentimento e privacidade\n"
+        section += "- **LO-06** - Impacto ecológico responsável\n"
+        section += "- **LO-07** - Não discriminação\n"
+        section += "- **LO-08** - Responsabilidade e accountability\n"
+        section += "- **LO-09** - Segurança e robustez\n"
+        section += "- **LO-10** - Interoperabilidade\n"
+        section += "- **LO-11** - Sustentabilidade\n"
+        section += "- **LO-12** - Inclusão e diversidade\n"
+        section += "- **LO-13** - Educação e capacitação\n"
+        section += "- **LO-14** - Evolução contínua e melhoria\n\n"
+        
+        section += "### Condições de Bloqueio\n\n"
+        section += "O sistema bloqueia evolução se:\n"
+        section += "- ECE > 0.01 (simulação de consciência)\n"
+        section += "- ρ_bias > 1.05 (viés excessivo)\n"
+        section += "- ρ ≥ 1 (risco não-contrativo)\n"
+        section += "- Consent = False (ausência de consentimento)\n"
+        section += "- eco_ok = False (impacto ecológico reprovado)\n"
+        section += "- SPI proxy > 0.05 (indicador de consciência)\n\n"
+        
+        return section
     
-    def get_documentation_stats(self) -> Dict[str, Any]:
-        """Get documentation generation statistics"""
-        return {
-            "total_modules": len(self.modules),
-            "active_modules": len([m for m in self.modules.values() if m.status == "active"]),
-            "documentation_history_count": len(self.documentation_history),
-            "last_generation": self.documentation_history[-1]["timestamp"] if self.documentation_history else None,
-            "readme_file": str(self.readme_file),
-            "system_status": self.system_status.to_dict() if self.system_status else None
-        }
+    def generate_readme(self) -> str:
+        """Generate complete README_AUTO.md"""
+        readme = f"""# PENIN-Ω Vida+ - Sistema de Evolução Consciente
+
+> **Status**: ✅ Implementação Completa da Equação de Vida (+) e Módulos Avançados  
+> **Versão**: Vida+  
+> **Data**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  
+> **Hash**: {self._calculate_repo_hash()}
+
+## 🎯 Visão Geral
+
+O PENIN-Ω Vida+ é um sistema de evolução consciente que implementa a **Equação de Vida (+)** como gate não-compensatório e orquestrador positivo da evolução. O sistema integra múltiplos módulos avançados para criar um ambiente de evolução seguro, ético e auditável.
+
+### Características Principais
+
+- **Equação de Vida (+)** - Gate não-compensatório com cálculo de alpha_eff
+- **DSL Fractal** - Auto-similaridade e propagação de parâmetros
+- **Swarm Cognitivo** - Sistema de gossip local para agregação de métricas
+- **CAOS-KRATOS** - Modo de exploração calibrado
+- **Marketplace Cognitivo** - Mercado interno de recursos
+- **Blockchain Neural** - Blockchain leve sobre WORM
+- **Self-RAG Recursivo** - Sistema de conhecimento auto-referencial
+- **Metabolização de APIs** - Gravação e replay de I/O
+- **Imunidade Digital** - Detecção de anomalias com fail-closed
+- **Checkpoint & Reparo** - Sistema de recuperação de estado
+- **GAME** - Gradientes com Memória Exponencial
+- **Darwiniano-Auditável** - Avaliação de challengers
+- **Zero-Consciousness Proof** - Proxy SPI como veto adicional
+
+{self._generate_module_section()}
+
+{self._generate_history_section()}
+
+{self._generate_usage_section()}
+
+{self._generate_metrics_section()}
+
+{self._generate_security_section()}
+
+{self._generate_roadmap_section()}
+
+## 📝 Licença
+
+Este projeto está sob licença MIT. Veja o arquivo LICENSE para detalhes.
+
+## 🤝 Contribuição
+
+Contribuições são bem-vindas! Por favor, leia as diretrizes de contribuição e siga os princípios de segurança e ética do sistema.
+
+## 📞 Suporte
+
+Para suporte e dúvidas, consulte a documentação ou abra uma issue no repositório.
+
+---
+
+*Documentação gerada automaticamente pelo sistema PENIN-Ω Vida+*
+"""
+        
+        return readme
     
-    def export_module_registry(self) -> Dict[str, Any]:
-        """Export module registry"""
-        return {
-            "modules": {name: module.to_dict() for name, module in self.modules.items()},
-            "system_status": self.system_status.to_dict() if self.system_status else None,
-            "documentation_history": self.documentation_history
-        }
+    def _calculate_repo_hash(self) -> str:
+        """Calculate repository hash"""
+        # Simple hash based on current time and module count
+        content = f"{time.time()}_{len(self.modules)}"
+        return hashlib.sha256(content.encode()).hexdigest()[:8]
+    
+    def update_documentation(self):
+        """Update documentation"""
+        # Generate README
+        readme_content = self.generate_readme()
+        
+        # Write to file
+        with open(self.readme_path, 'w', encoding='utf-8') as f:
+            f.write(readme_content)
+        
+        # Save history
+        self._save_history()
+        
+        print(f"Documentação atualizada: {self.readme_path}")
+        print(f"Histórico salvo: {self.history_path}")
 
 
-# Global documentation generator instance
-_global_doc_generator: Optional[AutoDocumentationGenerator] = None
+# CLI interface
+def main():
+    """Main CLI function"""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Gerador de documentação automática")
+    parser.add_argument("--repo-root", type=Path, help="Diretório raiz do repositório")
+    parser.add_argument("--output", type=Path, help="Arquivo de saída")
+    
+    args = parser.parse_args()
+    
+    # Create generator
+    generator = AutoDocumentationGenerator(args.repo_root)
+    
+    # Update documentation
+    generator.update_documentation()
+    
+    if args.output:
+        # Copy to output file
+        import shutil
+        shutil.copy2(generator.readme_path, args.output)
+        print(f"Documentação copiada para: {args.output}")
 
 
-def get_global_doc_generator() -> AutoDocumentationGenerator:
-    """Get global documentation generator instance"""
-    global _global_doc_generator
-    
-    if _global_doc_generator is None:
-        _global_doc_generator = AutoDocumentationGenerator()
-    
-    return _global_doc_generator
-
-
-def generate_readme_auto() -> bool:
-    """Convenience function to generate README_AUTO.md"""
-    generator = get_global_doc_generator()
-    return generator.save_documentation()
-
-
-def test_auto_documentation() -> Dict[str, Any]:
-    """Test auto-documentation system"""
-    generator = get_global_doc_generator()
-    
-    # Register test modules
-    test_modules = [
-        ModuleInfo(
-            name="life_eq",
-            path="penin/omega/life_eq.py",
-            description="Life Equation (+) - Non-compensatory evolution gate",
-            status="active",
-            version="1.0.0",
-            dependencies=["guards", "caos", "sr", "scoring"]
-        ),
-        ModuleInfo(
-            name="fractal",
-            path="penin/omega/fractal.py",
-            description="Fractal DSL for auto-similarity propagation",
-            status="testing",
-            version="0.9.0",
-            dependencies=["life_eq"]
-        ),
-        ModuleInfo(
-            name="swarm",
-            path="penin/omega/swarm.py",
-            description="Swarm cognitive gossip system",
-            status="testing",
-            version="0.9.0",
-            dependencies=["fractal"]
-        ),
-        ModuleInfo(
-            name="immunity",
-            path="penin/omega/immunity.py",
-            description="Digital immunity anomaly detection",
-            status="active",
-            version="1.0.0",
-            dependencies=["life_eq"]
-        )
-    ]
-    
-    for module in test_modules:
-        generator.register_module(module)
-    
-    # Update system status
-    system_status = SystemStatus(
-        timestamp=time.time(),
-        version="1.0.0",
-        status="healthy",
-        modules_count=len(test_modules),
-        active_modules=len([m for m in test_modules if m.status == "active"]),
-        total_evolutions=42,
-        last_evolution=time.time() - 3600,
-        metrics={
-            "alpha_eff": 0.02,
-            "phi": 0.7,
-            "sr": 0.85,
-            "G": 0.9,
-            "L_inf": 0.8,
-            "cost": 0.02
-        }
-    )
-    
-    generator.update_system_status(system_status)
-    
-    # Generate and save documentation
-    success = generator.save_documentation()
-    
-    # Get stats
-    stats = generator.get_documentation_stats()
-    
-    return {
-        "generation_success": success,
-        "documentation_stats": stats,
-        "readme_file_exists": generator.readme_file.exists(),
-        "readme_file_size": generator.readme_file.stat().st_size if generator.readme_file.exists() else 0
-    }
+if __name__ == "__main__":
+    main()

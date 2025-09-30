@@ -1,416 +1,437 @@
 """
 GAME - Gradientes com Memória Exponencial
-==========================================
+=========================================
 
-Implements EMA-based gradient calculation with exponential memory.
-Provides smooth gradient estimation for evolution parameters.
+Implements exponential moving average for gradients with fail-closed
+protection and adaptive learning rates.
 """
 
 import time
 import math
+import statistics
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass, field
-from collections import deque
-import numpy as np
+from enum import Enum
+
+
+class GradientType(Enum):
+    """Types of gradients"""
+    ALPHA_EFF = "alpha_eff"
+    PHI_CAOS = "phi_caos"
+    SR_OMEGA = "sr_omega"
+    G_COHERENCE = "g_coherence"
+    L_INF = "l_inf"
+    RHO_RISK = "rho_risk"
 
 
 @dataclass
-class GradientPoint:
-    """Single gradient measurement point"""
+class GradientSnapshot:
+    """Gradient snapshot"""
     timestamp: float
+    gradient_type: GradientType
     value: float
-    gradient: float
-    weight: float = 1.0
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "timestamp": self.timestamp,
-            "value": self.value,
-            "gradient": self.gradient,
-            "weight": self.weight
-        }
+    learning_rate: float
+    momentum: float
+    variance: float
+    confidence: float
 
 
 @dataclass
-class EMAParams:
-    """EMA parameters"""
-    alpha: float  # Smoothing factor (0 < alpha <= 1)
-    beta: float   # Gradient smoothing factor
-    gamma: float  # Weight decay factor
-    min_samples: int = 5  # Minimum samples for reliable gradient
-    
-    def __post_init__(self):
-        # Ensure valid ranges
-        self.alpha = max(0.001, min(1.0, self.alpha))
-        self.beta = max(0.001, min(1.0, self.beta))
-        self.gamma = max(0.001, min(1.0, self.gamma))
-        self.min_samples = max(1, self.min_samples)
+class GAMEConfig:
+    """GAME configuration"""
+    base_learning_rate: float = 0.01
+    momentum_decay: float = 0.9
+    variance_decay: float = 0.95
+    confidence_threshold: float = 0.8
+    max_learning_rate: float = 0.1
+    min_learning_rate: float = 0.001
+    gradient_clip_threshold: float = 1.0
+    stability_window: int = 10
 
 
 class GAMEEngine:
-    """GAME - Gradientes com Memória Exponencial"""
+    """GAME engine for gradient management"""
     
-    def __init__(self, params: Optional[EMAParams] = None):
-        if params is None:
-            params = EMAParams(
-                alpha=0.1,    # Moderate smoothing
-                beta=0.05,    # Gradient smoothing
-                gamma=0.99,   # Weight decay
-                min_samples=5
-            )
+    def __init__(self, config: GAMEConfig = None):
+        self.config = config or GAMEConfig()
         
-        self.params = params
+        # Gradient history for each type
+        self.gradient_history: Dict[GradientType, List[GradientSnapshot]] = {}
         
-        # State variables
-        self.ema_value: Optional[float] = None
-        self.ema_gradient: Optional[float] = None
-        self.ema_weight: float = 0.0
+        # Current state for each gradient type
+        self.current_state: Dict[GradientType, Dict[str, float]] = {}
         
-        # History for analysis
-        self.history: List[GradientPoint] = []
-        self.max_history = 1000
-        
-        # Gradient calculation
-        self.last_value: Optional[float] = None
-        self.last_timestamp: Optional[float] = None
-        
-        # Performance tracking
-        self.total_updates = 0
-        self.last_update_time = 0.0
+        # Initialize state
+        for grad_type in GradientType:
+            self.gradient_history[grad_type] = []
+            self.current_state[grad_type] = {
+                "value": 0.0,
+                "learning_rate": self.config.base_learning_rate,
+                "momentum": 0.0,
+                "variance": 0.0,
+                "confidence": 0.0
+            }
     
-    def update(self, value: float, timestamp: Optional[float] = None) -> Dict[str, float]:
+    def _clip_gradient(self, gradient: float) -> float:
+        """Clip gradient to prevent explosion"""
+        return max(-self.config.gradient_clip_threshold, 
+                  min(self.config.gradient_clip_threshold, gradient))
+    
+    def _calculate_confidence(self, variance: float, window_size: int) -> float:
+        """Calculate confidence based on variance and window size"""
+        if variance == 0:
+            return 1.0
+        
+        # Confidence decreases with high variance
+        confidence = 1.0 / (1.0 + variance)
+        
+        # Adjust for window size
+        confidence *= min(1.0, window_size / 10.0)
+        
+        return confidence
+    
+    def _adaptive_learning_rate(self, gradient_type: GradientType, 
+                               current_lr: float, variance: float,
+                               confidence: float) -> float:
+        """Calculate adaptive learning rate"""
+        # Base learning rate
+        new_lr = current_lr
+        
+        # Adjust based on variance
+        if variance > 0.1:  # High variance - reduce learning rate
+            new_lr *= 0.9
+        elif variance < 0.01:  # Low variance - increase learning rate
+            new_lr *= 1.1
+        
+        # Adjust based on confidence
+        if confidence < self.config.confidence_threshold:
+            new_lr *= 0.8  # Reduce learning rate for low confidence
+        
+        # Clip to bounds
+        new_lr = max(self.config.min_learning_rate, 
+                    min(self.config.max_learning_rate, new_lr))
+        
+        return new_lr
+    
+    def update_gradient(self, gradient_type: GradientType, 
+                       new_value: float, target_value: float = None) -> Dict[str, float]:
         """
-        Update GAME with new value
+        Update gradient with exponential moving average
         
         Args:
-            value: New measurement value
-            timestamp: Timestamp (defaults to current time)
+            gradient_type: Type of gradient
+            new_value: New gradient value
+            target_value: Target value (for supervised learning)
             
         Returns:
-            Dictionary with updated metrics
+            Updated gradient state
         """
-        if timestamp is None:
-            timestamp = time.time()
-        
         # Calculate gradient
-        gradient = self._calculate_gradient(value, timestamp)
+        if target_value is not None:
+            gradient = target_value - new_value
+        else:
+            gradient = new_value
         
-        # Update EMA
-        self._update_ema(value, gradient, timestamp)
+        # Clip gradient
+        gradient = self._clip_gradient(gradient)
+        
+        # Get current state
+        current_state = self.current_state[gradient_type]
+        
+        # Update momentum (exponential moving average)
+        momentum = self.config.momentum_decay * current_state["momentum"] + \
+                  (1 - self.config.momentum_decay) * gradient
+        
+        # Update variance (exponential moving average)
+        variance = self.config.variance_decay * current_state["variance"] + \
+                  (1 - self.config.variance_decay) * (gradient - momentum) ** 2
+        
+        # Calculate confidence
+        history_size = len(self.gradient_history[gradient_type])
+        confidence = self._calculate_confidence(variance, history_size)
+        
+        # Adaptive learning rate
+        learning_rate = self._adaptive_learning_rate(
+            gradient_type, current_state["learning_rate"], variance, confidence
+        )
+        
+        # Update value
+        new_gradient_value = current_state["value"] + learning_rate * gradient
+        
+        # Update state
+        self.current_state[gradient_type] = {
+            "value": new_gradient_value,
+            "learning_rate": learning_rate,
+            "momentum": momentum,
+            "variance": variance,
+            "confidence": confidence
+        }
+        
+        # Create snapshot
+        snapshot = GradientSnapshot(
+            timestamp=time.time(),
+            gradient_type=gradient_type,
+            value=new_gradient_value,
+            learning_rate=learning_rate,
+            momentum=momentum,
+            variance=variance,
+            confidence=confidence
+        )
         
         # Add to history
-        point = GradientPoint(
-            timestamp=timestamp,
-            value=value,
-            gradient=gradient,
-            weight=self.ema_weight
-        )
-        self.history.append(point)
+        self.gradient_history[gradient_type].append(snapshot)
         
-        # Trim history
-        if len(self.history) > self.max_history:
-            self.history = self.history[-self.max_history:]
+        # Keep only recent history
+        if len(self.gradient_history[gradient_type]) > 100:
+            self.gradient_history[gradient_type] = self.gradient_history[gradient_type][-100:]
         
-        # Update tracking
-        self.total_updates += 1
-        self.last_update_time = timestamp
-        
-        return {
-            "value": value,
-            "ema_value": self.ema_value or 0.0,
-            "ema_gradient": self.ema_gradient or 0.0,
-            "ema_weight": self.ema_weight,
-            "gradient": gradient,
-            "timestamp": timestamp
-        }
+        return self.current_state[gradient_type].copy()
     
-    def _calculate_gradient(self, value: float, timestamp: float) -> float:
-        """Calculate gradient from current and previous values"""
-        if self.last_value is None or self.last_timestamp is None:
-            return 0.0
-        
-        # Time difference
-        dt = timestamp - self.last_timestamp
-        
-        if dt <= 0:
-            return 0.0
-        
-        # Value difference
-        dv = value - self.last_value
-        
-        # Gradient (rate of change)
-        gradient = dv / dt
-        
-        # Store for next iteration
-        self.last_value = value
-        self.last_timestamp = timestamp
-        
-        return gradient
+    def get_gradient_state(self, gradient_type: GradientType) -> Dict[str, float]:
+        """Get current gradient state"""
+        return self.current_state[gradient_type].copy()
     
-    def _update_ema(self, value: float, gradient: float, timestamp: float) -> None:
-        """Update exponential moving averages"""
-        # Update weight (exponential decay)
-        self.ema_weight = self.params.gamma * self.ema_weight + 1.0
+    def get_gradient_history(self, gradient_type: GradientType, 
+                           window_size: int = None) -> List[GradientSnapshot]:
+        """Get gradient history"""
+        history = self.gradient_history[gradient_type]
         
-        # Update EMA value
-        if self.ema_value is None:
-            self.ema_value = value
-        else:
-            # Weighted update
-            weight = 1.0 / self.ema_weight
-            self.ema_value = (1.0 - self.params.alpha * weight) * self.ema_value + \
-                           self.params.alpha * weight * value
+        if window_size is None:
+            return history.copy()
         
-        # Update EMA gradient
-        if self.ema_gradient is None:
-            self.ema_gradient = gradient
-        else:
-            # Weighted update
-            weight = 1.0 / self.ema_weight
-            self.ema_gradient = (1.0 - self.params.beta * weight) * self.ema_gradient + \
-                              self.params.beta * weight * gradient
+        return history[-window_size:] if window_size > 0 else []
     
-    def get_current_gradient(self) -> Optional[float]:
-        """Get current EMA gradient"""
-        return self.ema_gradient
-    
-    def get_current_value(self) -> Optional[float]:
-        """Get current EMA value"""
-        return self.ema_value
-    
-    def get_gradient_trend(self, window: int = 10) -> Dict[str, float]:
-        """Analyze gradient trend over recent window"""
-        if len(self.history) < window:
+    def calculate_gradient_trend(self, gradient_type: GradientType, 
+                                window_size: int = 10) -> Dict[str, float]:
+        """Calculate gradient trend"""
+        history = self.get_gradient_history(gradient_type, window_size)
+        
+        if len(history) < 2:
             return {
                 "trend": 0.0,
-                "volatility": 0.0,
-                "acceleration": 0.0,
-                "confidence": 0.0
+                "stability": 0.0,
+                "acceleration": 0.0
             }
         
-        # Get recent points
-        recent_points = self.history[-window:]
+        # Calculate trend (slope)
+        values = [snapshot.value for snapshot in history]
+        timestamps = [snapshot.timestamp for snapshot in history]
         
-        # Calculate trend (linear regression slope)
-        timestamps = [p.timestamp for p in recent_points]
-        gradients = [p.gradient for p in recent_points]
+        # Linear regression for trend
+        n = len(values)
+        sum_x = sum(timestamps)
+        sum_y = sum(values)
+        sum_xy = sum(x * y for x, y in zip(timestamps, values))
+        sum_x2 = sum(x * x for x in timestamps)
         
-        if len(timestamps) < 2:
-            return {
-                "trend": 0.0,
-                "volatility": 0.0,
-                "acceleration": 0.0,
-                "confidence": 0.0
-            }
-        
-        # Linear regression
-        n = len(timestamps)
-        sum_t = sum(timestamps)
-        sum_g = sum(gradients)
-        sum_tg = sum(t * g for t, g in zip(timestamps, gradients))
-        sum_t2 = sum(t * t for t in timestamps)
-        
-        # Calculate slope (trend)
-        denominator = n * sum_t2 - sum_t * sum_t
-        if denominator != 0:
-            trend = (n * sum_tg - sum_t * sum_g) / denominator
-        else:
+        if n * sum_x2 - sum_x * sum_x == 0:
             trend = 0.0
+        else:
+            trend = (n * sum_xy - sum_x * sum_y) / (n * sum_x2 - sum_x * sum_x)
         
-        # Calculate volatility (standard deviation)
-        mean_gradient = sum_g / n
-        variance = sum((g - mean_gradient) ** 2 for g in gradients) / n
-        volatility = math.sqrt(variance)
+        # Calculate stability (inverse of variance)
+        variance = statistics.variance(values) if len(values) > 1 else 0.0
+        stability = 1.0 / (1.0 + variance)
         
-        # Calculate acceleration (second derivative approximation)
-        if len(gradients) >= 3:
-            acceleration = gradients[-1] - 2 * gradients[-2] + gradients[-3]
+        # Calculate acceleration (second derivative)
+        if len(values) >= 3:
+            # Simple finite difference approximation
+            acceleration = values[-1] - 2 * values[-2] + values[-3]
         else:
             acceleration = 0.0
         
-        # Calculate confidence (based on consistency)
-        confidence = 1.0 / (1.0 + volatility) if volatility > 0 else 1.0
-        
         return {
             "trend": trend,
-            "volatility": volatility,
-            "acceleration": acceleration,
-            "confidence": confidence
+            "stability": stability,
+            "acceleration": acceleration
         }
     
-    def predict_next_value(self, steps: int = 1) -> Optional[float]:
-        """Predict next value based on current gradient"""
-        if self.ema_value is None or self.ema_gradient is None:
-            return None
+    def detect_gradient_anomalies(self, gradient_type: GradientType) -> List[Dict[str, Any]]:
+        """Detect gradient anomalies"""
+        history = self.get_gradient_history(gradient_type, 20)
         
-        # Simple linear prediction
-        predicted_value = self.ema_value + self.ema_gradient * steps
+        if len(history) < 5:
+            return []
         
-        return predicted_value
+        anomalies = []
+        values = [snapshot.value for snapshot in history]
+        
+        # Calculate statistics
+        mean_val = statistics.mean(values)
+        std_val = statistics.stdev(values) if len(values) > 1 else 0.0
+        
+        if std_val == 0:
+            return []
+        
+        # Check for outliers
+        for i, snapshot in enumerate(history):
+            z_score = abs(snapshot.value - mean_val) / std_val
+            
+            if z_score > 3.0:  # 3-sigma rule
+                anomalies.append({
+                    "timestamp": snapshot.timestamp,
+                    "value": snapshot.value,
+                    "z_score": z_score,
+                    "type": "outlier",
+                    "severity": min(1.0, z_score / 5.0)
+                })
+        
+        # Check for sudden changes
+        for i in range(1, len(history)):
+            prev_value = history[i-1].value
+            curr_value = history[i].value
+            
+            change = abs(curr_value - prev_value)
+            if change > 2 * std_val:
+                anomalies.append({
+                    "timestamp": history[i].timestamp,
+                    "value": curr_value,
+                    "change": change,
+                    "type": "sudden_change",
+                    "severity": min(1.0, change / (5 * std_val))
+                })
+        
+        return anomalies
     
-    def get_performance_metrics(self) -> Dict[str, Any]:
-        """Get GAME performance metrics"""
-        if not self.history:
-            return {
-                "total_updates": 0,
-                "ema_value": None,
-                "ema_gradient": None,
-                "ema_weight": 0.0,
-                "history_length": 0,
-                "last_update_time": 0.0
-            }
+    def get_global_gradient_health(self) -> Dict[str, Any]:
+        """Get global gradient health"""
+        health_scores = {}
+        total_confidence = 0.0
+        total_stability = 0.0
         
-        # Calculate recent statistics
-        recent_window = min(20, len(self.history))
-        recent_points = self.history[-recent_window:]
+        for grad_type in GradientType:
+            state = self.current_state[grad_type]
+            trend_info = self.calculate_gradient_trend(grad_type)
+            anomalies = self.detect_gradient_anomalies(grad_type)
+            
+            # Calculate health score
+            confidence = state["confidence"]
+            stability = trend_info["stability"]
+            anomaly_penalty = len(anomalies) * 0.1
+            
+            health_score = max(0.0, confidence * stability - anomaly_penalty)
+            health_scores[grad_type.value] = health_score
+            
+            total_confidence += confidence
+            total_stability += stability
         
-        recent_values = [p.value for p in recent_points]
-        recent_gradients = [p.gradient for p in recent_points]
+        # Global health
+        avg_confidence = total_confidence / len(GradientType)
+        avg_stability = total_stability / len(GradientType)
+        global_health = avg_confidence * avg_stability
         
         return {
-            "total_updates": self.total_updates,
-            "ema_value": self.ema_value,
-            "ema_gradient": self.ema_gradient,
-            "ema_weight": self.ema_weight,
-            "history_length": len(self.history),
-            "last_update_time": self.last_update_time,
-            "recent_value_mean": sum(recent_values) / len(recent_values),
-            "recent_value_std": math.sqrt(sum((v - sum(recent_values)/len(recent_values))**2 for v in recent_values) / len(recent_values)),
-            "recent_gradient_mean": sum(recent_gradients) / len(recent_gradients),
-            "recent_gradient_std": math.sqrt(sum((g - sum(recent_gradients)/len(recent_gradients))**2 for g in recent_gradients) / len(recent_gradients)),
-            "params": {
-                "alpha": self.params.alpha,
-                "beta": self.params.beta,
-                "gamma": self.params.gamma,
-                "min_samples": self.params.min_samples
-            }
+            "global_health": global_health,
+            "average_confidence": avg_confidence,
+            "average_stability": avg_stability,
+            "gradient_health": health_scores,
+            "total_gradients": len(GradientType)
         }
     
-    def reset(self) -> None:
-        """Reset GAME state"""
-        self.ema_value = None
-        self.ema_gradient = None
-        self.ema_weight = 0.0
-        self.history.clear()
-        self.last_value = None
-        self.last_timestamp = None
-        self.total_updates = 0
-        self.last_update_time = 0.0
+    def reset_gradient(self, gradient_type: GradientType):
+        """Reset gradient state"""
+        self.gradient_history[gradient_type] = []
+        self.current_state[gradient_type] = {
+            "value": 0.0,
+            "learning_rate": self.config.base_learning_rate,
+            "momentum": 0.0,
+            "variance": 0.0,
+            "confidence": 0.0
+        }
     
-    def export_history(self) -> List[Dict[str, Any]]:
-        """Export gradient history"""
-        return [point.to_dict() for point in self.history]
+    def reset_all_gradients(self):
+        """Reset all gradients"""
+        for grad_type in GradientType:
+            self.reset_gradient(grad_type)
 
 
-class GAMEManager:
-    """Manages multiple GAME engines for different metrics"""
+# Integration with Life Equation
+def integrate_game_in_life_equation(
+    life_verdict: Dict[str, Any],
+    game_engine: GAMEEngine = None
+) -> Tuple[Dict[str, float], Dict[str, Any]]:
+    """
+    Integrate GAME engine with Life Equation
     
-    def __init__(self):
-        self.engines: Dict[str, GAMEEngine] = {}
-        self.default_params = EMAParams(alpha=0.1, beta=0.05, gamma=0.99, min_samples=5)
-    
-    def get_engine(self, metric_name: str, params: Optional[EMAParams] = None) -> GAMEEngine:
-        """Get or create GAME engine for metric"""
-        if metric_name not in self.engines:
-            engine_params = params or self.default_params
-            self.engines[metric_name] = GAMEEngine(engine_params)
+    Args:
+        life_verdict: Result from life_equation()
+        game_engine: GAME engine instance
         
-        return self.engines[metric_name]
+    Returns:
+        (updated_gradients, game_metrics)
+    """
+    if game_engine is None:
+        game_engine = GAMEEngine()
     
-    def update_metric(self, metric_name: str, value: float, 
-                     timestamp: Optional[float] = None) -> Dict[str, float]:
-        """Update metric in GAME engine"""
-        engine = self.get_engine(metric_name)
-        return engine.update(value, timestamp)
+    metrics = life_verdict.get("metrics", {})
+    updated_gradients = {}
     
-    def get_metric_gradient(self, metric_name: str) -> Optional[float]:
-        """Get current gradient for metric"""
-        if metric_name not in self.engines:
-            return None
+    # Update gradients based on Life Equation metrics
+    if "alpha_eff" in metrics:
+        updated_gradients["alpha_eff"] = game_engine.update_gradient(
+            GradientType.ALPHA_EFF, metrics["alpha_eff"]
+        )
+    
+    if "phi" in metrics:
+        updated_gradients["phi"] = game_engine.update_gradient(
+            GradientType.PHI_CAOS, metrics["phi"]
+        )
+    
+    if "sr" in metrics:
+        updated_gradients["sr"] = game_engine.update_gradient(
+            GradientType.SR_OMEGA, metrics["sr"]
+        )
+    
+    if "G" in metrics:
+        updated_gradients["G"] = game_engine.update_gradient(
+            GradientType.G_COHERENCE, metrics["G"]
+        )
+    
+    if "L_inf" in metrics:
+        updated_gradients["L_inf"] = game_engine.update_gradient(
+            GradientType.L_INF, metrics["L_inf"]
+        )
+    
+    if "rho" in metrics:
+        updated_gradients["rho"] = game_engine.update_gradient(
+            GradientType.RHO_RISK, metrics["rho"]
+        )
+    
+    # Get game metrics
+    game_metrics = game_engine.get_global_gradient_health()
+    
+    return updated_gradients, game_metrics
+
+
+# Example usage
+if __name__ == "__main__":
+    # Create GAME engine
+    game = GAMEEngine()
+    
+    # Simulate gradient updates
+    for i in range(20):
+        # Simulate alpha_eff gradient
+        alpha_eff = 0.5 + 0.1 * math.sin(i * 0.5) + 0.05 * (i % 3 - 1)
+        game.update_gradient(GradientType.ALPHA_EFF, alpha_eff)
         
-        return self.engines[metric_name].get_current_gradient()
-    
-    def get_all_gradients(self) -> Dict[str, Optional[float]]:
-        """Get gradients for all tracked metrics"""
-        return {
-            metric_name: engine.get_current_gradient()
-            for metric_name, engine in self.engines.items()
-        }
-    
-    def get_metric_trend(self, metric_name: str, window: int = 10) -> Dict[str, float]:
-        """Get trend analysis for metric"""
-        if metric_name not in self.engines:
-            return {"trend": 0.0, "volatility": 0.0, "acceleration": 0.0, "confidence": 0.0}
+        # Simulate phi gradient
+        phi = 0.7 + 0.05 * math.cos(i * 0.3)
+        game.update_gradient(GradientType.PHI_CAOS, phi)
         
-        return self.engines[metric_name].get_gradient_trend(window)
+        time.sleep(0.1)  # Simulate time passing
     
-    def get_all_trends(self, window: int = 10) -> Dict[str, Dict[str, float]]:
-        """Get trend analysis for all metrics"""
-        return {
-            metric_name: engine.get_gradient_trend(window)
-            for metric_name, engine in self.engines.items()
-        }
+    # Get gradient states
+    alpha_state = game.get_gradient_state(GradientType.ALPHA_EFF)
+    print(f"Alpha gradient state: {alpha_state}")
     
-    def get_manager_stats(self) -> Dict[str, Any]:
-        """Get manager statistics"""
-        return {
-            "total_metrics": len(self.engines),
-            "metric_names": list(self.engines.keys()),
-            "engines_stats": {
-                metric_name: engine.get_performance_metrics()
-                for metric_name, engine in self.engines.items()
-            }
-        }
-
-
-# Global GAME manager instance
-_global_game_manager: Optional[GAMEManager] = None
-
-
-def get_global_game_manager() -> GAMEManager:
-    """Get global GAME manager instance"""
-    global _global_game_manager
+    # Calculate trends
+    alpha_trend = game.calculate_gradient_trend(GradientType.ALPHA_EFF)
+    print(f"Alpha gradient trend: {alpha_trend}")
     
-    if _global_game_manager is None:
-        _global_game_manager = GAMEManager()
+    # Detect anomalies
+    anomalies = game.detect_gradient_anomalies(GradientType.ALPHA_EFF)
+    print(f"Alpha gradient anomalies: {len(anomalies)}")
     
-    return _global_game_manager
-
-
-def update_gradient(metric_name: str, value: float, timestamp: Optional[float] = None) -> Dict[str, float]:
-    """Convenience function to update gradient"""
-    manager = get_global_game_manager()
-    return manager.update_metric(metric_name, value, timestamp)
-
-
-def get_gradient(metric_name: str) -> Optional[float]:
-    """Convenience function to get gradient"""
-    manager = get_global_game_manager()
-    return manager.get_metric_gradient(metric_name)
-
-
-def test_game_system() -> Dict[str, Any]:
-    """Test GAME system functionality"""
-    manager = get_global_game_manager()
-    
-    # Test with synthetic data
-    test_values = [0.1, 0.15, 0.2, 0.18, 0.25, 0.3, 0.28, 0.35, 0.4, 0.38]
-    
-    # Update metrics
-    for i, value in enumerate(test_values):
-        manager.update_metric("test_metric", value, time.time() + i)
-    
-    # Get results
-    gradient = manager.get_metric_gradient("test_metric")
-    trend = manager.get_metric_trend("test_metric")
-    all_gradients = manager.get_all_gradients()
-    all_trends = manager.get_all_trends()
-    stats = manager.get_manager_stats()
-    
-    return {
-        "final_gradient": gradient,
-        "trend_analysis": trend,
-        "all_gradients": all_gradients,
-        "all_trends": all_trends,
-        "manager_stats": stats
-    }
+    # Get global health
+    health = game.get_global_gradient_health()
+    print(f"Global gradient health: {health}")

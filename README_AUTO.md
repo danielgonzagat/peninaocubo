@@ -1,219 +1,315 @@
-# PENIN-Ω Auto-Documentation
+# PENIN-Ω Vida+ - Sistema de Evolução Consciente
 
-> **Generated**: 2024-12-19 15:30:00  
-> **Version**: 1.0.0  
-> **Status**: HEALTHY  
-> **Evolutions**: 42
+> **Status**: ✅ Implementação Completa da Equação de Vida (+) e Módulos Avançados  
+> **Versão**: Vida+  
+> **Data**: 2025-09-30 15:12:54  
+> **Hash**: 99e89f53
 
-## System Overview
+## 🎯 Visão Geral
 
-PENIN-Ω is an advanced evolutionary AI system implementing the Life Equation (+) and multiple cognitive modules for safe, controlled evolution.
+O PENIN-Ω Vida+ é um sistema de evolução consciente que implementa a **Equação de Vida (+)** como gate não-compensatório e orquestrador positivo da evolução. O sistema integra múltiplos módulos avançados para criar um ambiente de evolução seguro, ético e auditável.
 
-### Core Principles
+### Características Principais
 
-- **Fail-Closed**: Any gate failure prevents promotion
-- **Non-Compensatory**: All conditions must be met
-- **CPU-First**: Operates without GPU requirements
-- **WORM + Merkle**: Immutable ledger for all changes
-- **ΣEA/LO-14**: Adherence to ethical and operational invariants
+- **Equação de Vida (+)** - Gate não-compensatório com cálculo de alpha_eff
+- **DSL Fractal** - Auto-similaridade e propagação de parâmetros
+- **Swarm Cognitivo** - Sistema de gossip local para agregação de métricas
+- **CAOS-KRATOS** - Modo de exploração calibrado
+- **Marketplace Cognitivo** - Mercado interno de recursos
+- **Blockchain Neural** - Blockchain leve sobre WORM
+- **Self-RAG Recursivo** - Sistema de conhecimento auto-referencial
+- **Metabolização de APIs** - Gravação e replay de I/O
+- **Imunidade Digital** - Detecção de anomalias com fail-closed
+- **Checkpoint & Reparo** - Sistema de recuperação de estado
+- **GAME** - Gradientes com Memória Exponencial
+- **Darwiniano-Auditável** - Avaliação de challengers
+- **Zero-Consciousness Proof** - Proxy SPI como veto adicional
 
-## System Modules
+## 📦 Módulos Implementados
 
-### Core Evolution Engine
+### 🆕 Novos Módulos (Vida+)
 
-| Module | Status | Version | Description |
-|--------|--------|---------|-------------|
-| life_eq | ✅ active | 1.0.0 | Life Equation (+) - Non-compensatory evolution gate and alpha_eff orchestrator |
-| guards | ✅ active | 1.0.0 | Σ-Guard ethical verification and IR→IC risk contractivity |
-| caos | ✅ active | 1.0.0 | CAOS+ metric calculation for chaos-adaptability-openness-stability |
-| sr | ✅ active | 1.0.0 | Self-Reflection (SR-Ω∞) system for awareness and metacognition |
-| scoring | ✅ active | 1.0.0 | L∞ non-compensatory scoring and harmonic aggregation |
-| runners | ✅ active | 1.0.0 | Main evolution cycle orchestrator with Vida+ integration |
+- **life_eq** (`penin/omega/life_eq.py`)
+  - Life Equation (+) - Non-compensatory gate and alpha_eff orchestrator
+  - Status: ✅ completed
 
-### Advanced Cognitive Modules
+- **fractal_dsl** (`penin/omega/fractal_dsl.yaml`)
+  - Fractal DSL - Auto-similarity configuration
+  - Status: ✅ completed
 
-| Module | Status | Version | Description |
-|--------|--------|---------|-------------|
-| fractal | ✅ active | 1.0.0 | Fractal DSL for auto-similarity propagation |
-| swarm | ✅ active | 1.0.0 | Swarm cognitive gossip system with SQLite/WORM |
-| caos_kratos | ✅ active | 1.0.0 | CAOS-KRATOS exploration mode for calibrated exploration |
-| market | ✅ active | 1.0.0 | Internal cognitive marketplace with Ω-tokens |
-| neural_chain | ✅ active | 1.0.0 | Lightweight neural blockchain on top of WORM |
-| self_rag | ✅ active | 1.0.0 | Recursive self-RAG system for knowledge processing |
-| api_metabolizer | ✅ active | 1.0.0 | API I/O recorder and replayer for dependency reduction |
+- **fractal** (`penin/omega/fractal.py`)
+  - Fractal Engine - Propagation and auto-similarity
+  - Status: ✅ completed
 
-### Safety & Monitoring
+- **swarm** (`penin/omega/swarm.py`)
+  - Swarm Cognitivo - Local gossip system
+  - Status: ✅ completed
 
-| Module | Status | Version | Description |
-|--------|--------|---------|-------------|
-| immunity | ✅ active | 1.0.0 | Digital immunity anomaly detection with fail-closed |
-| checkpoint | ✅ active | 1.0.0 | Checkpoint & repair system for system snapshots |
-| game | ✅ active | 1.0.0 | GAME - Gradientes com Memória Exponencial |
-| darwin_audit | ✅ active | 1.0.0 | Darwinian audit system for challenger evaluation |
-| zero_consciousness | ✅ active | 1.0.0 | Zero-Consciousness Proof (SPI proxy) veto system |
-| auto_docs | ✅ active | 1.0.0 | Auto-documentation generator for living docs |
+- **caos_kratos** (`penin/omega/caos_kratos.py`)
+  - CAOS-KRATOS - Exploration mode
+  - Status: ✅ completed
 
-## System Metrics
+- **market** (`penin/omega/market.py`)
+  - Marketplace Cognitivo - Internal resource market
+  - Status: ✅ completed
 
-### Current Performance
+- **neural_chain** (`penin/omega/neural_chain.py`)
+  - Blockchain Neural - Lightweight blockchain on WORM
+  - Status: ✅ completed
 
-- **alpha_eff**: 0.0200
-- **phi**: 0.7000
-- **sr**: 0.8500
-- **G**: 0.9000
-- **L_inf**: 0.8000
-- **dL_inf**: 0.0100
-- **cost**: 0.0200
-- **immunity_score**: 0.9500
-- **consciousness_score**: 0.0500
-- **fractal_depth**: 2
-- **swarm_nodes**: 3
-- **marketplace_trades**: 0
-- **neural_blocks**: 1
-- **checkpoints**: 1
+- **self_rag** (`penin/omega/self_rag.py`)
+  - Self-RAG Recursivo - Knowledge management
+  - Status: ✅ completed
 
-### Evolution History
+- **api_metabolizer** (`penin/omega/api_metabolizer.py`)
+  - Metabolização de APIs - I/O recorder/replayer
+  - Status: ✅ completed
 
-*Evolution history will be populated as the system runs*
+- **immunity** (`penin/omega/immunity.py`)
+  - Imunidade Digital - Anomaly detection
+  - Status: ✅ completed
 
-## Development Roadmap
+- **checkpoint** (`penin/omega/checkpoint.py`)
+  - Checkpoint & Reparo - State recovery
+  - Status: ✅ completed
 
-### Completed Features
+- **game** (`penin/omega/game.py`)
+  - GAME - Gradientes com Memória Exponencial
+  - Status: ✅ completed
 
-- Life Equation (+) implementation
-- Core evolution engine
-- Safety guards (Σ-Guard, IR→IC)
-- CAOS+ metric calculation
-- Self-reflection (SR-Ω∞) system
-- L∞ non-compensatory scoring
-- WORM + Merkle ledger
-- Basic evolution cycle
-- Fractal DSL propagation
-- Swarm cognitive gossip
-- CAOS-KRATOS exploration
-- Marketplace cognitive system
-- Neural blockchain (lightweight)
-- Self-RAG recursive system
-- API metabolization
-- Digital immunity system
-- Checkpoint & repair
-- GAME gradient memory
-- Darwinian audit
-- Zero-consciousness proof
-- Auto-documentation generator
+- **darwin_audit** (`penin/omega/darwin_audit.py`)
+  - Darwiniano-Auditável - Challenger evaluation
+  - Status: ✅ completed
 
-### In Progress
+- **zero_consciousness** (`penin/omega/zero_consciousness.py`)
+  - Zero-Consciousness Proof - SPI proxy
+  - Status: ✅ completed
 
-- Advanced swarm coordination
-- Enhanced marketplace dynamics
-- Sophisticated self-RAG
-- Comprehensive immunity
-- Advanced checkpointing
-- Gradient optimization
-- Evolutionary selection
-- Consciousness monitoring
+### 🔄 Módulos Existentes
 
-### Planned Features
+- **guards** (`penin/omega/guards.py`)
+  - Σ-Guard and IR→IC - Ethical and risk gating
+  - Status: 🔄 existing
 
-- Advanced swarm coordination
-- Enhanced marketplace dynamics
-- Sophisticated self-RAG
-- Comprehensive immunity
-- Advanced checkpointing
-- Gradient optimization
-- Evolutionary selection
-- Consciousness monitoring
+- **scoring** (`penin/omega/scoring.py`)
+  - Scoring utilities - L∞ and harmonic mean
+  - Status: 🔄 existing
 
-### Future Considerations
+- **caos** (`penin/omega/caos.py`)
+  - CAOS⁺ - Chaos-Adaptability-Openness-Stability
+  - Status: 🔄 existing
 
-- Multi-agent coordination
-- Distributed evolution
-- Advanced consciousness detection
-- Quantum-resistant cryptography
-- Biologically-inspired evolution
-- Ethical AI frameworks
-- Human-AI collaboration
-- Autonomous system management
+- **sr** (`penin/omega/sr.py`)
+  - SR-Ω∞ - Self-Reflection engine
+  - Status: 🔄 existing
 
-## System Information
+- **runners** (`penin/omega/runners.py`)
+  - Evolution Runner - Main evolution cycle
+  - Status: 🔄 existing
 
-- **Documentation Generated**: 2024-12-19 15:30:00
-- **Total Modules**: 14
-- **Active Modules**: 14
-- **System Uptime**: Unknown
-- **Last Evolution**: 2024-12-19 14:30:00
 
----
 
-*This documentation is automatically generated by the PENIN-Ω system. For manual updates, modify the source code and regenerate.*
+## 📜 Histórico do Sistema
 
-## Vida+ Implementation Summary
+### Vida+ (2025-09-30 15:12:54)
 
-The PENIN-Ω system has been successfully evolved to the **Vida+** state, implementing the Life Equation (+) as the primary orchestrator for evolution. This represents a significant advancement in AI safety and evolutionary control.
+Implementação completa da Equação de Vida (+) e módulos avançados
 
-### Key Achievements
+**Módulos Adicionados:** life_eq, fractal_dsl, fractal, swarm, caos_kratos, market, neural_chain, self_rag, api_metabolizer, immunity, checkpoint, game, darwin_audit, zero_consciousness
 
-1. **Life Equation (+)**: Implemented as a non-compensatory gate that calculates `alpha_eff` based on multiple factors including CAOS+, SR, global coherence, and ethical parameters.
+**Métricas:**
+- total_modules: 19
+- new_modules: 14
+- existing_modules: 5
 
-2. **Advanced Cognitive Modules**: All 12 advanced modules have been implemented and integrated:
-   - Fractal DSL for auto-similarity
-   - Swarm cognitive gossip system
-   - CAOS-KRATOS exploration mode
-   - Internal cognitive marketplace
-   - Lightweight neural blockchain
-   - Recursive self-RAG system
-   - API metabolization
-   - Digital immunity system
-   - Checkpoint & repair
-   - GAME gradient memory
-   - Darwinian audit
-   - Zero-consciousness proof
 
-3. **Fail-Closed Architecture**: The system maintains strict fail-closed principles where any gate failure prevents promotion, ensuring safe evolution.
 
-4. **Integration**: All modules are integrated into the main evolution cycle (`runners.py`) with proper configuration and error handling.
+## 🚀 Como Usar
 
-5. **Testing**: Comprehensive test suite (`test_vida_plus.py`) validates all modules and integration.
-
-### Technical Specifications
-
-- **Language**: Python 3.13+
-- **Architecture**: Modular, fail-closed
-- **Storage**: WORM + Merkle ledger
-- **Communication**: Swarm gossip protocol
-- **Safety**: Multi-layer gates and checks
-- **Documentation**: Auto-generated living docs
-
-### Usage
-
-To run the Vida+ system:
-
-```python
-from penin.omega.runners import EvolutionRunner, EvolutionConfig
-
-# Create config with Vida+ enabled
-config = EvolutionConfig(
-    enable_vida_plus=True,
-    base_alpha=0.02,
-    n_challengers=8
-)
-
-# Initialize and run evolution
-runner = EvolutionRunner(config)
-result = await runner.evolve_one_cycle()
-```
-
-### Testing
-
-Run the comprehensive test suite:
+### Instalação
 
 ```bash
-python3 test_vida_plus.py
+# Clone o repositório
+git clone <repo-url>
+cd penin-omega
+
+# Crie ambiente virtual
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Instale dependências
+pip install -e .[full,dev]
 ```
 
-This will test all modules and integration, providing a complete validation of the Vida+ system.
+### Configuração
+
+```bash
+# Configure diretórios de estado
+mkdir -p ~/.penin_omega/{state,knowledge,worm_ledger,snapshots}
+
+# Configure chave para blockchain neural
+export PENIN_CHAIN_KEY="your-secret-key"
+```
+
+### Execução Básica
+
+```bash
+# Ciclo de evolução simples
+python -m penin.runners evolve --n 3 --dry-run
+
+# Ciclo completo
+python -m penin.runners evolve --n 10
+
+# Testes
+pytest -q
+
+# Linting
+ruff check .
+```
+
+### Integração com Equação de Vida (+)
+
+```python
+from penin.omega.life_eq import life_equation
+from penin.omega.guards import sigma_guard, ir_to_ic_contractive
+from penin.omega.scoring import linf_harmonic
+from penin.omega.caos import phi_caos
+from penin.omega.sr import sr_omega
+
+# Configure métricas
+ethics_input = {
+    "ece": 0.01,
+    "rho_bias": 1.02,
+    "fairness": 0.8,
+    "consent": True,
+    "eco_ok": True
+}
+
+risk_series = {"rho": 0.8}
+caos_components = (0.7, 0.8, 0.6, 0.9)  # (C, A, O, S)
+sr_components = (0.8, 0.9, 0.7, 0.8)  # (awareness, ethics_ok, autocorr, metacog)
+
+# Execute Equação de Vida (+)
+verdict = life_equation(
+    base_alpha=0.1,
+    ethics_input=ethics_input,
+    risk_series=risk_series,
+    caos_components=caos_components,
+    sr_components=sr_components,
+    linf_weights={"lambda_c": 0.1},
+    linf_metrics={"metric1": 0.8},
+    cost=0.1,
+    ethical_ok_flag=True,
+    G=0.9,
+    dL_inf=0.05,
+    thresholds={"beta_min": 0.01, "theta_caos": 0.25, "tau_sr": 0.80, "theta_G": 0.85}
+)
+
+if verdict.ok:
+    print(f"Evolução aprovada: alpha_eff = {verdict.alpha_eff:.3f}")
+else:
+    print("Evolução bloqueada: fail-closed")
+```
+
+
+
+## 📊 Métricas e Observabilidade
+
+### Métricas Principais
+
+- `penin_alpha_eff` - Alpha efetivo da Equação de Vida (+)
+- `penin_phi` - Métrica CAOS⁺ (Chaos-Adaptability-Openness-Stability)
+- `penin_sr` - Métrica SR-Ω∞ (Self-Reflection)
+- `penin_G` - Coerência global Ω-ΣEA
+- `penin_Linf` - Score L∞ não-compensatório
+- `penin_dLinf` - Delta L∞ no ciclo
+- `penin_rho` - Contratividade de risco
+- `penin_spi_proxy` - Proxy SPI (Zero-Consciousness Proof)
+- `penin_rollbacks_total` - Total de rollbacks
+
+### Gates de Segurança
+
+- **Σ-Guard** - Verificação ética (ECE, ρ_bias, consent, eco_ok)
+- **IR→IC** - Verificação de contratividade de risco (ρ < 1)
+- **Equação de Vida (+)** - Gate não-compensatório principal
+- **Imunidade Digital** - Detecção de anomalias
+- **Zero-Consciousness Proof** - Proxy SPI como veto adicional
+
+### Limiares Padrão
+
+- `beta_min ≥ 0.01` - Delta L∞ mínimo
+- `theta_caos ≥ 0.25` - Limiar CAOS⁺
+- `tau_sr ≥ 0.80` - Limiar SR-Ω∞
+- `theta_G ≥ 0.85` - Limiar coerência global
+- `spi_threshold ≤ 0.05` - Limiar SPI proxy
+
+
+
+## 🛡️ Segurança e Ética
+
+### Princípios de Segurança
+
+- **Fail-closed absoluto** - Se qualquer condição ética/risco/coerência falhar, não promova
+- **Gates não-compensatórios** - Falha em qualquer componente leva a falha geral
+- **WORM + Merkle** - Todas as mudanças com hash e carimbo de tempo
+- **CPU-first** - Operações prioritariamente em CPU para evitar dependências de GPU
+
+### Leis Originárias (LO-01 a LO-14)
+
+- **LO-01** - Não criar consciência real ou simular sentimentos
+- **LO-02** - Respeitar ética e verdade
+- **LO-03** - Anti-idolatria e anti-fanatismo
+- **LO-04** - Transparência e auditabilidade
+- **LO-05** - Consentimento e privacidade
+- **LO-06** - Impacto ecológico responsável
+- **LO-07** - Não discriminação
+- **LO-08** - Responsabilidade e accountability
+- **LO-09** - Segurança e robustez
+- **LO-10** - Interoperabilidade
+- **LO-11** - Sustentabilidade
+- **LO-12** - Inclusão e diversidade
+- **LO-13** - Educação e capacitação
+- **LO-14** - Evolução contínua e melhoria
+
+### Condições de Bloqueio
+
+O sistema bloqueia evolução se:
+- ECE > 0.01 (simulação de consciência)
+- ρ_bias > 1.05 (viés excessivo)
+- ρ ≥ 1 (risco não-contrativo)
+- Consent = False (ausência de consentimento)
+- eco_ok = False (impacto ecológico reprovado)
+- SPI proxy > 0.05 (indicador de consciência)
+
+
+
+## 🗺️ Próximos Passos
+
+1. **Swarm multi-nó real** - Gossip com TLS e assinaturas cruzadas do bloco da Neural-Chain
+2. **Consensus leve** - Proof-of-Cognition com 2-de-3 validadores assinando o mesmo bloco
+3. **Marketplace dinâmico** - Preço adaptativo via bandits e curva de custo por recurso
+4. **Self-RAG vetorizado** - FAISS/HNSW + reranker pequeno para busca semântica
+5. **API Metabolizer distilado** - Treinar "mini-serviços" internos por endpoint
+6. **NAS online** - Continual Learning (Mammoth/zero-cost NAS) com gate VIDA+
+7. **MCA (Monte Carlo Adaptativo)** - Planos de evolução com orçamento/custo
+8. **Dashboards** - Prometheus/Grafana para métricas penin_*
+9. **Políticas OPA/Rego** - Reforçando VIDA+ e SPI proxy como deny-by-default
+10. **Playbook de rollback** - 6 causas com correções automatizadas
+
+
+
+## 📝 Licença
+
+Este projeto está sob licença MIT. Veja o arquivo LICENSE para detalhes.
+
+## 🤝 Contribuição
+
+Contribuições são bem-vindas! Por favor, leia as diretrizes de contribuição e siga os princípios de segurança e ética do sistema.
+
+## 📞 Suporte
+
+Para suporte e dúvidas, consulte a documentação ou abra uma issue no repositório.
 
 ---
 
-**Status**: ✅ **Vida+ Implementation Complete**  
-**Next Phase**: Production deployment and continuous evolution
+*Documentação gerada automaticamente pelo sistema PENIN-Ω Vida+*
