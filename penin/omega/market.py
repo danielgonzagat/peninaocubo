@@ -1,13 +1,13 @@
 """
-Cognitive Marketplace - Ω-Tokens Internal Economy
+Cognitive Marketplace - Internal Ω-Tokens System
 ================================================
 
 Implements internal marketplace for cognitive resources using Ω-tokens.
-Supports needs/offers matching with price discovery.
+Enables resource allocation and trading between system components.
 """
 
 import time
-import random
+import uuid
 from dataclasses import dataclass, field
 from typing import List, Dict, Any, Optional, Tuple
 from enum import Enum
@@ -22,11 +22,10 @@ class ResourceType(Enum):
     ATTENTION = "attention"
     COMPUTE_SLOTS = "compute_slots"
     DATA_BANDWIDTH = "data_bandwidth"
-    MODEL_CAPACITY = "model_capacity"
 
 
 class TradeStatus(Enum):
-    """Trade status"""
+    """Status of a trade"""
     PENDING = "pending"
     EXECUTED = "executed"
     CANCELLED = "cancelled"
@@ -41,14 +40,8 @@ class Need:
     quantity: float
     max_price: float
     priority: int = 1  # Higher = more urgent
-    created_at: float = field(default_factory=time.time)
-    expires_at: Optional[float] = None
-    
-    def is_expired(self) -> bool:
-        """Check if need is expired"""
-        if self.expires_at is None:
-            return False
-        return time.time() > self.expires_at
+    timestamp: float = field(default_factory=time.time)
+    need_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
 
 @dataclass
@@ -59,14 +52,8 @@ class Offer:
     quantity: float
     price: float
     quality: float = 1.0  # Quality factor (0-1)
-    created_at: float = field(default_factory=time.time)
-    expires_at: Optional[float] = None
-    
-    def is_expired(self) -> bool:
-        """Check if offer is expired"""
-        if self.expires_at is None:
-            return False
-        return time.time() > self.expires_at
+    timestamp: float = field(default_factory=time.time)
+    offer_id: str = field(default_factory=lambda: str(uuid.uuid4()))
 
 
 @dataclass
@@ -77,238 +64,178 @@ class Trade:
     offer: Offer
     quantity: float
     price: float
-    timestamp: float = field(default_factory=time.time)
-    status: TradeStatus = TradeStatus.EXECUTED
-    
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "trade_id": self.trade_id,
-            "need_agent": self.need.agent_id,
-            "offer_agent": self.offer.agent_id,
-            "resource": self.need.resource.value,
-            "quantity": self.quantity,
-            "price": self.price,
-            "timestamp": self.timestamp,
-            "status": self.status.value
-        }
+    timestamp: float
+    status: TradeStatus = TradeStatus.PENDING
 
 
+@dataclass
 class AgentWallet:
-    """Agent's Ω-token wallet"""
-    
-    def __init__(self, agent_id: str, initial_balance: float = 100.0):
-        self.agent_id = agent_id
-        self.balance = initial_balance
-        self.transaction_history: List[Dict[str, Any]] = []
-    
-    def can_afford(self, amount: float) -> bool:
-        """Check if agent can afford amount"""
-        return self.balance >= amount
-    
-    def spend(self, amount: float, description: str = "") -> bool:
-        """Spend tokens"""
-        if not self.can_afford(amount):
-            return False
-        
-        self.balance -= amount
-        self.transaction_history.append({
-            "type": "spend",
-            "amount": amount,
-            "balance_after": self.balance,
-            "description": description,
-            "timestamp": time.time()
-        })
-        return True
-    
-    def receive(self, amount: float, description: str = "") -> None:
-        """Receive tokens"""
-        self.balance += amount
-        self.transaction_history.append({
-            "type": "receive",
-            "amount": amount,
-            "balance_after": self.balance,
-            "description": description,
-            "timestamp": time.time()
-        })
-    
-    def get_stats(self) -> Dict[str, Any]:
-        """Get wallet statistics"""
-        return {
-            "agent_id": self.agent_id,
-            "balance": self.balance,
-            "transaction_count": len(self.transaction_history),
-            "recent_transactions": self.transaction_history[-5:] if self.transaction_history else []
-        }
+    """Agent's wallet with Ω-tokens"""
+    agent_id: str
+    balance: float = 100.0  # Starting balance
+    reserved: float = 0.0   # Reserved for pending trades
+    transaction_history: List[Dict[str, Any]] = field(default_factory=list)
 
 
 class InternalMarket:
     """Internal cognitive marketplace"""
     
-    def __init__(self):
+    def __init__(self, initial_token_supply: float = 10000.0):
+        self.initial_supply = initial_token_supply
+        self.total_supply = initial_token_supply
+        self.circulating_supply = 0.0
+        
+        # Market state
         self.needs: List[Need] = []
         self.offers: List[Offer] = []
         self.trades: List[Trade] = []
         self.wallets: Dict[str, AgentWallet] = {}
-        self.price_history: Dict[ResourceType, List[Tuple[float, float]]] = defaultdict(list)  # (price, timestamp)
-        self.trade_counter = 0
-    
-    def create_wallet(self, agent_id: str, initial_balance: float = 100.0) -> AgentWallet:
-        """Create wallet for agent"""
+        
+        # Market statistics
+        self.price_history: Dict[ResourceType, List[Tuple[float, float]]] = defaultdict(list)
+        self.volume_history: List[Tuple[float, float]] = []  # (timestamp, volume)
+        
+        # Market parameters
+        self.matching_algorithm = "price_time_priority"
+        self.max_price_deviation = 0.1  # 10% max deviation from market price
+        
+    def create_agent(self, agent_id: str, initial_balance: float = 100.0) -> AgentWallet:
+        """Create new agent with wallet"""
         wallet = AgentWallet(agent_id, initial_balance)
         self.wallets[agent_id] = wallet
+        self.circulating_supply += initial_balance
         return wallet
-    
-    def get_wallet(self, agent_id: str) -> Optional[AgentWallet]:
-        """Get agent's wallet"""
-        return self.wallets.get(agent_id)
     
     def add_need(self, need: Need) -> bool:
         """Add resource need to market"""
-        # Check if agent has wallet
-        if need.agent_id not in self.wallets:
-            self.create_wallet(need.agent_id)
-        
-        # Check if agent can afford
-        wallet = self.wallets[need.agent_id]
-        total_cost = need.quantity * need.max_price
-        if not wallet.can_afford(total_cost):
+        # Check agent has sufficient balance
+        wallet = self.wallets.get(need.agent_id)
+        if not wallet:
             return False
+        
+        required_tokens = need.quantity * need.max_price
+        if wallet.balance - wallet.reserved < required_tokens:
+            return False
+        
+        # Reserve tokens
+        wallet.reserved += required_tokens
         
         self.needs.append(need)
         return True
     
     def add_offer(self, offer: Offer) -> bool:
         """Add resource offer to market"""
-        # Check if agent has wallet
-        if offer.agent_id not in self.wallets:
-            self.create_wallet(offer.agent_id)
-        
         self.offers.append(offer)
         return True
     
-    def match(self, needs: List[Need], offers: List[Offer]) -> List[Trade]:
-        """
-        Match needs with offers
-        
-        Args:
-            needs: List of needs
-            offers: List of offers
-            
-        Returns:
-            List of executed trades
-        """
-        trades = []
-        
-        # Sort needs by priority (higher first)
-        sorted_needs = sorted(needs, key=lambda n: n.priority, reverse=True)
-        
-        for need in sorted_needs:
-            if need.is_expired():
-                continue
-            
-            # Find compatible offers
-            compatible_offers = [
-                o for o in offers 
-                if (o.resource == need.resource and 
-                    o.price <= need.max_price and 
-                    o.quantity > 0 and
-                    not o.is_expired())
-            ]
-            
-            if not compatible_offers:
-                continue
-            
-            # Sort by price (lowest first)
-            compatible_offers.sort(key=lambda o: o.price)
-            
-            remaining_quantity = need.quantity
-            
-            for offer in compatible_offers:
-                if remaining_quantity <= 0:
-                    break
-                
-                # Determine trade quantity
-                trade_quantity = min(remaining_quantity, offer.quantity)
-                trade_price = offer.price
-                
-                # Create trade
-                trade_id = f"trade_{self.trade_counter:06d}"
-                self.trade_counter += 1
-                
-                trade = Trade(
-                    trade_id=trade_id,
-                    need=need,
-                    offer=offer,
-                    quantity=trade_quantity,
-                    price=trade_price
-                )
-                
-                trades.append(trade)
-                
-                # Update quantities
-                remaining_quantity -= trade_quantity
-                offer.quantity -= trade_quantity
-                
-                # Record price
-                self.price_history[need.resource].append((trade_price, time.time()))
-        
-        return trades
-    
-    def execute_trades(self, trades: List[Trade]) -> List[Trade]:
-        """Execute trades and update wallets"""
+    def match_trades(self) -> List[Trade]:
+        """Match needs and offers to create trades"""
         executed_trades = []
         
-        for trade in trades:
-            need_wallet = self.wallets.get(trade.need.agent_id)
-            offer_wallet = self.wallets.get(trade.offer.agent_id)
+        # Sort needs by priority and timestamp
+        sorted_needs = sorted(self.needs, key=lambda n: (-n.priority, n.timestamp))
+        
+        for need in sorted_needs[:]:  # Copy to avoid modification during iteration
+            # Find matching offers
+            matching_offers = [
+                o for o in self.offers
+                if (o.resource == need.resource and 
+                    o.price <= need.max_price and 
+                    o.quantity > 0)
+            ]
             
-            if not need_wallet or not offer_wallet:
-                trade.status = TradeStatus.FAILED
+            if not matching_offers:
                 continue
             
-            total_cost = trade.quantity * trade.price
+            # Sort by price (lowest first) and quality
+            matching_offers.sort(key=lambda o: (o.price, -o.quality))
             
-            # Check if need agent can afford
-            if not need_wallet.can_afford(total_cost):
-                trade.status = TradeStatus.FAILED
-                continue
+            best_offer = matching_offers[0]
+            
+            # Determine trade quantity
+            trade_quantity = min(need.quantity, best_offer.quantity)
+            trade_price = best_offer.price
+            
+            # Create trade
+            trade = Trade(
+                trade_id=str(uuid.uuid4()),
+                need=need,
+                offer=best_offer,
+                quantity=trade_quantity,
+                price=trade_price,
+                timestamp=time.time()
+            )
             
             # Execute trade
-            need_wallet.spend(total_cost, f"Trade {trade.trade_id}")
-            offer_wallet.receive(total_cost, f"Trade {trade.trade_id}")
-            
-            trade.status = TradeStatus.EXECUTED
-            executed_trades.append(trade)
-            self.trades.append(trade)
+            if self._execute_trade(trade):
+                executed_trades.append(trade)
+                self.trades.append(trade)
+                
+                # Update quantities
+                need.quantity -= trade_quantity
+                best_offer.quantity -= trade_quantity
+                
+                # Remove fulfilled needs/offers
+                if need.quantity <= 0:
+                    self.needs.remove(need)
+                    # Release reserved tokens
+                    wallet = self.wallets[need.agent_id]
+                    wallet.reserved -= need.max_price * trade_quantity
+                
+                if best_offer.quantity <= 0:
+                    self.offers.remove(best_offer)
         
         return executed_trades
     
-    def process_market(self) -> Dict[str, Any]:
-        """Process market and execute trades"""
-        # Clean expired needs and offers
-        self.needs = [n for n in self.needs if not n.is_expired()]
-        self.offers = [o for o in self.offers if not o.is_expired()]
+    def _execute_trade(self, trade: Trade) -> bool:
+        """Execute a trade between agents"""
+        need_wallet = self.wallets.get(trade.need.agent_id)
+        offer_wallet = self.wallets.get(trade.offer.agent_id)
         
-        # Match and execute trades
-        trades = self.match(self.needs, self.offers)
-        executed_trades = self.execute_trades(trades)
+        if not need_wallet or not offer_wallet:
+            return False
         
-        # Remove fulfilled needs and empty offers
-        self.needs = [n for n in self.needs if n.quantity > 0]
-        self.offers = [o for o in self.offers if o.quantity > 0]
+        trade_value = trade.quantity * trade.price
         
-        return {
-            "trades_executed": len(executed_trades),
-            "trades": [t.to_dict() for t in executed_trades],
-            "remaining_needs": len(self.needs),
-            "remaining_offers": len(self.offers)
-        }
+        # Check sufficient balance
+        if need_wallet.balance < trade_value:
+            return False
+        
+        # Transfer tokens
+        need_wallet.balance -= trade_value
+        offer_wallet.balance += trade_value
+        
+        # Record transactions
+        need_wallet.transaction_history.append({
+            "type": "purchase",
+            "resource": trade.need.resource.value,
+            "quantity": trade.quantity,
+            "price": trade.price,
+            "total": trade_value,
+            "timestamp": trade.timestamp
+        })
+        
+        offer_wallet.transaction_history.append({
+            "type": "sale",
+            "resource": trade.offer.resource.value,
+            "quantity": trade.quantity,
+            "price": trade.price,
+            "total": trade_value,
+            "timestamp": trade.timestamp
+        })
+        
+        # Update market statistics
+        self.price_history[trade.need.resource].append((trade.timestamp, trade.price))
+        self.volume_history.append((trade.timestamp, trade_value))
+        
+        trade.status = TradeStatus.EXECUTED
+        return True
     
     def get_market_price(self, resource: ResourceType, window_s: float = 300.0) -> Optional[float]:
         """Get current market price for resource"""
         cutoff_time = time.time() - window_s
         recent_prices = [
-            price for price, timestamp in self.price_history[resource]
+            price for timestamp, price in self.price_history[resource]
             if timestamp >= cutoff_time
         ]
         
@@ -317,162 +244,190 @@ class InternalMarket:
         
         return sum(recent_prices) / len(recent_prices)
     
+    def get_agent_balance(self, agent_id: str) -> Optional[float]:
+        """Get agent's current balance"""
+        wallet = self.wallets.get(agent_id)
+        return wallet.balance if wallet else None
+    
     def get_market_stats(self) -> Dict[str, Any]:
         """Get market statistics"""
-        stats = {
-            "total_needs": len(self.needs),
-            "total_offers": len(self.offers),
-            "total_trades": len(self.trades),
+        total_needs = sum(need.quantity for need in self.needs)
+        total_offers = sum(offer.quantity for offer in self.offers)
+        
+        recent_volume = sum(
+            volume for timestamp, volume in self.volume_history[-10:]
+        )
+        
+        return {
+            "total_needs": total_needs,
+            "total_offers": total_offers,
+            "active_trades": len([t for t in self.trades if t.status == TradeStatus.EXECUTED]),
+            "recent_volume": recent_volume,
+            "circulating_supply": self.circulating_supply,
             "active_agents": len(self.wallets),
-            "resource_prices": {}
+            "resource_types": len(ResourceType)
         }
+    
+    def cleanup_expired(self, max_age_s: float = 3600.0):
+        """Clean up expired needs and offers"""
+        cutoff_time = time.time() - max_age_s
         
-        # Get current prices for each resource
-        for resource in ResourceType:
-            price = self.get_market_price(resource)
-            if price is not None:
-                stats["resource_prices"][resource.value] = price
+        # Remove expired needs
+        expired_needs = [n for n in self.needs if n.timestamp < cutoff_time]
+        for need in expired_needs:
+            self.needs.remove(need)
+            # Release reserved tokens
+            wallet = self.wallets.get(need.agent_id)
+            if wallet:
+                wallet.reserved -= need.max_price * need.quantity
         
-        # Agent balances
-        agent_balances = {
-            agent_id: wallet.balance 
-            for agent_id, wallet in self.wallets.items()
-        }
-        stats["agent_balances"] = agent_balances
+        # Remove expired offers
+        expired_offers = [o for o in self.offers if o.timestamp < cutoff_time]
+        for offer in expired_offers:
+            self.offers.remove(offer)
         
-        return stats
+        return len(expired_needs) + len(expired_offers)
 
 
-class MarketOrchestrator:
-    """Orchestrates market operations"""
+class CognitiveScheduler:
+    """Scheduler that uses marketplace for resource allocation"""
     
-    def __init__(self):
-        self.market = InternalMarket()
-        self.processing_interval = 10.0  # seconds
-        self.last_process_time = 0
-    
-    def should_process(self) -> bool:
-        """Check if market should be processed"""
-        return time.time() - self.last_process_time > self.processing_interval
-    
-    def process_if_needed(self) -> Optional[Dict[str, Any]]:
-        """Process market if needed"""
-        if self.should_process():
-            result = self.market.process_market()
-            self.last_process_time = time.time()
-            return result
-        return None
-    
-    def create_agent(self, agent_id: str, initial_balance: float = 100.0) -> AgentWallet:
-        """Create agent with wallet"""
-        return self.market.create_wallet(agent_id, initial_balance)
-    
-    def request_resource(
-        self,
-        agent_id: str,
-        resource: ResourceType,
-        quantity: float,
-        max_price: float,
-        priority: int = 1,
-        expires_in_s: Optional[float] = None
-    ) -> bool:
-        """Request resource"""
-        expires_at = time.time() + expires_in_s if expires_in_s else None
+    def __init__(self, market: InternalMarket):
+        self.market = market
+        self.scheduler_id = "cognitive_scheduler"
         
-        need = Need(
-            agent_id=agent_id,
-            resource=resource,
-            quantity=quantity,
-            max_price=max_price,
-            priority=priority,
-            expires_at=expires_at
-        )
-        
-        return self.market.add_need(need)
+        # Ensure scheduler has wallet
+        if self.scheduler_id not in self.market.wallets:
+            self.market.create_agent(self.scheduler_id, 1000.0)
     
-    def offer_resource(
-        self,
-        agent_id: str,
-        resource: ResourceType,
-        quantity: float,
-        price: float,
-        quality: float = 1.0,
-        expires_in_s: Optional[float] = None
-    ) -> bool:
-        """Offer resource"""
-        expires_at = time.time() + expires_in_s if expires_in_s else None
+    def allocate_resources(self, agent_requests: Dict[str, Dict[ResourceType, float]]) -> Dict[str, bool]:
+        """Allocate resources to agents based on requests"""
+        allocation_results = {}
         
-        offer = Offer(
-            agent_id=agent_id,
-            resource=resource,
-            quantity=quantity,
-            price=price,
-            quality=quality,
-            expires_at=expires_at
-        )
+        for agent_id, requests in agent_requests.items():
+            success = True
+            
+            for resource_type, quantity in requests.items():
+                # Create need
+                market_price = self.market.get_market_price(resource_type) or 1.0
+                need = Need(
+                    agent_id=agent_id,
+                    resource=resource_type,
+                    quantity=quantity,
+                    max_price=market_price * 1.1,  # 10% above market price
+                    priority=2
+                )
+                
+                if not self.market.add_need(need):
+                    success = False
+                    break
+            
+            allocation_results[agent_id] = success
         
-        return self.market.add_offer(offer)
+        # Execute matching
+        trades = self.market.match_trades()
+        
+        return allocation_results
     
-    def get_agent_stats(self, agent_id: str) -> Optional[Dict[str, Any]]:
-        """Get agent statistics"""
-        wallet = self.market.get_wallet(agent_id)
+    def get_allocation_status(self, agent_id: str) -> Dict[str, Any]:
+        """Get allocation status for agent"""
+        wallet = self.market.wallets.get(agent_id)
         if not wallet:
-            return None
+            return {"status": "no_wallet"}
         
-        return wallet.get_stats()
-    
-    def get_market_overview(self) -> Dict[str, Any]:
-        """Get market overview"""
-        return self.market.get_market_stats()
-
-
-# Global market instance
-_global_market: Optional[MarketOrchestrator] = None
-
-
-def get_global_market() -> MarketOrchestrator:
-    """Get global market instance"""
-    global _global_market
-    
-    if _global_market is None:
-        _global_market = MarketOrchestrator()
-    
-    return _global_market
-
-
-def test_marketplace() -> Dict[str, Any]:
-    """Test marketplace functionality"""
-    market = get_global_market()
-    
-    # Create test agents
-    agent_a = market.create_agent("agent-A", 200.0)
-    agent_b = market.create_agent("agent-B", 150.0)
-    agent_c = market.create_agent("agent-C", 100.0)
-    
-    # Agent A needs CPU time
-    market.request_resource("agent-A", ResourceType.CPU_TIME, 10.0, 5.0, priority=2)
-    
-    # Agent B offers CPU time
-    market.offer_resource("agent-B", ResourceType.CPU_TIME, 15.0, 4.0)
-    
-    # Agent C needs memory
-    market.request_resource("agent-C", ResourceType.MEMORY, 5.0, 3.0, priority=1)
-    
-    # Agent A offers memory
-    market.offer_resource("agent-A", ResourceType.MEMORY, 8.0, 2.5)
-    
-    # Process market
-    result = market.process_market()
-    
-    # Get stats
-    stats = market.get_market_overview()
-    
-    return {
-        "processing_result": result,
-        "market_stats": stats,
-        "agent_stats": {
-            "agent-A": market.get_agent_stats("agent-A"),
-            "agent-B": market.get_agent_stats("agent-B"),
-            "agent-C": market.get_agent_stats("agent-C")
+        recent_trades = [
+            t for t in wallet.transaction_history[-5:]
+        ]
+        
+        return {
+            "balance": wallet.balance,
+            "reserved": wallet.reserved,
+            "available": wallet.balance - wallet.reserved,
+            "recent_trades": recent_trades
         }
+
+
+# Integration with Life Equation
+def integrate_marketplace_in_life_equation(
+    life_verdict: Dict[str, Any],
+    market: InternalMarket,
+    agent_id: str = "life_equation_agent"
+) -> Tuple[float, Dict[str, Any]]:
+    """
+    Integrate marketplace into Life Equation evaluation
+    
+    Args:
+        life_verdict: Result from life_equation()
+        market: Internal marketplace
+        agent_id: Agent ID for marketplace
+        
+    Returns:
+        (adjusted_alpha_eff, market_details)
+    """
+    if not life_verdict.get("ok", False):
+        return 0.0, {"market_integration": "life_failed"}
+    
+    # Ensure agent exists in marketplace
+    if agent_id not in market.wallets:
+        market.create_agent(agent_id, 100.0)
+    
+    # Get current balance
+    balance = market.get_agent_balance(agent_id)
+    
+    # Adjust alpha_eff based on available resources
+    base_alpha_eff = life_verdict.get("alpha_eff", 0.0)
+    
+    # Resource availability factor (0.5 to 1.5)
+    resource_factor = min(1.5, max(0.5, balance / 100.0))
+    
+    adjusted_alpha_eff = base_alpha_eff * resource_factor
+    
+    market_details = {
+        "market_integration": "success",
+        "agent_balance": balance,
+        "resource_factor": resource_factor,
+        "base_alpha_eff": base_alpha_eff,
+        "adjusted_alpha_eff": adjusted_alpha_eff,
+        "market_stats": market.get_market_stats()
     }
+    
+    return adjusted_alpha_eff, market_details
+
+
+# Example usage
+if __name__ == "__main__":
+    # Create marketplace
+    market = InternalMarket()
+    
+    # Create agents
+    agent1 = market.create_agent("agent-1", 200.0)
+    agent2 = market.create_agent("agent-2", 150.0)
+    
+    # Add needs and offers
+    need = Need(
+        agent_id="agent-1",
+        resource=ResourceType.CPU_TIME,
+        quantity=10.0,
+        max_price=2.0
+    )
+    market.add_need(need)
+    
+    offer = Offer(
+        agent_id="agent-2",
+        resource=ResourceType.CPU_TIME,
+        quantity=15.0,
+        price=1.5
+    )
+    market.add_offer(offer)
+    
+    # Execute matching
+    trades = market.match_trades()
+    print(f"Executed {len(trades)} trades")
+    
+    # Check balances
+    print(f"Agent-1 balance: {market.get_agent_balance('agent-1')}")
+    print(f"Agent-2 balance: {market.get_agent_balance('agent-2')}")
+    
+    # Market stats
+    stats = market.get_market_stats()
+    print(f"Market stats: {stats}")
