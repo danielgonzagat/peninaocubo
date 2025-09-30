@@ -1,8 +1,9 @@
 from pathlib import Path
 import datetime
 
+
 def update_readme():
-    now = datetime.datetime.utcnow().isoformat()+"Z"
+    now = datetime.datetime.utcnow().isoformat() + "Z"
     txt = [
         "# PENIN-Ω — VIDA+",
         f"_Gerado em {now}_",
@@ -21,4 +22,4 @@ def update_readme():
         "6. API metabolizer → distillation por endpoint.",
         "7. NAS online + Continual Learning (Mammoth/zero-cost) com VIDA+.",
     ]
-    Path('README_AUTO.md').write_text("\n".join(txt), encoding='utf-8')
+    Path("README_AUTO.md").write_text("\n".join(txt), encoding="utf-8")

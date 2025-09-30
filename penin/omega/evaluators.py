@@ -6,12 +6,12 @@ Implements evaluation batteries for U/S/C/L metrics (Utility, Stability, Cost, L
 Provides deterministic tasks and scoring for model assessment.
 """
 
-import hashlib
 import json
-import re
 import time
+import hashlib
+from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Tuple
+import re
 
 
 @dataclass
@@ -409,8 +409,3 @@ def quick_evaluate_model(model_fn, max_tasks: int = 2) -> Dict[str, float]:
         "L": results["aggregate_scores"]["L"]["mean"],
         "overall": results["overall_score"],
     }
-
-
-def quick_evaluate_utility(*_, **__):
-    # stub leve: útil p/ smoke do CLI
-    return {'L_inf': 0.9, 'dL_inf': 0.02}

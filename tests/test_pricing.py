@@ -37,4 +37,3 @@ def test_usage_value_handles_various_structures():
 def test_unknown_model_has_zero_cost():
     cost = estimate_cost("unknown", "model", 1000, 1000)
     assert cost == 0.0
-

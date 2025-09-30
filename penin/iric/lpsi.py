@@ -22,4 +22,3 @@ def lpsi_project(I, H=None, S=None, max_iter: int = 3):
         else:
             pass
     return x
-

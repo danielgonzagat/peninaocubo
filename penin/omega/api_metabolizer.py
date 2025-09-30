@@ -17,7 +17,7 @@ def record_call(provider: str, endpoint: str, req: Dict[str, Any], resp: Dict[st
 
 def suggest_replay(prompt: str) -> Dict[str, Any]:
     best = None
-    best_len = 10 ** 12
+    best_len = 10**12
     if not LOG.exists():
         return {"note": "no-log"}
     with LOG.open("rb") as f:
@@ -33,4 +33,3 @@ def suggest_replay(prompt: str) -> Dict[str, Any]:
                     best_len = diff
                     best = it
     return best.get("resp", {"note": "no-similar-found"}) if best else {"note": "no-similar-found"}
-

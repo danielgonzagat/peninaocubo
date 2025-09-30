@@ -8,4 +8,3 @@ def compute_caos_plus(C: float, A: float, O: float, S: float, kappa: float = 20.
     """
     expo = max(1e-6, O * S)
     return math.pow(1.0 + kappa * max(0.0, C) * max(0.0, A), expo)
-

@@ -20,4 +20,3 @@ def restore_last() -> Optional[Dict[str, Any]]:
     if not snaps:
         return None
     return orjson.loads(snaps[-1].read_bytes())
-

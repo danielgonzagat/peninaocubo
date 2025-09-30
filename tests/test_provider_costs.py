@@ -5,6 +5,7 @@ import pytest
 
 sys.path.insert(0, "/workspace/peninaocubo")
 
+
 async def _immediate_to_thread(func, *args, **kwargs):
     return func(*args, **kwargs)
 
@@ -21,9 +22,7 @@ async def test_openai_provider_cost(monkeypatch):
 
     class DummyClient:
         def __init__(self, *_, **__):
-            self.chat = types.SimpleNamespace(
-                completions=types.SimpleNamespace(create=lambda **_: make_response())
-            )
+            self.chat = types.SimpleNamespace(completions=types.SimpleNamespace(create=lambda **_: make_response()))
 
     monkeypatch.setattr(openai_provider, "OpenAI", DummyClient)
     monkeypatch.setattr(openai_provider.asyncio, "to_thread", _immediate_to_thread)
@@ -48,9 +47,7 @@ async def test_deepseek_provider_cost(monkeypatch):
 
     class DummyClient:
         def __init__(self, *_, **__):
-            self.chat = types.SimpleNamespace(
-                completions=types.SimpleNamespace(create=lambda **_: make_response())
-            )
+            self.chat = types.SimpleNamespace(completions=types.SimpleNamespace(create=lambda **_: make_response()))
 
     monkeypatch.setattr(deepseek_provider, "OpenAI", DummyClient)
     monkeypatch.setattr(deepseek_provider.asyncio, "to_thread", _immediate_to_thread)

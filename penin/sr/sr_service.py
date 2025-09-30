@@ -26,4 +26,3 @@ async def sr_eval(x: SRInput):
     A = 1.0 / (1.0 + math.exp(-x.dlinf_dc))
     R = min(C, E, M, A)
     return {"C": C, "E": E, "M": M, "A": A, "R": R}
-

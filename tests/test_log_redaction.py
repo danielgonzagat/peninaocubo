@@ -11,20 +11,17 @@ def test_secret_redaction_dict():
         "password": "secretpassword",
         "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
         "normal_field": "normal_value",
-        "nested": {
-            "secret_key": "another_secret",
-            "public_data": "visible"
-        }
+        "nested": {"secret_key": "another_secret", "public_data": "visible"},
     }
-    
+
     redacted = SecretRedactor.redact(test_data)
-    
+
     # Check that secrets are redacted
     assert redacted["api_key"] == "[REDACTED]"
     assert redacted["password"] == "[REDACTED]"
     assert redacted["token"] == "[REDACTED]"
     assert redacted["nested"]["secret_key"] == "[REDACTED]"
-    
+
     # Check that non-secrets are preserved
     assert redacted["user_id"] == "12345"
     assert redacted["normal_field"] == "normal_value"
@@ -33,14 +30,10 @@ def test_secret_redaction_dict():
 
 def test_secret_redaction_list():
     """Test redaction of secrets in lists."""
-    test_data = [
-        {"api_key": "secret1", "name": "test1"},
-        {"password": "secret2", "id": "test2"},
-        {"normal": "value"}
-    ]
-    
+    test_data = [{"api_key": "secret1", "name": "test1"}, {"password": "secret2", "id": "test2"}, {"normal": "value"}]
+
     redacted = SecretRedactor.redact(test_data)
-    
+
     assert redacted[0]["api_key"] == "[REDACTED]"
     assert redacted[0]["name"] == "test1"
     assert redacted[1]["password"] == "[REDACTED]"
@@ -72,7 +65,7 @@ def test_secret_patterns():
         "jwt_token",
         "JWT_TOKEN",
     ]
-    
+
     for field_name in test_cases:
         test_data = {field_name: "secret_value"}
         redacted = SecretRedactor.redact(test_data)
@@ -98,7 +91,7 @@ def test_non_secret_fields():
         "category",
         "id",
     ]
-    
+
     for field_name in test_cases:
         test_data = {field_name: "some_value"}
         redacted = SecretRedactor.redact(test_data)
@@ -107,21 +100,13 @@ def test_non_secret_fields():
 
 def test_redact_decorator():
     """Test the redact_secrets decorator."""
+
     @redact_secrets
     def test_function(api_key, password, normal_param):
-        return {
-            "api_key": api_key,
-            "password": password,
-            "normal_param": normal_param,
-            "result": "success"
-        }
-    
-    result = test_function(
-        api_key="sk-1234567890abcdef",
-        password="secretpassword",
-        normal_param="normal_value"
-    )
-    
+        return {"api_key": api_key, "password": password, "normal_param": normal_param, "result": "success"}
+
+    result = test_function(api_key="sk-1234567890abcdef", password="secretpassword", normal_param="normal_value")
+
     # The function should receive redacted values
     assert result["api_key"] == "[REDACTED]"
     assert result["password"] == "[REDACTED]"
@@ -132,29 +117,26 @@ def test_redact_decorator():
 def test_secure_logger():
     """Test SecureLogger functionality."""
     import logging
-    
+
     # Create a test logger
     logger = logging.getLogger("test_secure_logger")
     logger.setLevel(logging.INFO)
-    
+
     # Capture log output
     import io
+
     log_capture = io.StringIO()
     handler = logging.StreamHandler(log_capture)
     logger.addHandler(handler)
-    
+
     # Create secure logger
     secure_logger = SecureLogger(logger)
-    
+
     # Test logging with secrets
-    test_data = {
-        "api_key": "sk-1234567890abcdef",
-        "password": "secretpassword",
-        "user_id": "12345"
-    }
-    
+    test_data = {"api_key": "sk-1234567890abcdef", "password": "secretpassword", "user_id": "12345"}
+
     secure_logger.info(test_data)
-    
+
     # Check that secrets are redacted in log output
     log_output = log_capture.getvalue()
     assert "[REDACTED]" in log_output
@@ -165,14 +147,10 @@ def test_secure_logger():
 
 def test_json_string_redaction():
     """Test redaction of JSON strings."""
-    test_json = json.dumps({
-        "api_key": "sk-1234567890abcdef",
-        "password": "secretpassword",
-        "user_id": "12345"
-    })
-    
+    test_json = json.dumps({"api_key": "sk-1234567890abcdef", "password": "secretpassword", "user_id": "12345"})
+
     redacted = SecretRedactor.redact(test_json)
-    
+
     # Should be a JSON string with redacted values
     parsed = json.loads(redacted)
     assert parsed["api_key"] == "[REDACTED]"
@@ -182,19 +160,10 @@ def test_json_string_redaction():
 
 def test_nested_redaction():
     """Test redaction in deeply nested structures."""
-    test_data = {
-        "level1": {
-            "level2": {
-                "level3": {
-                    "api_key": "secret",
-                    "normal_field": "value"
-                }
-            }
-        }
-    }
-    
+    test_data = {"level1": {"level2": {"level3": {"api_key": "secret", "normal_field": "value"}}}}
+
     redacted = SecretRedactor.redact(test_data)
-    
+
     assert redacted["level1"]["level2"]["level3"]["api_key"] == "[REDACTED]"
     assert redacted["level1"]["level2"]["level3"]["normal_field"] == "value"
 
@@ -203,19 +172,15 @@ def test_edge_cases():
     """Test edge cases for redaction."""
     # Empty dict
     assert SecretRedactor.redact({}) == {}
-    
+
     # None value
     assert SecretRedactor.redact(None) is None
-    
+
     # String that's not JSON
     assert SecretRedactor.redact("plain string") == "plain string"
-    
+
     # List with mixed types
-    mixed_list = [
-        {"api_key": "secret"},
-        "plain string",
-        {"normal": "value"}
-    ]
+    mixed_list = [{"api_key": "secret"}, "plain string", {"normal": "value"}]
     redacted = SecretRedactor.redact(mixed_list)
     assert redacted[0]["api_key"] == "[REDACTED]"
     assert redacted[1] == "plain string"

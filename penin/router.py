@@ -4,6 +4,7 @@ import json
 from datetime import date, datetime
 from pathlib import Path
 from typing import List, Optional, Dict, Any
+
 # ensure single datetime import (avoid duplicates in tests)
 # using datetime alias handled above
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -11,15 +12,18 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 try:
     from penin.config import settings
 except Exception:
+
     class _FallbackSettings:
         PENIN_MAX_PARALLEL_PROVIDERS: int = 3
         PENIN_BUDGET_DAILY_USD: float = 5.0
+
     settings = _FallbackSettings()
 from penin.providers.base import BaseProvider, LLMResponse
 
 
 class CostTracker:
     """Daily cost tracker with rollover and simple persistence-less state."""
+
     def __init__(self, budget_usd: float = 5.0, state_path: Optional[str] = None):
         self.budget_usd = float(budget_usd)
         self.state_path = state_path
@@ -57,10 +61,10 @@ class CostTracker:
 class MultiLLMRouter:
     """
     Multi-LLM router with cost-aware selection and budget tracking.
-    
+
     P0-4: Includes cost/budget in scoring to prevent overspending.
     """
-    
+
     def __init__(
         self,
         providers: List[BaseProvider],
@@ -79,13 +83,13 @@ class MultiLLMRouter:
         self.cost_weight = cost_weight
         self.latency_weight = latency_weight
         self.quality_weight = quality_weight
-        
+
         # P0-4: Budget tracking
         self._daily_spend = 0.0
         self._last_reset = datetime.now().date()
         self._total_tokens = 0
         self._request_count = 0
-    
+
     def _reset_daily_budget_if_needed(self):
         """Reset daily budget tracker at midnight"""
         today = datetime.now().date()
@@ -94,19 +98,19 @@ class MultiLLMRouter:
             self._total_tokens = 0
             self._request_count = 0
             self._last_reset = today
-    
+
     def _get_today_usage(self) -> float:
         """Get today's total usage in USD"""
         self._reset_daily_budget_if_needed()
         return self._daily_spend
-    
+
     def _add_usage(self, cost_usd: float, tokens: int = 0):
         """Add usage for today"""
         self._reset_daily_budget_if_needed()
         self._daily_spend += cost_usd
         self._total_tokens += tokens
         self._request_count += 1
-    
+
     def get_usage_stats(self) -> Dict[str, Any]:
         """Get current usage statistics"""
         self._reset_daily_budget_if_needed()
@@ -118,16 +122,16 @@ class MultiLLMRouter:
             "request_count": self._request_count,
             "avg_cost_per_request": self._daily_spend / max(1, self._request_count),
         }
-    
+
     def _score(self, r: LLMResponse) -> float:
         """Score response considering content, latency, and cost"""
         # Base score for having content
         base = 1.0 if r.content else 0.0
-        
+
         # Latency component (higher is better for lower latency)
         lat = max(0.01, r.latency_s)
         # P0 Fix: Include cost in scoring (higher cost = lower score)
-        cost_scaling = getattr(self, 'cost_scaling_factor', 1000)  # Make configurable
+        cost_scaling = getattr(self, "cost_scaling_factor", 1000)  # Make configurable
         cost_penalty = r.cost_usd * cost_scaling
         return base + (1.0 / lat) - cost_penalty
 
@@ -143,11 +147,8 @@ class MultiLLMRouter:
         current_usage = self._get_today_usage()
         if not force_budget_override and current_usage >= self.daily_budget_usd:
             raise RuntimeError(f"Daily budget exceeded: ${current_usage:.2f} >= ${self.daily_budget_usd:.2f}")
-        
-        tasks = [
-            p.chat(messages, tools=tools, system=system, temperature=temperature)
-            for p in self.providers
-        ]
+
+        tasks = [p.chat(messages, tools=tools, system=system, temperature=temperature) for p in self.providers]
         results: List[LLMResponse] = await asyncio.gather(*tasks, return_exceptions=True)
         ok = [r for r in results if isinstance(r, LLMResponse)]
         if not ok:
@@ -159,29 +160,26 @@ class MultiLLMRouter:
 
         # Record usage for all successful providers
         total_cost = sum(getattr(r, "cost_usd", 0.0) or 0.0 for r in ok)
-        total_tokens = sum(
-            int((getattr(r, "tokens_in", 0) or 0) + (getattr(r, "tokens_out", 0) or 0))
-            for r in ok
-        )
+        total_tokens = sum(int((getattr(r, "tokens_in", 0) or 0) + (getattr(r, "tokens_out", 0) or 0)) for r in ok)
         if total_cost > 0 or total_tokens > 0:
             self._add_usage(total_cost, total_tokens)
 
         return best_response
-        
+
     def get_budget_status(self) -> Dict[str, Any]:
         """Get current budget status"""
         current_usage = self._get_today_usage()
         remaining = max(0.0, self.daily_budget_usd - current_usage)
-        
+
         return {
             "daily_budget_usd": self.daily_budget_usd,
             "current_usage_usd": current_usage,
             "remaining_usd": remaining,
             "usage_percentage": (current_usage / self.daily_budget_usd) * 100,
             "budget_exceeded": current_usage >= self.daily_budget_usd,
-            "date": date.today().isoformat()
+            "date": date.today().isoformat(),
         }
-        
+
     def reset_daily_budget(self, new_budget: Optional[float] = None):
         """Reset daily budget counters (for new day or manual reset)"""
         if new_budget is not None:

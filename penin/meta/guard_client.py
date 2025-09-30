@@ -39,4 +39,3 @@ class SRClient:
         )
         r.raise_for_status()
         return r.json()
-

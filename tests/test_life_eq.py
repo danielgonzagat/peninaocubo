@@ -35,4 +35,3 @@ def test_life_eq_fail_guard():
         thresholds={"beta_min": 0.01, "theta_caos": 0.25, "tau_sr": 0.80, "theta_G": 0.85},
     )
     assert not res.ok and res.alpha_eff == 0
-

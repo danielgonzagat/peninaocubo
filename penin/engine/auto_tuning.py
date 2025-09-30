@@ -9,4 +9,3 @@ class OnlineTuner:
         self.g2 += grad * grad
         eta = self.eta0 / (1.0 + self.g2) ** 0.5
         return -eta * grad
-

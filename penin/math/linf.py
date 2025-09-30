@@ -15,4 +15,3 @@ def harmonic_noncomp(metrics: Dict[str, float], weights: Dict[str, float], eps: 
 def linf_score(metrics: Dict[str, float], weights: Dict[str, float], cost: float, lambda_c: float = 0.01) -> float:
     base = harmonic_noncomp(metrics, weights)
     return base * math.exp(-lambda_c * max(0.0, cost))
-

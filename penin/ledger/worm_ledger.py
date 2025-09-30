@@ -35,4 +35,3 @@ def merkle_root() -> str | None:
             nxt.append(_h((a + b).encode()))
         hashes = nxt
     return hashes[0]
-

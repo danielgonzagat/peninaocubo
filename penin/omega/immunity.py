@@ -15,4 +15,3 @@ def anomaly_score(metrics: Dict[str, Any]) -> float:
 
 def guard(metrics: Dict[str, Any], trigger: float = 1.0) -> bool:
     return anomaly_score(metrics) < trigger
-

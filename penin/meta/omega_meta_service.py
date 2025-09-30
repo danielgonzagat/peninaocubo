@@ -120,15 +120,21 @@ async def promote(pid: str, dlinf: float, caos_plus: float, sr: float, guard: Gu
     g = GUARD.eval(guard.dict())
     allow = bool(g.get("allow", False))
     promoted = bool(gate_ok and allow)
-    LEDGER.append(WORMEvent("promote", pid, {
-        "delta_linf": dlinf,
-        "caos_plus": caos_plus,
-        "sr": sr,
-        "guard": guard.dict(),
-        "allow": allow,
-        "gate_ok": gate_ok,
-        "promoted": promoted,
-    }))
+    LEDGER.append(
+        WORMEvent(
+            "promote",
+            pid,
+            {
+                "delta_linf": dlinf,
+                "caos_plus": caos_plus,
+                "sr": sr,
+                "guard": guard.dict(),
+                "allow": allow,
+                "gate_ok": gate_ok,
+                "promoted": promoted,
+            },
+        )
+    )
     return {"id": pid, "promoted": promoted, "gate_ok": gate_ok, "guard_allow": allow}
 
 
@@ -175,7 +181,12 @@ async def propose_canary_promote(x: PipelineInput):
     R = float(sr_res.get("R", 0.0))
 
     # 5) CAOS+
-    c, a, o, s = (x.caos_components.get("C", 0.6), x.caos_components.get("A", 0.6), x.caos_components.get("O", 1.0), x.caos_components.get("S", 1.0))
+    c, a, o, s = (
+        x.caos_components.get("C", 0.6),
+        x.caos_components.get("A", 0.6),
+        x.caos_components.get("O", 1.0),
+        x.caos_components.get("S", 1.0),
+    )
     caos_plus = 1.0 + phi_caos(c, a, o, s)  # ensure >=1.0 thresholding idea
 
     # 6) Guard
@@ -184,13 +195,19 @@ async def propose_canary_promote(x: PipelineInput):
 
     # 7) Promote
     promoted = bool((dlinf >= 0.01) and (caos_plus >= 1.0) and (R >= 0.80) and allow)
-    LEDGER.append(WORMEvent("promote", x.id, {
-        "delta_linf": dlinf,
-        "caos_plus": caos_plus,
-        "sr": R,
-        "guard_allow": allow,
-        "promoted": promoted,
-    }))
+    LEDGER.append(
+        WORMEvent(
+            "promote",
+            x.id,
+            {
+                "delta_linf": dlinf,
+                "caos_plus": caos_plus,
+                "sr": R,
+                "guard_allow": allow,
+                "promoted": promoted,
+            },
+        )
+    )
 
     return {
         "id": x.id,
@@ -202,4 +219,3 @@ async def propose_canary_promote(x: PipelineInput):
         "guard_allow": allow,
         "promoted": promoted,
     }
-

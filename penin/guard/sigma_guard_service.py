@@ -31,4 +31,3 @@ async def eval_guard(m: Metrics):
             "eco_ok": m.eco_ok,
         },
     }
-

@@ -42,4 +42,3 @@ def self_cycle() -> Dict[str, Any]:
         q2 = f"Detalhar implementações pendentes em {ans['doc']}"
         return {"q1": q, "a1": ans, "q2": q2}
     return {"q1": q, "a1": None}
-

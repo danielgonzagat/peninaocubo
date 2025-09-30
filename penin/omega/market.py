@@ -33,4 +33,3 @@ class InternalMarket:
                 n.qty -= qty
                 o.qty -= qty
         return trades
-

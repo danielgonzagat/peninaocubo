@@ -30,4 +30,3 @@ def add_block(state_snapshot: Dict[str, Any], prev_hash: Optional[str]) -> str:
     with CHAIN.open("ab") as f:
         f.write(orjson.dumps(block) + b"\n")
     return block_hash
-

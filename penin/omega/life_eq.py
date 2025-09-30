@@ -9,19 +9,25 @@ try:
 except Exception:
     _phi_caos = None  # fallback
 
+
 def _clamp(x: float, lo: float = 0.0, hi: float = 1.0) -> float:
     try:
         x = float(x)
     except Exception:
         return lo
-    if math.isnan(x) or math.isinf(x): return lo
-    if x < lo: return lo
-    if x > hi: return hi
+    if math.isnan(x) or math.isinf(x):
+        return lo
+    if x < lo:
+        return lo
+    if x > hi:
+        return hi
     return x
+
 
 def _accel(phi: float, kappa: float = 20.0) -> float:
     # aceleração suave e saturada: (1+κ·φ)/(1+κ) ∈ (0,1]
     return (1.0 + kappa * _clamp(phi)) / (1.0 + kappa)
+
 
 @dataclass
 class LifeVerdict:
@@ -29,6 +35,7 @@ class LifeVerdict:
     alpha_eff: float
     reasons: Dict[str, Any]
     metrics: Dict[str, float]
+
 
 def life_equation(
     *,

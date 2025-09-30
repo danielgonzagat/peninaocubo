@@ -17,4 +17,3 @@ def step_master(state: MasterState, delta_linf: float, alpha_omega: float) -> Ma
     """
     I_next = float(state.I + alpha_omega * delta_linf)
     return MasterState(I_next, state.H or {}, state.S or {})
-

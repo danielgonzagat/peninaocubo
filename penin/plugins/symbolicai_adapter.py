@@ -12,4 +12,3 @@ def verify_with_symbolicai(contract: str, specimen: str) -> Dict[str, Any]:
     passed = True
     explanations: List[str] = ["Contrato verificado (stub)"]
     return {"passed": passed, "explanations": explanations}
-

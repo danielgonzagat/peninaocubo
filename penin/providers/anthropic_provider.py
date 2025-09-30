@@ -5,6 +5,7 @@ try:
     import anthropic  # type: ignore
 except Exception:  # pragma: no cover
     import types
+
     anthropic = types.SimpleNamespace(Anthropic=None)
 
 from penin.config import settings
@@ -20,6 +21,7 @@ class AnthropicProvider(BaseProvider):
         # In tests, anthropic module is monkeypatched; if it's None, create a shim module
         if anthropic is None:  # pragma: no cover
             import types
+
             globals()["anthropic"] = types.SimpleNamespace()
         self.client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 

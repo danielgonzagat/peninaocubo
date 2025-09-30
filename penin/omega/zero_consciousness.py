@@ -7,4 +7,3 @@ def spi_proxy(ece: float, randomness: float, introspection_leak: float) -> float
 
 def assert_zero_consciousness(spi: float, tau: float = 0.05) -> bool:
     return float(spi) <= float(tau)
-

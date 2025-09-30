@@ -32,19 +32,19 @@ class AdaGradTuner:
 
 class PeninOmegaTuner:
     """Tuner principal do PENIN-Ω"""
-    
+
     def __init__(self):
         self.adagrad = AdaGradTuner()
         self.history = []
-    
+
     def update_from_cycle_result(self, metrics: Dict[str, Any]) -> Dict[str, float]:
         """Atualiza parâmetros baseado no resultado do ciclo"""
         self.history.append(metrics)
-        
+
         # Simular atualização de parâmetros
         params = {"kappa": 2.0, "alpha": 0.001}
         grads = {"kappa": 0.1, "alpha": 0.0001}
-        
+
         return self.adagrad.update(params, grads)
 
 

@@ -29,4 +29,3 @@ def test_league_ping():
     r = c.get("/league/canary/ping")
     j = r.json()
     assert r.status_code == 200 and j.get("ok") is True
-
