@@ -736,8 +736,13 @@ class WORMLedger:
     def __init__(self, path: Path = DIRS["WORM"] / "omega_core_1of8_v7.db"):
         self.db = sqlite3.connect(str(path), check_same_thread=False)
         # P0-3: Enable WAL mode and busy_timeout for better concurrency
-        self.db.execute("PRAGMA journal_mode=WAL")
-        self.db.execute("PRAGMA busy_timeout=3000")
+        try:
+            self.db.execute("PRAGMA journal_mode=WAL")
+            self.db.execute("PRAGMA busy_timeout=3000")
+        except sqlite3.Error as e:
+            # Log warning but don't fail - fallback to default mode
+            print(f"Warning: Could not set SQLite pragmas: {e}")
+        self.db.commit()  # Ensure pragmas are applied
         self._init_db()
         self._lock = threading.Lock()
         self.tail = self._get_last_hash()
