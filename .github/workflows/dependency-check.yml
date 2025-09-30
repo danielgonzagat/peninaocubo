@@ -1,0 +1,93 @@
+name: Dependency Check
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 2 * * 1'  # Weekly on Monday at 2 AM
+
+jobs:
+  dependency-check:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Generate lockfile
+      run: |
+        pip freeze > requirements-lock.txt
+    
+    - name: Check dependency drift
+      run: |
+        python scripts/check_dependency_drift.py --json > drift-report.json
+        python scripts/check_dependency_drift.py
+    
+    - name: Upload drift report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: dependency-drift-report
+        path: drift-report.json
+    
+    - name: Comment on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          const report = JSON.parse(fs.readFileSync('drift-report.json', 'utf8'));
+          
+          if (report.drift_detected) {
+            const comment = `## 🚨 Dependency Drift Detected
+            
+            **Summary:**
+            - Total Requirements: ${report.summary.total_requirements}
+            - Total Locked: ${report.summary.total_locked}
+            - Drift Issues: ${report.summary.drift_count}
+            
+            **Issues:**
+            ${report.missing_in_lock.length > 0 ? `- Missing in lockfile: ${report.missing_in_lock.join(', ')}` : ''}
+            ${report.version_mismatches.length > 0 ? `- Version mismatches: ${report.version_mismatches.map(m => m.package).join(', ')}` : ''}
+            
+            **Action Required:**
+            1. Update requirements.txt with exact versions
+            2. Regenerate lockfile: \`pip freeze > requirements-lock.txt\`
+            3. Test with updated dependencies
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+          } else {
+            const comment = `## ✅ No Dependency Drift Detected
+            
+            All dependencies are in sync between requirements.txt and requirements-lock.txt.
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+          }
+    
+    - name: Fail on drift
+      if: failure()
+      run: |
+        echo "❌ Dependency drift detected. Please fix before merging."
+        exit 1
