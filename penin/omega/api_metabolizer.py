@@ -35,7 +35,14 @@ def record_call(provider: str, endpoint: str, req: Dict[str, Any], resp: Dict[st
     }
     
     with LOG_PATH.open("ab") as f:
-        f.write((json.dumps(item) if hasattr(json, 'dumps') else str(item)).encode() + b"\n")
+        if hasattr(json, 'dumps'):
+            content = json.dumps(item)
+            if isinstance(content, bytes):
+                f.write(content + b"\n")
+            else:
+                f.write(content.encode() + b"\n")
+        else:
+            f.write(str(item).encode() + b"\n")
     
     return item["hash"]
 

@@ -34,7 +34,13 @@ def save_snapshot(state: Dict[str, Any], name: Optional[str] = None) -> str:
         }
     }
     
-    content = json.dumps(snapshot) if hasattr(json, 'dumps') else str(snapshot)
+    if hasattr(json, 'dumps'):
+        content = json.dumps(snapshot)
+        if isinstance(content, bytes):
+            content = content.decode('utf-8')
+    else:
+        content = str(snapshot)
+    
     filepath.write_text(content, encoding="utf-8")
     
     return str(filepath)
