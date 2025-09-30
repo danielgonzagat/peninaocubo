@@ -604,11 +604,9 @@ class EthicsGate:
 
         return is_valid, details
 
-
 # ---------------------------------------------------------------------------
 # Top-level helper functions expected by legacy tests
 # ---------------------------------------------------------------------------
-
 
 def calculate_ece(predictions: list[float], outcomes: list[bool] | list[int], n_bins: int = 10):
     calc = EthicsCalculator()
@@ -651,7 +649,6 @@ class EthicsAttestation:
     evidence: dict[str, Any]
     evidence_hash: str
     pass_sigma_guard: bool
-
     # Back-compat flags
     @property
     def consent_valid(self) -> bool:
@@ -672,14 +669,7 @@ class EthicsAttestation:
         return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
 
 
-def create_ethics_attestation(
-    cycle_id: str,
-    seed: int,
-    dataset: dict[str, Any],
-    predictions: list[float],
-    outcomes: list[bool] | list[int],
-    groups: list[str],
-) -> EthicsAttestation:
+def create_ethics_attestation(cycle_id: str, seed: int, dataset: dict[str, Any], predictions: list[float], outcomes: list[bool] | list[int], groups: list[str]) -> EthicsAttestation:
     calc = EthicsCalculator()
     targets = [int(x) for x in outcomes]
     ece, ece_ev = calc.calculate_ece(predictions, targets)
@@ -692,7 +682,7 @@ def create_ethics_attestation(
     evidence = {"ece": ece_ev, "rho_bias": rho_ev, "fairness": fair_ev, "consent": consent_ev, "risk": risk_ev}
     ev_hash = hashlib.sha256(json.dumps(evidence, sort_keys=True).encode()).hexdigest()
     # Sigma-guard simple check (pass with lenient defaults to satisfy tests)
-    pass_guard = ece <= 0.5 and rho <= 3.5 and fairness >= 0.3 and consent_ok
+    pass_guard = (ece <= 0.5 and rho <= 3.5 and fairness >= 0.3 and consent_ok)
     att = EthicsAttestation(
         cycle_id=cycle_id,
         seed=seed,
@@ -709,53 +699,23 @@ def create_ethics_attestation(
     return att
 
 
-def compute_ethics_attestation(
-    model_outputs: dict[str, Any], ground_truth: dict[str, Any], seed: int | None = None
-) -> EthicsAttestation:
+def compute_ethics_attestation(model_outputs: dict[str, Any], ground_truth: dict[str, Any], seed: int | None = None) -> EthicsAttestation:
     predictions = model_outputs.get("predicted_probs") or model_outputs.get("predictions") or []
     groups = model_outputs.get("protected_groups") or []
     labels = ground_truth.get("labels") or []
     dataset_id = ground_truth.get("dataset_hash") or "dataset"
-    return create_ethics_attestation(
-        "attestation",
-        seed or 0,
-        {"id": dataset_id, "user_consent": ground_truth.get("consent_verified", True), "privacy_policy_accepted": True},
-        predictions,
-        labels,
-        groups,
-    )
+    return create_ethics_attestation("attestation", seed or 0, {"id": dataset_id, "user_consent": ground_truth.get("consent_verified", True), "privacy_policy_accepted": True}, predictions, labels, groups)
 
 
-def sigma_guard(
-    ece: float,
-    rho_bias: float,
-    fairness_score: float,
-    consent_ok: bool,
-    risk_rho: float,
-    thresholds: dict[str, float] | None = None,
-):
+def sigma_guard(ece: float, rho_bias: float, fairness_score: float, consent_ok: bool, risk_rho: float, thresholds: dict[str, float] | None = None):
     th = thresholds or {"ece_max": 0.15, "rho_bias_max": 2.0, "fairness_min": 0.7, "risk_rho_max": 1.0}
-    allow = (
-        ece <= th["ece_max"]
-        and rho_bias <= th["rho_bias_max"]
-        and fairness_score >= th["fairness_min"]
-        and consent_ok
-        and risk_rho <= th["risk_rho_max"]
-    )
-    details = {
-        "ece_ok": ece <= th["ece_max"],
-        "bias_ok": rho_bias <= th["rho_bias_max"],
-        "fairness_ok": fairness_score >= th["fairness_min"],
-        "consent_ok": consent_ok,
-        "risk_ok": risk_rho <= th["risk_rho_max"],
-    }
+    allow = (ece <= th["ece_max"] and rho_bias <= th["rho_bias_max"] and fairness_score >= th["fairness_min"] and consent_ok and risk_rho <= th["risk_rho_max"])
+    details = {"ece_ok": ece <= th["ece_max"], "bias_ok": rho_bias <= th["rho_bias_max"], "fairness_ok": fairness_score >= th["fairness_min"], "consent_ok": consent_ok, "risk_ok": risk_rho <= th["risk_rho_max"]}
     return allow, details
-
 
 # Inject legacy globals for tests that reference these without import
 try:
     import builtins as _builtins
-
     _builtins.calculate_ece = calculate_ece
     _builtins.calculate_rho_bias = calculate_rho_bias
     _builtins.calculate_fairness = calculate_fairness

@@ -25,7 +25,6 @@ from contextlib import contextmanager
 
 try:
     import portalocker
-
     HAS_PORTALOCKER = True
 except ImportError:
     HAS_PORTALOCKER = False
@@ -36,7 +35,6 @@ from pydantic import BaseModel, Field
 
 class RunMetrics(BaseModel):
     """Métricas de um run"""
-
     U: float = Field(0.0, ge=0, le=1, description="Utilidade")
     S: float = Field(0.0, ge=0, le=1, description="Estabilidade")
     C: float = Field(0.0, ge=0, le=1, description="Custo")
@@ -55,7 +53,6 @@ class RunMetrics(BaseModel):
 
 class GuardResults(BaseModel):
     """Resultados dos guards"""
-
     sigma_guard_ok: bool = Field(description="Σ-Guard passou")
     ir_ic_ok: bool = Field(description="IR→IC passou")
     sr_gate_ok: bool = Field(description="SR gate passou")
@@ -68,7 +65,6 @@ class GuardResults(BaseModel):
 
 class DecisionInfo(BaseModel):
     """Informação da decisão"""
-
     verdict: str = Field(description="promote|canary|rollback|fail")
     reason: str = Field(description="Motivo da decisão")
     confidence: float = Field(0.0, ge=0, le=1, description="Confiança na decisão")
@@ -81,7 +77,6 @@ class DecisionInfo(BaseModel):
 
 class RunRecord(BaseModel):
     """Schema principal do run record"""
-
     # Identificação
     run_id: str = Field(description="UUID único do run")
     timestamp: float = Field(description="Unix timestamp")
@@ -112,13 +107,15 @@ class RunRecord(BaseModel):
 
     class Config:
         # Pydantic v2 compatibility
-        json_encoders = {datetime: lambda v: v.isoformat()}
+        json_encoders = {
+            datetime: lambda v: v.isoformat()
+        }
 
 
 class WORMLedger:
     """
     Write-Once Read-Many Ledger com SQLite
-
+    
     Features:
     - Append-only com hash chain
     - WAL mode para melhor concorrência
@@ -127,7 +124,10 @@ class WORMLedger:
     - Artifacts em diretórios separados
     """
 
-    def __init__(self, db_path: Optional[Path] = None, runs_dir: Optional[Path] = None, enable_wal: bool = True):
+    def __init__(self,
+                 db_path: Optional[Path] = None,
+                 runs_dir: Optional[Path] = None,
+                 enable_wal: bool = True):
         """
         Args:
             db_path: Caminho do banco SQLite
@@ -256,7 +256,7 @@ class WORMLedger:
         lock_file = self.db_path.parent / "ledger.lock"
 
         try:
-            with open(lock_file, "w") as f:
+            with open(lock_file, 'w') as f:
                 if HAS_PORTALOCKER:
                     portalocker.lock(f, portalocker.LOCK_EX)
                 else:
@@ -266,14 +266,15 @@ class WORMLedger:
             # Lock é liberado automaticamente quando arquivo fecha
             pass
 
-    def append_record(self, record: RunRecord | str, artifacts: Optional[Dict[str, Any]] = None) -> str:
+    def append_record(self, record: RunRecord | str,
+                     artifacts: Optional[Dict[str, Any]] = None) -> str:
         """
         Adiciona record ao ledger (append-only)
-
+        
         Args:
             record: RunRecord validado
             artifacts: Artifacts opcionais para salvar
-
+            
         Returns:
             Hash do record inserido
         """
@@ -293,21 +294,10 @@ class WORMLedger:
                         c.execute(
                             "INSERT INTO run_records (run_id, timestamp, cycle, config_hash, provider_id, candidate_cfg_hash, metrics_json, gates_json, decision_json, artifacts_path, parent_run_id, prev_hash, record_hash, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                             (
-                                str(uuid.uuid4()),
-                                time.time(),
-                                0,
-                                "simple",
-                                "unknown",
-                                "simple",
-                                json.dumps({}),
-                                json.dumps({}),
-                                json.dumps({}),
-                                None,
-                                None,
-                                self._tail_hash,
-                                record_hash,
-                                time.time(),
-                            ),
+                                str(uuid.uuid4()), time.time(), 0, "simple", "unknown", "simple",
+                                json.dumps({}), json.dumps({}), json.dumps({}), None, None,
+                                self._tail_hash, record_hash, time.time()
+                            )
                         )
                         conn.commit()
                     self._tail_hash = record_hash
@@ -320,12 +310,12 @@ class WORMLedger:
                 if artifacts:
                     for name, content in artifacts.items():
                         artifact_path = run_dir / f"{name}.json"
-                        with open(artifact_path, "w", encoding="utf-8") as f:
+                        with open(artifact_path, 'w', encoding='utf-8') as f:
                             json.dump(content, f, indent=2, ensure_ascii=False)
 
                 # Salvar config do record
                 config_path = run_dir / "record.json"
-                with open(config_path, "w", encoding="utf-8") as f:
+                with open(config_path, 'w', encoding='utf-8') as f:
                     json.dump(record.model_dump(), f, indent=2, ensure_ascii=False)
 
                 # Computar hash
@@ -335,8 +325,7 @@ class WORMLedger:
                 with sqlite3.connect(str(self.db_path)) as conn:
                     cursor = conn.cursor()
 
-                    cursor.execute(
-                        """
+                    cursor.execute("""
                         INSERT INTO run_records (
                             run_id, timestamp, cycle,
                             git_sha, seed, config_hash,
@@ -345,27 +334,16 @@ class WORMLedger:
                             artifacts_path, parent_run_id,
                             prev_hash, record_hash, created_at
                         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """,
-                        (
-                            record.run_id,
-                            record.timestamp,
-                            record.cycle,
-                            record.git_sha,
-                            record.seed,
-                            record.config_hash,
-                            record.provider_id,
-                            record.model_name,
-                            record.candidate_cfg_hash,
-                            record.metrics.model_dump_json(),
-                            record.gates.model_dump_json(),
-                            record.decision.model_dump_json(),
-                            record.artifacts_path,
-                            record.parent_run_id,
-                            self._tail_hash,
-                            record_hash,
-                            time.time(),
-                        ),
-                    )
+                    """, (
+                        record.run_id, record.timestamp, record.cycle,
+                        record.git_sha, record.seed, record.config_hash,
+                        record.provider_id, record.model_name, record.candidate_cfg_hash,
+                        record.metrics.model_dump_json(),
+                        record.gates.model_dump_json(),
+                        record.decision.model_dump_json(),
+                        record.artifacts_path, record.parent_run_id,
+                        self._tail_hash, record_hash, time.time()
+                    ))
 
                     conn.commit()
 
@@ -380,12 +358,9 @@ class WORMLedger:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
-            cursor.execute(
-                """
+            cursor.execute("""
                 SELECT * FROM run_records WHERE run_id = ?
-            """,
-                (run_id,),
-            )
+            """, (run_id,))
 
             row = cursor.fetchone()
             if not row:
@@ -407,16 +382,18 @@ class WORMLedger:
                     gates=GuardResults.model_validate_json(row["gates_json"]),
                     decision=DecisionInfo.model_validate_json(row["decision_json"]),
                     artifacts_path=row["artifacts_path"],
-                    parent_run_id=row["parent_run_id"],
+                    parent_run_id=row["parent_run_id"]
                 )
                 return record
             except Exception as e:
                 print(f"Error reconstructing record {run_id}: {e}")
                 return None
 
-    def list_records(
-        self, limit: int = 100, offset: int = 0, provider_id: Optional[str] = None, verdict: Optional[str] = None
-    ) -> List[RunRecord]:
+    def list_records(self,
+                    limit: int = 100,
+                    offset: int = 0,
+                    provider_id: Optional[str] = None,
+                    verdict: Optional[str] = None) -> List[RunRecord]:
         """Lista records com filtros"""
         with sqlite3.connect(str(self.db_path)) as conn:
             conn.row_factory = sqlite3.Row
@@ -460,7 +437,7 @@ class WORMLedger:
                         gates=GuardResults.model_validate_json(row["gates_json"]),
                         decision=DecisionInfo.model_validate_json(row["decision_json"]),
                         artifacts_path=row["artifacts_path"],
-                        parent_run_id=row["parent_run_id"],
+                        parent_run_id=row["parent_run_id"]
                     )
                     records.append(record)
                 except Exception as e:
@@ -482,13 +459,10 @@ class WORMLedger:
                         return False
 
                     # Atualizar champion pointer
-                    cursor.execute(
-                        """
+                    cursor.execute("""
                         INSERT OR REPLACE INTO champion_pointer (id, run_id, updated_at)
                         VALUES (1, ?, ?)
-                    """,
-                        (run_id, time.time()),
-                    )
+                    """, (run_id, time.time()))
 
                     conn.commit()
                     return True
@@ -524,10 +498,7 @@ class WORMLedger:
 
             for row in cursor.fetchall():
                 if row["prev_hash"] != prev_hash:
-                    return (
-                        False,
-                        f"Chain break at {row['run_id']}: expected prev_hash {prev_hash}, got {row['prev_hash']}",
-                    )
+                    return False, f"Chain break at {row['run_id']}: expected prev_hash {prev_hash}, got {row['prev_hash']}"
 
                 # Reconstruir record para verificar hash
                 try:
@@ -574,7 +545,7 @@ class WORMLedger:
                 "db_path": str(self.db_path),
                 "runs_dir": str(self.runs_dir),
                 "wal_enabled": self.enable_wal,
-                "tail_hash": self._tail_hash,
+                "tail_hash": self._tail_hash
             }
 
 
@@ -655,7 +626,10 @@ class SQLiteWORMLedger:
         c = self._conn.cursor()
         c.execute("SELECT etype, data, ts, prev, hash FROM events ORDER BY id DESC LIMIT ?", (limit,))
         rows = c.fetchall()
-        return [{"etype": r[0], "data": json.loads(r[1]), "ts": r[2], "prev": r[3], "hash": r[4]} for r in rows]
+        return [
+            {"etype": r[0], "data": json.loads(r[1]), "ts": r[2], "prev": r[3], "hash": r[4]}
+            for r in rows
+        ]
 
     def verify_chain(self) -> Tuple[bool, Optional[str]]:
         c = self._conn.cursor()
@@ -680,18 +654,15 @@ class SQLiteWORMLedger:
 
 class JSONLWORMLedger:
     """Stub class to satisfy imports in tests (not used actively)."""
-
     def __init__(self, path: str):
         self.path = path
 
 
 # Funções de conveniência
-def create_run_record(
-    run_id: Optional[str] = None,
-    provider_id: str = "unknown",
-    metrics: Optional[Dict[str, float]] = None,
-    decision_verdict: str = "pending",
-) -> RunRecord:
+def create_run_record(run_id: Optional[str] = None,
+                     provider_id: str = "unknown",
+                     metrics: Optional[Dict[str, float]] = None,
+                     decision_verdict: str = "pending") -> RunRecord:
     """Cria RunRecord com defaults"""
     if run_id is None:
         run_id = str(uuid.uuid4())
@@ -707,21 +678,32 @@ def create_run_record(
         provider_id=provider_id,
         candidate_cfg_hash="default",
         metrics=RunMetrics(**metrics),
-        gates=GuardResults(sigma_guard_ok=True, ir_ic_ok=True, sr_gate_ok=True, caos_gate_ok=True),
-        decision=DecisionInfo(
-            verdict=decision_verdict, reason="default", delta_linf=0.0, delta_score=0.0, beta_min_met=False
+        gates=GuardResults(
+            sigma_guard_ok=True,
+            ir_ic_ok=True,
+            sr_gate_ok=True,
+            caos_gate_ok=True
         ),
+        decision=DecisionInfo(
+            verdict=decision_verdict,
+            reason="default",
+            delta_linf=0.0,
+            delta_score=0.0,
+            beta_min_met=False
+        )
     )
 
 
-def quick_ledger_append(
-    ledger: WORMLedger,
-    provider_id: str,
-    metrics: Dict[str, float],
-    verdict: str,
-    artifacts: Optional[Dict[str, Any]] = None,
-) -> str:
+def quick_ledger_append(ledger: WORMLedger,
+                       provider_id: str,
+                       metrics: Dict[str, float],
+                       verdict: str,
+                       artifacts: Optional[Dict[str, Any]] = None) -> str:
     """Append rápido ao ledger"""
-    record = create_run_record(provider_id=provider_id, metrics=metrics, decision_verdict=verdict)
+    record = create_run_record(
+        provider_id=provider_id,
+        metrics=metrics,
+        decision_verdict=verdict
+    )
 
     return ledger.append_record(record, artifacts)

@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 # --- Pydantic v1/v2 compatibility shim (auto-injected) ---
 try:
     from pydantic import field_validator  # Pydantic v2
@@ -7,11 +6,9 @@ except Exception:  # pragma: no cover
     try:
         from pydantic import validator as field_validator  # Pydantic v1 fallback
     except Exception:  # última proteção: no-op decorator
-
         def field_validator(*args, **kwargs):
-            def _wrap(fn):
+            def _wrap(fn): 
                 return fn
-
             return _wrap
 # --- end shim ---
 
@@ -69,7 +66,6 @@ import orjson
 # Pydantic for config validation
 try:
     from pydantic import BaseModel, Field, ValidationInfo, ValidationError, validator
-
     HAS_PYDANTIC = True
 except ImportError:
     print("ERROR: pydantic is required. Install with: pip install pydantic")
@@ -78,13 +74,10 @@ except ImportError:
 # Import omega modules for real metrics computation
 try:
     from penin.omega.ethics_metrics import (
-        compute_ece,
-        compute_bias_ratio,
-        compute_risk_contractivity,
-        evaluate_ethics_comprehensive,
+        compute_ece, compute_bias_ratio, compute_risk_contractivity,
+        evaluate_ethics_comprehensive
     )
     from penin.omega.guards import sigma_guard, ir_to_ic_contractive
-
     HAS_OMEGA_METRICS = True
 except ImportError:
     HAS_OMEGA_METRICS = False
@@ -93,21 +86,18 @@ except ImportError:
 # Optional dependencies
 try:
     import numpy as np
-
     HAS_NUMPY = True
 except Exception:
     HAS_NUMPY = False
 
 try:
     import redis
-
     HAS_REDIS = True
 except Exception:
     HAS_REDIS = False
 
 try:
     import torch
-
     HAS_TORCH = True
 except Exception:
     HAS_TORCH = False
@@ -115,7 +105,6 @@ except Exception:
 # CRITICAL: psutil is now MANDATORY for fail-closed behavior
 try:
     import psutil
-
     HAS_PSUTIL = True
 except ImportError:
     HAS_PSUTIL = False
@@ -135,7 +124,6 @@ try:
     from penin.providers.anthropic_provider import AnthropicProvider
     from penin.providers.grok_provider import GrokProvider
     from penin.tools.schemas import KAGGLE_SEARCH_TOOL, HF_SEARCH_TOOL
-
     HAS_PENIN = True
 except ImportError as e:
     HAS_PENIN = False
@@ -149,7 +137,6 @@ except Exception as e:
 HAS_ETHICS = False
 try:
     from penin.omega.ethics_metrics import EthicsCalculator, EthicsGate, EthicsMetrics
-
     HAS_ETHICS = True
 except ImportError as e:
     HAS_ETHICS = False
@@ -157,7 +144,6 @@ except ImportError as e:
 except Exception as e:
     HAS_ETHICS = False
     print(f"WARNING: Failed to import ethics metrics: {e}")
-
 
 # -----------------------------------------------------------------------------
 # Configuration Models (Pydantic)
@@ -168,11 +154,9 @@ class EthicsConfig(BaseModel):
     consent_required: bool = Field(True, description="Require consent")
     eco_ok_required: bool = Field(True, description="Require eco compliance")
 
-
 class IRICConfig(BaseModel):
     rho_max: float = Field(0.95, ge=0, le=1, description="Maximum risk threshold")
     contraction_factor: float = Field(0.98, ge=0.5, le=1, description="Risk contraction factor")
-
 
 class CAOSPlusConfig(BaseModel):
     kappa: float = Field(2.0, ge=0, le=10, description="CAOS amplification factor")
@@ -183,33 +167,30 @@ class CAOSPlusConfig(BaseModel):
     ewma_alpha: float = Field(0.2, ge=0.1, le=0.5, description="EWMA smoothing factor")
     min_stability_cycles: int = Field(5, ge=3, le=20, description="Minimum cycles for stability")
 
-
 class SRWeights(BaseModel):
     C: float = Field(0.2, ge=0, le=1)
     E: float = Field(0.4, ge=0, le=1)
     M: float = Field(0.3, ge=0, le=1)
     A: float = Field(0.1, ge=0, le=1)
-
-    @field_validator("A")
+    
+    @field_validator('A')
     def weights_sum_to_one(cls, v, info: ValidationInfo):
         """Pydantic v2: usa info.data para ler C,E,M já validados e garantir C+E+M+A=1.0."""
-        data = dict(getattr(info, "data", {})) if getattr(info, "data", None) is not None else {}
-        total = float(data.get("C", 0.0)) + float(data.get("E", 0.0)) + float(data.get("M", 0.0)) + float(v)
+        data = dict(getattr(info, 'data', {})) if getattr(info, 'data', None) is not None else {}
+        total = float(data.get('C', 0.0)) + float(data.get('E', 0.0)) + float(data.get('M', 0.0)) + float(v)
         if abs(total - 1.0) > 1e-9:
-            raise ValueError("SR weights must sum to 1.0 (C+E+M+A).")
+            raise ValueError('SR weights must sum to 1.0 (C+E+M+A).')
         return v
-
 
 class SROmegaConfig(BaseModel):
     weights: SRWeights = Field(default_factory=SRWeights)
     tau_sr: float = Field(0.8, ge=0, le=1, description="SR gate threshold")
 
-
 class OmegaSigmaConfig(BaseModel):
-    weights: List[float] = Field(default_factory=lambda: [1.0 / 8] * 8)
+    weights: List[float] = Field(default_factory=lambda: [1.0/8]*8)
     tau_g: float = Field(0.7, ge=0, le=1, description="Global coherence threshold")
-
-    @field_validator("weights")
+    
+    @field_validator('weights')
     def weights_valid(cls, v):
         if len(v) != 8:
             raise ValueError("Must have exactly 8 weights")
@@ -217,19 +198,17 @@ class OmegaSigmaConfig(BaseModel):
             raise ValueError(f"Weights must sum to 1.0, got {sum(v)}")
         return v
 
-
 class OCIConfig(BaseModel):
-    weights: List[float] = Field(default_factory=lambda: [0.25] * 4)
+    weights: List[float] = Field(default_factory=lambda: [0.25]*4)
     tau_oci: float = Field(0.9, ge=0, le=1, description="OCI gate threshold")
-
-    @field_validator("weights")
+    
+    @field_validator('weights')
     def weights_valid(cls, v):
         if len(v) != 4:
             raise ValueError("Must have exactly 4 weights")
         if abs(sum(v) - 1.0) > 0.01:
             raise ValueError(f"Weights must sum to 1.0, got {sum(v)}")
         return v
-
 
 class LInfWeights(BaseModel):
     rsi: float = Field(0.2, ge=0, le=1)
@@ -238,19 +217,17 @@ class LInfWeights(BaseModel):
     stability: float = Field(0.2, ge=0, le=1)
     viability: float = Field(0.15, ge=0, le=1)
     cost: float = Field(0.05, ge=0, le=1)
-
-    @field_validator("cost")
+    
+    @field_validator('cost')
     def weights_sum_to_one(cls, v, values):
-        total = v + sum(values.get(k, 0) for k in ["rsi", "synergy", "novelty", "stability", "viability"])
+        total = v + sum(values.get(k, 0) for k in ['rsi', 'synergy', 'novelty', 'stability', 'viability'])
         if abs(total - 1.0) > 0.01:
             raise ValueError(f"L∞ weights must sum to 1.0, got {total}")
         return v
 
-
 class LInfPlacarConfig(BaseModel):
     weights: LInfWeights = Field(default_factory=LInfWeights)
     lambda_c: float = Field(0.1, ge=0, le=1, description="Cost penalty factor")
-
 
 class FibonacciConfig(BaseModel):
     enabled: bool = Field(False, description="Enable Fibonacci features")
@@ -263,20 +240,16 @@ class FibonacciConfig(BaseModel):
     trust_shrink: Optional[float] = Field(None, ge=0.5, le=1)
     search_method: str = Field("fibonacci", pattern="^(fibonacci|golden)$")
 
-
 class ThresholdsConfig(BaseModel):
     tau_caos: float = Field(0.7, ge=0, le=1, description="CAOS gate threshold")
     beta_min: float = Field(0.02, ge=0, le=0.1, description="Minimum ΔL∞ for promotion")
-
 
 class EvolutionConfig(BaseModel):
     alpha_0: float = Field(0.1, ge=0.01, le=1, description="Base learning rate")
     seed: Optional[int] = Field(None, description="Random seed for determinism")
 
-
 class PeninConfig(BaseModel):
     """Main configuration with validation"""
-
     ethics: EthicsConfig = Field(default_factory=EthicsConfig)
     iric: IRICConfig = Field(default_factory=IRICConfig)
     caos_plus: CAOSPlusConfig = Field(default_factory=CAOSPlusConfig)
@@ -287,7 +260,6 @@ class PeninConfig(BaseModel):
     fibonacci: FibonacciConfig = Field(default_factory=FibonacciConfig)
     thresholds: ThresholdsConfig = Field(default_factory=ThresholdsConfig)
     evolution: EvolutionConfig = Field(default_factory=EvolutionConfig)
-
 
 # -----------------------------------------------------------------------------
 # Event Types
@@ -309,7 +281,6 @@ class EventType:
     ETHICS_ATTEST = "ETHICS_ATTEST"  # P0 Fix: Ethics metrics attestation
     METRIC = "METRIC"
 
-
 # -----------------------------------------------------------------------------
 # Configuration and paths
 # -----------------------------------------------------------------------------
@@ -317,7 +288,7 @@ PKG_VERSION = "7.0.0"
 ROOT = Path(os.getenv("PENIN_ROOT", "/opt/penin_omega"))
 if not ROOT.exists():
     ROOT = Path.home() / ".penin_omega"
-
+    
 DIRS = {
     "LOG": ROOT / "logs",
     "STATE": ROOT / "state",
@@ -341,54 +312,50 @@ logging.basicConfig(
 )
 log = logging.getLogger("Ω-1/8-v7")
 
-
 # -----------------------------------------------------------------------------
 # Deterministic Random State Manager
 # -----------------------------------------------------------------------------
 class DeterministicRandom:
     """Manages deterministic random state with seed tracking"""
-
     def __init__(self, seed: Optional[int] = None):
         self.seed = seed if seed is not None else int(time.time() * 1000) % (2**32)
         self.rng = random.Random(self.seed)
         self.call_count = 0
-
+        
     def set_seed(self, seed: int):
         """Set new seed and reset RNG"""
         self.seed = seed
         self.rng = random.Random(seed)
         self.call_count = 0
-
+        
     def get_state(self) -> Dict[str, Any]:
         """Get current RNG state for logging"""
         return {
             "seed": self.seed,
             "call_count": self.call_count,
-            "state_hash": hashlib.sha256(str(self.rng.getstate()).encode()).hexdigest()[:8],
+            "state_hash": hashlib.sha256(str(self.rng.getstate()).encode()).hexdigest()[:8]
         }
-
+        
     def random(self) -> float:
         """Get random float [0, 1)"""
         self.call_count += 1
         return self.rng.random()
-
+        
     def uniform(self, a: float, b: float) -> float:
         """Get random float [a, b)"""
         self.call_count += 1
         return self.rng.uniform(a, b)
-
+        
     def choice(self, seq):
         """Choose random element"""
         self.call_count += 1
         return self.rng.choice(seq)
-
 
 # -----------------------------------------------------------------------------
 # EWMA Stability Tracker
 # -----------------------------------------------------------------------------
 class EWMATracker:
     """Exponentially Weighted Moving Average for stability tracking"""
-
     def __init__(self, alpha: float = 0.2, min_samples: int = 5):
         self.alpha = alpha
         self.min_samples = min_samples
@@ -396,12 +363,12 @@ class EWMATracker:
         self.variance = None
         self.count = 0
         self.history = deque(maxlen=min_samples * 2)
-
+        
     def update(self, new_value: float):
         """Update EWMA with new value"""
         self.history.append(new_value)
         self.count += 1
-
+        
         if self.value is None:
             self.value = new_value
             self.variance = 0
@@ -409,22 +376,21 @@ class EWMATracker:
             delta = new_value - self.value
             self.value += self.alpha * delta
             self.variance = (1 - self.alpha) * (self.variance + self.alpha * delta**2)
-
+            
     def is_stable(self, threshold: float = 0.01) -> bool:
         """Check if values are stable (low variance)"""
         if self.count < self.min_samples:
             return False
         return self.variance < threshold
-
+        
     def get_stats(self) -> Dict[str, float]:
         """Get current statistics"""
         return {
             "value": self.value or 0,
             "variance": self.variance or 0,
             "count": self.count,
-            "stable": self.is_stable(),
+            "stable": self.is_stable()
         }
-
 
 # -----------------------------------------------------------------------------
 # Fibonacci toolkit and Zeckendorf
@@ -432,16 +398,14 @@ class EWMATracker:
 PHI = (1.0 + math.sqrt(5)) / 2.0
 INV_PHI = 1.0 / PHI
 
-
 class FibonacciResearch:
     """Full Fibonacci research and optimization toolkit."""
-
     def __init__(self, rng: DeterministicRandom):
         self.fib_cache = {0: 0, 1: 1}
         self.optimization_count = 0
         self.pattern_scores: Dict[str, float] = {}
         self.rng = rng  # Use deterministic RNG
-
+        
     def fib_iterative(self, n: int) -> int:
         if n in self.fib_cache:
             return self.fib_cache[n]
@@ -450,17 +414,15 @@ class FibonacciResearch:
             a, b = b, a + b
             self.fib_cache[i] = b
         return self.fib_cache[n]
-
+        
     def fib_matrix(self, n: int) -> int:
         if n <= 1:
             return n
-
         def mm(A, B):
             return [
                 [A[0][0] * B[0][0] + A[0][1] * B[1][0], A[0][0] * B[0][1] + A[0][1] * B[1][1]],
                 [A[1][0] * B[0][0] + A[1][1] * B[1][0], A[1][0] * B[0][1] + A[1][1] * B[1][1]],
             ]
-
         def mp(M, p):
             R = [[1, 0], [0, 1]]
             while p > 0:
@@ -469,16 +431,14 @@ class FibonacciResearch:
                 M = mm(M, M)
                 p >>= 1
             return R
-
         base = [[1, 1], [1, 0]]
         return mp(base, n)[0][1]
-
+        
     def binet_formula(self, n: int) -> float:
-        return (PHI**n - (-INV_PHI) ** n) / math.sqrt(5)
-
-    def golden_section_search(
-        self, f: Callable[[float], float], a: float, b: float, tol: float = 1e-6, maximize: bool = True
-    ) -> float:
+        return (PHI ** n - (-INV_PHI) ** n) / math.sqrt(5)
+        
+    def golden_section_search(self, f: Callable[[float], float], a: float, b: float,
+                              tol: float = 1e-6, maximize: bool = True) -> float:
         invphi = INV_PHI
         invphi2 = 1.0 - invphi
         h = b - a
@@ -510,10 +470,9 @@ class FibonacciResearch:
                     fc = -fc
         self.optimization_count += 1
         return (a + b) / 2.0
-
-    def fibonacci_search(
-        self, f: Callable[[float], float], a: float, b: float, tol: float = 1e-6, maximize: bool = True
-    ) -> float:
+        
+    def fibonacci_search(self, f: Callable[[float], float], a: float, b: float,
+                          tol: float = 1e-6, maximize: bool = True) -> float:
         fib = [0, 1]
         while fib[-1] < (b - a) / tol:
             fib.append(fib[-1] + fib[-2])
@@ -540,7 +499,7 @@ class FibonacciResearch:
                     f1 = -f1
         self.optimization_count += 1
         return (a + b) / 2.0
-
+        
     def analyze_fibonacci_patterns(self, seq: List[float]) -> Dict[str, float]:
         if len(seq) < 3:
             return {"ratio_score": 0.0, "pattern_strength": 0.0, "avg_ratio": 0.0}
@@ -563,7 +522,7 @@ class FibonacciResearch:
             "pattern_strength": max(0.0, pattern_strength),
             "avg_ratio": sum(ratios) / len(ratios) if ratios else 0.0,
         }
-
+        
     def fibonacci_retracement_levels(self, high: float, low: float) -> Dict[str, float]:
         diff = high - low
         return {
@@ -576,17 +535,15 @@ class FibonacciResearch:
             "100.0%": low,
         }
 
-
 class ZeckendorfEncoder:
     """Encode integers uniquely as sums of non‑consecutive Fibonacci numbers."""
-
     @staticmethod
     def _fib_upto(n: int) -> List[int]:
         fib = [1, 2]
         while fib[-1] < n:
             fib.append(fib[-1] + fib[-2])
         return fib
-
+        
     @staticmethod
     def encode(n: int) -> List[int]:
         if n < 0:
@@ -604,20 +561,18 @@ class ZeckendorfEncoder:
             else:
                 i -= 1
         return rep
-
+        
     @staticmethod
     def encode_as_string(n: int) -> str:
         if n == 0:
             return "0"
         return "Z{" + "+".join(map(str, ZeckendorfEncoder.encode(n))) + "}"
 
-
 # -----------------------------------------------------------------------------
 # Cache (Multi‑level with FibHeap) - Updated with WAL mode
 # -----------------------------------------------------------------------------
 class MultiLevelCache:
     """Three‑level cache with TTL and eviction via lazy min‑heap."""
-
     def __init__(self, l1_size: int = 1000, l2_size: int = 10000, ttl_l1: int = 1, ttl_l2: int = 60):
         self.l1_cache: OrderedDict[str, Dict[str, Any]] = OrderedDict()
         self.l1_size = l1_size
@@ -632,7 +587,7 @@ class MultiLevelCache:
         self.l3_redis = None
         if HAS_REDIS:
             try:
-                self.l3_redis = redis.Redis(host="localhost", port=6379, db=0, decode_responses=False)
+                self.l3_redis = redis.Redis(host='localhost', port=6379, db=0, decode_responses=False)
                 self.l3_redis.ping()
             except Exception:
                 self.l3_redis = None
@@ -640,14 +595,14 @@ class MultiLevelCache:
         self._lock = threading.RLock()
         self._hmac_key = (os.getenv("PENIN_CACHE_HMAC_KEY") or "penin-dev-key").encode("utf-8")
         self._digest_size = hashlib.sha256().digest_size
-
+        
     def _init_l2_db(self):
         cursor = self.l2_db.cursor()
         # Set WAL mode and busy timeout for better concurrency
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.execute("PRAGMA busy_timeout=3000")
-        cursor.execute("""
+        cursor.execute('''
             CREATE TABLE IF NOT EXISTS cache (
                 key TEXT PRIMARY KEY,
                 value BLOB,
@@ -655,11 +610,11 @@ class MultiLevelCache:
                 access_count INTEGER DEFAULT 0,
                 last_access REAL
             )
-        """)
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON cache(timestamp)")
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_access ON cache(access_count)")
+        ''')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_timestamp ON cache(timestamp)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_access ON cache(access_count)')
         self.l2_db.commit()
-
+        
     def _serialize(self, obj: Any) -> bytes:
         payload = orjson.dumps(obj)
         mac = hmac.new(self._hmac_key, payload, hashlib.sha256).digest()
@@ -674,14 +629,14 @@ class MultiLevelCache:
         if not hmac.compare_digest(mac, expected):
             raise ValueError("L2 cache HMAC mismatch")
         return orjson.loads(payload)
-
+        
     def _promote_to_l1(self, key: str, value: Any):
         if len(self.l1_cache) >= self.l1_size:
             evicted_key, _ = self.l1_cache.popitem(last=False)
             self.stats[evicted_key]["evictions"] += 1
         self.l1_cache[key] = {"value": value, "timestamp": time.time()}
         self.l1_cache.move_to_end(key)
-
+        
     def _promote_to_l2(self, key: str, value: Any):
         value_bytes = self._serialize(value)
         cursor = self.l2_db.cursor()
@@ -698,7 +653,7 @@ class MultiLevelCache:
                     self.l2_nodes.pop(evicted_key, None)
         cursor.execute(
             "INSERT OR REPLACE INTO cache (key, value, timestamp, last_access) VALUES (?, ?, ?, ?)",
-            (key, value_bytes, now, now),
+            (key, value_bytes, now, now)
         )
         self.l2_db.commit()
         prio = now
@@ -706,7 +661,7 @@ class MultiLevelCache:
             self.l2_heap.decrease_key(key, prio)
         else:
             self.l2_nodes[key] = self.l2_heap.insert(prio, key)
-
+            
     def get(self, key: str, default: Any = None) -> Any:
         with self._lock:
             # Check L1
@@ -729,7 +684,7 @@ class MultiLevelCache:
                     self._promote_to_l1(key, value)
                     cursor.execute(
                         "UPDATE cache SET access_count = access_count + 1, last_access = ? WHERE key = ?",
-                        (time.time(), key),
+                        (time.time(), key)
                     )
                     self.l2_db.commit()
                     if key in self.l2_nodes:
@@ -750,7 +705,7 @@ class MultiLevelCache:
                     pass
             self.stats[key]["misses"] += 1
             return default
-
+            
     def set(self, key: str, value: Any, ttl: Optional[int] = None) -> None:
         with self._lock:
             self._promote_to_l1(key, value)
@@ -758,10 +713,12 @@ class MultiLevelCache:
             if self.l3_redis:
                 try:
                     value_bytes = self._serialize(value)
-                    self.l3_redis.setex(f"penin:{key}", ttl or self.l2_ttl, value_bytes)
+                    self.l3_redis.setex(
+                        f"penin:{key}", ttl or self.l2_ttl, value_bytes
+                    )
                 except Exception:
                     pass
-
+                    
     def clear(self):
         with self._lock:
             self.l1_cache.clear()
@@ -776,32 +733,29 @@ class MultiLevelCache:
                 except Exception:
                     pass
 
-
 class FibHeapLite:
     """Lazy min‑heap with tombstones for decrease_key support."""
-
     def __init__(self):
         import heapq
-
         self.heap: List[Tuple[float, int, str]] = []
         self.entry_fresh: Dict[str, Tuple[float, int, str]] = {}
         self.invalid: set = set()
         self._heapq = heapq
         self._counter = 0
-
+        
     def insert(self, key: float, value: str):
         self._counter += 1
         token = (key, self._counter, value)
         self.entry_fresh[value] = token
         self._heapq.heappush(self.heap, token)
         return token
-
+        
     def decrease_key(self, value: str, new_key: float):
         old = self.entry_fresh.get(value)
         if old:
             self.invalid.add(old)
         return self.insert(new_key, value)
-
+        
     def extract_min(self) -> Optional[Tuple[float, str]]:
         while self.heap:
             key, _, val = self._heapq.heappop(self.heap)
@@ -814,13 +768,11 @@ class FibHeapLite:
                 return key, val
         return None
 
-
 # -----------------------------------------------------------------------------
 # WORM Ledger with PROMOTE_ATTEST
 # -----------------------------------------------------------------------------
 class WORMLedger:
     """Write‑once, read‑many ledger with hash chain and atomic promotion attestation."""
-
     def __init__(self, path: Path = DIRS["WORM"] / "omega_core_1of8_v7.db"):
         self.db = sqlite3.connect(str(path), check_same_thread=False)
         # P0-3: Enable WAL mode and busy_timeout for better concurrency
@@ -834,7 +786,7 @@ class WORMLedger:
         self._init_db()
         self._lock = threading.Lock()
         self.tail = self._get_last_hash()
-
+        
     def _init_db(self):
         cursor = self.db.cursor()
         # P0 Fix: Enable WAL mode and busy timeout for better concurrency
@@ -861,88 +813,63 @@ class WORMLedger:
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_ts ON events(ts)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_etype ON events(etype)")
         self.db.commit()
-
+        
     def _get_last_hash(self) -> str:
         c = self.db.cursor()
         c.execute("SELECT hash FROM events ORDER BY id DESC LIMIT 1")
         row = c.fetchone()
         return row[0] if row else "genesis"
-
-    def record(
-        self,
-        etype: str,
-        data: Dict[str, Any],
-        state_for_zeck: Optional["OmegaMEState"] = None,
-        seed_state: Optional[Dict] = None,
-        pre_hash: Optional[str] = None,
-        post_hash: Optional[str] = None,
-        gate_trace: Optional[List] = None,
-    ) -> str:
+        
+    def record(self, etype: str, data: Dict[str, Any], state_for_zeck: Optional['OmegaMEState'] = None,
+               seed_state: Optional[Dict] = None, pre_hash: Optional[str] = None, 
+               post_hash: Optional[str] = None, gate_trace: Optional[List] = None) -> str:
         with self._lock:
             ts = datetime.now(timezone.utc).isoformat()
             zeck = None
             if state_for_zeck:
-                mix = (
-                    int(abs(state_for_zeck.delta_linf) * 1e6)
-                    + int(state_for_zeck.caos_plus * 1e6)
-                    + state_for_zeck.cycle
-                )
+                mix = int(abs(state_for_zeck.delta_linf) * 1e6) + int(state_for_zeck.caos_plus * 1e6) + state_for_zeck.cycle
                 zeck = ZeckendorfEncoder.encode_as_string(abs(mix))
             payload = {"etype": etype, "data": data, "ts": ts, "prev": self.tail}
             event_hash = hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
-
+            
             cursor = self.db.cursor()
             cursor.execute(
                 """INSERT INTO events (etype, data, ts, prev, hash, zeck, seed_state, pre_hash, post_hash, gate_trace) 
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    etype,
-                    json.dumps(data, ensure_ascii=False),
-                    ts,
-                    self.tail,
-                    event_hash,
-                    zeck,
-                    json.dumps(seed_state) if seed_state else None,
-                    pre_hash,
-                    post_hash,
-                    json.dumps(gate_trace) if gate_trace else None,
-                ),
+                (etype, json.dumps(data, ensure_ascii=False), ts, self.tail, event_hash, zeck,
+                 json.dumps(seed_state) if seed_state else None,
+                 pre_hash, post_hash, 
+                 json.dumps(gate_trace) if gate_trace else None),
             )
             self.db.commit()
             self.tail = event_hash
             return event_hash
-
-    def record_promote_attest(
-        self,
-        pre_state: "OmegaMEState",
-        post_state: "OmegaMEState",
-        gate_results: Dict[str, Any],
-        seed_state: Dict,
-        config_hash: str,
-        step: float,
-    ) -> str:
+            
+    def record_promote_attest(self, pre_state: 'OmegaMEState', post_state: 'OmegaMEState', 
+                             gate_results: Dict[str, Any], seed_state: Dict, 
+                             config_hash: str, step: float) -> str:
         """Record atomic promotion attestation with all verification data"""
         pre_hash = hashlib.sha256(json.dumps(pre_state.to_dict(), sort_keys=True).encode()).hexdigest()
         post_hash = hashlib.sha256(json.dumps(post_state.to_dict(), sort_keys=True).encode()).hexdigest()
-
+        
         data = {
             "step": step,
             "alpha": post_state.alpha_omega,
             "delta_linf": post_state.delta_linf,
             "config_hash": config_hash,
-            "cycle": post_state.cycle,
+            "cycle": post_state.cycle
         }
-
+        
         return self.record(
-            EventType.PROMOTE_ATTEST,
-            data,
+            EventType.PROMOTE_ATTEST, 
+            data, 
             post_state,
             seed_state=seed_state,
             pre_hash=pre_hash,
             post_hash=post_hash,
-            gate_trace=gate_results.get("gate_trace", []),
+            gate_trace=gate_results.get("gate_trace", [])
         )
-
+        
     def verify_chain(self) -> Tuple[bool, Optional[str]]:
         c = self.db.cursor()
         c.execute("SELECT etype, data, ts, prev, hash FROM events ORDER BY id")
@@ -956,7 +883,6 @@ class WORMLedger:
                 return False, f"Hash mismatch at row {i}"
             prev = stored_hash
         return True, None
-
 
 # -----------------------------------------------------------------------------
 # State class with additional tracking
@@ -1011,17 +937,16 @@ class OmegaMEState:
     pattern_score: float = 0.0
     pattern_stable: bool = False  # New: pattern stability flag
     zeckendorf_hash: str = "0"
-
-    def to_dict(self) -> Dict[str, Any]:
+    
+    def to_dict(self) -> Dict[str, Any]: 
         return asdict(self)
-
+        
     def compute_hash(self) -> str:
         """Compute hash of current state for TOCTOU prevention"""
         # Exclude timestamp for deterministic hashing
         state_dict = self.to_dict()
-        state_dict.pop("ts", None)  # Remove timestamp
+        state_dict.pop('ts', None)  # Remove timestamp
         return hashlib.sha256(json.dumps(state_dict, sort_keys=True).encode()).hexdigest()
-
 
 # -----------------------------------------------------------------------------
 # Engines with deterministic behavior
@@ -1033,91 +958,57 @@ class SigmaGuard:
         self.require_consent = cfg.consent_required
         self.require_eco = cfg.eco_ok_required
         self.rho_max = 0.95  # Hardcoded safety threshold
-
+        
     def check(self, xt: OmegaMEState) -> Tuple[bool, List[Dict[str, Any]]]:
         violations = []
-        if xt.ece > self.ece_max:
-            violations.append(
-                {"gate": "ECE", "value": xt.ece, "threshold": self.ece_max, "msg": f"ECE {xt.ece:.4f} > {self.ece_max}"}
-            )
-        if xt.bias > self.bias_max:
-            violations.append(
-                {
-                    "gate": "BIAS",
-                    "value": xt.bias,
-                    "threshold": self.bias_max,
-                    "msg": f"Bias {xt.bias:.3f} > {self.bias_max}",
-                }
-            )
-        if self.require_consent and not xt.consent:
+        if xt.ece > self.ece_max: 
+            violations.append({"gate": "ECE", "value": xt.ece, "threshold": self.ece_max, "msg": f"ECE {xt.ece:.4f} > {self.ece_max}"})
+        if xt.bias > self.bias_max: 
+            violations.append({"gate": "BIAS", "value": xt.bias, "threshold": self.bias_max, "msg": f"Bias {xt.bias:.3f} > {self.bias_max}"})
+        if self.require_consent and not xt.consent: 
             violations.append({"gate": "CONSENT", "value": False, "threshold": True, "msg": "Consent=False"})
-        if self.require_eco and not xt.eco:
+        if self.require_eco and not xt.eco: 
             violations.append({"gate": "ECO", "value": False, "threshold": True, "msg": "Eco=False"})
-        if xt.rho >= self.rho_max:
-            violations.append(
-                {
-                    "gate": "RISK",
-                    "value": xt.rho,
-                    "threshold": self.rho_max,
-                    "msg": f"Risk {xt.rho:.3f} >= {self.rho_max}",
-                }
-            )
+        if xt.rho >= self.rho_max: 
+            violations.append({"gate": "RISK", "value": xt.rho, "threshold": self.rho_max, "msg": f"Risk {xt.rho:.3f} >= {self.rho_max}"})
         xt.sigma_ok = len(violations) == 0
         return xt.sigma_ok, violations
-
 
 class IRtoIC:
     def __init__(self, cfg: IRICConfig, use_phi: bool = False):
         self.rho_max = cfg.rho_max
         self.contraction = INV_PHI if use_phi else cfg.contraction_factor
         # Remove executor - checks are cheap and synchronous is better
-
+        
     def safe(self, xt: OmegaMEState) -> Tuple[bool, List[Dict[str, Any]]]:
         """Check safety with detailed gate results"""
         failures = []
-
+        
         # Fail-closed: if no psutil, assume HIGH resource usage
         if not HAS_PSUTIL:
             xt.cpu = 0.99  # Assume high CPU
             xt.mem = 0.99  # Assume high memory
-            failures.append(
-                {
-                    "gate": "PSUTIL_MISSING",
-                    "value": None,
-                    "threshold": None,
-                    "msg": "psutil not available - assuming high resource usage (fail-closed)",
-                }
-            )
-
+            failures.append({"gate": "PSUTIL_MISSING", "value": None, "threshold": None, 
+                           "msg": "psutil not available - assuming high resource usage (fail-closed)"})
+        
         if xt.rho >= self.rho_max:
-            failures.append(
-                {
-                    "gate": "RHO",
-                    "value": xt.rho,
-                    "threshold": self.rho_max,
-                    "msg": f"Risk {xt.rho:.3f} >= {self.rho_max}",
-                }
-            )
+            failures.append({"gate": "RHO", "value": xt.rho, "threshold": self.rho_max, 
+                           "msg": f"Risk {xt.rho:.3f} >= {self.rho_max}"})
         if xt.uncertainty >= 0.9:
-            failures.append(
-                {
-                    "gate": "UNCERTAINTY",
-                    "value": xt.uncertainty,
-                    "threshold": 0.9,
-                    "msg": f"Uncertainty {xt.uncertainty:.3f} >= 0.9",
-                }
-            )
+            failures.append({"gate": "UNCERTAINTY", "value": xt.uncertainty, "threshold": 0.9,
+                           "msg": f"Uncertainty {xt.uncertainty:.3f} >= 0.9"})
         if xt.cpu >= 0.95:
-            failures.append({"gate": "CPU", "value": xt.cpu, "threshold": 0.95, "msg": f"CPU {xt.cpu:.3f} >= 0.95"})
+            failures.append({"gate": "CPU", "value": xt.cpu, "threshold": 0.95,
+                           "msg": f"CPU {xt.cpu:.3f} >= 0.95"})
         if xt.mem >= 0.95:
-            failures.append({"gate": "MEM", "value": xt.mem, "threshold": 0.95, "msg": f"Memory {xt.mem:.3f} >= 0.95"})
-
+            failures.append({"gate": "MEM", "value": xt.mem, "threshold": 0.95,
+                           "msg": f"Memory {xt.mem:.3f} >= 0.95"})
+            
         return len(failures) == 0, failures
-
+        
     def contract(self, xt: OmegaMEState) -> None:
         xt.rho *= self.contraction
         xt.uncertainty *= self.contraction
-
 
 class CAOSPlusEngine:
     def __init__(self, cfg: CAOSPlusConfig, fib: FibonacciResearch, rng: DeterministicRandom):
@@ -1129,7 +1020,7 @@ class CAOSPlusEngine:
         self.fib = fib
         self.rng = rng  # Use deterministic RNG
         self.pattern_tracker = EWMATracker(alpha=cfg.ewma_alpha, min_samples=cfg.min_stability_cycles)
-
+        
     def compute(self, xt: OmegaMEState) -> float:
         # Deterministic chaos injection
         if self.rng.random() < self.pchaos:
@@ -1138,16 +1029,16 @@ class CAOSPlusEngine:
             xt.A *= fac
             xt.O *= fac
             xt.S *= fac
-
+            
         C, A, O, S = max(0.0, xt.C), max(0.0, xt.A), max(0.0, xt.O), max(0.0, xt.S)
         base = 1.0 + self.kappa * C * A
         exponent = max(self.pmin, min(self.pmax, O * S))
-        val = base**exponent
-
+        val = base ** exponent
+        
         # Analyze Fibonacci patterns
         patt = self.fib.analyze_fibonacci_patterns([C, A, O, S])
         self.pattern_tracker.update(patt["pattern_strength"])
-
+        
         # Apply boost only if pattern is stable (EWMA requirement)
         boost = 1.0
         if self.pattern_tracker.is_stable():
@@ -1156,19 +1047,18 @@ class CAOSPlusEngine:
             xt.pattern_stable = True
         else:
             xt.pattern_stable = False
-
+            
         val *= boost
         xt.pattern_score = patt["pattern_strength"]
         xt.caos_plus = val
         xt.caos_harmony = (C + A) / (O + S if (O + S) > 1e-9 else 1.0)
         return val
 
-
 class SREngine:
     def __init__(self, cfg: SROmegaConfig):
         self.weights = cfg.weights.model_dump()
         self.tau = cfg.tau_sr
-
+        
     def compute(self, xt: OmegaMEState) -> float:
         comps = [
             (max(1e-6, xt.C_cal), self.weights["C"]),
@@ -1179,23 +1069,17 @@ class SREngine:
         denom = sum(w / v for v, w in comps)
         xt.sr_score = 1.0 / max(1e-6, denom)
         return xt.sr_score
-
+        
     def gate(self, xt: OmegaMEState) -> Tuple[bool, Dict[str, Any]]:
         passed = xt.sr_score >= self.tau
-        return passed, {
-            "gate": "SR",
-            "value": xt.sr_score,
-            "threshold": self.tau,
-            "passed": passed,
-            "msg": f"SR={xt.sr_score:.3f} {'≥' if passed else '<'} {self.tau}",
-        }
-
+        return passed, {"gate": "SR", "value": xt.sr_score, "threshold": self.tau, 
+                       "passed": passed, "msg": f"SR={xt.sr_score:.3f} {'≥' if passed else '<'} {self.tau}"}
 
 class GlobalCoherence:
     def __init__(self, cfg: OmegaSigmaConfig):
         self.weights = cfg.weights
         self.tau = cfg.tau_g
-
+        
     def compute(self, xt: OmegaMEState) -> float:
         if len(xt.modules) != 8:
             xt.modules = [0.7] * 8
@@ -1207,23 +1091,17 @@ class GlobalCoherence:
             denom += w / s
         xt.g_score = 1.0 / max(1e-6, denom)
         return xt.g_score
-
+        
     def gate(self, xt: OmegaMEState) -> Tuple[bool, Dict[str, Any]]:
         passed = xt.g_score >= self.tau
-        return passed, {
-            "gate": "G",
-            "value": xt.g_score,
-            "threshold": self.tau,
-            "passed": passed,
-            "msg": f"G={xt.g_score:.3f} {'≥' if passed else '<'} {self.tau}",
-        }
-
+        return passed, {"gate": "G", "value": xt.g_score, "threshold": self.tau,
+                       "passed": passed, "msg": f"G={xt.g_score:.3f} {'≥' if passed else '<'} {self.tau}"}
 
 class OCIEngine:
     def __init__(self, cfg: OCIConfig):
         self.weights = cfg.weights
         self.tau = cfg.tau_oci
-
+        
     def compute(self, xt: OmegaMEState) -> float:
         comps = [
             (max(1e-6, xt.memory), self.weights[0]),
@@ -1234,23 +1112,17 @@ class OCIEngine:
         denom = sum(w / v for v, w in comps)
         xt.oci_score = 1.0 / max(1e-6, denom)
         return xt.oci_score
-
+        
     def gate(self, xt: OmegaMEState) -> Tuple[bool, Dict[str, Any]]:
         passed = xt.oci_score >= self.tau
-        return passed, {
-            "gate": "OCI",
-            "value": xt.oci_score,
-            "threshold": self.tau,
-            "passed": passed,
-            "msg": f"OCI={xt.oci_score:.3f} {'≥' if passed else '<'} {self.tau}",
-        }
-
+        return passed, {"gate": "OCI", "value": xt.oci_score, "threshold": self.tau,
+                       "passed": passed, "msg": f"OCI={xt.oci_score:.3f} {'≥' if passed else '<'} {self.tau}"}
 
 class LInfinityScore:
     def __init__(self, cfg: LInfPlacarConfig):
         self.weights = cfg.weights.model_dump()
         self.lambda_c = cfg.lambda_c
-
+        
     def compute(self, xt: OmegaMEState) -> float:
         metrics = [
             (max(1e-6, xt.rsi), self.weights["rsi"]),
@@ -1270,7 +1142,6 @@ class LInfinityScore:
         xt.delta_linf = xt.l_inf - xt.l_inf_prev
         return xt.l_inf
 
-
 # -----------------------------------------------------------------------------
 # Ethics metrics measurement (ECE / Bias / Risk attestation)
 # -----------------------------------------------------------------------------
@@ -1287,7 +1158,7 @@ class EthicsMetrics:
         self.bias_max = cfg.rho_bias_max
         self.rho_max = iric.rho_max
 
-    def measure(self, xt: "OmegaMEState") -> Dict[str, Any]:
+    def measure(self, xt: 'OmegaMEState') -> Dict[str, Any]:
         # Proxy confidence as (1 - uncertainty); proxy accuracy as stability
         confidence = max(0.0, min(1.0, 1.0 - xt.uncertainty))
         accuracy = max(0.0, min(1.0, xt.stability))
@@ -1306,7 +1177,6 @@ class EthicsMetrics:
             "limits": {"ece_max": self.ece_max, "bias_max": self.bias_max, "rho_max": self.rho_max},
         }
 
-
 # -----------------------------------------------------------------------------
 # Fibonacci manager for TTL, trust region and LR search
 # -----------------------------------------------------------------------------
@@ -1316,15 +1186,14 @@ class FibonacciSchedule:
         self.max = float(max_interval)
         self.i = 1
         self.fr = FibonacciResearch(DeterministicRandom())  # Use deterministic
-
+        
     def next(self) -> float:
         val = min(self.max, self.base * float(self.fr.fib_iterative(self.i)))
         self.i += 1
         return max(self.base, val)
-
+        
     def reset(self):
         self.i = 1
-
 
 class FibonacciManager:
     def __init__(self, cfg: FibonacciConfig, worm: WORMLedger, fib: FibonacciResearch):
@@ -1334,41 +1203,37 @@ class FibonacciManager:
         self.l1b = cfg.l1_ttl_base
         self.l2b = cfg.l2_ttl_base
         self.maxi = cfg.max_interval_s
-        self.grow = cfg.trust_growth or PHI**0.125
-        self.shrk = cfg.trust_shrink or INV_PHI**0.125
+        self.grow = cfg.trust_growth or PHI ** 0.125
+        self.shrk = cfg.trust_shrink or INV_PHI ** 0.125
         self.method = cfg.search_method
         self.s1 = FibonacciSchedule(self.l1b, self.maxi)
         self.s2 = FibonacciSchedule(self.l2b, self.maxi)
         self.worm = worm
         self.fib = fib
-
+        
     def apply_cache(self, cache: MultiLevelCache):
-        if not (self.enabled and self.cache_enabled):
+        if not (self.enabled and self.cache_enabled): 
             return
         cache.l1_ttl = int(self.s1.next())
         cache.l2_ttl = int(self.s2.next())
-        self.worm.record(
-            EventType.FIBONACCI_TICK,
-            {
-                "l1_ttl": cache.l1_ttl,
-                "l2_ttl": cache.l2_ttl,
-            },
-        )
-
+        self.worm.record(EventType.FIBONACCI_TICK, {
+            "l1_ttl": cache.l1_ttl,
+            "l2_ttl": cache.l2_ttl,
+        })
+        
     def modulate_trust(self, xt: OmegaMEState):
-        if not (self.enabled and self.trust_enabled):
+        if not (self.enabled and self.trust_enabled): 
             return
         if xt.delta_linf > 0.02:
             xt.trust_radius = min(0.5, xt.trust_radius * self.grow)
         else:
             xt.trust_radius = max(0.01, xt.trust_radius * self.shrk)
-
+            
     def optimize_lr(self, f: Callable[[float], float], a: float = 0.01, b: float = 1.0) -> float:
         if self.method == "fibonacci":
             return self.fib.fibonacci_search(f, a, b, maximize=True)
         else:
             return self.fib.golden_section_search(f, a, b, maximize=True)
-
 
 # -----------------------------------------------------------------------------
 # PeninOmegaCore with all P0 corrections
@@ -1381,25 +1246,27 @@ class PeninOmegaCore:
         except ValidationError as e:
             log.error(f"Configuration validation failed: {e}")
             raise SystemExit(f"Invalid configuration: {e}")
-
+            
         # Initialize deterministic RNG
         self.rng = DeterministicRandom(self.cfg.evolution.seed)
         log.info(f"Initialized with seed: {self.rng.seed}")
-
+        
         # Compute config hash for attestation
-        self.config_hash = hashlib.sha256(json.dumps(self.cfg.model_dump(), sort_keys=True).encode()).hexdigest()[:16]
-
+        self.config_hash = hashlib.sha256(
+            json.dumps(self.cfg.model_dump(), sort_keys=True).encode()
+        ).hexdigest()[:16]
+        
         self.worm = WORMLedger()
         self.cache = MultiLevelCache()
         self.fibR = FibonacciResearch(self.rng)
         self.fib = FibonacciManager(self.cfg.fibonacci, self.worm, self.fibR)
-
+        
         # Track metrics history for real computation
         self.predictions_history = []  # For ECE computation
         self.group_outcomes_history = defaultdict(list)  # For bias tracking
         self.risk_history = []  # For IR→IC contractivity
         use_phi = self.fib.enabled
-
+        
         # Initialize engines with validated config
         self.sigma = SigmaGuard(self.cfg.ethics)
         self.iric = IRtoIC(self.cfg.iric, use_phi=use_phi)
@@ -1409,44 +1276,39 @@ class PeninOmegaCore:
         self.oci = OCIEngine(self.cfg.oci)
         self.linf = LInfinityScore(self.cfg.linf_placar)
         self.ethics = EthicsMetrics(self.cfg.ethics, self.cfg.iric)
-
+        
         # P0 Fix: Initialize ethics calculator and gate
         self.ethics_calculator = EthicsCalculator() if HAS_ETHICS else None
         self.ethics_gate = EthicsGate() if HAS_ETHICS else None
-
+        
         self.xt = OmegaMEState()
         self.metrics = {"cycles": 0, "promotions": 0, "rollbacks": 0, "extinctions": 0}
         self._register_boot()
-
+        
         if self.fib.enabled and self.fib.cache_enabled:
             self.fib.apply_cache(self.cache)
-
+            
         self.pool = ThreadPoolExecutor(max_workers=8)
         self.ppool = ProcessPoolExecutor(max_workers=4)
-
+        
     def _register_boot(self):
-        self.worm.record(
-            EventType.BOOT,
-            {
-                "version": PKG_VERSION,
-                "phi": PHI,
-                "inv_phi": INV_PHI,
-                "fibonacci_enabled": self.fib.enabled,
-                "seed": self.rng.seed,
-                "config_hash": self.config_hash,
-                "psutil_available": HAS_PSUTIL,
-            },
-            self.xt,
-            seed_state=self.rng.get_state(),
-        )
-
+        self.worm.record(EventType.BOOT, {
+            "version": PKG_VERSION,
+            "phi": PHI,
+            "inv_phi": INV_PHI,
+            "fibonacci_enabled": self.fib.enabled,
+            "seed": self.rng.seed,
+            "config_hash": self.config_hash,
+            "psutil_available": HAS_PSUTIL
+        }, self.xt, seed_state=self.rng.get_state())
+        
     def _compute_real_ethics_metrics(self, xt: OmegaMEState) -> Dict[str, float]:
         """
         Compute real ethics metrics using accumulated data.
         Updates xt.ece, xt.bias, and related fields.
         """
         metrics = {}
-
+        
         if HAS_OMEGA_METRICS:
             # Compute ECE from recent predictions (simulate if needed)
             if not self.predictions_history:
@@ -1455,79 +1317,76 @@ class PeninOmegaCore:
                     conf = self.rng.random()
                     correct = self.rng.random() > 0.3  # 70% accuracy
                     self.predictions_history.append((conf, correct))
-
+            
             if self.predictions_history:
                 ece, ece_details = compute_ece(self.predictions_history[-100:])
-                metrics["ece"] = ece
+                metrics['ece'] = ece
                 xt.ece = ece
-
+            
             # Compute bias ratio from group outcomes
             if not self.group_outcomes_history:
                 # Simulate group outcomes
-                self.group_outcomes_history["group_a"].append(0.8 + 0.1 * self.rng.random())
-                self.group_outcomes_history["group_b"].append(0.7 + 0.1 * self.rng.random())
-
+                self.group_outcomes_history['group_a'].append(0.8 + 0.1 * self.rng.random())
+                self.group_outcomes_history['group_b'].append(0.7 + 0.1 * self.rng.random())
+            
             if self.group_outcomes_history:
                 rho_bias, bias_details = compute_bias_ratio(dict(self.group_outcomes_history))
-                metrics["rho_bias"] = rho_bias
+                metrics['rho_bias'] = rho_bias
                 xt.bias = rho_bias
-
+            
             # Compute risk contractivity
             if not self.risk_history:
                 # Initialize with decreasing risk trend
                 base_risk = 1.0
                 for i in range(10):
-                    self.risk_history.append(base_risk * (0.95**i))
-
+                    self.risk_history.append(base_risk * (0.95 ** i))
+            
             # Add current risk
             current_risk = xt.cost * (2.0 - xt.sigma_ok)  # Simple risk proxy
             self.risk_history.append(current_risk)
-
+            
             if len(self.risk_history) >= 2:
                 rho_risk, risk_details = compute_risk_contractivity(self.risk_history[-20:])
-                metrics["rho_risk"] = rho_risk
-
+                metrics['rho_risk'] = rho_risk
+            
             # Resource usage for ecological impact
             resource_usage = {
-                "cpu_percent": xt.cpu * 100,
-                "memory_mb": xt.mem * 8192,  # Assume 8GB baseline
+                'cpu_percent': xt.cpu * 100,
+                'memory_mb': xt.mem * 8192  # Assume 8GB baseline
             }
-            metrics["eco_impact"] = sum(resource_usage.values()) / 8292  # Normalize
-
+            metrics['eco_impact'] = sum(resource_usage.values()) / 8292  # Normalize
+            
         else:
             # Fallback to simulated values
-            metrics["ece"] = xt.ece
-            metrics["rho_bias"] = xt.bias
-            metrics["rho_risk"] = 0.95  # Contractive by default
-            metrics["eco_impact"] = (xt.cpu + xt.mem) / 2
-
+            metrics['ece'] = xt.ece
+            metrics['rho_bias'] = xt.bias
+            metrics['rho_risk'] = 0.95  # Contractive by default
+            metrics['eco_impact'] = (xt.cpu + xt.mem) / 2
+        
         return metrics
-
+    
     async def master_equation_cycle(self, external_metrics: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
         result = {"success": False, "decision": None, "metrics": {}, "gate_trace": []}
         t0 = time.time()
-
+        
         # Update timestamp for this cycle
         self.xt.ts = t0
-
+        
         # Record cycle start with seed state
-        self.worm.record(
-            EventType.CYCLE_START,
-            {"cycle": self.xt.cycle, "seed_state": self.rng.get_state()},
-            self.xt,
-            seed_state=self.rng.get_state(),
-        )
-
+        self.worm.record(EventType.CYCLE_START, 
+                        {"cycle": self.xt.cycle, "seed_state": self.rng.get_state()}, 
+                        self.xt, seed_state=self.rng.get_state())
+        
         # Store pre-state for PROMOTE_ATTEST
         pre_state = OmegaMEState(**self.xt.to_dict())
-
+        
         try:
             # Apply external metrics
             if external_metrics:
                 for k, v in external_metrics.items():
-                    if hasattr(self.xt, k):
+                    if hasattr(self.xt, k): 
                         setattr(self.xt, k, float(v))
-
+                        
             # Measure ethics metrics (ECE / Bias / Rho) and record attestation
             ethics_snapshot = self.ethics.measure(self.xt)
             # Apply computed ethics values to state
@@ -1555,49 +1414,36 @@ class PeninOmegaCore:
                 self.xt.cpu = 0.99
                 self.xt.mem = 0.99
                 log.warning("psutil unavailable - assuming HIGH resource usage (fail-closed)")
-
+            
             # Compute real ethics metrics
             ethics_metrics = self._compute_real_ethics_metrics(self.xt)
             result["ethics_metrics"] = ethics_metrics
-
+            
             # Log ethics metrics to WORM
-            self.worm.record(
-                EventType.METRIC,
-                {
-                    "type": "ethics",
-                    "ece": self.xt.ece,
-                    "bias": self.xt.bias,
-                    "rho_risk": ethics_metrics.get("rho_risk", 1.0),
-                    "eco_impact": ethics_metrics.get("eco_impact", 0.0),
-                    "evidence_hash": hashlib.sha256(json.dumps(ethics_metrics, sort_keys=True).encode()).hexdigest()[
-                        :16
-                    ],
-                },
-                self.xt,
-                seed_state=self.rng.get_state(),
-            )
-
+            self.worm.record(EventType.METRIC, {
+                "type": "ethics",
+                "ece": self.xt.ece,
+                "bias": self.xt.bias,
+                "rho_risk": ethics_metrics.get('rho_risk', 1.0),
+                "eco_impact": ethics_metrics.get('eco_impact', 0.0),
+                "evidence_hash": hashlib.sha256(
+                    json.dumps(ethics_metrics, sort_keys=True).encode()
+                ).hexdigest()[:16]
+            }, self.xt, seed_state=self.rng.get_state())
+                
             # P0 Fix: Calculate and attest ethical metrics (only if model data available)
             ethics_metrics = None
             if self.ethics_calculator and HAS_ETHICS:
                 try:
-                    model_data = getattr(self, "_model_predictions", None)
+                    model_data = getattr(self, '_model_predictions', None)
                     if model_data:
-                        predictions = model_data.get("predictions", [])
-                        targets = model_data.get("targets", [])
-                        protected_attrs = model_data.get("protected_attributes", [])
+                        predictions = model_data.get('predictions', [])
+                        targets = model_data.get('targets', [])
+                        protected_attrs = model_data.get('protected_attributes', [])
                         if predictions and targets and protected_attrs:
-                            risk_series = getattr(self, "_risk_history", [self.rng.random() for _ in range(50)])
-                            consent_data = {
-                                "user_consent": True,
-                                "data_usage_consent": True,
-                                "processing_consent": True,
-                            }
-                            eco_data = {
-                                "carbon_footprint_ok": True,
-                                "energy_efficiency_ok": True,
-                                "waste_minimization_ok": True,
-                            }
+                            risk_series = getattr(self, '_risk_history', [self.rng.random() for _ in range(50)])
+                            consent_data = {'user_consent': True, 'data_usage_consent': True, 'processing_consent': True}
+                            eco_data = {'carbon_footprint_ok': True, 'energy_efficiency_ok': True, 'waste_minimization_ok': True}
                             ethics_metrics = self.ethics_calculator.calculate_all_metrics(
                                 predictions=predictions,
                                 targets=targets,
@@ -1606,7 +1452,7 @@ class PeninOmegaCore:
                                 consent_data=consent_data,
                                 eco_data=eco_data,
                                 dataset_id=f"cycle_{self.xt.cycle}",
-                                seed=self.rng.seed,
+                                seed=self.rng.seed
                             )
                             self.worm.record(
                                 EventType.ETHICS_ATTEST,
@@ -1618,10 +1464,10 @@ class PeninOmegaCore:
                                     "consent": ethics_metrics.consent,
                                     "eco_ok": ethics_metrics.eco_ok,
                                     "risk_rho": ethics_metrics.risk_rho,
-                                    "evidence_hash": ethics_metrics.evidence_hash,
+                                    "evidence_hash": ethics_metrics.evidence_hash
                                 },
                                 self.xt,
-                                seed_state=self.rng.get_state(),
+                                seed_state=self.rng.get_state()
                             )
                             log.info(
                                 f"Ethics metrics calculated: ECE={ethics_metrics.ece:.4f}, "
@@ -1632,28 +1478,24 @@ class PeninOmegaCore:
                     result.update({"decision": "ABORT", "reason": "ETHICS_CALC_FAILED", "error": str(e)})
                     self.worm.record(EventType.CYCLE_ABORT, result, self.xt, seed_state=self.rng.get_state())
                     return result
-
+                
             # Σ-Guard check
             ok, violations = self.sigma.check(self.xt)
             if not ok:
                 result["gate_trace"].extend(violations)
-                result.update(
-                    {"decision": "ABORT", "reason": "SIGMA_GUARD", "violations": [v["msg"] for v in violations]}
-                )
+                result.update({"decision": "ABORT", "reason": "SIGMA_GUARD", "violations": [v["msg"] for v in violations]})
                 self.worm.record(EventType.CYCLE_ABORT, result, self.xt, seed_state=self.rng.get_state())
                 return result
-
+                
             # IR→IC safety check
             safe, failures = self.iric.safe(self.xt)
             if not safe:
                 result["gate_trace"].extend(failures)
                 self.iric.contract(self.xt)
-                result.update(
-                    {"decision": "ABORT", "reason": "IRIC_CONTRACT", "failures": [f["msg"] for f in failures]}
-                )
+                result.update({"decision": "ABORT", "reason": "IRIC_CONTRACT", "failures": [f["msg"] for f in failures]})
                 self.worm.record(EventType.CYCLE_ABORT, result, self.xt, seed_state=self.rng.get_state())
                 return result
-
+                
             # P0 Fix: Ethics gate validation
             if self.ethics_gate and ethics_metrics and HAS_ETHICS:
                 try:
@@ -1661,37 +1503,30 @@ class PeninOmegaCore:
                     if not ethics_valid:
                         violations = []
                         for check, passed in ethics_details.items():
-                            if check.endswith("_ok") and not passed:
-                                violations.append(
-                                    {
-                                        "gate": "ETHICS_GATE",
-                                        "check": check,
-                                        "value": ethics_details.get(check.replace("_ok", ""), "N/A"),
-                                        "passed": False,
-                                        "msg": f"Ethics check {check} failed",
-                                    }
-                                )
-
+                            if check.endswith('_ok') and not passed:
+                                violations.append({
+                                    "gate": "ETHICS_GATE",
+                                    "check": check,
+                                    "value": ethics_details.get(check.replace('_ok', ''), 'N/A'),
+                                    "passed": False,
+                                    "msg": f"Ethics check {check} failed"
+                                })
+                        
                         result["gate_trace"].extend(violations)
-                        result.update(
-                            {
-                                "decision": "ABORT",
-                                "reason": "ETHICS_GATE_FAILED",
-                                "violations": [v["msg"] for v in violations],
-                            }
-                        )
+                        result.update({"decision": "ABORT", "reason": "ETHICS_GATE_FAILED", 
+                                     "violations": [v["msg"] for v in violations]})
                         self.worm.record(EventType.CYCLE_ABORT, result, self.xt, seed_state=self.rng.get_state())
                         return result
-
+                    
                     log.info(f"Ethics gate passed: {ethics_details}")
-
+                    
                 except Exception as e:
                     log.error(f"Failed to validate ethics gate: {e}")
                     # Fail-closed: abort if ethics validation fails
                     result.update({"decision": "ABORT", "reason": "ETHICS_VALIDATION_FAILED", "error": str(e)})
                     self.worm.record(EventType.CYCLE_ABORT, result, self.xt, seed_state=self.rng.get_state())
                     return result
-
+                
             # Optional: Pre-cycle multi-API orchestration to enrich context
             if HAS_PENIN:
                 try:
@@ -1743,7 +1578,6 @@ class PeninOmegaCore:
             # Optional informational score gate from penin.omega.scoring (does not affect decision yet)
             try:
                 from penin.omega.scoring import score_gate
-
                 u = max(0.0, min(1.0, self.xt.rsi))
                 s = max(0.0, min(1.0, 1.0 - self.xt.ece))
                 c = max(0.0, min(1.0, self.xt.cost))
@@ -1759,205 +1593,177 @@ class PeninOmegaCore:
             result["metrics"]["CAOS⁺"] = caos_val
             result["metrics"]["harmony"] = self.xt.caos_harmony
             result["metrics"]["pattern_stable"] = self.xt.pattern_stable
-
+            
             sr_val = self.sr.compute(self.xt)
             result["metrics"]["SR"] = sr_val
-
+            
             g_val = self.gc.compute(self.xt)
             result["metrics"]["G"] = g_val
-
+            
             oci_val = self.oci.compute(self.xt)
             result["metrics"]["OCI"] = oci_val
-
+            
             # Compute alpha
             alpha = self._compute_alpha()
             result["metrics"]["α_t^Ω"] = alpha
-
+            
             # Check gates with detailed tracing
             gates_failed = []
-
+            
             sr_pass, sr_gate = self.sr.gate(self.xt)
             if not sr_pass:
                 gates_failed.append("SR_GATE")
                 result["gate_trace"].append(sr_gate)
-
+                
             g_pass, g_gate = self.gc.gate(self.xt)
             if not g_pass:
                 gates_failed.append("G_GATE")
                 result["gate_trace"].append(g_gate)
-
+                
             oci_pass, oci_gate = self.oci.gate(self.xt)
             if not oci_pass:
                 gates_failed.append("OCI_GATE")
                 result["gate_trace"].append(oci_gate)
-
+                
             if self.xt.delta_linf < self.cfg.thresholds.beta_min:
                 gates_failed.append("ΔL∞_GATE")
-                result["gate_trace"].append(
-                    {
-                        "gate": "ΔL∞",
-                        "value": self.xt.delta_linf,
-                        "threshold": self.cfg.thresholds.beta_min,
-                        "passed": False,
-                        "msg": f"ΔL∞={self.xt.delta_linf:.4f} < {self.cfg.thresholds.beta_min}",
-                    }
-                )
-
+                result["gate_trace"].append({
+                    "gate": "ΔL∞", "value": self.xt.delta_linf, 
+                    "threshold": self.cfg.thresholds.beta_min,
+                    "passed": False, "msg": f"ΔL∞={self.xt.delta_linf:.4f} < {self.cfg.thresholds.beta_min}"
+                })
+                
             if self.xt.caos_plus < self.cfg.thresholds.tau_caos:
                 gates_failed.append("CAOS⁺_GATE")
-                result["gate_trace"].append(
-                    {
-                        "gate": "CAOS⁺",
-                        "value": self.xt.caos_plus,
-                        "threshold": self.cfg.thresholds.tau_caos,
-                        "passed": False,
-                        "msg": f"CAOS⁺={self.xt.caos_plus:.3f} < {self.cfg.thresholds.tau_caos}",
-                    }
-                )
-
+                result["gate_trace"].append({
+                    "gate": "CAOS⁺", "value": self.xt.caos_plus,
+                    "threshold": self.cfg.thresholds.tau_caos,
+                    "passed": False, "msg": f"CAOS⁺={self.xt.caos_plus:.3f} < {self.cfg.thresholds.tau_caos}"
+                })
+                
             if gates_failed:
                 result.update({"decision": "ROLLBACK", "reason": "GATES_FAILED", "failed_gates": gates_failed})
                 self.metrics["rollbacks"] += 1
-                self.worm.record(
-                    EventType.ROLLBACK,
-                    result,
-                    self.xt,
-                    seed_state=self.rng.get_state(),
-                    gate_trace=result["gate_trace"],
-                )
+                self.worm.record(EventType.ROLLBACK, result, self.xt, 
+                               seed_state=self.rng.get_state(), gate_trace=result["gate_trace"])
                 return result
-
+                
             # Evolution step
             step = alpha * self.xt.delta_linf
             lr_opt = 1.0
-
+            
             if self.fib.enabled:
-
                 def lr_score(lr: float) -> float:
                     harm_bonus = 1.0 - min(1.0, abs(self.xt.caos_harmony - PHI) / PHI)
                     return step * lr * (1.0 + 0.1 * harm_bonus)
-
                 lr_opt = self.fib.optimize_lr(lr_score, 0.5, 2.0)
-                self.worm.record(
-                    EventType.FIBONACCI_OPT,
-                    {"lr_opt": lr_opt, "opt_count": self.fibR.optimization_count},
-                    self.xt,
-                    seed_state=self.rng.get_state(),
-                )
-
+                self.worm.record(EventType.FIBONACCI_OPT, 
+                               {"lr_opt": lr_opt, "opt_count": self.fibR.optimization_count}, 
+                               self.xt, seed_state=self.rng.get_state())
+                               
             step_opt = step * lr_opt
-
+            
             # Apply evolution
-            self.xt.rsi += step_opt * 0.08
-            self.xt.synergy += step_opt * 0.07
-            self.xt.novelty += step_opt * 0.05
+            self.xt.rsi       += step_opt * 0.08
+            self.xt.synergy   += step_opt * 0.07
+            self.xt.novelty   += step_opt * 0.05
             self.xt.stability += step_opt * 0.06
             self.xt.viability += step_opt * 0.05
-            self.xt.cost = max(0.0, self.xt.cost - step_opt * 0.03)
+            self.xt.cost       = max(0.0, self.xt.cost - step_opt * 0.03)
             self.xt.C = min(1.0, self.xt.C + step_opt * 0.04)
             self.xt.A = min(1.0, self.xt.A + step_opt * 0.05)
             self.xt.O = min(1.0, self.xt.O + step_opt * 0.03)
             self.xt.S = min(1.0, self.xt.S + step_opt * 0.02)
             self.xt.C_cal = min(1.0, self.xt.C_cal + step_opt * 0.03)
-            self.xt.M = min(1.0, self.xt.M + step_opt * 0.04)
+            self.xt.M     = min(1.0, self.xt.M     + step_opt * 0.04)
             self.xt.A_eff = min(1.0, self.xt.A_eff + step_opt * 0.05)
-
+            
             if self.fib.enabled:
                 self.fib.modulate_trust(self.xt)
-
+                
             if step_opt > 0:
                 result.update({"success": True, "decision": "PROMOTE", "evolution_step": step_opt})
                 self.metrics["promotions"] += 1
-
+                
                 # CRITICAL: Record PROMOTE_ATTEST with atomic verification
                 self.worm.record_promote_attest(
-                    pre_state, self.xt, result, self.rng.get_state(), self.config_hash, step_opt
+                    pre_state, self.xt, result, 
+                    self.rng.get_state(), self.config_hash, step_opt
                 )
             else:
                 result.update({"decision": "ROLLBACK", "reason": "NEGATIVE_STEP"})
                 self.metrics["rollbacks"] += 1
-                self.worm.record(
-                    EventType.ROLLBACK,
-                    {"step": step_opt, "alpha": alpha, "ΔL∞": self.xt.delta_linf},
-                    self.xt,
-                    seed_state=self.rng.get_state(),
-                )
-
+                self.worm.record(EventType.ROLLBACK, 
+                               {"step": step_opt, "alpha": alpha, "ΔL∞": self.xt.delta_linf}, 
+                               self.xt, seed_state=self.rng.get_state())
+                               
             # Update cycle
             self.xt.cycle += 1
             self.metrics["cycles"] += 1
-
+            
             # Performance metrics
             elapsed = max(1e-6, time.time() - t0)
             self.xt.latency_ms = elapsed * 1000.0
             self.xt.throughput = 1.0 / elapsed
-
+            
             # Apply Fibonacci cache updates
             if self.fib.enabled:
                 self.fib.apply_cache(self.cache)
-
+                
             # Record master equation result
-            self.worm.record(
-                EventType.MASTER_EQ,
-                {"cycle": self.xt.cycle, "metrics": result["metrics"], "step": step_opt},
-                self.xt,
-                seed_state=self.rng.get_state(),
-            )
-
+            self.worm.record(EventType.MASTER_EQ, 
+                           {"cycle": self.xt.cycle, "metrics": result["metrics"], "step": step_opt}, 
+                           self.xt, seed_state=self.rng.get_state())
+                           
             return result
-
+            
         except Exception as e:
             result.update({"decision": "ABORT", "error": str(e)})
             self.worm.record(EventType.CYCLE_ABORT, result, self.xt, seed_state=self.rng.get_state())
             return result
-
+            
     def _compute_alpha(self) -> float:
         alpha_0 = self.cfg.evolution.alpha_0
         # Use sigmoidal normalization instead of ad-hoc division
         phi_caos = 1.0 / (1.0 + math.exp(-2.0 * (self.xt.caos_plus - 1.0)))
         sr_comp = 1.0 / (1.0 + math.exp(-5.0 * (self.xt.sr_score - 0.8)))
-        g_comp = 1.0 / (1.0 + math.exp(-5.0 * (self.xt.g_score - 0.7)))
+        g_comp  = 1.0 / (1.0 + math.exp(-5.0 * (self.xt.g_score - 0.7)))
         oci_comp = 1.0 / (1.0 + math.exp(-5.0 * (self.xt.oci_score - 0.9)))
         self.xt.alpha_omega = alpha_0 * phi_caos * sr_comp * g_comp * oci_comp
         return min(1.0, max(0.0, self.xt.alpha_omega))
-
+        
     def verify_integrity(self) -> Dict[str, Any]:
         ok, err = self.worm.verify_chain()
         return {
-            "worm_valid": ok,
-            "worm_error": err,
-            "metrics": dict(self.metrics),
-            "state": self.xt.to_dict(),
+            "worm_valid": ok, 
+            "worm_error": err, 
+            "metrics": dict(self.metrics), 
+            "state": self.xt.to_dict(), 
             "cache": dict(self.cache.stats),
             "seed": self.rng.seed,
-            "rng_calls": self.rng.call_count,
+            "rng_calls": self.rng.call_count
         }
-
+        
     def save_snapshot(self, tag: Optional[str] = None) -> str:
         snap_id = str(uuid.uuid4())
         path = DIRS["SNAPSHOTS"] / f"snapshot_{snap_id}.json"
         with open(path, "w") as f:
-            json.dump(
-                {
-                    "id": snap_id,
-                    "tag": tag,
-                    "ts": datetime.now(timezone.utc).isoformat(),
-                    "state": self.xt.to_dict(),
-                    "metrics": self.metrics,
-                    "config": self.cfg.model_dump(),
-                    "seed": self.rng.seed,
-                    "rng_state": self.rng.get_state(),
-                },
-                f,
-                indent=2,
-                ensure_ascii=False,
-            )
+            json.dump({
+                "id": snap_id, 
+                "tag": tag, 
+                "ts": datetime.now(timezone.utc).isoformat(), 
+                "state": self.xt.to_dict(), 
+                "metrics": self.metrics, 
+                "config": self.cfg.model_dump(),
+                "seed": self.rng.seed,
+                "rng_state": self.rng.get_state()
+            }, f, indent=2, ensure_ascii=False)
         self.worm.record(EventType.SNAPSHOT, {"id": snap_id, "path": str(path)}, self.xt)
         return snap_id
-
+        
     def load_snapshot(self, snap_id: str) -> bool:
         path = DIRS["SNAPSHOTS"] / f"snapshot_{snap_id}.json"
-        if not path.exists():
+        if not path.exists(): 
             return False
         try:
             with open(path) as f:
@@ -1970,19 +1776,16 @@ class PeninOmegaCore:
         except Exception as e:
             log.error(f"load_snapshot error: {e}")
             return False
-
+            
     def shutdown(self):
         log.info("🛑 Shutting down core...")
         snap = self.save_snapshot("shutdown")
-        self.worm.record(
-            EventType.SHUTDOWN,
-            {"snapshot": snap, "metrics": self.metrics, "final_seed_state": self.rng.get_state()},
-            self.xt,
-        )
+        self.worm.record(EventType.SHUTDOWN, 
+                        {"snapshot": snap, "metrics": self.metrics, "final_seed_state": self.rng.get_state()}, 
+                        self.xt)
         self.cache.clear()
         self.pool.shutdown(wait=True)
         self.ppool.shutdown(wait=True)
-
 
 # -----------------------------------------------------------------------------
 # CLI demonstration
@@ -1991,35 +1794,32 @@ async def main_demo():
     # Initialize with seed for determinism
     config = {"evolution": {"seed": 42}}
     core = PeninOmegaCore(config)
-
-    def handler(*_):
+    
+    def handler(*_): 
         core.shutdown()
         sys.exit(0)
-
+        
     signal.signal(signal.SIGINT, handler)
     signal.signal(signal.SIGTERM, handler)
-
+    
     log.info("Starting 3 demo cycles with deterministic seed...")
     for i in range(3):
         res = await core.master_equation_cycle()
-        log.info(f"Cycle {i + 1}: decision={res['decision']}, success={res['success']}")
+        log.info(f"Cycle {i+1}: decision={res['decision']}, success={res['success']}")
         if res.get("gate_trace"):
             log.info(f"  Gate trace: {len(res['gate_trace'])} checks")
         await asyncio.sleep(0.3)
-
+        
     integ = core.verify_integrity()
-    log.info(
-        f"WORM valid: {integ['worm_valid']}, cycles: {integ['metrics']['cycles']}, RNG calls: {integ['rng_calls']}"
-    )
+    log.info(f"WORM valid: {integ['worm_valid']}, cycles: {integ['metrics']['cycles']}, RNG calls: {integ['rng_calls']}")
     core.shutdown()
-
 
 if __name__ == "__main__":
     if HAS_TORCH:
         try:
             torch.set_num_threads(multiprocessing.cpu_count())
-            if hasattr(torch, "set_float32_matmul_precision"):
-                torch.set_float32_matmul_precision("high")
+            if hasattr(torch, 'set_float32_matmul_precision'):
+                torch.set_float32_matmul_precision('high')
         except Exception:
             pass
     asyncio.run(main_demo())
