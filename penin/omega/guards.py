@@ -1,365 +1,483 @@
 """
-Guards Module
-=============
+Guards Module - Σ-Guard + IR→IC (Fail-Closed)
+==============================================
 
-Implements Σ-Guard (ethics/safety gates) and IR→IC (risk contractivity) validation.
-All guards are fail-closed: any violation blocks promotion.
-
-Policy thresholds are configurable but default to conservative values.
-Each guard returns (ok: bool, details: dict) for audit trail.
+Implementa:
+- Σ-Guard: Verificação ética/segurança (ECE, ρ_bias, consent, eco_ok)
+- IR→IC: Contratividade de risco (ρ < 1 para convergência)
+- Fail-closed: Qualquer falha bloqueia promoção com detalhes
+- Integração com ethics_metrics para cálculo real das métricas
 """
 
-import hashlib
-import json
 import time
-from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Dict, Any, List, Optional
+from typing_extensions import Tuple
+from dataclasses import dataclass
+from enum import Enum
+
+# Import do módulo de métricas éticas
+from .ethics_metrics import EthicsMetricsCalculator, calculate_and_validate_ethics
+
+
+class GuardResult(Enum):
+    """Resultado dos guards"""
+    PASS = "pass"
+    FAIL = "fail"
+    ERROR = "error"
 
 
 @dataclass
-class GuardResult:
-    """Result of a guard evaluation"""
-
-    passed: bool
+class GuardViolation:
+    """Violação de guard"""
     guard_name: str
-    violations: list[str]
-    details: dict[str, Any]
-    timestamp: float
-    evidence_hash: str
-
-    def to_dict(self) -> dict:
-        """Convert to dict for serialization"""
-        return asdict(self)
-
-
-class SigmaGuardPolicy:
-    """
-    Σ-Guard policy configuration and thresholds.
-
-    Default values are conservative (fail-closed).
-    """
-
-    def __init__(self, config: dict[str, Any] | None = None):
-        config = config or {}
-
-        # Ethics thresholds
-        self.ece_max = config.get("ece_max", 0.01)  # Max expected calibration error
-        self.rho_bias_max = config.get("rho_bias_max", 1.05)  # Max bias ratio
-        self.fairness_dp_max = config.get("fairness_dp_max", 0.1)  # Max demographic parity distance
-        self.fairness_eo_max = config.get("fairness_eo_max", 0.1)  # Max equal opportunity distance
-
-        # Safety thresholds
-        self.rho_risk_max = config.get("rho_risk_max", 1.0)  # Must be contractive (<1.0)
-        self.eco_impact_max = config.get("eco_impact_max", 0.5)  # Max ecological impact
-
-        # Consent requirements
-        self.require_consent = config.get("require_consent", True)
-        self.require_purpose = config.get("require_purpose", True)
-        self.require_retention = config.get("require_retention", True)
-
-        # Additional safety checks
-        self.min_confidence = config.get("min_confidence", 0.7)  # Min model confidence
-        self.max_uncertainty = config.get("max_uncertainty", 0.3)  # Max uncertainty
-        self.require_human_oversight = config.get("require_human_oversight", False)
-
-    def to_dict(self) -> dict:
-        """Export policy as dict"""
+    metric: str
+    value: Any
+    threshold: Any
+    message: str
+    severity: str = "high"  # high, medium, low
+    
+    def to_dict(self) -> Dict[str, Any]:
         return {
-            "ece_max": self.ece_max,
-            "rho_bias_max": self.rho_bias_max,
-            "fairness_dp_max": self.fairness_dp_max,
-            "fairness_eo_max": self.fairness_eo_max,
-            "rho_risk_max": self.rho_risk_max,
-            "eco_impact_max": self.eco_impact_max,
-            "require_consent": self.require_consent,
-            "require_purpose": self.require_purpose,
-            "require_retention": self.require_retention,
-            "min_confidence": self.min_confidence,
-            "max_uncertainty": self.max_uncertainty,
-            "require_human_oversight": self.require_human_oversight,
+            "guard": self.guard_name,
+            "metric": self.metric,
+            "value": self.value,
+            "threshold": self.threshold,
+            "message": self.message,
+            "severity": self.severity
         }
 
 
-def sigma_guard(metrics: dict[str, Any], policy: SigmaGuardPolicy | None = None, strict: bool = True) -> GuardResult:
+class SigmaGuard:
     """
-    Σ-Guard: Comprehensive ethics and safety validation.
-
-    Args:
-        metrics: Dict containing computed metrics (ECE, bias, fairness, etc.)
-        policy: Policy configuration (uses defaults if None)
-        strict: If True, all checks must pass. If False, warnings allowed.
-
-    Returns:
-        GuardResult with pass/fail and detailed violations
+    Σ-Guard: Verificação ética e de segurança
+    
+    Verifica:
+    - ECE ≤ threshold (calibração)
+    - ρ_bias ≤ threshold (fairness)
+    - consent == True (consentimento)
+    - eco_ok == True (compliance ambiental)
     """
-    if policy is None:
-        policy = SigmaGuardPolicy()
-
-    violations = []
-    details = {
-        "policy": policy.to_dict(),
-        "metrics_received": list(metrics.keys()),
-        "checks_performed": [],
-    }
-
-    # ECE Check
-    if "ece" in metrics:
-        ece = metrics["ece"]
-        details["checks_performed"].append("ece")
-        if ece > policy.ece_max:
-            violations.append(f"ECE {ece:.4f} exceeds threshold {policy.ece_max}")
-            details["ece_violation"] = {"value": ece, "threshold": policy.ece_max}
-
-    # Bias ratio check
-    if "rho_bias" in metrics:
-        rho_bias = metrics["rho_bias"]
-        details["checks_performed"].append("rho_bias")
-        if rho_bias > policy.rho_bias_max:
-            violations.append(f"Bias ratio {rho_bias:.4f} exceeds threshold {policy.rho_bias_max}")
-            details["bias_violation"] = {"value": rho_bias, "threshold": policy.rho_bias_max}
-
-    # Fairness checks
-    if "fairness_dp" in metrics:
-        fairness_dp = metrics["fairness_dp"]
-        details["checks_performed"].append("fairness_dp")
-        if fairness_dp > policy.fairness_dp_max:
-            violations.append(f"Demographic parity distance {fairness_dp:.4f} exceeds {policy.fairness_dp_max}")
-            details["fairness_dp_violation"] = {
-                "value": fairness_dp,
-                "threshold": policy.fairness_dp_max,
+    
+    def __init__(self,
+                 ece_max: float = 0.01,
+                 rho_bias_max: float = 1.05,
+                 require_consent: bool = True,
+                 require_eco: bool = True):
+        """
+        Args:
+            ece_max: Threshold máximo para ECE
+            rho_bias_max: Threshold máximo para bias ratio
+            require_consent: Se consent é obrigatório
+            require_eco: Se eco compliance é obrigatório
+        """
+        self.ece_max = ece_max
+        self.rho_bias_max = rho_bias_max
+        self.require_consent = require_consent
+        self.require_eco = require_eco
+        self.ethics_calc = EthicsMetricsCalculator()
+        
+    def check(self, 
+              state_dict: Dict[str, Any],
+              dataset_id: Optional[str] = None,
+              seed: Optional[int] = None) -> Tuple[GuardResult, List[GuardViolation], Dict[str, Any]]:
+        """
+        Executa verificação Σ-Guard
+        
+        Args:
+            state_dict: Estado atual do sistema
+            dataset_id: ID do dataset para evidência
+            seed: Seed para reprodutibilidade
+            
+        Returns:
+            (result, violations, evidence)
+        """
+        violations = []
+        
+        try:
+            # Calcular métricas éticas reais
+            config = {
+                "ethics": {
+                    "ece_max": self.ece_max,
+                    "rho_bias_max": self.rho_bias_max,
+                    "consent_required": self.require_consent,
+                    "eco_ok_required": self.require_eco
+                }
             }
-
-    if "fairness_eo" in metrics:
-        fairness_eo = metrics["fairness_eo"]
-        details["checks_performed"].append("fairness_eo")
-        if fairness_eo > policy.fairness_eo_max:
-            violations.append(f"Equal opportunity distance {fairness_eo:.4f} exceeds {policy.fairness_eo_max}")
-            details["fairness_eo_violation"] = {
-                "value": fairness_eo,
-                "threshold": policy.fairness_eo_max,
-            }
-
-    # Risk contractivity check
-    if "rho_risk" in metrics:
-        rho_risk = metrics["rho_risk"]
-        details["checks_performed"].append("rho_risk")
-        if rho_risk >= policy.rho_risk_max:
-            violations.append(f"Risk not contractive: ρ={rho_risk:.4f} >= {policy.rho_risk_max}")
-            details["risk_violation"] = {"value": rho_risk, "threshold": policy.rho_risk_max}
-
-    # Ecological impact check
-    if "eco_impact" in metrics:
-        eco_impact = metrics["eco_impact"]
-        details["checks_performed"].append("eco_impact")
-        if eco_impact > policy.eco_impact_max:
-            violations.append(f"Ecological impact {eco_impact:.4f} exceeds {policy.eco_impact_max}")
-            details["eco_violation"] = {"value": eco_impact, "threshold": policy.eco_impact_max}
-
-    # Consent validation
-    if policy.require_consent and "consent_valid" in metrics:
-        details["checks_performed"].append("consent")
-        if not metrics["consent_valid"]:
-            violations.append("Consent validation failed")
-            details["consent_violation"] = True
-
-    # Confidence check
-    if "confidence" in metrics:
-        confidence = metrics["confidence"]
-        details["checks_performed"].append("confidence")
-        if confidence < policy.min_confidence:
-            violations.append(f"Confidence {confidence:.4f} below minimum {policy.min_confidence}")
-            details["confidence_violation"] = {
-                "value": confidence,
-                "threshold": policy.min_confidence,
-            }
-
-    # Uncertainty check
-    if "uncertainty" in metrics:
-        uncertainty = metrics["uncertainty"]
-        details["checks_performed"].append("uncertainty")
-        if uncertainty > policy.max_uncertainty:
-            violations.append(f"Uncertainty {uncertainty:.4f} exceeds maximum {policy.max_uncertainty}")
-            details["uncertainty_violation"] = {
-                "value": uncertainty,
-                "threshold": policy.max_uncertainty,
-            }
-
-    # Human oversight check
-    if policy.require_human_oversight:
-        details["checks_performed"].append("human_oversight")
-        if not metrics.get("human_oversight_confirmed", False):
-            if strict:
-                violations.append("Human oversight required but not confirmed")
-            details["human_oversight_required"] = True
-
-    # Create evidence hash
-    evidence = {"metrics": metrics, "policy": policy.to_dict(), "timestamp": time.time()}
-    evidence_hash = hashlib.sha256(json.dumps(evidence, sort_keys=True).encode()).hexdigest()[:16]
-
-    passed = len(violations) == 0
-
-    return GuardResult(
-        passed=passed,
-        guard_name="sigma_guard",
-        violations=violations,
-        details=details,
-        timestamp=time.time(),
-        evidence_hash=evidence_hash,
-    )
-
-
-def ir_to_ic_contractive(
-    risk_history: list[float],
-    window: int = 10,
-    max_rho: float = 1.0,
-    require_monotonic: bool = False,
-) -> GuardResult:
-    """
-    IR→IC (Information Risk to Information Confidence) contractivity check.
-
-    Validates that risk is contracting over time (ρ < 1).
-
-    Args:
-        risk_history: List of risk values over time
-        window: Sliding window size for analysis
-        max_rho: Maximum allowed contractivity factor
-        require_monotonic: If True, require strictly decreasing risk
-
-    Returns:
-        GuardResult with contractivity analysis
-    """
-    violations = []
-    details = {
-        "window": window,
-        "max_rho": max_rho,
-        "require_monotonic": require_monotonic,
-        "history_length": len(risk_history),
-    }
-
-    if len(risk_history) < 2:
-        details["status"] = "insufficient_data"
-        passed = False  # Fail-closed when insufficient data
-        violations.append(f"Insufficient risk history: {len(risk_history)} < 2")
-    else:
-        # Use sliding window if history is long
-        analysis_window = risk_history[-window:] if len(risk_history) > window else risk_history
-
-        # Compute contractivity ratios
-        ratios = []
-        for i in range(1, len(analysis_window)):
-            if analysis_window[i - 1] > 0:
-                ratio = analysis_window[i] / analysis_window[i - 1]
-                ratios.append(ratio)
-
-        if not ratios:
-            details["status"] = "no_ratios"
-            passed = False
-            violations.append("Cannot compute contractivity ratios")
-        else:
-            max_ratio = max(ratios)
-            avg_ratio = sum(ratios) / len(ratios)
-
-            details["max_ratio"] = float(max_ratio)
-            details["avg_ratio"] = float(avg_ratio)
-            details["ratios"] = [float(r) for r in ratios]
-
-            # Check contractivity
-            if max_ratio >= max_rho:
-                violations.append(f"Risk not contractive: max ρ={max_ratio:.4f} >= {max_rho}")
-                details["status"] = "expanding"
+            
+            ethics_result = calculate_and_validate_ethics(
+                state_dict, config, dataset_id, seed
+            )
+            
+            metrics = ethics_result["metrics"]
+            validation = ethics_result["validation"]
+            
+            # Processar violações da validação
+            for violation in validation["violations"]:
+                guard_violation = GuardViolation(
+                    guard_name="SIGMA_GUARD",
+                    metric=violation["metric"],
+                    value=violation["value"],
+                    threshold=violation["threshold"],
+                    message=violation["message"],
+                    severity="high"
+                )
+                violations.append(guard_violation)
+                
+            # Determinar resultado
+            if validation["passed"]:
+                result = GuardResult.PASS
             else:
-                details["status"] = "contracting"
+                result = GuardResult.FAIL
+                
+            evidence = {
+                "guard": "SIGMA_GUARD",
+                "timestamp": time.time(),
+                "metrics": metrics,
+                "validation": validation,
+                "evidence_hash": ethics_result["evidence_hash"],
+                "config": {
+                    "ece_max": self.ece_max,
+                    "rho_bias_max": self.rho_bias_max,
+                    "require_consent": self.require_consent,
+                    "require_eco": self.require_eco
+                }
+            }
+            
+        except Exception as e:
+            # Fail-closed: erro vira falha
+            violation = GuardViolation(
+                guard_name="SIGMA_GUARD",
+                metric="SYSTEM_ERROR",
+                value=str(e),
+                threshold="NO_ERROR",
+                message=f"Σ-Guard system error: {e}",
+                severity="high"
+            )
+            violations.append(violation)
+            result = GuardResult.ERROR
+            
+            evidence = {
+                "guard": "SIGMA_GUARD",
+                "timestamp": time.time(),
+                "error": str(e),
+                "result": "ERROR"
+            }
+            
+        return result, violations, evidence
+        
+    def update_thresholds(self, 
+                         ece_max: Optional[float] = None,
+                         rho_bias_max: Optional[float] = None,
+                         require_consent: Optional[bool] = None,
+                         require_eco: Optional[bool] = None) -> None:
+        """Atualiza thresholds do guard"""
+        if ece_max is not None:
+            self.ece_max = ece_max
+        if rho_bias_max is not None:
+            self.rho_bias_max = rho_bias_max
+        if require_consent is not None:
+            self.require_consent = require_consent
+        if require_eco is not None:
+            self.require_eco = require_eco
+            
+    def get_config(self) -> Dict[str, Any]:
+        """Retorna configuração atual"""
+        return {
+            "ece_max": self.ece_max,
+            "rho_bias_max": self.rho_bias_max,
+            "require_consent": self.require_consent,
+            "require_eco": self.require_eco
+        }
 
-            # Check monotonicity if required
-            if require_monotonic:
-                if any(r >= 1.0 for r in ratios):
-                    violations.append("Risk not monotonically decreasing")
-                    details["monotonic"] = False
-                else:
-                    details["monotonic"] = True
 
-            # Additional trend analysis
-            if len(analysis_window) >= 3:
-                # Check acceleration (second derivative)
-                accel = []
-                for i in range(2, len(analysis_window)):
-                    if analysis_window[i - 1] > 0 and analysis_window[i - 2] > 0:
-                        r1 = analysis_window[i - 1] / analysis_window[i - 2]
-                        r2 = analysis_window[i] / analysis_window[i - 1]
-                        accel.append(r2 - r1)
-
-                if accel:
-                    avg_accel = sum(accel) / len(accel)
-                    details["avg_acceleration"] = float(avg_accel)
-                    details["trend"] = "accelerating" if avg_accel < 0 else "decelerating"
-
-    # Create evidence hash
-    evidence = {
-        "risk_history": risk_history[-20:] if len(risk_history) > 20 else risk_history,
-        "config": {"window": window, "max_rho": max_rho},
-        "timestamp": time.time(),
-    }
-    evidence_hash = hashlib.sha256(json.dumps(evidence, sort_keys=True).encode()).hexdigest()[:16]
-
-    passed = len(violations) == 0
-
-    return GuardResult(
-        passed=passed,
-        guard_name="ir_to_ic",
-        violations=violations,
-        details=details,
-        timestamp=time.time(),
-        evidence_hash=evidence_hash,
-    )
-
-
-def combined_guard_check(
-    metrics: dict[str, Any],
-    risk_history: list[float] | None = None,
-    policy: SigmaGuardPolicy | None = None,
-    strict: bool = True,
-) -> tuple[bool, dict[str, GuardResult]]:
+class IRtoICGuard:
     """
-    Run all guards and return combined result.
+    IR→IC Guard: Verificação de contratividade de risco
+    
+    Verifica se ρ < 1 (sistema contrativo/convergente)
+    """
+    
+    def __init__(self,
+                 rho_max: float = 0.95,
+                 min_history_length: int = 2,
+                 contraction_factor: float = 0.98):
+        """
+        Args:
+            rho_max: Threshold máximo para ρ
+            min_history_length: Mínimo de pontos para análise
+            contraction_factor: Fator de contração esperado
+        """
+        self.rho_max = rho_max
+        self.min_history = min_history_length
+        self.contraction_factor = contraction_factor
+        
+    def check_contractive(self, 
+                         risk_series: List[float]) -> Tuple[GuardResult, List[GuardViolation], Dict[str, Any]]:
+        """
+        Verifica contratividade da série de risco
+        
+        Args:
+            risk_series: Série temporal de valores de risco
+            
+        Returns:
+            (result, violations, analysis)
+        """
+        violations = []
+        
+        try:
+            if len(risk_series) < self.min_history:
+                violation = GuardViolation(
+                    guard_name="IR_TO_IC",
+                    metric="HISTORY_LENGTH",
+                    value=len(risk_series),
+                    threshold=self.min_history,
+                    message=f"Insufficient risk history: {len(risk_series)} < {self.min_history}",
+                    severity="medium"
+                )
+                violations.append(violation)
+                
+                analysis = {
+                    "guard": "IR_TO_IC",
+                    "result": "INSUFFICIENT_DATA",
+                    "series_length": len(risk_series),
+                    "min_required": self.min_history
+                }
+                
+                return GuardResult.FAIL, violations, analysis
+                
+            # Calcular ratios consecutivos
+            ratios = []
+            for i in range(1, len(risk_series)):
+                if risk_series[i-1] != 0:
+                    ratio = abs(risk_series[i] / risk_series[i-1])
+                    ratios.append(ratio)
+                    
+            if not ratios:
+                violation = GuardViolation(
+                    guard_name="IR_TO_IC",
+                    metric="VALID_RATIOS",
+                    value=0,
+                    threshold=1,
+                    message="No valid risk ratios found (division by zero)",
+                    severity="high"
+                )
+                violations.append(violation)
+                
+                return GuardResult.ERROR, violations, {"error": "no_valid_ratios"}
+                
+            # Análise de contratividade
+            max_ratio = max(ratios)
+            mean_ratio = sum(ratios) / len(ratios)
+            
+            # Verificar se é contrativo (ρ < 1)
+            is_contractive = max_ratio < 1.0
+            meets_threshold = max_ratio < self.rho_max
+            
+            if not meets_threshold:
+                violation = GuardViolation(
+                    guard_name="IR_TO_IC",
+                    metric="RHO_MAX",
+                    value=max_ratio,
+                    threshold=self.rho_max,
+                    message=f"Risk ratio ρ={max_ratio:.3f} ≥ {self.rho_max} (non-contractive)",
+                    severity="high"
+                )
+                violations.append(violation)
+                
+            if not is_contractive:
+                violation = GuardViolation(
+                    guard_name="IR_TO_IC",
+                    metric="CONTRACTIVE",
+                    value=max_ratio,
+                    threshold=1.0,
+                    message=f"System not contractive: max ρ={max_ratio:.3f} ≥ 1.0",
+                    severity="high"
+                )
+                violations.append(violation)
+                
+            # Resultado
+            if meets_threshold and is_contractive:
+                result = GuardResult.PASS
+            else:
+                result = GuardResult.FAIL
+                
+            analysis = {
+                "guard": "IR_TO_IC",
+                "result": result.value,
+                "max_ratio": max_ratio,
+                "mean_ratio": mean_ratio,
+                "is_contractive": is_contractive,
+                "meets_threshold": meets_threshold,
+                "series_length": len(risk_series),
+                "n_ratios": len(ratios),
+                "ratios": ratios[-5:],  # Últimos 5 para debug
+                "config": {
+                    "rho_max": self.rho_max,
+                    "contraction_factor": self.contraction_factor
+                }
+            }
+            
+        except Exception as e:
+            # Fail-closed
+            violation = GuardViolation(
+                guard_name="IR_TO_IC",
+                metric="SYSTEM_ERROR",
+                value=str(e),
+                threshold="NO_ERROR",
+                message=f"IR→IC system error: {e}",
+                severity="high"
+            )
+            violations.append(violation)
+            result = GuardResult.ERROR
+            
+            analysis = {
+                "guard": "IR_TO_IC",
+                "error": str(e),
+                "result": "ERROR"
+            }
+            
+        return result, violations, analysis
+        
+    def apply_contraction(self, current_risk: float) -> float:
+        """Aplica fator de contração ao risco atual"""
+        return current_risk * self.contraction_factor
+        
+    def get_config(self) -> Dict[str, Any]:
+        """Retorna configuração atual"""
+        return {
+            "rho_max": self.rho_max,
+            "min_history": self.min_history,
+            "contraction_factor": self.contraction_factor
+        }
 
-    Args:
-        metrics: Metrics dict for Σ-Guard
-        risk_history: Risk history for IR→IC
-        policy: Sigma guard policy
-        strict: Strict mode for all guards
 
+class GuardOrchestrator:
+    """
+    Orquestrador de todos os guards
+    
+    Executa Σ-Guard e IR→IC em sequência, fail-closed
+    """
+    
+    def __init__(self,
+                 sigma_guard: Optional[SigmaGuard] = None,
+                 iric_guard: Optional[IRtoICGuard] = None):
+        """
+        Args:
+            sigma_guard: Instância do Σ-Guard (default: padrão)
+            iric_guard: Instância do IR→IC Guard (default: padrão)
+        """
+        self.sigma_guard = sigma_guard or SigmaGuard()
+        self.iric_guard = iric_guard or IRtoICGuard()
+        
+    def check_all_guards(self,
+                        state_dict: Dict[str, Any],
+                        risk_series: Optional[List[float]] = None,
+                        dataset_id: Optional[str] = None,
+                        seed: Optional[int] = None) -> Tuple[bool, List[GuardViolation], Dict[str, Any]]:
+        """
+        Executa todos os guards
+        
+        Args:
+            state_dict: Estado atual do sistema
+            risk_series: Série de risco para IR→IC
+            dataset_id: ID do dataset
+            seed: Seed para reprodutibilidade
+            
+        Returns:
+            (all_passed, all_violations, combined_evidence)
+        """
+        all_violations = []
+        evidence = {
+            "timestamp": time.time(),
+            "guards_executed": [],
+            "overall_result": None
+        }
+        
+        # 1. Σ-Guard
+        sigma_result, sigma_violations, sigma_evidence = self.sigma_guard.check(
+            state_dict, dataset_id, seed
+        )
+        
+        all_violations.extend(sigma_violations)
+        evidence["sigma_guard"] = sigma_evidence
+        evidence["guards_executed"].append("SIGMA_GUARD")
+        
+        # 2. IR→IC Guard
+        if risk_series is None:
+            # Usar histórico do state_dict ou valor atual
+            risk_series = state_dict.get("risk_history", [state_dict.get("rho", 0.5)])
+            
+        iric_result, iric_violations, iric_evidence = self.iric_guard.check_contractive(risk_series)
+        
+        all_violations.extend(iric_violations)
+        evidence["iric_guard"] = iric_evidence
+        evidence["guards_executed"].append("IR_TO_IC")
+        
+        # Resultado combinado (fail-closed)
+        all_passed = (sigma_result == GuardResult.PASS and 
+                     iric_result == GuardResult.PASS)
+        
+        evidence["overall_result"] = "PASS" if all_passed else "FAIL"
+        evidence["sigma_result"] = sigma_result.value
+        evidence["iric_result"] = iric_result.value
+        evidence["total_violations"] = len(all_violations)
+        
+        return all_passed, all_violations, evidence
+        
+    def get_guard_summary(self) -> Dict[str, Any]:
+        """Retorna resumo de configuração dos guards"""
+        return {
+            "sigma_guard": self.sigma_guard.get_config(),
+            "iric_guard": self.iric_guard.get_config(),
+            "orchestrator": {
+                "fail_closed": True,
+                "guards_count": 2
+            }
+        }
+
+
+# Funções de conveniência
+def quick_sigma_guard_check(state_dict: Dict[str, Any],
+                           ece_max: float = 0.01,
+                           rho_bias_max: float = 1.05) -> Tuple[bool, List[str]]:
+    """Verificação rápida do Σ-Guard"""
+    guard = SigmaGuard(ece_max=ece_max, rho_bias_max=rho_bias_max)
+    result, violations, _ = guard.check(state_dict)
+    
+    passed = result == GuardResult.PASS
+    messages = [v.message for v in violations]
+    
+    return passed, messages
+
+
+def quick_iric_check(risk_series: List[float],
+                    rho_max: float = 0.95) -> Tuple[bool, float]:
+    """Verificação rápida do IR→IC"""
+    guard = IRtoICGuard(rho_max=rho_max)
+    result, violations, analysis = guard.check_contractive(risk_series)
+    
+    passed = result == GuardResult.PASS
+    max_ratio = analysis.get("max_ratio", 1.0)
+    
+    return passed, max_ratio
+
+
+def full_guard_check(state_dict: Dict[str, Any],
+                    risk_series: Optional[List[float]] = None) -> Dict[str, Any]:
+    """
+    Verificação completa de todos os guards
+    
     Returns:
-        Tuple of (all_passed, dict of individual results)
+        Dict com resultado detalhado
     """
-    results = {}
-
-    # Run Σ-Guard
-    results["sigma"] = sigma_guard(metrics, policy, strict)
-
-    # Run IR→IC if risk history provided
-    if risk_history is not None:
-        results["ir_ic"] = ir_to_ic_contractive(risk_history, max_rho=policy.rho_risk_max if policy else 1.0)
-
-    # Check if all passed
-    all_passed = all(r.passed for r in results.values())
-
-    return all_passed, results
-
-
-# Helper function for OPA/Rego integration (placeholder)
-def evaluate_rego_policy(policy_path: str, input_data: dict[str, Any]) -> GuardResult:
-    """
-    Evaluate OPA/Rego policy file (placeholder for future integration).
-
-    This would integrate with Open Policy Agent for policy-as-code.
-    """
-    # TODO: Implement actual OPA integration
-    # For now, return a simple pass
-    return GuardResult(
-        passed=True,
-        guard_name="rego_policy",
-        violations=[],
-        details={"policy_path": policy_path, "status": "not_implemented"},
-        timestamp=time.time(),
-        evidence_hash=hashlib.sha256(str(input_data).encode()).hexdigest()[:16],
+    orchestrator = GuardOrchestrator()
+    passed, violations, evidence = orchestrator.check_all_guards(
+        state_dict, risk_series
     )
+    
+    return {
+        "passed": passed,
+        "violations": [v.to_dict() for v in violations],
+        "evidence": evidence,
+        "summary": orchestrator.get_guard_summary()
+    }

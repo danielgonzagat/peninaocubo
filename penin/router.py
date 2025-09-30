@@ -1,5 +1,8 @@
 import asyncio
 import time
+import json
+from datetime import datetime, date, timedelta
+from pathlib import Path
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -8,8 +11,70 @@ from penin.config import settings
 from penin.providers.base import BaseProvider, LLMResponse
 
 
-class CostTracker:
-    """Track costs with daily budget limits"""
+class MultiLLMRouter:
+    def __init__(self, providers: List[BaseProvider], 
+                 daily_budget_usd: float = 100.0,
+                 cost_weight: float = 0.3):
+        self.providers = providers[: settings.PENIN_MAX_PARALLEL_PROVIDERS]
+        self.daily_budget_usd = daily_budget_usd
+        self.cost_weight = cost_weight
+        self.usage_file = Path.home() / ".penin_omega" / "router_usage.json"
+        self.usage_file.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Load today's usage
+        self.daily_usage = self._load_daily_usage()
+
+    def _load_daily_usage(self) -> Dict[str, float]:
+        """Load today's usage from file"""
+        today = date.today().isoformat()
+        
+        if not self.usage_file.exists():
+            return {today: 0.0}
+            
+        try:
+            with open(self.usage_file, 'r') as f:
+                all_usage = json.load(f)
+            return {today: all_usage.get(today, 0.0)}
+        except Exception:
+            return {today: 0.0}
+            
+    def _save_daily_usage(self):
+        """Save usage to file"""
+        try:
+            # Load existing data
+            all_usage = {}
+            if self.usage_file.exists():
+                with open(self.usage_file, 'r') as f:
+                    all_usage = json.load(f)
+                    
+            # Update with current usage
+            all_usage.update(self.daily_usage)
+            
+            # Keep only last 30 days
+            cutoff = (datetime.now().date() - timedelta(days=30)).isoformat()
+            all_usage = {k: v for k, v in all_usage.items() if k >= cutoff}
+            
+            # Save
+            with open(self.usage_file, 'w') as f:
+                json.dump(all_usage, f, indent=2)
+        except Exception as e:
+            print(f"Warning: Could not save usage data: {e}")
+            
+    def _get_today_usage(self) -> float:
+        """Get today's total usage in USD"""
+        today = date.today().isoformat()
+        return self.daily_usage.get(today, 0.0)
+        
+    def _add_usage(self, cost_usd: float):
+        """Add usage for today"""
+        today = date.today().isoformat()
+        self.daily_usage[today] = self.daily_usage.get(today, 0.0) + cost_usd
+        self._save_daily_usage()
+        
+    def _check_budget(self, estimated_cost: float) -> bool:
+        """Check if request fits within daily budget"""
+        current_usage = self._get_today_usage()
+        return (current_usage + estimated_cost) <= self.daily_budget_usd
 
     def __init__(self, daily_budget: float):
         self.daily_budget = daily_budget
@@ -70,48 +135,34 @@ class MultiLLMRouter:
             self._last_reset = today
     
     def _score(self, r: LLMResponse) -> float:
-        """
-        Score response considering quality, latency, and cost.
+        """Score response considering content, latency, and cost"""
+        # Base score for having content
+        base = 1.0 if r.content else 0.0
         
-        P0-4: Multi-factor scoring with budget awareness.
-        Lower cost is better (normalized).
-        """
-        # Quality: presence of content (binary for now)
-        quality = 1.0 if r.content else 0.0
-        
-        # Latency: inverse latency (faster is better)
+        # Latency component (higher is better for lower latency)
         lat = max(0.01, r.latency_s)
         latency_score = 1.0 / lat
-        # Normalize to [0,1] assuming max 10s latency
-        latency_score = min(1.0, latency_score / (1.0 / 0.1))
         
-        # Cost: lower is better
-        # Normalize assuming max $0.10 per request
-        cost_score = max(0.0, 1.0 - (r.cost_usd / 0.10))
+        # Cost component (lower cost is better)
+        # Normalize cost to [0,1] range, assuming max $1 per request
+        cost_normalized = min(1.0, max(0.0, getattr(r, 'cost_usd', 0.0)))
+        cost_score = 1.0 - cost_normalized  # Invert so lower cost = higher score
         
-        # Weighted combination
-        score = (
-            self.quality_weight * quality
-            + self.latency_weight * latency_score
-            + self.cost_weight * cost_score
-        )
+        # Budget penalty - heavily penalize if over budget
+        budget_penalty = 1.0
+        if hasattr(r, 'cost_usd') and r.cost_usd > 0:
+            if not self._check_budget(r.cost_usd):
+                budget_penalty = 0.1  # Severe penalty for budget violation
+                
+        # Combined score
+        content_weight = 0.4
+        latency_weight = 1.0 - self.cost_weight - content_weight
         
+        score = (content_weight * base + 
+                latency_weight * latency_score + 
+                self.cost_weight * cost_score) * budget_penalty
+                
         return score
-    
-    def _check_budget(self, estimated_cost: float = 0.01) -> bool:
-        """
-        Check if we have budget remaining for this request.
-        
-        P0-4: Fail-closed budget enforcement.
-        """
-        self._reset_daily_budget_if_needed()
-        return (self._daily_spend + estimated_cost) <= self.daily_budget_usd
-    
-    def _record_spend(self, response: LLMResponse):
-        """Record spending from response"""
-        self._daily_spend += response.cost_usd
-        self._total_tokens += response.tokens_in + response.tokens_out
-        self._request_count += 1
 
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=0.5))
     async def ask(
@@ -120,17 +171,12 @@ class MultiLLMRouter:
         system: str | None = None,
         tools: list[dict[str, Any]] | None = None,
         temperature: float = 0.7,
+        force_budget_override: bool = False,
     ) -> LLMResponse:
-        """
-        Ask question to multiple providers and return best response.
-        
-        P0-4: Includes budget checking and cost-aware selection.
-        """
-        # P0-4: Check budget before making requests
-        if not self._check_budget():
-            raise RuntimeError(
-                f"Daily budget exceeded: ${self._daily_spend:.4f} / ${self.daily_budget_usd:.2f}"
-            )
+        # Check budget before making requests
+        current_usage = self._get_today_usage()
+        if not force_budget_override and current_usage >= self.daily_budget_usd:
+            raise RuntimeError(f"Daily budget exceeded: ${current_usage:.2f} >= ${self.daily_budget_usd:.2f}")
         
         tasks = [
             p.chat(messages, tools=tools, system=system, temperature=temperature)
@@ -141,31 +187,35 @@ class MultiLLMRouter:
         if not ok:
             errors = [str(r) for r in results if isinstance(r, Exception)]
             raise RuntimeError(f"All providers failed. Errors: {errors}")
+            
+        # Select best response
+        best_response = max(ok, key=self._score)
         
-        # P0-4: Select best response with cost-aware scoring
-        best = max(ok, key=self._score)
+        # Record usage
+        if hasattr(best_response, 'cost_usd') and best_response.cost_usd > 0:
+            self._add_usage(best_response.cost_usd)
+            
+        return best_response
         
-        # P0-4: Record actual spend
-        self._record_spend(best)
+    def get_budget_status(self) -> Dict[str, Any]:
+        """Get current budget status"""
+        current_usage = self._get_today_usage()
+        remaining = max(0.0, self.daily_budget_usd - current_usage)
         
-        # P0-4: Hard-stop if budget exceeded
-        if self._daily_spend > self.daily_budget_usd:
-            raise RuntimeError(
-                f"Budget hard-stop triggered: ${self._daily_spend:.4f} exceeds ${self.daily_budget_usd:.2f}"
-            )
-        
-        return best
-    
-    def get_usage_stats(self) -> Dict[str, Any]:
-        """Get current usage statistics"""
-        self._reset_daily_budget_if_needed()
         return {
-            "daily_spend_usd": self._daily_spend,
             "daily_budget_usd": self.daily_budget_usd,
-            "budget_remaining_usd": self.daily_budget_usd - self._daily_spend,
-            "budget_used_pct": (self._daily_spend / self.daily_budget_usd) * 100,
-            "total_tokens": self._total_tokens,
-            "request_count": self._request_count,
-            "avg_cost_per_request": self._daily_spend / max(1, self._request_count),
-            "last_reset": self._last_reset.isoformat(),
+            "current_usage_usd": current_usage,
+            "remaining_usd": remaining,
+            "usage_percentage": (current_usage / self.daily_budget_usd) * 100,
+            "budget_exceeded": current_usage >= self.daily_budget_usd,
+            "date": date.today().isoformat()
         }
+        
+    def reset_daily_budget(self, new_budget: Optional[float] = None):
+        """Reset daily budget (for new day or manual reset)"""
+        if new_budget is not None:
+            self.daily_budget_usd = new_budget
+            
+        today = date.today().isoformat()
+        self.daily_usage = {today: 0.0}
+        self._save_daily_usage()
