@@ -1,33 +1,43 @@
 """
-Metabolização de APIs - I/O Recorder → Replayer
-================================================
+API Metabolizer - I/O Recording & Replay
+========================================
 
-Grava chamadas de APIs e sugere respostas cacheadas para reduzir dependências.
+Records API calls and responses to enable:
+- Replay of similar requests (reducing dependencies)
+- Learning from I/O patterns
+- Eventually replacing APIs with internal models
+
+This is the first step toward "metabolizing" external dependencies.
 """
 
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
+from collections import Counter
+import re
 
 try:
-    import orjson
-    HAS_ORJSON = True
+    import orjson as json_lib
 except ImportError:
-    import json
-    HAS_ORJSON = False
+    import json as json_lib
 
 
 LOG = Path.home() / ".penin_omega" / "knowledge" / "api_io.jsonl"
 LOG.parent.mkdir(parents=True, exist_ok=True)
 
 
-def record_call(provider: str, endpoint: str, req: Dict[str, Any], resp: Dict[str, Any]) -> None:
+def record_call(
+    provider: str,
+    endpoint: str,
+    req: Dict[str, Any],
+    resp: Dict[str, Any]
+) -> None:
     """
-    Grava chamada de API.
+    Record an API call.
     
     Args:
-        provider: Nome do provider (e.g., "openai", "anthropic")
-        endpoint: Endpoint chamado
+        provider: Provider name (e.g., "openai", "anthropic")
+        endpoint: Endpoint name (e.g., "chat/completions")
         req: Request payload
         resp: Response payload
     """
@@ -39,88 +49,200 @@ def record_call(provider: str, endpoint: str, req: Dict[str, Any], resp: Dict[st
         "resp": resp
     }
     
-    if HAS_ORJSON:
-        line = orjson.dumps(item) + b"\n"
+    if hasattr(json_lib, 'dumps'):
+        data = json_lib.dumps(item) + b"\n" if 'orjson' in str(type(json_lib)) else (json_lib.dumps(item) + "\n").encode()
     else:
-        line = (json.dumps(item) + "\n").encode()
+        import json
+        data = (json.dumps(item) + "\n").encode()
     
-    LOG.open("ab").write(line)
+    LOG.open("ab").write(data)
 
 
-def suggest_replay(prompt: str) -> Optional[Dict[str, Any]]:
+def _tokenize(text: str) -> List[str]:
+    """Simple tokenization for similarity"""
+    return [t for t in re.findall(r"[A-Za-z0-9_]+", text.lower()) if t]
+
+
+def _similarity(text1: str, text2: str) -> float:
+    """Compute similarity between two texts"""
+    tokens1 = Counter(_tokenize(text1))
+    tokens2 = Counter(_tokenize(text2))
+    
+    all_tokens = set(tokens1.keys()) | set(tokens2.keys())
+    
+    if not all_tokens:
+        return 0.0
+    
+    intersection = sum(min(tokens1[t], tokens2[t]) for t in all_tokens)
+    union = sum(max(tokens1[t], tokens2[t]) for t in all_tokens)
+    
+    return intersection / max(1, union)
+
+
+def suggest_replay(
+    provider: str,
+    prompt: str,
+    similarity_threshold: float = 0.7
+) -> Optional[Dict[str, Any]]:
     """
-    Procura resposta similar para replay.
+    Suggest a replay from past calls.
     
     Args:
-        prompt: Prompt da query atual
+        provider: Provider name
+        prompt: Current prompt
+        similarity_threshold: Minimum similarity to consider
         
     Returns:
-        Response dict ou None se não encontrar similar
+        Best matching response or None
     """
     if not LOG.exists():
         return None
     
-    best = None
-    best_diff = 10**9
+    best_match = None
+    best_score = 0.0
     
-    for line in LOG.open("rb"):
-        if HAS_ORJSON:
-            it = orjson.loads(line)
-        else:
-            it = json.loads(line.decode())
-        
-        # Verificar se tem prompt similar
-        req_prompt = it.get("req", {})
-        if isinstance(req_prompt, dict):
-            req_prompt = req_prompt.get("prompt", "") or req_prompt.get("messages", "")
-        if isinstance(req_prompt, list):
-            req_prompt = str(req_prompt)
-        
-        if isinstance(req_prompt, str):
-            diff = abs(len(req_prompt) - len(prompt))
-            if diff < best_diff:
-                best_diff = diff
-                best = it
+    with LOG.open("rb") as f:
+        for line in f:
+            if hasattr(json_lib, 'loads'):
+                item = json_lib.loads(line)
+            else:
+                import json
+                item = json.loads(line.decode())
+            
+            if item["p"] != provider:
+                continue
+            
+            # Extract prompt from request
+            req_prompt = str(item["req"].get("prompt", item["req"].get("messages", "")))
+            
+            # Compute similarity
+            score = _similarity(prompt, req_prompt)
+            
+            if score > best_score:
+                best_score = score
+                best_match = item
     
-    if best and best_diff < 100:  # Similar enough
-        return best.get("resp", {"note": "cached-response"})
+    if best_match and best_score >= similarity_threshold:
+        return {
+            "response": best_match["resp"],
+            "similarity": best_score,
+            "timestamp": best_match["t"]
+        }
     
     return None
 
 
-def get_provider_stats(provider: str) -> Dict[str, Any]:
-    """
-    Estatísticas de uso de um provider.
-    
-    Args:
-        provider: Nome do provider
-        
-    Returns:
-        Dict com estatísticas
-    """
+def get_stats() -> Dict[str, Any]:
+    """Get metabolizer statistics"""
     if not LOG.exists():
-        return {"count": 0, "first": None, "last": None}
+        return {"total_calls": 0}
     
-    count = 0
-    first_ts = None
-    last_ts = None
+    providers = Counter()
+    endpoints = Counter()
+    total = 0
     
-    for line in LOG.open("rb"):
-        if HAS_ORJSON:
-            it = orjson.loads(line)
-        else:
-            it = json.loads(line.decode())
-        
-        if it.get("p") == provider:
-            count += 1
-            ts = it.get("t", 0)
-            if first_ts is None or ts < first_ts:
-                first_ts = ts
-            if last_ts is None or ts > last_ts:
-                last_ts = ts
+    with LOG.open("rb") as f:
+        for line in f:
+            if hasattr(json_lib, 'loads'):
+                item = json_lib.loads(line)
+            else:
+                import json
+                item = json.loads(line.decode())
+            
+            providers[item["p"]] += 1
+            endpoints[item["e"]] += 1
+            total += 1
     
     return {
-        "count": count,
-        "first": first_ts,
-        "last": last_ts
+        "total_calls": total,
+        "providers": dict(providers),
+        "endpoints": dict(endpoints)
     }
+
+
+class APIMetabolizer:
+    """
+    Manages API call recording and replay.
+    
+    Integration point for the router to gradually reduce
+    external dependencies.
+    """
+    
+    def __init__(self, replay_enabled: bool = True):
+        self.replay_enabled = replay_enabled
+        self.hits = 0
+        self.misses = 0
+        
+        print(f"🧬 API Metabolizer initialized (replay={'ON' if replay_enabled else 'OFF'})")
+    
+    def record(
+        self,
+        provider: str,
+        endpoint: str,
+        req: Dict[str, Any],
+        resp: Dict[str, Any]
+    ) -> None:
+        """Record an API call"""
+        record_call(provider, endpoint, req, resp)
+    
+    def try_replay(
+        self,
+        provider: str,
+        prompt: str,
+        similarity_threshold: float = 0.7
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Try to replay from cache.
+        
+        Returns:
+            Cached response or None
+        """
+        if not self.replay_enabled:
+            return None
+        
+        result = suggest_replay(provider, prompt, similarity_threshold)
+        
+        if result:
+            self.hits += 1
+            print(f"🎯 Cache HIT (similarity={result['similarity']:.2f})")
+        else:
+            self.misses += 1
+        
+        return result
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get statistics"""
+        global_stats = get_stats()
+        
+        hit_rate = self.hits / max(1, self.hits + self.misses)
+        
+        return {
+            **global_stats,
+            "cache_hits": self.hits,
+            "cache_misses": self.misses,
+            "hit_rate": hit_rate
+        }
+
+
+# Quick test
+def quick_metabolizer_test():
+    """Quick test of metabolizer"""
+    meta = APIMetabolizer(replay_enabled=True)
+    
+    # Record some calls
+    for i in range(3):
+        meta.record(
+            "openai",
+            "chat/completions",
+            {"prompt": f"Test prompt {i}"},
+            {"text": f"Response {i}", "cost": 0.01}
+        )
+    
+    # Try replay
+    result = meta.try_replay("openai", "Test prompt 0")
+    print(f"\n🎯 Replay result: {result}")
+    
+    stats = meta.get_stats()
+    print(f"\n📊 Stats: {stats}")
+    
+    return meta

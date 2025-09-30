@@ -1,99 +1,130 @@
 """
-Imunidade Digital - Detecção de Anomalias
-==========================================
+Digital Immunity - Anomaly Detection & Fail-Closed
+=================================================
 
-Detecção simples de anomalias + fail-closed.
+Detects anomalous metrics and triggers fail-closed response.
+
+Simple heuristics:
+- NaN/Inf detection
+- Out-of-range values
+- Sudden spikes
+
+When anomaly detected → Σ-Guard blocks and initiates rollback.
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, List
+import math
 
 
 def anomaly_score(metrics: Dict[str, Any]) -> float:
     """
-    Calcula score de anomalia nas métricas.
+    Compute anomaly score for metrics.
     
     Args:
-        metrics: Dicionário com métricas do sistema
+        metrics: Dict of metric values
         
     Returns:
-        Score de anomalia (0 = normal, >1 = anômalo)
+        Anomaly score (0 = clean, higher = more anomalous)
     """
     score = 0.0
     
-    for k, v in metrics.items():
+    for key, value in metrics.items():
         try:
-            val = float(v)
+            v = float(value)
             
-            # Valores fora de range razoável
-            if not (0.0 <= val <= 1e6):
-                score += 1.0
+            # Check for NaN/Inf
+            if math.isnan(v) or math.isinf(v):
+                score += 10.0
+                continue
             
-            # NaN ou Infinity
-            if val != val or abs(val) == float('inf'):
-                score += 2.0
+            # Check for negative (most metrics should be positive)
+            if v < 0.0:
+                score += 5.0
             
-            # Valores negativos onde não deveriam estar
-            if val < 0 and k in ["accuracy", "phi", "sr", "G"]:
-                score += 1.0
+            # Check for absurd values
+            if abs(v) > 1e6:
+                score += 3.0
             
-        except (TypeError, ValueError):
-            # Valor não numérico onde deveria ser
-            if k in ["accuracy", "phi", "sr", "G", "cost"]:
-                score += 1.0
+        except (ValueError, TypeError):
+            # Non-numeric value
+            score += 1.0
     
     return score
 
 
 def guard(metrics: Dict[str, Any], trigger: float = 1.0) -> bool:
     """
-    Gate de imunidade: True = OK, False = anomalia detectada.
+    Guard function: returns True if OK, False if anomaly detected.
     
     Args:
-        metrics: Métricas do sistema
-        trigger: Limiar para trigger (score >= trigger → bloqueio)
+        metrics: Metrics to check
+        trigger: Anomaly threshold (default 1.0)
         
     Returns:
-        True se sistema está normal (anomaly_score < trigger)
+        True if metrics are OK, False if anomaly detected
     """
-    return anomaly_score(metrics) < trigger
-
-
-def diagnose(metrics: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Diagnóstico detalhado de anomalias.
-    
-    Args:
-        metrics: Métricas do sistema
-        
-    Returns:
-        Dict com diagnóstico
-    """
-    issues = []
-    
-    for k, v in metrics.items():
-        try:
-            val = float(v)
-            
-            if not (0.0 <= val <= 1e6):
-                issues.append(f"{k}={val} fora de range [0, 1e6]")
-            
-            if val != val:
-                issues.append(f"{k} é NaN")
-            
-            if abs(val) == float('inf'):
-                issues.append(f"{k} é Infinity")
-            
-            if val < 0 and k in ["accuracy", "phi", "sr", "G"]:
-                issues.append(f"{k}={val} negativo (esperado >= 0)")
-                
-        except (TypeError, ValueError):
-            issues.append(f"{k}={v} não é numérico")
-    
     score = anomaly_score(metrics)
+    return score < trigger
+
+
+class ImmunitySystem:
+    """
+    Digital immunity system.
     
-    return {
-        "anomaly_score": score,
-        "issues": issues,
-        "healthy": score < 1.0,
-        "num_issues": len(issues)
-    }
+    Monitors metrics for anomalies and triggers fail-closed response.
+    """
+    
+    def __init__(self, trigger: float = 1.0):
+        self.trigger = trigger
+        self.alerts: List[Dict[str, Any]] = []
+        print(f"🛡️  Immunity System initialized (trigger={trigger})")
+    
+    def check(self, metrics: Dict[str, Any]) -> bool:
+        """
+        Check metrics for anomalies.
+        
+        Returns:
+            True if OK, False if anomaly
+        """
+        score = anomaly_score(metrics)
+        
+        if score >= self.trigger:
+            alert = {
+                "score": score,
+                "metrics": metrics,
+                "triggered": True
+            }
+            self.alerts.append(alert)
+            print(f"⚠️  ANOMALY DETECTED: score={score:.2f}")
+            return False
+        
+        return True
+    
+    def get_alerts(self) -> List[Dict[str, Any]]:
+        """Get all alerts"""
+        return self.alerts
+    
+    def reset_alerts(self) -> None:
+        """Clear alert history"""
+        self.alerts = []
+
+
+# Quick test
+def quick_immunity_test():
+    """Quick test of immunity system"""
+    system = ImmunitySystem(trigger=1.0)
+    
+    # Test clean metrics
+    clean = {"phi": 0.7, "sr": 0.85, "G": 0.9}
+    assert system.check(clean), "Clean metrics should pass"
+    print("✅ Clean metrics passed")
+    
+    # Test anomalous metrics
+    anomalous = {"phi": float('nan'), "sr": -1.0, "G": 1e10}
+    assert not system.check(anomalous), "Anomalous metrics should fail"
+    print("✅ Anomalous metrics blocked")
+    
+    alerts = system.get_alerts()
+    print(f"\n📊 Total alerts: {len(alerts)}")
+    
+    return system
