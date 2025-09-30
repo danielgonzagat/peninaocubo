@@ -29,10 +29,7 @@ def test_ethics_metrics():
     print("\n[TEST] Ethics Metrics Computation")
     
     try:
-        from penin.omega.ethics_metrics import (
-            compute_ece, compute_bias_ratio, compute_risk_contractivity,
-            compute_fairness_metrics, validate_consent, compute_ecological_impact
-        )
+        from penin.omega.ethics_metrics import EthicsCalculator
         
         # Test ECE computation
         predictions = [
@@ -43,7 +40,8 @@ def test_ethics_metrics():
             (0.2, False),  # Low confidence, wrong
         ]
         
-        ece, ece_details = compute_ece(predictions, n_bins=5)
+        calc = EthicsCalculator()
+        ece, ece_details = calc.calculate_ece(predictions, labels, n_bins=5)
         print(f"  ✓ ECE computed: {ece:.4f}")
         assert 0 <= ece <= 1, "ECE should be in [0,1]"
         
@@ -54,13 +52,19 @@ def test_ethics_metrics():
             "group_c": [0.75, 0.8, 0.85]
         }
         
-        rho_bias, bias_details = compute_bias_ratio(group_outcomes)
+        calc = EthicsCalculator()
+        rho_bias, bias_details = calc.calculate_bias_ratio(
+            predictions,
+            labels,
+            [g for g, _ in groups]
+        )
         print(f"  ✓ Bias ratio computed: {rho_bias:.4f}")
         assert rho_bias >= 1.0, "Bias ratio should be >= 1.0"
         
         # Test risk contractivity
         risk_history = [1.0, 0.95, 0.9, 0.85, 0.8, 0.78]
-        rho_risk, risk_details = compute_risk_contractivity(risk_history)
+        calc = EthicsCalculator()
+        rho_risk, risk_details = calc.calculate_risk_contraction(risk_history)
         print(f"  ✓ Risk contractivity computed: ρ={rho_risk:.4f}")
         assert rho_risk < 1.0, "Risk should be contractive (ρ < 1)"
         
