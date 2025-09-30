@@ -4,6 +4,7 @@ import time
 import google.generativeai as genai
 
 from penin.config import settings
+from penin.providers.pricing import estimate_cost_usd, get_first_available
 
 from .base import BaseProvider, LLMResponse, Message, Tool
 
@@ -45,14 +46,26 @@ class GeminiProvider(BaseProvider):
         resp = await asyncio.to_thread(_generate)
         text = getattr(resp, "text", "") or ""
         usage = getattr(resp, "usage_metadata", None)
-        tokens_in = getattr(usage, "prompt_token_count", 0) if usage else 0
-        tokens_out = getattr(usage, "candidates_token_count", 0) if usage else 0
+        tokens_in = get_first_available(
+            usage,
+            "prompt_token_count",
+            "prompt_tokens",
+            "input_tokens",
+        )
+        tokens_out = get_first_available(
+            usage,
+            "candidates_token_count",
+            "completion_tokens",
+            "output_tokens",
+        )
+        cost_usd = estimate_cost_usd(self.name, self.model, tokens_in, tokens_out)
         end = time.time()
         return LLMResponse(
             content=text,
             model=self.model,
             tokens_in=tokens_in,
             tokens_out=tokens_out,
+            cost_usd=cost_usd,
             provider=self.name,
             latency_s=end - start,
         )

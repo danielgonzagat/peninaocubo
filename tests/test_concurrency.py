@@ -9,9 +9,16 @@ import pytest
 def test_worm_concurrent_access():
     """Test WORM ledger concurrent access with busy_timeout"""
     import sys
-    sys.path.insert(0, '/workspace')
+    sys.path.insert(0, '/workspace/peninaocubo')
     
-    from penin.omega.ledger import WORMLedger
+    from penin.omega.ledger import (
+        WORMLedger,
+        RunRecord,
+        RunMetrics,
+        GuardResults,
+        DecisionInfo,
+    )
+    import uuid
     
     # Create temporary database
     db_path = tempfile.mktemp() + ".db"
@@ -20,12 +27,31 @@ def test_worm_concurrent_access():
         """Worker function that writes to WORM"""
         try:
             ledger = WORMLedger(db_path)
-            record = {
-                "worker_id": worker_id,
-                "timestamp": time.time(),
-                "data": f"test_data_{worker_id}"
-            }
-            ledger.append_record("test_event", record)
+            run_record = RunRecord(
+                run_id=str(uuid.uuid4()),
+                timestamp=time.time(),
+                cycle=worker_id,
+                config_hash="test-config",
+                provider_id="test-provider",
+                model_name="mock-model",
+                candidate_cfg_hash="candidate-hash",
+                metrics=RunMetrics(),
+                gates=GuardResults(
+                    sigma_guard_ok=True,
+                    ir_ic_ok=True,
+                    sr_gate_ok=True,
+                    caos_gate_ok=True,
+                ),
+                decision=DecisionInfo(
+                    verdict="promote",
+                    reason="concurrency",
+                    confidence=1.0,
+                    delta_linf=0.0,
+                    delta_score=0.0,
+                    beta_min_met=True,
+                ),
+            )
+            ledger.append_record(run_record)
             results[worker_id] = "success"
         except Exception as e:
             results[worker_id] = f"error: {str(e)}"
@@ -53,7 +79,7 @@ def test_worm_concurrent_access():
 def test_router_budget_concurrency():
     """Test router budget tracking under concurrent access"""
     import sys
-    sys.path.insert(0, '/workspace')
+    sys.path.insert(0, '/workspace/peninaocubo')
     
     from penin.router import MultiLLMRouter
     
@@ -68,6 +94,7 @@ def test_router_budget_concurrency():
         """Make a request and track budget"""
         try:
             response = await router.ask([{"role": "user", "content": f"test {request_id}"}])
+            assert response.cost_usd > 0
             return f"success_{request_id}"
         except Exception as e:
             return f"error_{request_id}: {str(e)}"
@@ -91,7 +118,7 @@ def test_router_budget_concurrency():
 def test_cache_concurrency():
     """Test cache L2 concurrent access"""
     import sys
-    sys.path.insert(0, '/workspace')
+    sys.path.insert(0, '/workspace/peninaocubo')
     
     # Mock the cache class
     class MockCache:
@@ -138,7 +165,7 @@ def test_cache_concurrency():
 def test_network_failure_handling():
     """Test handling of network failures and timeouts"""
     import sys
-    sys.path.insert(0, '/workspace')
+    sys.path.insert(0, '/workspace/peninaocubo')
     
     from penin.router import MultiLLMRouter
     
@@ -163,6 +190,7 @@ def test_network_failure_handling():
         for i in range(5):
             try:
                 response = await router.ask([{"role": "user", "content": f"test {i}"}])
+                assert response.cost_usd > 0
                 results.append("success")
             except Exception as e:
                 results.append(f"failed: {str(e)}")
@@ -179,24 +207,24 @@ def test_network_failure_handling():
 def test_ethics_gate_concurrency():
     """Test ethics gate under concurrent evaluation"""
     import sys
-    sys.path.insert(0, '/workspace')
+    sys.path.insert(0, '/workspace/peninaocubo')
     
-    from penin.omega.ethics_metrics import EthicsMetrics
+    from penin.omega.ethics_metrics import EthicsCalculator
     
     def ethics_worker(worker_id):
         """Worker that evaluates ethics metrics"""
         try:
-            metrics = EthicsMetrics()
-            
+            calculator = EthicsCalculator()
+
             # Mock evaluation data
             predictions = [0.1, 0.2, 0.3, 0.4, 0.5]
             targets = [0.0, 0.0, 1.0, 1.0, 1.0]
             groups = [0, 0, 1, 1, 1]
-            
-            ece = metrics.compute_ece(predictions, targets)
-            bias_ratio = metrics.compute_bias_ratio(predictions, targets, groups)
-            fairness = metrics.compute_fairness_score(predictions, targets, groups)
-            
+
+            ece, _ = calculator.calculate_ece(predictions, targets)
+            bias_ratio, _ = calculator.calculate_bias_ratio(predictions, targets, groups)
+            fairness, _ = calculator.calculate_fairness(predictions, targets, groups)
+
             return {
                 "worker_id": worker_id,
                 "ece": ece,
