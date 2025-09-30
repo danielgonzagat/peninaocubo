@@ -32,7 +32,6 @@ try:
 except ImportError:
     # Fallback para desenvolvimento
     import sys
-
     # Package imports now work without sys.path hacks
     try:
         from penin.omega.runners import EvolutionRunner, CycleConfig, BatchRunner
@@ -55,10 +54,14 @@ class PeninCLI:
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
         # Componentes principais
-        self.ledger = WORMLedger(db_path=self.data_dir / "cli_ledger.db", runs_dir=self.data_dir / "cli_runs")
+        self.ledger = WORMLedger(
+            db_path=self.data_dir / "cli_ledger.db",
+            runs_dir=self.data_dir / "cli_runs"
+        )
 
         self.runner = EvolutionRunner(
-            ledger_path=self.data_dir / "evolution_ledger.db", runs_dir=self.data_dir / "evolution_runs"
+            ledger_path=self.data_dir / "evolution_ledger.db",
+            runs_dir=self.data_dir / "evolution_runs"
         )
 
     def cmd_evolve(self, args) -> int:
@@ -73,7 +76,7 @@ class PeninCLI:
             provider_id=args.provider,
             dry_run=args.dry_run,
             enable_tuning=not args.no_tuning,
-            enable_canary=not args.no_canary,
+            enable_canary=not args.no_canary
         )
 
         print("Configuração:")
@@ -104,9 +107,9 @@ class PeninCLI:
                 print("\n✅ Batch completo:")
                 print(f"   Ciclos: {result['total_cycles']}")
                 print(f"   Sucessos: {result['successful_cycles']}")
-                print(f"   Taxa: {result['success_rate'] * 100:.1f}%")
+                print(f"   Taxa: {result['success_rate']*100:.1f}%")
 
-                return 0 if result["successful_cycles"] > 0 else 1
+                return 0 if result['successful_cycles'] > 0 else 1
             else:
                 # Ciclo único
                 result = self.runner.evolve_one_cycle(config, mock_model)
@@ -143,7 +146,7 @@ class PeninCLI:
                 mock_model,
                 config={"model": args.model, "suite": args.suite},
                 provider_id=args.model,
-                model_name=args.model,
+                model_name=args.model
             )
 
             print("✅ Avaliação completa:")
@@ -159,7 +162,7 @@ class PeninCLI:
             # Salvar resultado
             if args.save:
                 output_file = self.data_dir / f"evaluation_{int(time.time())}.json"
-                with open(output_file, "w") as f:
+                with open(output_file, 'w') as f:
                     json.dump(result.to_dict(), f, indent=2)
                 print(f"   💾 Salvo em: {output_file}")
 
@@ -259,7 +262,8 @@ class PeninCLI:
             if champion_info.get("run_id"):
                 print(f"   Champion: {champion_info['run_id'][:8]}...")
                 if champion_info.get("timestamp"):
-                    champion_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(champion_info["timestamp"]))
+                    champion_time = time.strftime("%Y-%m-%d %H:%M:%S",
+                                                 time.localtime(champion_info["timestamp"]))
                     print(f"   Desde: {champion_time}")
             else:
                 print("   Champion: Nenhum")
@@ -313,7 +317,7 @@ class PeninCLI:
                     enable_metrics=True,
                     metrics_port=args.port,
                     metrics_auth_token=args.auth_token,
-                    enable_json_logs=True,
+                    enable_json_logs=True
                 )
 
                 obs = ObservabilityManager(obs_config)
@@ -361,48 +365,61 @@ Exemplos:
   penin rollback --to LAST_GOOD
   penin dashboard --serve --port 8000
   penin status --verbose
-        """,
+        """
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Comandos disponíveis")
 
     # Comando: evolve
     evolve_parser = subparsers.add_parser("evolve", help="Executar ciclo de evolução")
-    evolve_parser.add_argument(
-        "--n", "--n-challengers", dest="n_challengers", type=int, default=6, help="Número de challengers"
-    )
-    evolve_parser.add_argument("--budget", type=float, default=1.0, help="Budget em USD")
-    evolve_parser.add_argument("--provider", default="mock", help="ID do provider")
-    evolve_parser.add_argument("--dry-run", action="store_true", help="Dry run (só mutação)")
-    evolve_parser.add_argument("--no-tuning", action="store_true", help="Desabilitar auto-tuning")
-    evolve_parser.add_argument("--no-canary", action="store_true", help="Desabilitar testes canário")
-    evolve_parser.add_argument("--batch", type=int, help="Executar batch de N ciclos")
+    evolve_parser.add_argument("--n", "--n-challengers", dest="n_challengers",
+                              type=int, default=6, help="Número de challengers")
+    evolve_parser.add_argument("--budget", type=float, default=1.0,
+                              help="Budget em USD")
+    evolve_parser.add_argument("--provider", default="mock",
+                              help="ID do provider")
+    evolve_parser.add_argument("--dry-run", action="store_true",
+                              help="Dry run (só mutação)")
+    evolve_parser.add_argument("--no-tuning", action="store_true",
+                              help="Desabilitar auto-tuning")
+    evolve_parser.add_argument("--no-canary", action="store_true",
+                              help="Desabilitar testes canário")
+    evolve_parser.add_argument("--batch", type=int,
+                              help="Executar batch de N ciclos")
 
     # Comando: evaluate
     eval_parser = subparsers.add_parser("evaluate", help="Avaliar modelo")
-    eval_parser.add_argument("--model", required=True, help="Modelo para avaliar")
-    eval_parser.add_argument("--suite", default="basic", choices=["basic", "full", "custom"], help="Suíte de avaliação")
-    eval_parser.add_argument("--save", action="store_true", help="Salvar resultado em arquivo")
+    eval_parser.add_argument("--model", required=True,
+                            help="Modelo para avaliar")
+    eval_parser.add_argument("--suite", default="basic",
+                            choices=["basic", "full", "custom"],
+                            help="Suíte de avaliação")
+    eval_parser.add_argument("--save", action="store_true",
+                            help="Salvar resultado em arquivo")
 
     # Comando: promote
     promote_parser = subparsers.add_parser("promote", help="Promover run para champion")
-    promote_parser.add_argument("--run", dest="run_id", required=True, help="ID do run para promover")
+    promote_parser.add_argument("--run", dest="run_id", required=True,
+                               help="ID do run para promover")
 
     # Comando: rollback
     rollback_parser = subparsers.add_parser("rollback", help="Rollback champion")
-    rollback_parser.add_argument(
-        "--to", dest="target", default="LAST_GOOD", help="Target do rollback (run_id ou LAST_GOOD)"
-    )
+    rollback_parser.add_argument("--to", dest="target", default="LAST_GOOD",
+                                help="Target do rollback (run_id ou LAST_GOOD)")
 
     # Comando: status
     status_parser = subparsers.add_parser("status", help="Status do sistema")
-    status_parser.add_argument("--verbose", "-v", action="store_true", help="Output verboso")
+    status_parser.add_argument("--verbose", "-v", action="store_true",
+                              help="Output verboso")
 
     # Comando: dashboard
     dashboard_parser = subparsers.add_parser("dashboard", help="Dashboard de observabilidade")
-    dashboard_parser.add_argument("--serve", action="store_true", help="Iniciar servidor")
-    dashboard_parser.add_argument("--port", type=int, default=8000, help="Porta do servidor")
-    dashboard_parser.add_argument("--auth-token", help="Token de autenticação")
+    dashboard_parser.add_argument("--serve", action="store_true",
+                                 help="Iniciar servidor")
+    dashboard_parser.add_argument("--port", type=int, default=8000,
+                                 help="Porta do servidor")
+    dashboard_parser.add_argument("--auth-token",
+                                 help="Token de autenticação")
 
     return parser
 
