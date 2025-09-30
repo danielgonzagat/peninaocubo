@@ -768,8 +768,15 @@ class WORMLedger:
             cursor.execute("PRAGMA synchronous=NORMAL")
             cursor.execute("PRAGMA busy_timeout=3000")
         except sqlite3.Error as e:
-            # Log the specific database error but continue with default settings
-            print(f"Warning: Could not configure SQLite optimizations: {e}")
+            # Log the specific SQLite error but continue with default settings
+            import logging
+            logging.warning(f"Failed to configure SQLite optimizations: {e}")
+        except Exception as e:
+            # Log unexpected errors
+            import logging
+            logging.error(f"Unexpected error configuring SQLite: {e}")
+            raise
+        except Exception:
             pass
         cursor.execute(
             """
