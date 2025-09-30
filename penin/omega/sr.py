@@ -582,3 +582,269 @@ def validate_sr_non_compensatory(awareness: float, ethics: float,
     components = SRComponents(awareness, ethics, autocorrection, metacognition)
     
     return engine.analyze_non_compensatory(components)
+
+
+def compute_sr_omega(awareness: float, ethics: float, autocorrection: float, metacognition: float,
+                    method: str = 'harmonic', config: 'SRConfig' = None) -> Tuple[float, Dict[str, Any]]:
+    """
+    Compute SR-Ω∞ score (convenience function)
+    
+    Args:
+        awareness: Awareness component (0-1)
+        ethics: Ethics component (0-1)
+        autocorrection: Autocorrection component (0-1)
+        metacognition: Metacognition component (0-1)
+        method: Aggregation method ('harmonic', 'min_soft', 'geometric')
+        
+    Returns:
+        SR-Ω∞ score (0-1)
+    """
+    # Handle config parameter
+    if config is not None:
+        method = config.method
+    
+    if method == 'harmonic':
+        method_enum = SRAggregationMethod.HARMONIC
+    elif method == 'min_soft':
+        method_enum = SRAggregationMethod.MIN_SOFT
+    elif method == 'geometric':
+        method_enum = SRAggregationMethod.GEOMETRIC
+    else:
+        method_enum = SRAggregationMethod.HARMONIC
+    
+    engine = SROmegaEngine(method=method_enum)
+    components = SRComponents(awareness, ethics, autocorrection, metacognition)
+    sr_score, details = engine.compute_sr(components)
+    
+    return sr_score, details
+
+
+def harmonic_mean(values: List[float]) -> float:
+    """Compute harmonic mean of values"""
+    if not values:
+        return 0.0
+    
+    # Avoid division by zero
+    safe_values = [max(1e-9, v) for v in values]
+    return len(safe_values) / sum(1.0 / v for v in safe_values)
+
+
+def geometric_mean(values: List[float]) -> float:
+    """Compute geometric mean of values"""
+    if not values:
+        return 0.0
+    
+    # Avoid log(0)
+    safe_values = [max(1e-9, v) for v in values]
+    
+    # Geometric mean: nth root of product
+    log_sum = sum(math.log(v) for v in safe_values)
+    return math.exp(log_sum / len(safe_values))
+
+
+def min_soft_pnorm(values: List[float], p: float = -10.0) -> float:
+    """Compute min-soft p-norm approximation"""
+    if not values:
+        return 0.0
+    
+    # Avoid division by zero
+    safe_values = [max(1e-9, v) for v in values]
+    
+    if p == 0:
+        # Geometric mean as limit
+        log_sum = sum(math.log(v) for v in safe_values)
+        return math.exp(log_sum / len(safe_values))
+    else:
+        # p-norm: (Σ x_i^p)^(1/p)
+        powered_sum = sum(v ** p for v in safe_values)
+        return powered_sum ** (1.0 / p)
+
+
+def compute_awareness_score(state_dict: Dict[str, Any], *args) -> float:
+    """Compute awareness score from system state"""
+    # Handle different input types
+    if isinstance(state_dict, (int, float)):
+        # If it's a number, use it directly as the base score
+        return max(0.0, min(1.0, float(state_dict)))
+    elif isinstance(state_dict, list):
+        # If it's a list, use the first element as the base score
+        base_score = state_dict[0] if state_dict else 0.5
+        return max(0.0, min(1.0, base_score))
+    
+    # Extract relevant metrics
+    confidence = state_dict.get("confidence", 0.5)
+    uncertainty = state_dict.get("uncertainty", 0.5)
+    calibration = state_dict.get("calibration", 0.5)
+    
+    # Awareness is high when confidence is well-calibrated and uncertainty is acknowledged
+    # Formula: confidence * calibration * (1 - uncertainty)
+    awareness = confidence * calibration * (1.0 - uncertainty)
+    
+    return max(0.0, min(1.0, awareness))
+
+
+def compute_autocorrection_score(state_dict: Dict[str, Any], *args) -> float:
+    """Compute autocorrection score from system state"""
+    # Handle different input types
+    if isinstance(state_dict, (int, float)):
+        # If it's a number, use it directly as the base score
+        return max(0.0, min(1.0, float(state_dict)))
+    elif isinstance(state_dict, list):
+        # If it's a list, use the first element as the base score
+        base_score = state_dict[0] if state_dict else 0.5
+        return max(0.0, min(1.0, base_score))
+    
+    # Extract relevant metrics
+    error_rate = state_dict.get("error_rate", 0.5)
+    correction_attempts = state_dict.get("correction_attempts", 0.5)
+    success_rate = state_dict.get("success_rate", 0.5)
+    
+    # Autocorrection is high when error rate is low and correction success is high
+    # Formula: (1 - error_rate) * correction_attempts * success_rate
+    autocorrection = (1.0 - error_rate) * correction_attempts * success_rate
+    
+    return max(0.0, min(1.0, autocorrection))
+
+
+def compute_metacognition_score(state_dict: Dict[str, Any], *args) -> float:
+    """Compute metacognition score from system state"""
+    # Handle different input types
+    if isinstance(state_dict, (int, float)):
+        # If it's a number, use it directly as the base score
+        return max(0.0, min(1.0, float(state_dict)))
+    elif isinstance(state_dict, list):
+        # If it's a list, use the first element as the base score
+        base_score = state_dict[0] if state_dict else 0.5
+        return max(0.0, min(1.0, base_score))
+    
+    # Extract relevant metrics
+    reflection_depth = state_dict.get("reflection_depth", 0.5)
+    self_awareness = state_dict.get("self_awareness", 0.5)
+    planning_quality = state_dict.get("planning_quality", 0.5)
+    
+    # Metacognition is high when all components are strong
+    # Formula: geometric mean of components
+    components = [reflection_depth, self_awareness, planning_quality]
+    metacognition = geometric_mean(components)
+    
+    return max(0.0, min(1.0, metacognition))
+
+
+class SRConfig:
+    """SR configuration class"""
+    
+    def __init__(self, weights: Optional[Dict[str, float]] = None,
+                 method: str = 'harmonic', p_norm: float = -10.0,
+                 aggregation: str = None):
+        if weights is None:
+            weights = {
+                "awareness": 0.25,
+                "ethics": 0.25,
+                "autocorrection": 0.25,
+                "metacognition": 0.25
+            }
+        
+        self.weights = weights
+        self.method = method
+        if aggregation is not None:
+            self.method = aggregation
+        self.p_norm = p_norm
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "weights": self.weights,
+            "method": self.method,
+            "p_norm": self.p_norm
+        }
+    
+    def update(self, **kwargs):
+        """Update configuration parameters"""
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+
+
+class SRTracker:
+    """SR tracker for monitoring scores over time"""
+    
+    def __init__(self, window_size: int = 50):
+        self.window_size = window_size
+        self.sr_history = []
+        self.components_history = []
+    
+    def add_measurement(self, sr_score: float, components: Dict[str, float]):
+        """Add an SR measurement"""
+        self.sr_history.append(sr_score)
+        self.components_history.append(components.copy())
+        
+        if len(self.sr_history) > self.window_size:
+            self.sr_history = self.sr_history[-self.window_size:]
+            self.components_history = self.components_history[-self.window_size:]
+    
+    def update(self, awareness: float, ethics: float, 
+               autocorrection: float, metacognition: float) -> Tuple[float, float]:
+        """Update tracker with new SR components and return SR score and EMA"""
+        sr_score, details = compute_sr_omega(awareness, ethics, autocorrection, metacognition)
+        components = {
+            "awareness": awareness,
+            "ethics": ethics,
+            "autocorrection": autocorrection,
+            "metacognition": metacognition
+        }
+        
+        self.add_measurement(sr_score, components)
+        
+        # Calculate EMA of SR scores
+        if len(self.sr_history) > 1:
+            alpha = 0.3  # EMA smoothing factor
+            ema = self.sr_history[0]
+            for score in self.sr_history[1:]:
+                ema = alpha * score + (1 - alpha) * ema
+        else:
+            ema = sr_score
+        
+        return sr_score, ema
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get SR statistics"""
+        if not self.sr_history:
+            return {"count": 0, "avg_sr": 0.0, "stability": "unknown"}
+        
+        avg_sr = sum(self.sr_history) / len(self.sr_history)
+        min_sr = min(self.sr_history)
+        max_sr = max(self.sr_history)
+        
+        # Stability based on SR variance
+        variance = sum((s - avg_sr) ** 2 for s in self.sr_history) / len(self.sr_history)
+        stability = "high" if variance < 0.01 else "medium" if variance < 0.05 else "low"
+        
+        return {
+            "count": len(self.sr_history),
+            "avg_sr": avg_sr,
+            "min_sr": min_sr,
+            "max_sr": max_sr,
+            "variance": variance,
+            "stability": stability,
+            "latest_sr": self.sr_history[-1] if self.sr_history else 0.0
+        }
+    
+    def get_trend(self) -> str:
+        """Get trend direction"""
+        if len(self.sr_history) < 2:
+            return "stable"
+        
+        recent = self.sr_history[-3:] if len(self.sr_history) >= 3 else self.sr_history[-2:]
+        earlier = self.sr_history[:len(self.sr_history)-len(recent)]
+        
+        if not earlier:
+            return "stable"
+        
+        recent_avg = sum(recent) / len(recent)
+        earlier_avg = sum(earlier) / len(earlier)
+        
+        if recent_avg > earlier_avg + 0.05:
+            return "improving"
+        elif recent_avg < earlier_avg - 0.05:
+            return "declining"
+        else:
+            return "stable"
