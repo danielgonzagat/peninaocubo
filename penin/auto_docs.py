@@ -1,14 +1,24 @@
 from pathlib import Path
 import datetime
 
-
 def update_readme():
-    root = Path(".")
-    now = datetime.datetime.utcnow().isoformat()
-    txt = f"# PENIN-Ω — Auto Docs\n\nGenerated at {now}Z\n\n- Services: 8010/8011/8012/8013 running.\n- Gates: ΔL∞≥0.01, CAOS+≥1.0, SR≥0.80, Σ-Guard allow==true.\n- Ledger: WORM + Merkle root via CLI.\n"
-    (root / "README_AUTO.md").write_text(txt, encoding="utf-8")
-
-
-if __name__ == "__main__":
-    update_readme()
-
+    now = datetime.datetime.utcnow().isoformat()+"Z"
+    txt = [
+        "# PENIN-Ω — VIDA+",
+        f"_Gerado em {now}_",
+        "",
+        "## Equação de Vida (+) — Gate não-compensatório",
+        "- Implementada em `penin/omega/life_eq.py`.",
+        "- Hook automático via `sitecustomize.py` (ligue com `PENIN_ENABLE_VIDA_HOOK=1`).",
+        "- Fail-closed real: se qualquer critério falhar, promoção é bloqueada.",
+        "",
+        "## Próximos passos (roadmap curto)",
+        "1. Fractal DSL + propagate core.",
+        "2. Swarm heartbeat → G global.",
+        "3. Marketplace cognitivo (Ω-tokens).",
+        "4. Neural-Chain com co-assinatura (swarm).",
+        "5. Self-RAG com FAISS/HNSW + reranker leve.",
+        "6. API metabolizer → distillation por endpoint.",
+        "7. NAS online + Continual Learning (Mammoth/zero-cost) com VIDA+.",
+    ]
+    Path('README_AUTO.md').write_text("\n".join(txt), encoding='utf-8')

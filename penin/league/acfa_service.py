@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 
+
 app = FastAPI(title="ACFA League", version="0.1.0")
 
 

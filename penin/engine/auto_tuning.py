@@ -1,7 +1,5 @@
 class OnlineTuner:
-    """
-    Minimal OCO-like tuner (AdaGrad style). Adjusts step size based on accumulated grad^2.
-    """
+    """Simple AdaGrad-like online tuner for step size adaptation."""
 
     def __init__(self, eta0: float = 0.1):
         self.g2 = 1e-9
