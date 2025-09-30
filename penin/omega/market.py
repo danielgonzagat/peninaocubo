@@ -22,12 +22,11 @@ class InternalMarket:
     def match(self, needs: List[Need], offers: List[Offer]) -> List[Tuple[Need, Offer, float]]:
         trades: List[Tuple[Need, Offer, float]] = []
         for n in needs:
-            candidates = [o for o in offers if o.resource == n.resource and o.price <= n.max_price and o.qty > 0]
-            if not candidates:
+            options = [o for o in offers if o.resource == n.resource and o.price <= n.max_price and o.qty > 0]
+            if not options:
                 continue
-            # Choose lowest price
-            o = min(candidates, key=lambda x: x.price)
-            qty = min(max(0.0, n.qty), max(0.0, o.qty))
+            o = min(options, key=lambda x: x.price)
+            qty = min(n.qty, o.qty)
             if qty > 0:
                 trades.append((n, o, qty))
                 n.qty -= qty

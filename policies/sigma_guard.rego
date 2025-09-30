@@ -1,3 +1,15 @@
+package sigma.guard
+
+default allow = false
+
+allow {
+  input.rho < 1
+  input.ece <= 0.01
+  input.rho_bias <= 1.05
+  input.consent == true
+  input.eco_ok == true
+}
+
 package penin.sigma_guard
 
 # Σ-Guard: Ethics and Safety Gate Policies

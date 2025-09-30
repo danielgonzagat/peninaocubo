@@ -140,7 +140,7 @@ class SecureCache:
                     self.stats["l2_hits"] += 1
                     return value
                 except ValueError as e:
-                    # HMAC mismatch or deserialization error - remove corrupted entry and fail-closed
+                    # HMAC mismatch or deserialization error - remove corrupted entry and raise
                     print(f"Cache integrity error for key {key}: {e}")
                     cursor.execute("DELETE FROM cache WHERE key = ?", (key,))
                     self.l2_db.commit()
