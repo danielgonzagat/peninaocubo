@@ -1,31 +1,129 @@
-# Byte-compiled / cache
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Python
 __pycache__/
 *.py[cod]
-*.pyo
-*.pyd
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
 
 # Virtual environments
-.venv/
-
-# Environment files
 .env
-.env.*
-!.env.example
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
 
-# Tool caches
-.mypy_cache/
-.pytest_cache/
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
-# Databases and stateful artifacts
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Database files
 *.db
 *.sqlite
 *.sqlite3
-ledger_*.jsonl
+*.db-journal
 
-# Build artifacts
-build/
-dist/
-site/
+# Cache directories
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# OS / editor
-.DS_Store
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+.tmp/
+
+# Coverage reports
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.hypothesis/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# PEP 582
+__pypackages__/
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# pytype static type analyzer
+.pytype/
+
+# Cython debug symbols
+cython_debug/
+
+# PENIN specific
+penin_data/
+*.penin
