@@ -21,12 +21,9 @@ from typing import List
 
 # Imports dos módulos corrigidos
 from penin.omega.ethics_metrics import (
-    calculate_ece,
-    calculate_rho_bias,
-    calculate_fairness,
-    validate_consent,
-    create_ethics_attestation,
-    EthicsAttestation
+    EthicsCalculator,
+    EthicsGate,
+    EthicsMetrics
 )
 
 from penin.omega.ledger import (

@@ -68,6 +68,7 @@ class CAOSComponents:
         self.A = max(0.0, min(1.0, A))
         self.O = max(0.0, min(1.0, O))
         self.S = max(0.0, min(1.0, S))
+        
     def to_dict(self) -> Dict[str, float]:
         """Convert to dictionary"""
         return {"C": self.C, "A": self.A, "O": self.O, "S": self.S}
