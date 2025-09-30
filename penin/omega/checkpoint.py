@@ -1,8 +1,6 @@
 from pathlib import Path
 import time
-
 import orjson
-
 
 SNAP = Path.home() / ".penin_omega" / "snapshots"
 SNAP.mkdir(parents=True, exist_ok=True)

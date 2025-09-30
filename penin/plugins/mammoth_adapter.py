@@ -4,9 +4,9 @@ from typing import Dict, Any
 def continual_step_mammoth(dataset: str = "cifar10") -> Dict[str, Any]:
     try:
         import mammoth  # type: ignore  # noqa: F401
-    except Exception as e:  # pragma: no cover
+    except Exception as e:
         raise ImportError(
-            "Mammoth não instalado. Instale com `pip install mammoth-cl`."
+            "Mammoth not installed. Install with `pip install mammoth-cl` or skip this plugin."
         ) from e
 
     ece = 0.006

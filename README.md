@@ -1,3 +1,34 @@
+PENIN-Ω — Lemniscata 8+1 Monorepo
+
+This repository contains a minimal, local-first implementation of the PENIN-Ω system:
+- FastAPI services: Ω-META (:8010), Σ-Guard (:8011), SR-Ω∞ (:8012), ACFA League (:8013)
+- Core modules: Master Equation, CAOS+, Fibonacci scheduler, Online tuner
+- Math modules: L∞ aggregator (non-compensatory), Agápe, OCI
+- IR→IC: Lψ projection (placeholder) with contractive behavior
+- WORM + Merkle ledger and CLI support
+- Plugin routes for NextPy, NASLib, Mammoth, SymbolicAI (with safe fallbacks)
+- Tests and demo script
+
+Quick start
+1) Create venv and install
+   python3 -m venv .venv && source .venv/bin/activate
+   pip install -r requirements.txt
+   export PYTHONPATH=$PWD
+   chmod +x penin/cli/peninctl
+
+2) Start services (separate terminals)
+   ./penin/cli/peninctl guard   # :8011
+   ./penin/cli/peninctl sr      # :8012
+   ./penin/cli/peninctl meta    # :8010
+   ./penin/cli/peninctl league  # :8013
+
+3) Demo
+   python demo/run_demo.py
+
+Notes
+- Plugin libraries are optional. Routes will return realistic stub data if the plugin package is not installed.
+- Promotion gates are fail-closed and require CAOS+ ≥ 1.0, SR ≥ 0.80, ΔL∞ ≥ 0.01, and Σ-Guard allow==true.
+
 # PENIN-Ω v7.1 - Sistema de Evolução Mestre
 
 ## 📋 Status das Correções
