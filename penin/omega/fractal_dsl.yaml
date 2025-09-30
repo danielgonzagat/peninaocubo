@@ -1,6 +1,6 @@
 version: 1
-depth: 2            # levels below core
-branching: 3        # children per node
+depth: 2            # níveis abaixo do núcleo
+branching: 3        # filhos por nó
 weights:
   caos: 1.0
   sr: 1.0

@@ -1,0 +1,40 @@
+{
+  "start_time": 1759245864.1648743,
+  "modules_tested": [
+    "life_equation",
+    "swarm",
+    "fractal",
+    "caos_kratos",
+    "neural_chain",
+    "checkpoint",
+    "immunity",
+    "zero_consciousness",
+    "auto_docs"
+  ],
+  "modules_passed": [
+    "life_equation",
+    "swarm",
+    "fractal",
+    "caos_kratos",
+    "neural_chain",
+    "checkpoint",
+    "immunity",
+    "zero_consciousness",
+    "auto_docs"
+  ],
+  "modules_failed": [],
+  "metrics": {
+    "alpha_eff": 0.0006283787718298728,
+    "global_G": 0.8898876404494382,
+    "active_nodes": 2,
+    "fractal_nodes_updated": 7,
+    "phi_kratos": 0.2413460805444283,
+    "phi_adaptive": 0.25732159024138807,
+    "chain_hash": "2f7fec014a19dbd7",
+    "spi_proxy": 0.014000000000000002
+  },
+  "errors": [],
+  "duration_s": 0.00881195068359375,
+  "success_rate": 1.0,
+  "overall_success": true
+}
