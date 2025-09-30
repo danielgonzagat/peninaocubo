@@ -1,26 +1,27 @@
-import time
 import asyncio
-from typing import List, Optional
+import time
+
 from openai import OpenAI
-from .base import BaseProvider, LLMResponse, Message, Tool
+
 from penin.config import settings
 
+from .base import BaseProvider, LLMResponse, Message, Tool
 
 BETA = False
 BASE_URL = "https://api.deepseek.com/beta" if BETA else "https://api.deepseek.com"
 
 
 class DeepSeekProvider(BaseProvider):
-    def __init__(self, model: Optional[str] = None):
+    def __init__(self, model: str | None = None):
         self.name = "deepseek"
         self.model = model or settings.DEEPSEEK_MODEL
         self.client = OpenAI(api_key=settings.DEEPSEEK_API_KEY, base_url=BASE_URL)
 
     async def chat(
         self,
-        messages: List[Message],
-        tools: Optional[List[Tool]] = None,
-        system: Optional[str] = None,
+        messages: list[Message],
+        tools: list[Tool] | None = None,
+        system: str | None = None,
         temperature: float = 0.7,
     ) -> LLMResponse:
         start = time.time()
