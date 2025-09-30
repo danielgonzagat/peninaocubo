@@ -1,0 +1,19 @@
+{
+  "config": {
+    "temperature": 0.68,
+    "top_p": 0.51,
+    "max_tokens": 1500,
+    "model": "gpt-4o-mini",
+    "id": "challenger_1"
+  },
+  "scores": {
+    "id": "challenger_1",
+    "utility": 0.8476231281122599,
+    "stability": 0.8057208823067211,
+    "cost": 0.0018432571587543322,
+    "learning": 0.6581652233476849,
+    "linf": 0.8097168950966022
+  },
+  "promoted_at": "2025-09-30T10:49:38.581695",
+  "cycle_id": "20250930_104938"
+}
