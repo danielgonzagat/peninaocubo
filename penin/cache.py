@@ -101,51 +101,53 @@ class SecureCache:
         """Check if cache entry is expired."""
         return time.time() - timestamp > ttl
 
-    def get(self, key: str) -> Optional[Any]:
-        """Get value from cache (L1 -> L2)."""
-        # Check L1
-        if key in self.l1_cache:
-            entry = self.l1_cache[key]
-            if not self._is_expired(entry["timestamp"], self.l1_ttl):
-                self.l1_cache.move_to_end(key)
-                self.stats["hits"] += 1
-                self.stats["l1_hits"] += 1
-                return entry["value"]
-            else:
-                del self.l1_cache[key]
-
-        # Check L2
-        cursor = self.l2_db.cursor()
-        cursor.execute("SELECT value, timestamp FROM cache WHERE key = ?", (key,))
-        row = cursor.fetchone()
-
-        if row:
-            value_bytes, timestamp = row
-            if not self._is_expired(timestamp, self.l2_ttl):
-                try:
-                    value = self._deserialize(value_bytes)
-                    # Promote to L1
-                    self._promote_to_l1(key, value)
-                    # Update access count
-                    cursor.execute("UPDATE cache SET access_count = access_count + 1 WHERE key = ?", (key,))
-                    self.l2_db.commit()
-                    self.stats["hits"] += 1
-                    self.stats["l2_hits"] += 1
+    def get(self, key: str):
+        """Get value (L1 -> L2). Em caso de HMAC mismatch no L2, LEVANTA ValueError."""
+        try:
+            # L1
+            if key in self.l1_cache:
+                value, ts = self.l1_cache[key]
+                if not self._is_expired(ts, self.l1_ttl):
                     return value
-                except ValueError as e:
-                    # HMAC mismatch or deserialization error - remove corrupted entry
-                    print(f"Cache integrity error for key {key}: {e}")
-                    cursor.execute("DELETE FROM cache WHERE key = ?", (key,))
-                    self.l2_db.commit()
-            else:
-                # Expired
-                cursor.execute("DELETE FROM cache WHERE key = ?", (key,))
+
+            # L2
+            cursor = self.l2_db.cursor()
+            cursor.execute("SELECT value, hmac, timestamp FROM cache WHERE key=?", (key,))
+            row = cursor.fetchone()
+            if row is None:
+                return None
+
+            data, saved_hmac, ts = row
+
+            # TTL do L2
+            if self.l2_ttl and self._is_expired(ts, self.l2_ttl):
+                cursor.execute("DELETE FROM cache WHERE key=?", (key,))
                 self.l2_db.commit()
+                return None
 
-        self.stats["misses"] += 1
-        return None
+            # Verificação de integridade (HMAC). Em mismatch => **raise**.
+            calc_hmac = hmac.new(self.hmac_key, data, hashlib.sha256).hexdigest()
+            if not hmac.compare_digest(calc_hmac, saved_hmac):
+                logger.warning(
+                    "Cache integrity error for key %s: L2 cache HMAC mismatch - data may be corrupted or tampered",
+                    key,
+                )
+                raise ValueError("L2 cache HMAC mismatch")
+                raise ValueError("L2 cache HMAC mismatch")
 
-    def set(self, key: str, value: Any) -> None:
+            # OK: desserializa, promove pra L1 e retorna
+            value = orjson.loads(data)
+            self._promote_to_l1(key, value)
+            return value
+
+        # Não engula o ValueError de mismatch — o teste espera que ele suba.
+        except ValueError:
+            raise
+
+        # Qualquer outro erro: loga e devolve None (comportamento anterior).
+        except Exception as e:
+            logger.exception("Cache get failed", exc_info=e)
+            return None    def set(self, key: str, value: Any) -> None:
         """Set value in cache."""
         # Add to L1
         self._promote_to_l1(key, value)
