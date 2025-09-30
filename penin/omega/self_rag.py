@@ -1,117 +1,194 @@
 """
-Self-RAG Recursivo - PoC Leve
-==============================
+Self-RAG Recursive - Lightweight Knowledge Query
+================================================
 
-RAG simples sobre knowledge/ com queries recursivas.
-Usa token overlap para similaridade (sem embeddings pesados).
+Implements a simple self-referential RAG system:
+- Ingest text into knowledge base
+- Query via token-based similarity
+- Self-cycle: generate new questions from answers
+
+This is a CPU-friendly PoC without heavy embeddings.
 """
 
 from collections import Counter
 import re
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, List, Optional
 
 
 KB = Path.home() / ".penin_omega" / "knowledge"
 KB.mkdir(parents=True, exist_ok=True)
 
 
-def _tok(s: str) -> list:
-    """Tokeniza string em palavras"""
-    return [t for t in re.findall(r"[A-Za-z0-9_]+", s.lower()) if t]
+def _tokenize(text: str) -> List[str]:
+    """Tokenize text for similarity"""
+    return [t for t in re.findall(r"[A-Za-z0-9_]+", text.lower()) if t]
 
 
-def _score(qt: Counter, dt: Counter) -> float:
-    """Score de similaridade entre query e documento"""
-    keys = set(qt) | set(dt)
-    num = sum(min(qt[k], dt[k]) for k in keys)
-    den = sum(max(qt[k], dt[k]) for k in keys) or 1
-    return num / den
+def _score(query_tokens: Counter, doc_tokens: Counter) -> float:
+    """Compute similarity score"""
+    all_keys = set(query_tokens.keys()) | set(doc_tokens.keys())
+    
+    if not all_keys:
+        return 0.0
+    
+    intersection = sum(min(query_tokens[k], doc_tokens[k]) for k in all_keys)
+    union = sum(max(query_tokens[k], doc_tokens[k]) for k in all_keys)
+    
+    return intersection / max(1, union)
 
 
 def ingest_text(name: str, text: str) -> None:
     """
-    Ingere texto na knowledge base.
+    Ingest text into knowledge base.
     
     Args:
-        name: Nome do documento
-        text: Conteúdo do texto
+        name: Document name
+        text: Document content
     """
-    (KB / f"{name}.txt").write_text(text, encoding="utf-8")
+    path = KB / f"{name}.txt"
+    path.write_text(text, encoding="utf-8")
+    print(f"📥 Ingested: {name} ({len(text)} chars)")
 
 
-def query(q: str) -> Dict[str, Any]:
+def query(q: str, top_k: int = 3) -> List[Dict[str, Any]]:
     """
-    Query na knowledge base.
+    Query knowledge base.
     
     Args:
         q: Query string
+        top_k: Number of results to return
         
     Returns:
-        Dict com doc mais relevante e score
+        List of {doc, score, preview} dicts
     """
-    qt = Counter(_tok(q))
-    best = None
-    best_score = 0.0
+    query_tokens = Counter(_tokenize(q))
     
-    for p in KB.glob("*.txt"):
-        text = p.read_text(encoding="utf-8")
-        dt = Counter(_tok(text))
-        s = _score(qt, dt)
+    results = []
+    
+    for doc_path in KB.glob("*.txt"):
+        doc_text = doc_path.read_text(encoding="utf-8")
+        doc_tokens = Counter(_tokenize(doc_text))
         
-        if s > best_score:
-            best = p
-            best_score = s
+        score = _score(query_tokens, doc_tokens)
+        
+        if score > 0:
+            results.append({
+                "doc": doc_path.name,
+                "score": score,
+                "preview": doc_text[:200]
+            })
     
-    return {
-        "doc": best.name if best else None,
-        "score": best_score,
-        "content": best.read_text(encoding="utf-8") if best and best_score > 0.1 else None
-    }
+    # Sort by score descending
+    results.sort(key=lambda x: x["score"], reverse=True)
+    
+    return results[:top_k]
 
 
 def self_cycle() -> Dict[str, Any]:
     """
-    Executa um ciclo de auto-reflexão.
+    Execute one self-RAG cycle.
     
-    Query inicial sobre evolução, depois gera nova query baseada no resultado.
+    Generates a question, queries KB, and generates follow-up.
     
     Returns:
-        Dict com queries e respostas
+        Dict with cycle results
     """
-    q1 = "o que está faltando para evolução segura do penin?"
-    ans1 = query(q1)
+    # Initial question
+    q1 = "What is missing for safe evolution of PENIN-Ω?"
     
-    if ans1["doc"]:
-        # Gerar nova pergunta a partir do melhor doc
-        q2 = f"Detalhar implementações pendentes em {ans1['doc']}"
-        ans2 = query(q2)
-        
-        return {
-            "q1": q1,
-            "a1": ans1,
-            "q2": q2,
-            "a2": ans2
-        }
+    # Query
+    results = query(q1, top_k=1)
+    
+    if not results:
+        return {"q1": q1, "a1": None, "q2": None}
+    
+    best = results[0]
+    
+    # Generate follow-up question
+    q2 = f"Detail implementation gaps in {best['doc']}"
     
     return {
         "q1": q1,
-        "a1": ans1,
-        "q2": None,
-        "a2": None
+        "a1": best,
+        "q2": q2
     }
 
 
-def get_knowledge_stats() -> Dict[str, Any]:
-    """Estatísticas da knowledge base"""
-    docs = list(KB.glob("*.txt"))
+class SelfRAG:
+    """
+    Self-referential RAG system.
     
-    total_chars = 0
-    for doc in docs:
-        total_chars += len(doc.read_text(encoding="utf-8"))
+    Manages knowledge ingestion, querying, and recursive self-inquiry.
+    """
     
-    return {
-        "num_docs": len(docs),
-        "total_chars": total_chars,
-        "avg_chars_per_doc": total_chars // max(1, len(docs))
-    }
+    def __init__(self):
+        self.cycle_history: List[Dict[str, Any]] = []
+        print("🔄 Self-RAG initialized")
+    
+    def ingest(self, name: str, text: str) -> None:
+        """Ingest document"""
+        ingest_text(name, text)
+    
+    def query(self, q: str, top_k: int = 3) -> List[Dict[str, Any]]:
+        """Query knowledge base"""
+        return query(q, top_k)
+    
+    def cycle(self) -> Dict[str, Any]:
+        """Execute self-RAG cycle"""
+        result = self_cycle()
+        self.cycle_history.append(result)
+        
+        print(f"🔄 Cycle {len(self.cycle_history)}:")
+        print(f"   Q1: {result['q1']}")
+        if result['a1']:
+            print(f"   A1: {result['a1']['doc']} (score={result['a1']['score']:.3f})")
+        print(f"   Q2: {result['q2']}")
+        
+        return result
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get statistics"""
+        docs = list(KB.glob("*.txt"))
+        
+        return {
+            "documents": len(docs),
+            "cycles": len(self.cycle_history),
+            "kb_path": str(KB)
+        }
+
+
+# Quick test
+def quick_self_rag_test():
+    """Quick test of self-RAG"""
+    rag = SelfRAG()
+    
+    # Ingest some docs
+    rag.ingest("penin_overview", """
+        PENIN-Ω is an auto-evolutionary AI system.
+        Key components: Sigma-Guard, CAOS+, SR-Omega, L-infinity, WORM ledger.
+        Missing: Life Equation integration, fractal DSL, swarm consensus.
+    """)
+    
+    rag.ingest("todo_list", """
+        TODO for PENIN evolution:
+        - Integrate Life Equation as positive gate
+        - Implement fractal DSL for module replication
+        - Add swarm cognitive gossip protocol
+        - Enable API metabolization
+    """)
+    
+    # Run query
+    results = rag.query("What components are missing?")
+    print(f"\n🔍 Query results:")
+    for r in results:
+        print(f"   {r['doc']}: {r['score']:.3f}")
+    
+    # Run cycle
+    print(f"\n🔄 Running self-cycle...")
+    rag.cycle()
+    
+    stats = rag.get_stats()
+    print(f"\n📊 Stats: {stats}")
+    
+    return rag

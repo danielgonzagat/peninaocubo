@@ -1,47 +1,76 @@
 """
-GAME - Gradientes com Memória Exponencial
-==========================================
+GAME - Gradient with Adaptive Memory Exponential
+================================================
 
-EMA de gradientes para aprendizado online.
+Implements EMA (exponential moving average) for gradients.
 """
 
 
 def ema_grad(g_prev: float, g_now: float, beta: float = 0.9) -> float:
     """
-    EMA de gradiente.
+    Compute EMA of gradients.
     
     Args:
-        g_prev: Gradiente anterior (EMA)
-        g_now: Gradiente atual
-        beta: Fator de decaimento
+        g_prev: Previous gradient
+        g_now: Current gradient
+        beta: EMA decay factor
         
     Returns:
-        Novo EMA do gradiente
+        Smoothed gradient
     """
-    return beta * g_prev + (1.0 - beta) * g_now
+    return beta * g_prev + (1 - beta) * g_now
 
 
 class GAMEOptimizer:
-    """Otimizador GAME (Gradient with Adaptive Memory Exponential)"""
+    """
+    Gradient optimizer with exponential memory.
     
-    def __init__(self, beta: float = 0.9, lr: float = 0.01):
+    Maintains EMA of gradients for smoother updates.
+    """
+    
+    def __init__(self, beta: float = 0.9):
         self.beta = beta
-        self.lr = lr
-        self.ema = 0.0
+        self.grad_ema: float = 0.0
+        self.steps: int = 0
+        
+        print(f"📈 GAME Optimizer initialized (beta={beta})")
     
     def step(self, gradient: float) -> float:
         """
-        Passo de otimização.
+        Update with new gradient.
         
         Args:
-            gradient: Gradiente atual
+            gradient: Current gradient
             
         Returns:
-            Update (delta para aplicar)
+            Smoothed gradient
         """
-        self.ema = ema_grad(self.ema, gradient, self.beta)
-        return -self.lr * self.ema
+        self.grad_ema = ema_grad(self.grad_ema, gradient, self.beta)
+        self.steps += 1
+        return self.grad_ema
     
-    def reset(self) -> None:
-        """Reseta EMA"""
-        self.ema = 0.0
+    def get_stats(self) -> dict:
+        """Get optimizer statistics"""
+        return {
+            "beta": self.beta,
+            "grad_ema": self.grad_ema,
+            "steps": self.steps
+        }
+
+
+# Quick test
+def quick_game_test():
+    """Quick test of GAME optimizer"""
+    opt = GAMEOptimizer(beta=0.9)
+    
+    gradients = [1.0, 0.8, 1.2, 0.9, 1.1]
+    
+    print("\n📈 Gradient updates:")
+    for g in gradients:
+        smoothed = opt.step(g)
+        print(f"   g={g:.2f} → smoothed={smoothed:.4f}")
+    
+    stats = opt.get_stats()
+    print(f"\n📊 Stats: {stats}")
+    
+    return opt
