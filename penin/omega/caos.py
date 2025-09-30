@@ -1,7 +1,7 @@
 from __future__ import annotations
 import math
 from dataclasses import dataclass
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict
 
 # --------------------------------------------------------------------
 # Utilidades
@@ -35,7 +35,7 @@ def compute_caos_plus(
     s: float,
     *,
     kappa: float = 25.0,
-    kappa_max: float = 100.0,
+    kappa_max: float = 10.0,  # default que os testes esperam
 ) -> float:
     c = _clamp(c)
     a = _clamp(a)
@@ -66,7 +66,7 @@ def phi_caos(
     *,
     kappa: float = 25.0,
     gamma: float = 1.0,
-    kappa_max: float = 100.0,
+    kappa_max: float = 10.0,  # manter consistente com compute_caos_plus
 ) -> float:
     if gamma < 0:
         gamma = 0.0
@@ -84,7 +84,7 @@ def phi_kratos(
     exploration_factor: float = 2.0,
     kappa: float = 25.0,
     gamma: float = 1.0,
-    kappa_max: float = 100.0,
+    kappa_max: float = 10.0,
 ) -> float:
     """Variante de exploração: amplifica (o,s)^η de forma controlada."""
     ef = max(1.0, float(exploration_factor))
@@ -111,32 +111,39 @@ class CAOSComponents:
         cc = self.clamped()
         return (cc.C, cc.A, cc.O, cc.S)
 
+    def to_dict(self) -> Dict[str, float]:
+        cc = self.clamped()
+        return {"C": cc.C, "A": cc.A, "O": cc.O, "S": cc.S}
+
 
 @dataclass
 class CAOSConfig:
     """Configuração padrão utilizada nos cálculos."""
     kappa: float = 25.0
     gamma: float = 1.0
-    kappa_max: float = 100.0
+    kappa_max: float = 10.0           # <- teste espera 10.0
     exploration_factor: float = 2.0
+    ema_beta: float = 0.9             # para EMA do tracker
 
 
 class CAOSTracker:
     """
-    Rastreador simples de histórico dos cálculos CAOS⁺ e φ.
-    Mantém uma lista de (components, caos_plus, phi).
+    Rastreador simples de histórico dos cálculos CAOS⁺ e φ + EMA do φ.
+    Mantém uma lista de (components, caos_plus, phi) e um estado ema_phi.
     """
     def __init__(self, cfg: Optional[CAOSConfig] = None):
         self.cfg = cfg or CAOSConfig()
         self.history: List[Tuple[CAOSComponents, float, float]] = []
+        self.ema_phi: float = 0.0
+        self._ema_initialized: bool = False
 
-    def update(self, *args, **kwargs) -> float:
+    def update(self, *args, **kwargs) -> Tuple[float, float]:
         """
         Aceita:
           - update(CAOSComponents)
           - update(C, A, O, S)
           - update(C=..., A=..., O=..., S=...)
-        Retorna φ calculado.
+        Retorna (phi, ema_phi).
         """
         comp: Optional[CAOSComponents] = None
         if args:
@@ -158,8 +165,17 @@ class CAOSTracker:
         z = compute_caos_plus(c2.C, c2.A, c2.O, c2.S, kappa=self.cfg.kappa, kappa_max=self.cfg.kappa_max)
         phi = 1.0 - math.exp(-self.cfg.gamma * z)
         phi = _clamp(phi, 0.0, 1.0)
+
+        # EMA do φ
+        b = _clamp(self.cfg.ema_beta, 0.0, 1.0)
+        if not self._ema_initialized:
+            self.ema_phi = phi
+            self._ema_initialized = True
+        else:
+            self.ema_phi = b * self.ema_phi + (1.0 - b) * phi
+
         self.history.append((c2, z, phi))
-        return phi
+        return phi, self.ema_phi
 
     # alias comum
     record = update
@@ -192,6 +208,11 @@ class CAOSPlusEngine:
             gamma=self.cfg.gamma,
             kappa_max=self.cfg.kappa_max,
         )
+
+    # <- método que os testes chamam:
+    def compute(self, c: float, a: float, o: float, s: float) -> float:
+        """Compat: retorna φ diretamente a partir dos 4 componentes."""
+        return phi_caos(c, a, o, s, kappa=self.cfg.kappa, gamma=self.cfg.gamma, kappa_max=self.cfg.kappa_max)
 
 
 __all__ = [
