@@ -4,12 +4,12 @@ CAOS⁺ Module
 
 Implements φ(CAOS⁺) with stable computation using log-space and tanh saturation.
 
-CAOS⁺ = (1 + κ·C·A)^(O·S)
+CAOS⁺ = (1 + κ·C·A)^(openness·S)
 
 Where:
 - C: Coherence [0,1]
 - A: Awareness [0,1]
-- O: Openness to the unknown [0,1]
+- openness: Openness to the unknown [0,1]
 - S: Silence/listening [0,1]
 - κ: Amplification factor [1, κ_max]
 - φ: Saturation function (tanh)
@@ -34,7 +34,7 @@ class CAOSConfig:
 
 
 def compute_caos_plus(
-    C: float, A: float, O: float, S: float, kappa: float, config: CAOSConfig | None = None
+    C: float, A: float, openness: float, S: float, kappa: float, config: CAOSConfig | None = None
 ) -> tuple[float, dict]:
     """
     Compute CAOS⁺ with numerical stability.
@@ -42,7 +42,7 @@ def compute_caos_plus(
     Args:
         C: Coherence [0,1]
         A: Awareness [0,1]
-        O: Openness [0,1]
+        openness: Openness [0,1]
         S: Silence [0,1]
         kappa: Amplification factor
         config: Optional configuration
@@ -57,14 +57,14 @@ def compute_caos_plus(
     if config.clamp_inputs:
         C = max(0.0, min(1.0, C))
         A = max(0.0, min(1.0, A))
-        O = max(0.0, min(1.0, O))
+        openness = max(0.0, min(1.0, openness))
         S = max(0.0, min(1.0, S))
         kappa = max(1.0, min(config.kappa_max, kappa))
 
     details = {
         "C": C,
         "A": A,
-        "O": O,
+        "openness": openness,
         "S": S,
         "kappa": kappa,
         "method": "log_space" if config.use_log_space else "direct",
@@ -72,7 +72,7 @@ def compute_caos_plus(
 
     # Compute base term
     base = 1.0 + kappa * C * A
-    exponent = O * S
+    exponent = openness * S
 
     # Prevent edge cases
     if base <= 0:
@@ -137,21 +137,21 @@ def apply_saturation(value: float, gamma: float = 0.5) -> float:
         return min(0.999, value / (1.0 + value))
 
 
-def compute_caos_harmony(C: float, A: float, O: float, S: float, epsilon: float = 1e-8) -> float:
+def compute_caos_harmony(C: float, A: float, openness: float, S: float, epsilon: float = 1e-8) -> float:
     """
     Compute CAOS harmony using harmonic mean.
 
     Non-compensatory aggregation of CAOS components.
 
     Args:
-        C, A, O, S: CAOS components [0,1]
+        C, A, openness, S: CAOS components [0,1]
         epsilon: Small value for stability
 
     Returns:
         Harmonic mean of CAOS components
     """
     # Ensure all values are positive
-    values = [max(epsilon, v) for v in [C, A, O, S]]
+    values = [max(epsilon, v) for v in [C, A, openness, S]]
 
     # Harmonic mean
     denominator = sum(1.0 / v for v in values)
@@ -161,41 +161,43 @@ def compute_caos_harmony(C: float, A: float, O: float, S: float, epsilon: float 
     return 4.0 / denominator
 
 
-def caos_gradient(C: float, A: float, O: float, S: float, kappa: float, delta: float = 0.001) -> dict[str, float]:
+def caos_gradient(
+    C: float, A: float, openness: float, S: float, kappa: float, delta: float = 0.001
+) -> dict[str, float]:
     """
     Compute numerical gradient of CAOS⁺ with respect to each component.
 
     Useful for understanding sensitivity and tuning.
 
     Args:
-        C, A, O, S, kappa: CAOS parameters
+        C, A, openness, S, kappa: CAOS parameters
         delta: Small perturbation for numerical gradient
 
     Returns:
         Dict with gradients for each component
     """
-    base_caos, _ = compute_caos_plus(C, A, O, S, kappa)
+    base_caos, _ = compute_caos_plus(C, A, openness, S, kappa)
 
     gradients = {}
 
     # Gradient w.r.t C
-    caos_c_plus, _ = compute_caos_plus(C + delta, A, O, S, kappa)
+    caos_c_plus, _ = compute_caos_plus(C + delta, A, openness, S, kappa)
     gradients["dC"] = (caos_c_plus - base_caos) / delta
 
     # Gradient w.r.t A
-    caos_a_plus, _ = compute_caos_plus(C, A + delta, O, S, kappa)
+    caos_a_plus, _ = compute_caos_plus(C, A + delta, openness, S, kappa)
     gradients["dA"] = (caos_a_plus - base_caos) / delta
 
-    # Gradient w.r.t O
-    caos_o_plus, _ = compute_caos_plus(C, A, O + delta, S, kappa)
+    # Gradient w.r.t openness
+    caos_o_plus, _ = compute_caos_plus(C, A, openness + delta, S, kappa)
     gradients["dO"] = (caos_o_plus - base_caos) / delta
 
     # Gradient w.r.t S
-    caos_s_plus, _ = compute_caos_plus(C, A, O, S + delta, kappa)
+    caos_s_plus, _ = compute_caos_plus(C, A, openness, S + delta, kappa)
     gradients["dS"] = (caos_s_plus - base_caos) / delta
 
     # Gradient w.r.t kappa
-    caos_k_plus, _ = compute_caos_plus(C, A, O, S, kappa + delta)
+    caos_k_plus, _ = compute_caos_plus(C, A, openness, S, kappa + delta)
     gradients["dkappa"] = (caos_k_plus - base_caos) / delta
 
     return gradients
@@ -213,18 +215,18 @@ class CAOSTracker:
         self.caos_ema = None
         self.history = []
 
-    def update(self, C: float, A: float, O: float, S: float, kappa: float = 2.0):
+    def update(self, C: float, A: float, openness: float, S: float, kappa: float = 2.0):
         """Update CAOS tracking with new values"""
         # Update EMAs
         if self.C_ema is None:
             self.C_ema = C
             self.A_ema = A
-            self.O_ema = O
+            self.O_ema = openness
             self.S_ema = S
         else:
             self.C_ema = self.alpha * C + (1 - self.alpha) * self.C_ema
             self.A_ema = self.alpha * A + (1 - self.alpha) * self.A_ema
-            self.O_ema = self.alpha * O + (1 - self.alpha) * self.O_ema
+            self.O_ema = self.alpha * openness + (1 - self.alpha) * self.O_ema
             self.S_ema = self.alpha * S + (1 - self.alpha) * self.S_ema
 
         # Compute CAOS⁺ with EMA values
@@ -240,7 +242,7 @@ class CAOSTracker:
             {
                 "C": C,
                 "A": A,
-                "O": O,
+                "openness": openness,
                 "S": S,
                 "C_ema": self.C_ema,
                 "A_ema": self.A_ema,
