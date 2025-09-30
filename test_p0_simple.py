@@ -14,9 +14,10 @@ import time
 import sys
 from pathlib import Path
 
-# Add the workspace to the path
-sys.path.insert(0, '/workspace')
-
+# Add the project root to the path dynamically
+import os
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
 def test_ethics_metrics_calculation():
     """Test P0: Ethics metrics calculation and validation"""
     print("Testing ethics metrics calculation...")
