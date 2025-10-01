@@ -140,3 +140,5 @@ cython_debug/
 # PENIN specific
 penin_data/
 *.penin
+# Benchmark results (regeneratable)
+benchmarks/*.json
