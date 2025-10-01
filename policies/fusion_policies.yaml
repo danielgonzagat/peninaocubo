@@ -1,0 +1,14 @@
+licenses:
+  allow_embed: ["Apache-2.0","MIT","BSD-3-Clause"]
+  disallow_embed: ["GPL-3.0-or-later","AGPL-3.0"]
+
+gates:
+  ethics:
+    ece_max: 0.01
+    rho_bias_max: 1.05
+  risk:
+    rho_contractivity_max: 1.0
+  promotion:
+    sr_min: 0.80
+    G_min: 0.85
+    caos_ratio_min: 1.0
