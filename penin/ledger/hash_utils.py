@@ -126,13 +126,17 @@ def detect_hash_algorithm(hash_value: str) -> str:
         raise ValueError(f"Unknown hash length: {hash_len}")
 
 
-def migrate_hash_chain(
+# Internal placeholder: not part of public API
+def _migrate_hash_chain(
     events: list[dict],
     from_algorithm: str = LEGACY_HASH_ALGORITHM,
     to_algorithm: str = HASH_ALGORITHM,
 ) -> list[dict]:
     """
-    Migrate hash chain from one algorithm to another.
+    INTERNAL USE ONLY: Placeholder for hash chain migration.
+
+    This function is not implemented. Hash chain migration requires event-specific
+    serialization and should be performed using ledger-specific migration tools.
 
     Args:
         events: List of event dictionaries with hashes
@@ -140,30 +144,15 @@ def migrate_hash_chain(
         to_algorithm: Target hash algorithm
 
     Returns:
-        List of events with updated hashes
+        List of events with updated hashes (not implemented)
 
-    Note:
-        This is a destructive operation that breaks the original chain.
-        Only use for explicit migration scenarios.
+    Raises:
+        NotImplementedError: Always raised. Use ledger-specific migration tools.
     """
-    if from_algorithm == to_algorithm:
-        return events
-
-    migrated = []
-    previous_hash = None
-
-    for event in events:
-        # Recompute hash with new algorithm
-        # Note: This requires re-serializing the event data
-        # Implementation depends on event structure
-        raise NotImplementedError(
-            "Hash chain migration requires event-specific serialization. "
-            "Use ledger-specific migration tools instead."
-        )
-
-    return migrated
-
-
+    raise NotImplementedError(
+        "Hash chain migration requires event-specific serialization. "
+        "Use ledger-specific migration tools instead."
+    )
 # ============================================================================
 # Performance Benchmarks
 # ============================================================================
