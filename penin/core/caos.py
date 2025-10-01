@@ -45,6 +45,38 @@ Auditabilidade:
 - Todos cálculos registrados em WORM ledger
 - PCAg gerados para cada computação crítica
 - Determinismo garantido via seed
+
+Quick Start:
+------------
+>>> # Uso simples com componentes já calculados
+>>> from penin.core.caos import compute_caos_plus_exponential
+>>> caos = compute_caos_plus_exponential(c=0.88, a=0.40, o=0.35, s=0.82, kappa=20.0)
+>>> print(f"CAOS⁺: {caos:.2f}")  # ~1.86
+
+>>> # Uso completo com métricas e EMA
+>>> from penin.core.caos import (
+...     ConsistencyMetrics, AutoevolutionMetrics,
+...     IncognoscibleMetrics, SilenceMetrics,
+...     CAOSConfig, CAOSState, compute_caos_plus_complete
+... )
+>>> 
+>>> consistency = ConsistencyMetrics(pass_at_k=0.92, ece=0.008)
+>>> autoevol = AutoevolutionMetrics(delta_linf=0.06, cost_normalized=0.15)
+>>> incog = IncognoscibleMetrics(epistemic_uncertainty=0.35)
+>>> silence = SilenceMetrics(noise_ratio=0.08)
+>>> 
+>>> config = CAOSConfig(kappa=25.0, ema_half_life=5)
+>>> state = CAOSState()
+>>> 
+>>> caos, details = compute_caos_plus_complete(
+...     consistency, autoevol, incog, silence, config, state
+... )
+>>> print(f"CAOS⁺: {caos:.4f}, Stability: {details['state_stability']:.3f}")
+
+Documentação Completa:
+---------------------
+Para guia detalhado com exemplos práticos, best practices e FAQ, consulte:
+docs/caos_guide.md
 """
 
 from __future__ import annotations
