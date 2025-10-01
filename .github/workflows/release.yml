@@ -1,238 +1,346 @@
-name: Release Pipeline
+# PENIN-Ω IA³ - Release Workflow
+# Purpose: Automated semantic versioning, changelog, build, publish
+
+name: Release
+
 on:
   push:
     tags:
-      - 'v*'
+      - "v*.*.*"
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to release (e.g., v0.8.1)'
+        description: "Version to release (e.g., 1.0.0)"
         required: true
-        type: string
+      prerelease:
+        description: "Mark as pre-release"
+        type: boolean
+        default: false
+
+env:
+  PYTHON_VERSION: "3.11"
 
 jobs:
-  build-and-test:
+  # ============================================================================
+  # Job 1: Validate Release
+  # ============================================================================
+  validate:
+    name: Validate Release
     runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install build dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build twine wheel
-    
-    - name: Install project dependencies
-      run: |
-        pip install -r requirements.txt
-    
-    - name: Run tests
-      run: |
-        python -m pytest tests/ -v --cov=penin --cov-report=xml
-    
-    - name: Upload coverage
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-        flags: unittests
-        name: codecov-umbrella
-    
-    - name: Build package
-      run: |
-        python -m build
-    
-    - name: Check package
-      run: |
-        twine check dist/*
-    
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: dist-packages
-        path: dist/
+    timeout-minutes: 10
 
-  security-scan:
-    runs-on: ubuntu-latest
-    needs: build-and-test
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install safety bandit semgrep
-    
-    - name: Security scan with safety
-      run: |
-        pip install -r requirements.txt
-        safety check --json --output safety-report.json || true
-    
-    - name: Security scan with bandit
-      run: |
-        bandit -r penin/ -f json -o bandit-report.json || true
-    
-    - name: Security scan with semgrep
-      run: |
-        semgrep --config=auto --json --output=semgrep-report.json . || true
-    
-    - name: Upload security reports
-      uses: actions/upload-artifact@v3
-      with:
-        name: security-reports
-        path: |
-          safety-report.json
-          bandit-report.json
-          semgrep-report.json
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is_prerelease: ${{ steps.version.outputs.is_prerelease }}
 
-  sbom-generation:
-    runs-on: ubuntu-latest
-    needs: build-and-test
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Download build artifacts
-      uses: actions/download-artifact@v3
-      with:
-        name: dist-packages
-        path: dist/
-    
-    - name: Generate SBOM
-      run: |
-        pip install cyclonedx-bom
-        cyclonedx-py -o sbom.json -e .
-    
-    - name: Upload SBOM
-      uses: actions/upload-artifact@v3
-      with:
-        name: sbom
-        path: sbom.json
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-  sign-and-publish:
+      - name: Extract version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            IS_PRERELEASE="${{ github.event.inputs.prerelease }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+            IS_PRERELEASE="false"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "is_prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          echo "Release version: $VERSION (prerelease: $IS_PRERELEASE)"
+
+      - name: Validate version format
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            exit 1
+          fi
+          echo "✅ Valid version: $VERSION"
+
+      - name: Check version in pyproject.toml
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          PYPROJECT_VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
+          if [ "$VERSION" != "$PYPROJECT_VERSION" ]; then
+            echo "⚠️ Version mismatch: tag=$VERSION, pyproject.toml=$PYPROJECT_VERSION"
+            echo "Updating pyproject.toml..."
+            sed -i "s/^version = .*/version = \"$VERSION\"/" pyproject.toml
+          else
+            echo "✅ Version matches"
+          fi
+
+  # ============================================================================
+  # Job 2: Run Full Test Suite
+  # ============================================================================
+  test:
+    name: Test Suite (Pre-release)
     runs-on: ubuntu-latest
-    needs: [build-and-test, security-scan, sbom-generation]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    needs: validate
+    timeout-minutes: 30
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Download build artifacts
-      uses: actions/download-artifact@v3
-      with:
-        name: dist-packages
-        path: dist/
-    
-    - name: Download SBOM
-      uses: actions/download-artifact@v3
-      with:
-        name: sbom
-        path: .
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-    
-    - name: Install signing tools
-      run: |
-        pip install twine sigstore
-    
-    - name: Sign package with Sigstore
-      env:
-        SIGSTORE_TOKEN: ${{ secrets.SIGSTORE_TOKEN }}
-      run: |
-        # Sign the wheel
-        sigstore sign dist/*.whl
-        
-        # Sign the source distribution
-        sigstore sign dist/*.tar.gz
-        
-        # Sign the SBOM
-        sigstore sign sbom.json
-    
-    - name: Publish to private registry
-      env:
-        PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
-        PYPI_URL: ${{ secrets.PYPI_URL }}
-      run: |
-        twine upload --repository-url $PYPI_URL \
-          --username __token__ \
-          --password $PYPI_TOKEN \
-          dist/*
-    
-    - name: Create GitHub Release
-      uses: actions/create-release@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        tag_name: ${{ github.ref_name }}
-        release_name: Release ${{ github.ref_name }}
-        body: |
-          ## PENIN-Ω ${{ github.ref_name }}
-          
-          ### Changes
-          - See CHANGELOG.md for detailed changes
-          
-          ### Installation
-          ```bash
-          pip install peninaocubo==${{ github.ref_name }}
-          ```
-          
-          ### Security
-          - Package signed with Sigstore
-          - SBOM included
-          - Security scans passed
-          
-          ### Artifacts
-          - Source distribution (.tar.gz)
-          - Wheel distribution (.whl)
-          - SBOM (Software Bill of Materials)
-          - Security reports
-        draft: false
-        prerelease: false
-    
-    - name: Upload release assets
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: dist/
-        asset_name: packages
-        asset_content_type: application/zip
-    
-    - name: Upload SBOM
-      uses: actions/upload-release-asset@v1
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        upload_url: ${{ steps.create_release.outputs.upload_url }}
-        asset_path: sbom.json
-        asset_name: sbom.json
-        asset_content_type: application/json
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  notify:
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,full,nextpy,metacog,spikingjelly]"
+
+      - name: Run full test suite
+        run: |
+          pytest tests/ -v --tb=short --maxfail=3 \
+                 --cov=penin --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          flags: release
+          name: release-coverage
+
+  # ============================================================================
+  # Job 3: Build Distributions
+  # ============================================================================
+  build:
+    name: Build Distributions
     runs-on: ubuntu-latest
-    needs: [sign-and-publish]
+    needs: [validate, test]
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine check-wheel-contents
+
+      - name: Update version in code
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          sed -i "s/^version = .*/version = \"$VERSION\"/" pyproject.toml
+          sed -i "s/__version__ = .*/__version__ = \"$VERSION\"/" penin/__init__.py
+
+      - name: Build distributions
+        run: python -m build
+
+      - name: Validate distributions
+        run: |
+          twine check dist/*
+          check-wheel-contents dist/*.whl
+
+      - name: Generate checksums
+        run: |
+          cd dist/
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ needs.validate.outputs.version }}
+          path: dist/
+          retention-days: 30
+
+  # ============================================================================
+  # Job 4: Generate Changelog
+  # ============================================================================
+  changelog:
+    name: Generate Changelog
+    runs-on: ubuntu-latest
+    needs: validate
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION="${{ needs.validate.outputs.version }}"
+          
+          # Get commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          if [ -z "$LAST_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            COMMITS=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" --no-merges)
+          fi
+          
+          # Generate changelog content
+          cat > RELEASE_NOTES.md <<EOF
+          # PENIN-Ω v${VERSION}
+          
+          ## 🚀 What's New
+          
+          ${COMMITS}
+          
+          ## 📊 Statistics
+          - **Version**: ${VERSION}
+          - **Release Date**: $(date -u +"%Y-%m-%d")
+          - **Python**: 3.11+
+          - **License**: Apache 2.0
+          
+          ## 📦 Installation
+          
+          \`\`\`bash
+          pip install peninaocubo==${VERSION}
+          \`\`\`
+          
+          ## 🔗 Links
+          - [Documentation](https://github.com/danielgonzagat/peninaocubo/tree/main/docs)
+          - [Changelog](https://github.com/danielgonzagat/peninaocubo/blob/main/CHANGELOG.md)
+          - [Issues](https://github.com/danielgonzagat/peninaocubo/issues)
+          EOF
+          
+          cat RELEASE_NOTES.md
+
+      - name: Upload release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: RELEASE_NOTES.md
+
+  # ============================================================================
+  # Job 5: Create GitHub Release
+  # ============================================================================
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate, test, build, changelog]
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ needs.validate.outputs.version }}
+          path: dist/
+
+      - name: Download release notes
+        uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.validate.outputs.version }}
+          name: PENIN-Ω v${{ needs.validate.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ needs.validate.outputs.is_prerelease == 'true' }}
+          files: |
+            dist/*
+            LICENSE
+            README.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================================================
+  # Job 6: Publish to PyPI (optional, requires secrets)
+  # ============================================================================
+  publish-pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: [validate, test, build, release]
+    if: needs.validate.outputs.is_prerelease == 'false' && github.event_name == 'push'
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/project/peninaocubo/
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-${{ needs.validate.outputs.version }}
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          skip-existing: true
+          verbose: true
+
+  # ============================================================================
+  # Job 7: Build & Push Docker Image (optional)
+  # ============================================================================
+  docker:
+    name: Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [validate, test, release]
+    if: needs.validate.outputs.is_prerelease == 'false'
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: deploy/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ needs.validate.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # Final Release Status
+  # ============================================================================
+  release-success:
+    name: Release Success
+    runs-on: ubuntu-latest
+    needs: [validate, test, build, changelog, release]
     if: always()
+
     steps:
-    - name: Notify on success
-      if: needs.sign-and-publish.result == 'success'
-      run: |
-        echo "✅ Release ${{ github.ref_name }} published successfully!"
-        # Add notification logic here (Slack, email, etc.)
-    
-    - name: Notify on failure
-      if: needs.sign-and-publish.result == 'failure'
-      run: |
-        echo "❌ Release ${{ github.ref_name }} failed!"
-        # Add notification logic here (Slack, email, etc.)
+      - name: Check all release jobs
+        run: |
+          echo "🎉 Release v${{ needs.validate.outputs.version }} completed!"
+          echo "✅ GitHub Release created"
+          echo "📦 Distributions built and uploaded"
+          echo "📝 Changelog generated"

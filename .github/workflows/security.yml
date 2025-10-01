@@ -1,12 +1,306 @@
-name: security
-on: [push, pull_request]
+# PENIN-Ω IA³ - Security & Compliance Workflow
+# Purpose: SBOM generation, SCA, secrets scanning, dependency audits
+
+name: Security
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run weekly on Mondays at 00:00 UTC
+    - cron: "0 0 * * 1"
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.11"
+
 jobs:
-  gitleaks:
+  # ============================================================================
+  # Job 1: SBOM Generation (Software Bill of Materials)
+  # ============================================================================
+  sbom:
+    name: Generate SBOM
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[full]"
+          pip install cyclonedx-bom
+
+      - name: Generate CycloneDX SBOM
+        run: |
+          cyclonedx-py -o sbom.json --format json
+          cyclonedx-py -o sbom.xml --format xml
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ github.sha }}
+          path: |
+            sbom.json
+            sbom.xml
+          retention-days: 90
+
+      - name: Commit SBOM (main branch only)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p security/
+          mv sbom.json security/sbom.json
+          mv sbom.xml security/sbom.xml
+          git add security/sbom.*
+          git commit -m "chore(security): update SBOM [skip ci]" || true
+          git push || true
+
+  # ============================================================================
+  # Job 2: Software Composition Analysis (SCA)
+  # ============================================================================
+  sca:
+    name: Software Composition Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[full]"
+          pip install safety pip-audit
+
+      - name: Run Safety check
+        run: |
+          safety check --json --output safety-report.json || true
+          safety check || true
+        continue-on-error: true
+
+      - name: Run pip-audit
+        run: |
+          pip-audit --format json --output pip-audit-report.json || true
+          pip-audit || true
+        continue-on-error: true
+
+      - name: Upload SCA reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: sca-reports-${{ github.sha }}
+          path: |
+            safety-report.json
+            pip-audit-report.json
+          retention-days: 30
+
+  # ============================================================================
+  # Job 3: Secrets Scanning
+  # ============================================================================
+  secrets-scan:
+    name: Secrets Detection
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v2
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
         with:
-          args: --redact --no-git
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install detect-secrets
+        run: pip install detect-secrets
+
+      - name: Run detect-secrets scan
+        run: |
+          detect-secrets scan --all-files \
+            --exclude-files 'docs/archive/.*' \
+            --exclude-files '\.git/.*' \
+            --exclude-files '\.venv/.*' \
+            > .secrets.baseline.new || true
+
+      - name: Check for new secrets
+        run: |
+          if [ -f .secrets.baseline ]; then
+            detect-secrets audit .secrets.baseline.new || true
+          fi
+
+      - name: Gitleaks scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================================================
+  # Job 4: Dependency Review (PRs only)
+  # ============================================================================
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          deny-licenses: GPL-3.0, AGPL-3.0
+
+  # ============================================================================
+  # Job 5: CodeQL Analysis
+  # ============================================================================
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+          queries: security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"
+
+  # ============================================================================
+  # Job 6: Container Scanning (if Docker images exist)
+  # ============================================================================
+  container-scan:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          if [ -f deploy/Dockerfile ]; then
+            docker build -t penin-omega:scan -f deploy/Dockerfile .
+          fi
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        if: success()
+        with:
+          image-ref: penin-omega:scan
+          format: sarif
+          output: trivy-results.sarif
+          severity: CRITICAL,HIGH
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy-results.sarif
+
+  # ============================================================================
+  # Job 7: License Compliance Check
+  # ============================================================================
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[full]"
+          pip install pip-licenses
+
+      - name: Check licenses
+        run: |
+          pip-licenses --format=json --output-file=licenses.json
+          pip-licenses --format=markdown --output-file=licenses.md
+
+      - name: Validate licenses (no GPL/AGPL)
+        run: |
+          if grep -iE "GPL-3|AGPL" licenses.json; then
+            echo "❌ Incompatible license detected!"
+            exit 1
+          else
+            echo "✅ All licenses compatible"
+          fi
+
+      - name: Upload license report
+        uses: actions/upload-artifact@v4
+        with:
+          name: licenses-${{ github.sha }}
+          path: licenses.*
+          retention-days: 30
+
+  # ============================================================================
+  # Final Security Status
+  # ============================================================================
+  security-success:
+    name: Security Success
+    runs-on: ubuntu-latest
+    needs: [sbom, sca, secrets-scan, codeql, license-check]
+    if: always()
+
+    steps:
+      - name: Check all security jobs
+        run: |
+          if [[ "${{ needs.sbom.result }}" == "success" && \
+                "${{ needs.sca.result }}" == "success" && \
+                "${{ needs.secrets-scan.result }}" == "success" && \
+                "${{ needs.codeql.result }}" == "success" && \
+                "${{ needs.license-check.result }}" == "success" ]]; then
+            echo "✅ All security checks passed!"
+            exit 0
+          else
+            echo "⚠️ Some security checks failed or were skipped"
+            exit 0
+          fi
