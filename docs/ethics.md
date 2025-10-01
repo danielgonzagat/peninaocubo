@@ -2,6 +2,10 @@
 
 **Fail-Closed Ethical AI with Mathematical Guarantees**
 
+**Version**: 1.0.0  
+**Last Updated**: 2025-10-01  
+**Status**: ✅ Production-Ready
+
 ---
 
 ## 📜 Overview
@@ -13,8 +17,11 @@ The PENIN-Ω Ethics Framework implements **ΣEA/LO-14** (Συστήμα Ηθικ
 - **Fail-Closed Design**: Violations trigger automatic rollback
 - **Mathematical Guarantees**: Non-compensatory aggregation (harmonic mean)
 - **Continuous Auditing**: WORM ledger integration
+- **Full Implementation**: `penin.ethics.laws` module with automated validators
 
 **Mathematical Guarantee**: ∀ decision `d`: `ΣEA(d) = true` ∨ `reject(d) with rollback`
+
+**Code Location**: `penin/ethics/laws.py`
 
 ---
 

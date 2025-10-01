@@ -3,8 +3,10 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Tests](https://img.shields.io/badge/tests-57%20passing-brightgreen.svg)](tests/)
-[![IA³](https://img.shields.io/badge/IA%C2%B3-Production%20Beta-success.svg)](docs/architecture.md)
+[![Tests](https://img.shields.io/badge/tests-71%20passing-brightgreen.svg)](tests/)
+[![IA³](https://img.shields.io/badge/IA%C2%B3-v0.9.0%20Beta-success.svg)](docs/architecture.md)
+[![Ethics](https://img.shields.io/badge/Ethics-%CE%A3EA%2FLO--14-green.svg)](docs/ethics.md)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-4%20workflows-blue.svg)](.github/workflows/)
 
 **PENIN-Ω** is a self-evolving AI system implementing the Master Equation with CAOS+, SR-Ω∞, and L∞ aggregation for ethical, auditable, and production-ready machine learning operations.
 
