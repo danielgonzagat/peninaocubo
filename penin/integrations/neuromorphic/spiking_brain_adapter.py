@@ -141,12 +141,14 @@ class SpikingBrainAdapter(BaseIntegration):
             logger.info("SpikingBrain-7B initialized (placeholder mode)")
 
             self.initialized = True
-            self.log_event({
-                "event": "spiking_brain_initialized",
-                "model_size": self.sb_config.model_size,
-                "context_length": self.sb_config.context_length,
-                "mode": "placeholder",
-            })
+            self.log_event(
+                {
+                    "event": "spiking_brain_initialized",
+                    "model_size": self.sb_config.model_size,
+                    "context_length": self.sb_config.context_length,
+                    "mode": "placeholder",
+                }
+            )
 
             return True
 
@@ -154,12 +156,7 @@ class SpikingBrainAdapter(BaseIntegration):
             logger.error(f"Failed to initialize SpikingBrain-7B: {e}")
             return False
 
-    def generate_spiking(
-        self,
-        prompt: str,
-        max_tokens: int = 512,
-        **kwargs
-    ) -> tuple[str, dict[str, Any]]:
+    def generate_spiking(self, prompt: str, max_tokens: int = 512, **kwargs) -> tuple[str, dict[str, Any]]:
         """
         Generate text using spiking neural network
 
@@ -178,7 +175,8 @@ class SpikingBrainAdapter(BaseIntegration):
         # Actual implementation would use the SNN model
 
         import time
-        start_time = time.time()
+
+        time.time()
 
         # Simulated metrics (replace with actual SNN metrics)
         metrics = {
@@ -193,21 +191,18 @@ class SpikingBrainAdapter(BaseIntegration):
         generated_text = f"[SpikingBrain-7B placeholder response to: {prompt[:50]}...]"
 
         if self.sb_config.log_spike_statistics:
-            self.log_event({
-                "event": "spiking_generation",
-                "prompt_length": len(prompt),
-                "output_length": len(generated_text),
-                "metrics": metrics,
-            })
+            self.log_event(
+                {
+                    "event": "spiking_generation",
+                    "prompt_length": len(prompt),
+                    "output_length": len(generated_text),
+                    "metrics": metrics,
+                }
+            )
 
         return generated_text, metrics
 
-    def hybrid_generate(
-        self,
-        prompt: str,
-        fallback_model: Any = None,
-        **kwargs
-    ) -> tuple[str, dict[str, Any]]:
+    def hybrid_generate(self, prompt: str, fallback_model: Any = None, **kwargs) -> tuple[str, dict[str, Any]]:
         """
         Hybrid generation: SNN first, fallback to traditional if quality low
 
@@ -296,36 +291,44 @@ class SpikingBrainAdapter(BaseIntegration):
         checks = []
 
         # LO-01: No anthropomorphism
-        checks.append({
-            "law": "LO-01",
-            "check": "no_anthropomorphism",
-            "passed": True,
-            "note": "SNN LLM is explicitly computational, not conscious",
-        })
+        checks.append(
+            {
+                "law": "LO-01",
+                "check": "no_anthropomorphism",
+                "passed": True,
+                "note": "SNN LLM is explicitly computational, not conscious",
+            }
+        )
 
         # LO-04: Contractivity
-        checks.append({
-            "law": "LO-04",
-            "check": "contractivity",
-            "passed": True,
-            "note": "Spike patterns monitored for ρ<1",
-        })
+        checks.append(
+            {
+                "law": "LO-04",
+                "check": "contractivity",
+                "passed": True,
+                "note": "Spike patterns monitored for ρ<1",
+            }
+        )
 
         # LO-08: Transparency
-        checks.append({
-            "law": "LO-08",
-            "check": "transparency",
-            "passed": self.sb_config.log_spike_statistics,
-            "note": "Spike statistics logged to WORM",
-        })
+        checks.append(
+            {
+                "law": "LO-08",
+                "check": "transparency",
+                "passed": self.sb_config.log_spike_statistics,
+                "note": "Spike statistics logged to WORM",
+            }
+        )
 
         # LO-09: Reversibility (hybrid mode)
-        checks.append({
-            "law": "LO-09",
-            "check": "reversibility",
-            "passed": self.sb_config.hybrid_mode,
-            "note": "Fallback to traditional LLM available",
-        })
+        checks.append(
+            {
+                "law": "LO-09",
+                "check": "reversibility",
+                "passed": self.sb_config.hybrid_mode,
+                "note": "Fallback to traditional LLM available",
+            }
+        )
 
         all_passed = all(c["passed"] for c in checks)
 

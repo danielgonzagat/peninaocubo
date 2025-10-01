@@ -35,16 +35,14 @@ from penin.math.vida_morte_gates import (
 @dataclass
 class DeathConfig:
     """Configuration for Death Gate."""
+
     beta_min: float = 0.01
     enable_auto_tune: bool = True
     budget_weight: float = 0.5
     risk_weight: float = 0.5
 
 
-def death_gate_check(
-    delta_linf: float,
-    config: DeathConfig | None = None
-) -> bool:
+def death_gate_check(delta_linf: float, config: DeathConfig | None = None) -> bool:
     """
     Check if challenger should be killed (darwinian selection).
 

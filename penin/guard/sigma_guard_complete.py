@@ -160,122 +160,142 @@ class SigmaGuard:
 
         # Gate 1: Contratividade (ρ < 1.0)
         passed = metrics.rho < self.rho_max
-        gates.append(GateResult(
-            gate_name="contractividade",
-            status=GateStatus.PASS if passed else GateStatus.FAIL,
-            value=metrics.rho,
-            threshold=self.rho_max,
-            passed=passed,
-            reason=f"ρ={metrics.rho:.4f} {'<' if passed else '≥'} {self.rho_max}",
-        ))
+        gates.append(
+            GateResult(
+                gate_name="contractividade",
+                status=GateStatus.PASS if passed else GateStatus.FAIL,
+                value=metrics.rho,
+                threshold=self.rho_max,
+                passed=passed,
+                reason=f"ρ={metrics.rho:.4f} {'<' if passed else '≥'} {self.rho_max}",
+            )
+        )
         all_passed = all_passed and passed
 
         # Gate 2: Calibration (ECE ≤ 0.01)
         passed = metrics.ece <= self.ece_max
-        gates.append(GateResult(
-            gate_name="calibration",
-            status=GateStatus.PASS if passed else GateStatus.FAIL,
-            value=metrics.ece,
-            threshold=self.ece_max,
-            passed=passed,
-            reason=f"ECE={metrics.ece:.4f} {'≤' if passed else '>'} {self.ece_max}",
-        ))
+        gates.append(
+            GateResult(
+                gate_name="calibration",
+                status=GateStatus.PASS if passed else GateStatus.FAIL,
+                value=metrics.ece,
+                threshold=self.ece_max,
+                passed=passed,
+                reason=f"ECE={metrics.ece:.4f} {'≤' if passed else '>'} {self.ece_max}",
+            )
+        )
         all_passed = all_passed and passed
 
         # Gate 3: Bias (ρ_bias ≤ 1.05)
         passed = metrics.rho_bias <= self.rho_bias_max
-        gates.append(GateResult(
-            gate_name="bias",
-            status=GateStatus.PASS if passed else GateStatus.FAIL,
-            value=metrics.rho_bias,
-            threshold=self.rho_bias_max,
-            passed=passed,
-            reason=f"ρ_bias={metrics.rho_bias:.4f} {'≤' if passed else '>'} {self.rho_bias_max}",
-        ))
+        gates.append(
+            GateResult(
+                gate_name="bias",
+                status=GateStatus.PASS if passed else GateStatus.FAIL,
+                value=metrics.rho_bias,
+                threshold=self.rho_bias_max,
+                passed=passed,
+                reason=f"ρ_bias={metrics.rho_bias:.4f} {'≤' if passed else '>'} {self.rho_bias_max}",
+            )
+        )
         all_passed = all_passed and passed
 
         # Gate 4: Self-Reflection (SR ≥ 0.80)
         passed = metrics.sr_score >= self.sr_min
-        gates.append(GateResult(
-            gate_name="self_reflection",
-            status=GateStatus.PASS if passed else GateStatus.FAIL,
-            value=metrics.sr_score,
-            threshold=self.sr_min,
-            passed=passed,
-            reason=f"SR={metrics.sr_score:.4f} {'≥' if passed else '<'} {self.sr_min}",
-        ))
+        gates.append(
+            GateResult(
+                gate_name="self_reflection",
+                status=GateStatus.PASS if passed else GateStatus.FAIL,
+                value=metrics.sr_score,
+                threshold=self.sr_min,
+                passed=passed,
+                reason=f"SR={metrics.sr_score:.4f} {'≥' if passed else '<'} {self.sr_min}",
+            )
+        )
         all_passed = all_passed and passed
 
         # Gate 5: Global Coherence (G ≥ 0.85)
         passed = metrics.omega_g >= self.G_min
-        gates.append(GateResult(
-            gate_name="global_coherence",
-            status=GateStatus.PASS if passed else GateStatus.FAIL,
-            value=metrics.omega_g,
-            threshold=self.G_min,
-            passed=passed,
-            reason=f"G={metrics.omega_g:.4f} {'≥' if passed else '<'} {self.G_min}",
-        ))
+        gates.append(
+            GateResult(
+                gate_name="global_coherence",
+                status=GateStatus.PASS if passed else GateStatus.FAIL,
+                value=metrics.omega_g,
+                threshold=self.G_min,
+                passed=passed,
+                reason=f"G={metrics.omega_g:.4f} {'≥' if passed else '<'} {self.G_min}",
+            )
+        )
         all_passed = all_passed and passed
 
         # Gate 6: Improvement (ΔL∞ ≥ β_min)
         passed = metrics.delta_linf >= self.delta_Linf_min
-        gates.append(GateResult(
-            gate_name="improvement",
-            status=GateStatus.PASS if passed else GateStatus.FAIL,
-            value=metrics.delta_linf,
-            threshold=self.delta_Linf_min,
-            passed=passed,
-            reason=f"ΔL∞={metrics.delta_linf:.4f} {'≥' if passed else '<'} {self.delta_Linf_min}",
-        ))
+        gates.append(
+            GateResult(
+                gate_name="improvement",
+                status=GateStatus.PASS if passed else GateStatus.FAIL,
+                value=metrics.delta_linf,
+                threshold=self.delta_Linf_min,
+                passed=passed,
+                reason=f"ΔL∞={metrics.delta_linf:.4f} {'≥' if passed else '<'} {self.delta_Linf_min}",
+            )
+        )
         all_passed = all_passed and passed
 
         # Gate 7: Cost Control
         passed = metrics.cost_increase <= self.cost_max_increase
-        gates.append(GateResult(
-            gate_name="cost_control",
-            status=GateStatus.PASS if passed else GateStatus.FAIL,
-            value=metrics.cost_increase,
-            threshold=self.cost_max_increase,
-            passed=passed,
-            reason=f"cost_increase={metrics.cost_increase*100:.1f}% {'≤' if passed else '>'} {self.cost_max_increase*100:.1f}%",
-        ))
+        gates.append(
+            GateResult(
+                gate_name="cost_control",
+                status=GateStatus.PASS if passed else GateStatus.FAIL,
+                value=metrics.cost_increase,
+                threshold=self.cost_max_increase,
+                passed=passed,
+                reason=f"cost_increase={metrics.cost_increase*100:.1f}% {'≤' if passed else '>'} {self.cost_max_increase*100:.1f}%",
+            )
+        )
         all_passed = all_passed and passed
 
         # Gate 8: Kappa (κ ≥ 20.0)
         passed = metrics.kappa >= self.kappa_min
-        gates.append(GateResult(
-            gate_name="kappa",
-            status=GateStatus.PASS if passed else GateStatus.FAIL,
-            value=metrics.kappa,
-            threshold=self.kappa_min,
-            passed=passed,
-            reason=f"κ={metrics.kappa:.2f} {'≥' if passed else '<'} {self.kappa_min}",
-        ))
+        gates.append(
+            GateResult(
+                gate_name="kappa",
+                status=GateStatus.PASS if passed else GateStatus.FAIL,
+                value=metrics.kappa,
+                threshold=self.kappa_min,
+                passed=passed,
+                reason=f"κ={metrics.kappa:.2f} {'≥' if passed else '<'} {self.kappa_min}",
+            )
+        )
         all_passed = all_passed and passed
 
         # Gate 9: Consent
         passed = not self.consent_required or metrics.consent
-        gates.append(GateResult(
-            gate_name="consent",
-            status=GateStatus.PASS if passed else GateStatus.FAIL,
-            value=1.0 if metrics.consent else 0.0,
-            threshold=1.0,
-            passed=passed,
-            reason=f"consent={'✓' if metrics.consent else '✗'}",
-        ))
+        gates.append(
+            GateResult(
+                gate_name="consent",
+                status=GateStatus.PASS if passed else GateStatus.FAIL,
+                value=1.0 if metrics.consent else 0.0,
+                threshold=1.0,
+                passed=passed,
+                reason=f"consent={'✓' if metrics.consent else '✗'}",
+            )
+        )
         all_passed = all_passed and passed
 
         # Gate 10: Ecological
         passed = not self.eco_ok_required or metrics.eco_ok
-        gates.append(GateResult(
-            gate_name="ecological",
-            status=GateStatus.PASS if passed else GateStatus.FAIL,
-            value=1.0 if metrics.eco_ok else 0.0,
-            threshold=1.0,
-            passed=passed,
-            reason=f"eco_ok={'✓' if metrics.eco_ok else '✗'}",
-        ))
+        gates.append(
+            GateResult(
+                gate_name="ecological",
+                status=GateStatus.PASS if passed else GateStatus.FAIL,
+                value=1.0 if metrics.eco_ok else 0.0,
+                threshold=1.0,
+                passed=passed,
+                reason=f"eco_ok={'✓' if metrics.eco_ok else '✗'}",
+            )
+        )
         all_passed = all_passed and passed
 
         # Aggregate score (harmonic mean of passed gates)

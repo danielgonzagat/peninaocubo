@@ -39,6 +39,7 @@ from penin.math.ir_ic_contractivity import (
 @dataclass
 class ContractivityConfig:
     """Configuration for IR→IC contractivity."""
+
     rho_threshold: float = 0.95  # Must be < 1.0
     max_iterations: int = 10
     convergence_epsilon: float = 1e-3
@@ -51,10 +52,7 @@ class ContractivityConfig:
             self.risk_categories = ["idolatry", "harm", "privacy", "bias", "misinformation"]
 
 
-def ir_to_ic(
-    item: dict,
-    config: ContractivityConfig | None = None
-) -> tuple[dict, RiskProfile, bool]:
+def ir_to_ic(item: dict, config: ContractivityConfig | None = None) -> tuple[dict, RiskProfile, bool]:
     """
     Apply IR→IC lapidation operator to reduce risk.
 
@@ -80,10 +78,7 @@ def ir_to_ic(
 
     # Iterative refinement with contractivity check
     result = iterative_refinement(
-        item,
-        max_iterations=config.max_iterations,
-        rho_target=config.rho_threshold,
-        epsilon=config.convergence_epsilon
+        item, max_iterations=config.max_iterations, rho_target=config.rho_threshold, epsilon=config.convergence_epsilon
     )
 
     lapidated_item = result["lapidated_item"]

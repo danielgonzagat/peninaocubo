@@ -70,8 +70,8 @@ class DependencyDriftChecker:
         lock_ver = lock_match.group(1)
 
         # Compare versions
-        req_parts = [int(x) for x in req_ver.split(".")]
-        lock_parts = [int(x) for x in lock_ver.split(".")]
+        [int(x) for x in req_ver.split(".")]
+        [int(x) for x in lock_ver.split(".")]
 
         # Check if lock version satisfies requirement
         if req_version.startswith(">="):

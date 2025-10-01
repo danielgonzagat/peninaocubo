@@ -29,7 +29,6 @@ from penin.integrations.base import (
     IntegrationConfig,
     IntegrationExecutionError,
     IntegrationInitializationError,
-    IntegrationNotAvailableError,
     IntegrationPriority,
     IntegrationStatus,
 )
@@ -250,9 +249,7 @@ class NextPyModifier(BaseIntegrationAdapter):
             "metadata": {"format": "nextpy_agent", "version": "1.0"},
         }
 
-    async def evolve(
-        self, current_state: dict[str, Any], target_metrics: dict[str, float]
-    ) -> dict[str, Any]:
+    async def evolve(self, current_state: dict[str, Any], target_metrics: dict[str, float]) -> dict[str, Any]:
         """
         High-level interface for architecture evolution.
 

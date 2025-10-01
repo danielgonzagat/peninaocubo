@@ -47,7 +47,7 @@ class TestLifeEquation:
         )
 
         assert isinstance(result, LifeVerdict)
-        assert result.ok == True
+        assert result.ok
         assert result.alpha_eff > 0
         assert "phi" in result.metrics
 
@@ -74,7 +74,7 @@ class TestLifeEquation:
             thresholds={},
         )
 
-        assert result.ok == False
+        assert not result.ok
         assert result.alpha_eff == 0.0
 
 
@@ -144,7 +144,6 @@ class TestCAOSKratos:
 
     def test_phi_kratos_amplification(self):
         """Test KRATOS amplification"""
-        base_phi = 0.5
         kratos_phi = phi_kratos(0.7, 0.6, 0.8, 0.9, exploration_factor=2.0)
 
         assert kratos_phi > 0  # Should produce valid result
@@ -154,8 +153,8 @@ class TestCAOSKratos:
         safe = kratos_gate(phi_kratos_val=1.2, phi_base_val=1.0, safety_ratio=1.5)
         unsafe = kratos_gate(phi_kratos_val=2.0, phi_base_val=1.0, safety_ratio=1.5)
 
-        assert safe == True
-        assert unsafe == False
+        assert safe
+        assert not unsafe
 
 
 class TestMarketplace:
@@ -187,7 +186,7 @@ class TestNeuralChain:
         # Verify chain
         valid = verify_chain()
 
-        assert valid == True
+        assert valid
         assert h2 != h1
 
         # Get latest
@@ -267,8 +266,8 @@ class TestImmunity:
         normal = {"metric": 0.5}
         anomalous = {"metric": float("inf")}
 
-        assert guard(normal) == True
-        assert guard(anomalous) == False
+        assert guard(normal)
+        assert not guard(anomalous)
 
 
 class TestCheckpoint:
@@ -294,7 +293,7 @@ class TestCheckpoint:
         cp_id = save_snapshot(state)
 
         valid = verify_checkpoint(cp_id)
-        assert valid == True
+        assert valid
 
 
 class TestGAME:
@@ -315,7 +314,7 @@ class TestGAME:
 
         # Update gradients
         for i in range(3):
-            smoothed = tracker.update("param1", 1.0 / (i + 1))
+            tracker.update("param1", 1.0 / (i + 1))
 
         assert "param1" in tracker.gradients
         assert tracker.step_count["param1"] == 3
@@ -375,8 +374,8 @@ class TestZeroConsciousness:
         safe = assert_zero_consciousness(0.03, tau=0.05)
         risky = assert_zero_consciousness(0.08, tau=0.05)
 
-        assert safe == True
-        assert risky == False
+        assert safe
+        assert not risky
 
     def test_self_reference_detection(self):
         """Test self-reference counting"""
@@ -418,7 +417,7 @@ class TestIntegration:
             thresholds={"beta_min": 0.01, "theta_caos": 0.25, "tau_sr": 0.80, "theta_G": 0.85},
         )
 
-        assert result.ok == True
+        assert result.ok
 
     def test_checkpoint_with_chain(self):
         """Test checkpoint saved to neural chain"""
@@ -427,11 +426,11 @@ class TestIntegration:
         cp_id = save_snapshot(state, reason="chain_test")
 
         # Add to chain
-        block_hash = add_block({"checkpoint": cp_id, "state_summary": state})
+        add_block({"checkpoint": cp_id, "state_summary": state})
 
         # Verify both
-        assert verify_checkpoint(cp_id) == True
-        assert verify_chain() == True
+        assert verify_checkpoint(cp_id)
+        assert verify_chain()
 
     def test_immunity_triggers_checkpoint(self):
         """Test immunity system triggering checkpoint"""

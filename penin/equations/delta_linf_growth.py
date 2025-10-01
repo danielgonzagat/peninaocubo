@@ -16,14 +16,13 @@ from dataclasses import dataclass
 @dataclass
 class DeltaLInfConfig:
     """Configuration for ΔL∞ growth."""
+
     beta_min: float = 0.01
     compounding_enabled: bool = True
 
 
 def delta_linf_compound_growth(
-    L_current: float,
-    L_next: float,
-    config: DeltaLInfConfig | None = None
+    L_current: float, L_next: float, config: DeltaLInfConfig | None = None
 ) -> tuple[bool, float]:
     """
     Check if L∞ growth meets compound threshold.

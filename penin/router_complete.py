@@ -34,6 +34,7 @@ from typing import Any
 
 try:
     import orjson
+
     ORJSON_AVAILABLE = True
 except ImportError:
     ORJSON_AVAILABLE = False
@@ -64,8 +65,10 @@ CB_HALF_OPEN_MAX_CALLS = 1
 # Enums
 # ============================================================================
 
+
 class ProviderHealth(str, Enum):
     """Health status for circuit breaker and analytics."""
+
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
@@ -74,6 +77,7 @@ class ProviderHealth(str, Enum):
 
 class RouterMode(str, Enum):
     """Operation mode for router."""
+
     PRODUCTION = "production"
     DRY_RUN = "dry_run"
     SHADOW = "shadow"
@@ -82,6 +86,7 @@ class RouterMode(str, Enum):
 # ============================================================================
 # Budget Tracker
 # ============================================================================
+
 
 @dataclass
 class BudgetTracker:
@@ -106,12 +111,14 @@ class BudgetTracker:
         """Auto-reset on new day."""
         today = date.today()
         if today > self.last_reset:
-            self.spend_history.append({
-                "date": self.last_reset.isoformat(),
-                "spend_usd": round(self.current_spend_usd, 6),
-                "tokens": self.total_tokens,
-                "requests": self.request_count,
-            })
+            self.spend_history.append(
+                {
+                    "date": self.last_reset.isoformat(),
+                    "spend_usd": round(self.current_spend_usd, 6),
+                    "tokens": self.total_tokens,
+                    "requests": self.request_count,
+                }
+            )
             self.current_spend_usd = 0.0
             self.total_tokens = 0
             self.request_count = 0
@@ -174,6 +181,7 @@ class BudgetTracker:
 # ============================================================================
 # Provider Statistics
 # ============================================================================
+
 
 @dataclass
 class ProviderStats:
@@ -286,6 +294,7 @@ class ProviderStats:
 # Circuit Breaker
 # ============================================================================
 
+
 class CircuitBreaker:
     """
     Circuit breaker to prevent hammering unhealthy providers.
@@ -366,6 +375,7 @@ class CircuitBreaker:
 # Cache with HMAC Integrity
 # ============================================================================
 
+
 class CacheEntry:
     """Cache entry with HMAC integrity."""
 
@@ -379,11 +389,7 @@ class CacheEntry:
     def _compute_hmac(self) -> str:
         """Compute HMAC-SHA256 for integrity."""
         data = f"{self.key}:{self.value}:{self.created_at}:{self.ttl}"
-        return hmac.new(
-            CACHE_HMAC_SECRET.encode(),
-            data.encode(),
-            hashlib.sha256
-        ).hexdigest()
+        return hmac.new(CACHE_HMAC_SECRET.encode(), data.encode(), hashlib.sha256).hexdigest()
 
     def is_valid(self) -> bool:
         """Check if entry is valid (not expired and integrity intact)."""
@@ -511,6 +517,7 @@ class HMACCache:
 # ============================================================================
 # Complete Multi-LLM Router
 # ============================================================================
+
 
 class MultiLLMRouterComplete:
     """
@@ -705,10 +712,10 @@ class MultiLLMRouterComplete:
 
         # Weighted sum
         return (
-            has_content * 0.2 +
-            latency_score * self.latency_weight +
-            cost_score * self.cost_weight +
-            quality_score * self.quality_weight
+            has_content * 0.2
+            + latency_score * self.latency_weight
+            + cost_score * self.cost_weight
+            + quality_score * self.quality_weight
         )
 
     async def _invoke_provider(
@@ -731,12 +738,7 @@ class MultiLLMRouterComplete:
         # Call provider
         start = time.monotonic()
         try:
-            response = await provider.chat(
-                messages,
-                tools=tools,
-                system=system,
-                temperature=temperature
-            )
+            response = await provider.chat(messages, tools=tools, system=system, temperature=temperature)
         except Exception as exc:
             # Record failure
             async with self._provider_locks[provider_id]:
@@ -802,12 +804,7 @@ class MultiLLMRouterComplete:
         """
         # Check cache
         if use_cache and self._cache:
-            cache_key = self._cache._make_key(
-                messages,
-                system=system,
-                tools=tools,
-                temperature=temperature
-            )
+            cache_key = self._cache._make_key(messages, system=system, tools=tools, temperature=temperature)
             cached = self._cache.get(cache_key)
             if cached is not None:
                 return cached
@@ -839,13 +836,7 @@ class MultiLLMRouterComplete:
 
         # Invoke providers in parallel
         tasks = [
-            self._invoke_provider(
-                provider,
-                messages,
-                tools=tools,
-                system=system,
-                temperature=temperature
-            )
+            self._invoke_provider(provider, messages, tools=tools, system=system, temperature=temperature)
             for provider in self.providers
         ]
 
@@ -905,16 +896,10 @@ class MultiLLMRouterComplete:
     def get_usage_stats(self) -> dict[str, Any]:
         """Get comprehensive usage statistics."""
         data = self._budget.snapshot()
-        data["providers"] = {
-            pid: stats.to_dict()
-            for pid, stats in self.provider_stats.items()
-        }
+        data["providers"] = {pid: stats.to_dict() for pid, stats in self.provider_stats.items()}
 
         if self.enable_circuit_breaker:
-            data["circuit_breakers"] = {
-                pid: breaker.state.value
-                for pid, breaker in self.circuit_breakers.items()
-            }
+            data["circuit_breakers"] = {pid: breaker.state.value for pid, breaker in self.circuit_breakers.items()}
 
         if self._cache:
             data["cache"] = self._cache.stats()
@@ -952,10 +937,9 @@ class MultiLLMRouterComplete:
 # Factory Function
 # ============================================================================
 
+
 def create_router_complete(
-    providers: Iterable[BaseProvider],
-    daily_budget_usd: float = 5.0,
-    **kwargs: Any
+    providers: Iterable[BaseProvider], daily_budget_usd: float = 5.0, **kwargs: Any
 ) -> MultiLLMRouterComplete:
     """
     Factory function for creating complete router.
@@ -968,8 +952,4 @@ def create_router_complete(
     Returns:
         Configured MultiLLMRouterComplete instance
     """
-    return MultiLLMRouterComplete(
-        providers=providers,
-        daily_budget_usd=daily_budget_usd,
-        **kwargs
-    )
+    return MultiLLMRouterComplete(providers=providers, daily_budget_usd=daily_budget_usd, **kwargs)

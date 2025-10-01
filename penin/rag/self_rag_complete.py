@@ -28,12 +28,14 @@ from typing import Any
 
 try:
     import numpy as np
+
     NUMPY_AVAILABLE = True
 except ImportError:
     NUMPY_AVAILABLE = False
 
 try:
     from sentence_transformers import SentenceTransformer
+
     SENTENCE_TRANSFORMERS_AVAILABLE = True
 except ImportError:
     SENTENCE_TRANSFORMERS_AVAILABLE = False
@@ -50,16 +52,49 @@ DEFAULT_SIMILARITY_THRESHOLD = 0.85
 DEFAULT_EMBEDDING_MODEL = "all-MiniLM-L6-v2"
 
 STOPWORDS = {
-    "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
-    "has", "he", "in", "is", "it", "its", "of", "on", "that", "the",
-    "to", "was", "will", "with", "this", "but", "they", "have",
-    "had", "what", "when", "where", "who", "which", "why", "how"
+    "a",
+    "an",
+    "and",
+    "are",
+    "as",
+    "at",
+    "be",
+    "by",
+    "for",
+    "from",
+    "has",
+    "he",
+    "in",
+    "is",
+    "it",
+    "its",
+    "of",
+    "on",
+    "that",
+    "the",
+    "to",
+    "was",
+    "will",
+    "with",
+    "this",
+    "but",
+    "they",
+    "have",
+    "had",
+    "what",
+    "when",
+    "where",
+    "who",
+    "which",
+    "why",
+    "how",
 }
 
 
 # ============================================================================
 # Document and Chunk
 # ============================================================================
+
 
 @dataclass
 class Document:
@@ -74,9 +109,7 @@ class Document:
     def __post_init__(self):
         """Compute content hash on initialization."""
         if self.content_hash is None:
-            self.content_hash = hashlib.sha256(
-                self.content.encode()
-            ).hexdigest()
+            self.content_hash = hashlib.sha256(self.content.encode()).hexdigest()
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -104,9 +137,7 @@ class Chunk:
     def __post_init__(self):
         """Compute chunk hash on initialization."""
         if not self.chunk_hash:
-            self.chunk_hash = hashlib.sha256(
-                f"{self.doc_id}:{self.content}".encode()
-            ).hexdigest()
+            self.chunk_hash = hashlib.sha256(f"{self.doc_id}:{self.content}".encode()).hexdigest()
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -134,10 +165,7 @@ class RetrievalResult:
     def __post_init__(self):
         """Generate citation on initialization."""
         if not self.citation:
-            self.citation = (
-                f"[{self.chunk.doc_id}:{self.chunk.chunk_id} "
-                f"hash:{self.chunk.chunk_hash[:8]}...]"
-            )
+            self.citation = f"[{self.chunk.doc_id}:{self.chunk.chunk_id} " f"hash:{self.chunk.chunk_hash[:8]}...]"
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -153,6 +181,7 @@ class RetrievalResult:
 # ============================================================================
 # BM25 Retriever
 # ============================================================================
+
 
 class BM25:
     """
@@ -176,7 +205,7 @@ class BM25:
     @staticmethod
     def tokenize(text: str) -> list[str]:
         """Tokenize text (simple whitespace + lowercasing)."""
-        tokens = re.findall(r'\b\w+\b', text.lower())
+        tokens = re.findall(r"\b\w+\b", text.lower())
         return [t for t in tokens if t not in STOPWORDS and len(t) > 2]
 
     def fit(self, documents: list[tuple[str, str]]) -> None:
@@ -243,9 +272,7 @@ class BM25:
             idf = self.idf[token]
 
             numerator = tf * (self.k1 + 1)
-            denominator = tf + self.k1 * (
-                1 - self.b + self.b * (doc_length / self.avg_doc_length)
-            )
+            denominator = tf + self.k1 * (1 - self.b + self.b * (doc_length / self.avg_doc_length))
 
             score += idf * (numerator / denominator)
 
@@ -276,6 +303,7 @@ class BM25:
 # Embedding Retriever
 # ============================================================================
 
+
 class EmbeddingRetriever:
     """
     Dense embedding retriever using sentence transformers.
@@ -286,16 +314,10 @@ class EmbeddingRetriever:
     def __init__(self, model_name: str = DEFAULT_EMBEDDING_MODEL):
         """Initialize embedding model."""
         if not SENTENCE_TRANSFORMERS_AVAILABLE:
-            raise ImportError(
-                "sentence-transformers not available. "
-                "Install with: pip install sentence-transformers"
-            )
+            raise ImportError("sentence-transformers not available. " "Install with: pip install sentence-transformers")
 
         if not NUMPY_AVAILABLE:
-            raise ImportError(
-                "numpy not available. "
-                "Install with: pip install numpy"
-            )
+            raise ImportError("numpy not available. " "Install with: pip install numpy")
 
         self.model = SentenceTransformer(model_name)
         self.embeddings: np.ndarray | None = None
@@ -312,11 +334,7 @@ class EmbeddingRetriever:
         contents = [content for _, content in documents]
 
         # Encode all documents
-        self.embeddings = self.model.encode(
-            contents,
-            convert_to_numpy=True,
-            show_progress_bar=False
-        )
+        self.embeddings = self.model.encode(contents, convert_to_numpy=True, show_progress_bar=False)
 
     @staticmethod
     def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
@@ -338,11 +356,7 @@ class EmbeddingRetriever:
             return []
 
         # Encode query
-        query_embedding = self.model.encode(
-            [query],
-            convert_to_numpy=True,
-            show_progress_bar=False
-        )[0]
+        query_embedding = self.model.encode([query], convert_to_numpy=True, show_progress_bar=False)[0]
 
         # Compute similarities
         scores = []
@@ -357,6 +371,7 @@ class EmbeddingRetriever:
 # ============================================================================
 # Chunker
 # ============================================================================
+
 
 class TextChunker:
     """
@@ -394,7 +409,7 @@ class TextChunker:
 
         if self.preserve_sentences:
             # Split by sentences (naive)
-            sentences = re.split(r'[.!?]+\s+', content)
+            sentences = re.split(r"[.!?]+\s+", content)
             chunks = self._chunk_sentences(doc, sentences)
         else:
             # Simple fixed-size chunking
@@ -443,7 +458,7 @@ class TextChunker:
 
             if current_length + sentence_length > self.chunk_size and current_chunk:
                 # Finalize current chunk
-                chunk_content = '. '.join(current_chunk) + '.'
+                chunk_content = ". ".join(current_chunk) + "."
                 start_idx = doc.content.find(current_chunk[0])
                 end_idx = start_idx + len(chunk_content)
 
@@ -472,7 +487,7 @@ class TextChunker:
 
         # Add final chunk
         if current_chunk:
-            chunk_content = '. '.join(current_chunk) + '.'
+            chunk_content = ". ".join(current_chunk) + "."
             start_idx = doc.content.find(current_chunk[0]) if current_chunk else 0
             end_idx = start_idx + len(chunk_content)
 
@@ -492,6 +507,7 @@ class TextChunker:
 # ============================================================================
 # Deduplication
 # ============================================================================
+
 
 class Deduplicator:
     """
@@ -549,11 +565,7 @@ class Deduplicator:
 
         # Encode all chunks
         contents = [chunk.content for chunk in chunks]
-        embeddings = model.encode(
-            contents,
-            convert_to_numpy=True,
-            show_progress_bar=False
-        )
+        embeddings = model.encode(contents, convert_to_numpy=True, show_progress_bar=False)
 
         # Greedy deduplication
         keep_mask = [True] * len(chunks)
@@ -566,10 +578,7 @@ class Deduplicator:
                 if not keep_mask[j]:
                     continue
 
-                similarity = EmbeddingRetriever.cosine_similarity(
-                    embeddings[i],
-                    embeddings[j]
-                )
+                similarity = EmbeddingRetriever.cosine_similarity(embeddings[i], embeddings[j])
 
                 if similarity >= self.similarity_threshold:
                     keep_mask[j] = False
@@ -580,6 +589,7 @@ class Deduplicator:
 # ============================================================================
 # Fractal Coherence
 # ============================================================================
+
 
 def fractal_coherence(results: list[RetrievalResult]) -> float:
     """
@@ -632,6 +642,7 @@ def fractal_coherence(results: list[RetrievalResult]) -> float:
 # ============================================================================
 # Self-RAG System
 # ============================================================================
+
 
 class SelfRAG:
     """
@@ -806,11 +817,7 @@ class SelfRAG:
             combined_scores[chunk_id] = combined_scores.get(chunk_id, 0.0) + rrf_score
 
         # Sort by combined score
-        ranked = sorted(
-            combined_scores.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )[:top_k]
+        ranked = sorted(combined_scores.items(), key=lambda x: x[1], reverse=True)[:top_k]
 
         # Create results
         results = []
@@ -844,6 +851,7 @@ class SelfRAG:
 # ============================================================================
 # Factory Function
 # ============================================================================
+
 
 def create_self_rag(
     chunk_size: int = DEFAULT_CHUNK_SIZE,

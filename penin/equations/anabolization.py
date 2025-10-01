@@ -20,10 +20,11 @@ from dataclasses import dataclass
 @dataclass
 class AnabolizationConfig:
     """Configuration for anabolization."""
-    mu: float = 0.5      # ΔL∞ weight
-    nu: float = 0.3      # CAOS⁺ exponent
-    xi: float = 0.25     # SR exponent
-    zeta: float = 0.2    # OCI exponent
+
+    mu: float = 0.5  # ΔL∞ weight
+    nu: float = 0.3  # CAOS⁺ exponent
+    xi: float = 0.25  # SR exponent
+    zeta: float = 0.2  # OCI exponent
     min_anabolic_rate: float = 0.5
     max_anabolic_rate: float = 2.0
 
@@ -34,7 +35,7 @@ def anabolize_penin(
     sr_score: float,
     oci_score: float,
     delta_linf: float,
-    config: AnabolizationConfig | None = None
+    config: AnabolizationConfig | None = None,
 ) -> float:
     """
     Compute anabolic factor (evolution acceleration/deceleration).
@@ -54,17 +55,16 @@ def anabolize_penin(
 
     # Multiplicative anabolization function
     f_anabolize = (
-        (1.0 + config.mu * delta_linf) *
-        math.pow(caos_plus, config.nu) *
-        math.pow(sr_score, config.xi) *
-        math.pow(oci_score, config.zeta)
+        (1.0 + config.mu * delta_linf)
+        * math.pow(caos_plus, config.nu)
+        * math.pow(sr_score, config.xi)
+        * math.pow(oci_score, config.zeta)
     )
 
     A_next = A_current * f_anabolize
 
     # Clamp to safe bounds
-    A_next = max(config.min_anabolic_rate,
-                 min(config.max_anabolic_rate, A_next))
+    A_next = max(config.min_anabolic_rate, min(config.max_anabolic_rate, A_next))
 
     return A_next
 

@@ -3,7 +3,7 @@ from typing import Any
 
 def anomaly_score(metrics: dict[str, Any]) -> float:
     s = 0.0
-    for k, v in metrics.items():
+    for _k, v in metrics.items():
         try:
             x = float(v)
             if not (0.0 <= x <= 1e6):

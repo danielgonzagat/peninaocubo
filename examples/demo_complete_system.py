@@ -34,6 +34,7 @@ from penin.router_complete import MultiLLMRouterComplete, RouterMode
 # Mock Provider for Demo
 # ============================================================================
 
+
 class MockProvider(BaseProvider):
     """Mock LLM provider for demo."""
 
@@ -70,6 +71,7 @@ class MockProvider(BaseProvider):
 # ============================================================================
 # Demo Functions
 # ============================================================================
+
 
 async def demo_router():
     """Demonstrate Multi-LLM Router."""
@@ -109,14 +111,14 @@ async def demo_router():
     print(f"  Usage: {stats['budget']['budget_used_pct']:.2f}%")
 
     print("\n📊 Provider Statistics:")
-    for provider_id, provider_stats in stats['providers'].items():
+    for provider_id, provider_stats in stats["providers"].items():
         print(f"  {provider_id}:")
         print(f"    Requests: {provider_stats['total_requests']}")
         print(f"    Success Rate: {provider_stats['success_rate']*100:.1f}%")
         print(f"    Avg Latency: {provider_stats['avg_latency_s']:.3f}s")
         print(f"    Total Cost: ${provider_stats['total_cost_usd']:.6f}")
 
-    if stats.get('cache'):
+    if stats.get("cache"):
         print("\n🗂️  Cache Statistics:")
         print(f"  Hit Rate: {stats['cache']['hit_rate']*100:.1f}%")
         print(f"  L1 Size: {stats['cache']['l1_size']}")
@@ -324,7 +326,7 @@ async def demo_omega_meta():
     # Show statistics
     stats = meta.get_statistics()
     print("\n📈 Ω-META Statistics:")
-    champion = stats['framework']['champion']
+    champion = stats["framework"]["champion"]
     if champion:
         print(f"  Champion: {champion['mutation_id']}")
         print(f"  Traffic: {champion['traffic_percentage']*100:.0f}%")
@@ -399,7 +401,7 @@ def demo_sigma_guard():
 
     for i, test_case in enumerate(test_cases, 1):
         print(f"\n  Test {i}: {test_case['name']}")
-        result = guard.validate(test_case['metrics'])
+        result = guard.validate(test_case["metrics"])
 
         if result.allow:
             print("    ✅ PASS")
@@ -473,6 +475,7 @@ def demo_equations():
 # Main Demo
 # ============================================================================
 
+
 async def main():
     """Run complete demo."""
     print("\n" + "=" * 60)
@@ -488,11 +491,11 @@ async def main():
 
     try:
         # Run demos
-        router = await demo_router()
-        ledger = demo_worm_ledger()
-        rag = demo_self_rag()
-        meta = await demo_omega_meta()
-        guard = demo_sigma_guard()
+        await demo_router()
+        demo_worm_ledger()
+        demo_self_rag()
+        await demo_omega_meta()
+        demo_sigma_guard()
         demo_equations()
 
         # Final summary
@@ -517,6 +520,7 @@ async def main():
     except Exception as e:
         print(f"\n❌ Demo failed: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

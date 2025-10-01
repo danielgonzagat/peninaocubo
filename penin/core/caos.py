@@ -144,11 +144,7 @@ class ConsistencyMetrics:
         ece_norm = clamp01(1.0 - self.ece)  # Inverter ECE
         ext_norm = clamp01(self.external_verification)
 
-        c = (
-            self.weight_pass * pass_norm
-            + self.weight_ece * ece_norm
-            + self.weight_external * ext_norm
-        )
+        c = self.weight_pass * pass_norm + self.weight_ece * ece_norm + self.weight_external * ext_norm
 
         return clamp01(c)
 
@@ -207,11 +203,7 @@ class IncognoscibleMetrics:
         ood_norm = clamp01(self.ood_score)
         ens_norm = clamp01(self.ensemble_disagreement)
 
-        o = (
-            self.weight_epistemic * epist_norm
-            + self.weight_ood * ood_norm
-            + self.weight_ensemble * ens_norm
-        )
+        o = self.weight_epistemic * epist_norm + self.weight_ood * ood_norm + self.weight_ensemble * ens_norm
 
         return clamp01(o)
 

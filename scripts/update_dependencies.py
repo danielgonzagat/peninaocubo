@@ -47,9 +47,13 @@ class DependencyUpdater:
         """Check for security vulnerabilities."""
         try:
             # Try to use safety if available
-            result = subprocess.run([sys.executable, "-m", "pip", "install", "safety"], check=False, capture_output=True, text=True)
+            result = subprocess.run(
+                [sys.executable, "-m", "pip", "install", "safety"], check=False, capture_output=True, text=True
+            )
 
-            result = subprocess.run([sys.executable, "-m", "safety", "check", "--json"], check=False, capture_output=True, text=True)
+            result = subprocess.run(
+                [sys.executable, "-m", "safety", "check", "--json"], check=False, capture_output=True, text=True
+            )
 
             if result.returncode == 0:
                 vulnerabilities = json.loads(result.stdout)
@@ -69,7 +73,7 @@ class DependencyUpdater:
             else:
                 cmd = [sys.executable, "-m", "pip", "install", "--upgrade", package_name]
 
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+            subprocess.run(cmd, capture_output=True, text=True, check=True)
             print(f"✅ Updated {package_name}")
             return True
         except subprocess.CalledProcessError as e:
@@ -89,7 +93,7 @@ class DependencyUpdater:
         all_passed = True
         for cmd in test_commands:
             try:
-                result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+                subprocess.run(cmd, capture_output=True, text=True, check=True)
                 print(f"✅ {cmd[-1]}")
             except subprocess.CalledProcessError as e:
                 print(f"❌ {cmd[-1]}: {e.stderr}")

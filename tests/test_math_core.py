@@ -158,7 +158,9 @@ class TestSROmegaInfinity:
 
     def test_basic_computation(self):
         """Test basic SR score."""
-        R_t, comp = compute_sr_score(awareness=0.92, ethics_ok=True, autocorrection=0.88, metacognition=0.67, return_components=True)
+        R_t, comp = compute_sr_score(
+            awareness=0.92, ethics_ok=True, autocorrection=0.88, metacognition=0.67, return_components=True
+        )
 
         assert 0.0 <= R_t <= 1.0
         assert isinstance(comp, SRComponents)
@@ -166,7 +168,9 @@ class TestSROmegaInfinity:
 
     def test_ethics_fail_closed(self):
         """Test ethics failure returns 0."""
-        R_t, comp = compute_sr_score(awareness=0.95, ethics_ok=False, autocorrection=0.90, metacognition=0.80, return_components=True)
+        R_t, comp = compute_sr_score(
+            awareness=0.95, ethics_ok=False, autocorrection=0.90, metacognition=0.80, return_components=True
+        )
 
         assert R_t == 0.0
         assert comp.ethics_ok == 0.0

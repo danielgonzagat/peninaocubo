@@ -121,13 +121,13 @@ class VidaPlusRunner:
         G = compute_swarm_coherence(window_s=60)
 
         # 3. Self-RAG introspection
-        rag_cycle = self_cycle("what improvements are needed?", max_depth=2)
+        self_cycle("what improvements are needed?", max_depth=2)
 
         # 4. Compute current metrics
         metrics = self._compute_metrics(swarm_state)
 
         # 5. Check immunity
-        immunity_report = detect_anomalies(metrics)
+        detect_anomalies(metrics)
         if not immunity_guard(metrics):
             print("  ⚠️ Immunity triggered - rolling back")
             if self.checkpoint_id:

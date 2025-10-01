@@ -23,14 +23,13 @@ from penin.math.vida_morte_gates import compute_lyapunov_quadratic, life_gate_ly
 @dataclass
 class LyapunovConfig:
     """Configuration for Lyapunov contractivity check."""
+
     tolerance: float = 1e-6
     I_star: Any = None  # Target state
 
 
 def lyapunov_check(
-    I_current: dict[str, float],
-    I_next: dict[str, float],
-    config: LyapunovConfig | None = None
+    I_current: dict[str, float], I_next: dict[str, float], config: LyapunovConfig | None = None
 ) -> tuple[bool, float]:
     """
     Check Lyapunov contractivity: V(I_next) < V(I_current).

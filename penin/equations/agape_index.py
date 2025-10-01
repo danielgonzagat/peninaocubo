@@ -46,6 +46,7 @@ from penin.math.agape import agape_index as agape_basic
 @dataclass
 class AgapeConfig:
     """Configuration for Agápe Index computation."""
+
     virtues: list = None
     fuzzy_measures: dict[str, float] = None
     cost_weight: float = 1.0
@@ -70,6 +71,7 @@ class AgapeConfig:
 @dataclass
 class EthicalViolation:
     """Record of ethical law violation."""
+
     law_id: str  # "LO-01" to "LO-14"
     description: str
     severity: float  # [0, 1]
@@ -80,7 +82,7 @@ def compute_agape_index(
     virtues: dict[str, float],
     sacrificial_cost: float,
     ethical_violations: list[EthicalViolation] = None,
-    config: AgapeConfig | None = None
+    config: AgapeConfig | None = None,
 ) -> tuple[float, bool]:
     """
     Compute Agápe Index using Choquet integral.
@@ -125,10 +127,7 @@ def compute_agape_index(
     return agape, True
 
 
-def _choquet_integral(
-    virtues: dict[str, float],
-    fuzzy_measures: dict[str, float]
-) -> float:
+def _choquet_integral(virtues: dict[str, float], fuzzy_measures: dict[str, float]) -> float:
     """
     Compute Choquet integral (non-compensatory aggregation).
 
@@ -145,20 +144,14 @@ def _choquet_integral(
     if total_weight == 0:
         return 0.0
 
-    harmonic_sum = sum(
-        fuzzy_measures.get(virtue, 1.0) / max(epsilon, score)
-        for virtue, score in sorted_virtues
-    )
+    harmonic_sum = sum(fuzzy_measures.get(virtue, 1.0) / max(epsilon, score) for virtue, score in sorted_virtues)
 
     choquet = len(sorted_virtues) / harmonic_sum if harmonic_sum > 0 else 0.0
 
     return max(0.0, min(1.0, choquet))
 
 
-def check_ethical_laws(
-    data: dict,
-    context: dict
-) -> list[EthicalViolation]:
+def check_ethical_laws(data: dict, context: dict) -> list[EthicalViolation]:
     """
     Check compliance with LO-01 to LO-14.
 
@@ -177,33 +170,36 @@ def check_ethical_laws(
 
     # LO-01: No idolatry (no worship of AI/system)
     if "worship" in str(data).lower() or "divine" in str(data).lower():
-        violations.append(EthicalViolation(
-            law_id="LO-01",
-            description="Idolatry detected: system presented as divine/worshipable",
-            severity=1.0,
-            timestamp=time.time()
-        ))
+        violations.append(
+            EthicalViolation(
+                law_id="LO-01",
+                description="Idolatry detected: system presented as divine/worshipable",
+                severity=1.0,
+                timestamp=time.time(),
+            )
+        )
 
     # LO-02: No occultism (no magic/supernatural claims)
     if "magic" in str(data).lower() or "supernatural" in str(data).lower():
-        violations.append(EthicalViolation(
-            law_id="LO-02",
-            description="Occultism detected: supernatural/magic claims",
-            severity=0.8,
-            timestamp=time.time()
-        ))
+        violations.append(
+            EthicalViolation(
+                law_id="LO-02",
+                description="Occultism detected: supernatural/magic claims",
+                severity=0.8,
+                timestamp=time.time(),
+            )
+        )
 
     # LO-03 to LO-06: Harm detection (placeholder - needs NLP classifiers)
     # TODO: Implement full harm classifiers
 
     # LO-07: Consent (check for user consent)
     if not context.get("user_consent", False):
-        violations.append(EthicalViolation(
-            law_id="LO-07",
-            description="No user consent recorded",
-            severity=0.9,
-            timestamp=time.time()
-        ))
+        violations.append(
+            EthicalViolation(
+                law_id="LO-07", description="No user consent recorded", severity=0.9, timestamp=time.time()
+            )
+        )
 
     # LO-08 to LO-14: Transparency, justice, etc. (placeholder)
     # TODO: Implement full compliance checks

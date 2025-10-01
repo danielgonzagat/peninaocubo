@@ -13,7 +13,9 @@ def test_module_1():
     try:
         import subprocess
 
-        result = subprocess.run([sys.executable, "1_de_8", "--test"], check=False, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(
+            [sys.executable, "1_de_8", "--test"], check=False, capture_output=True, text=True, timeout=30
+        )
         if result.returncode == 0:
             print("✅ 1/8 (Core) - All tests passed")
             return True
@@ -49,7 +51,9 @@ def test_module_3():
     try:
         import subprocess
 
-        result = subprocess.run([sys.executable, "3_de_8", "--seed", "42"], check=False, capture_output=True, text=True, timeout=15)
+        result = subprocess.run(
+            [sys.executable, "3_de_8", "--seed", "42"], check=False, capture_output=True, text=True, timeout=15
+        )
         if "RELATÓRIO DE AQUISIÇÃO" in result.stdout:
             print("✅ 3/8 (Acquisition) - Working")
             return True
@@ -67,7 +71,9 @@ def test_module_4():
     try:
         import subprocess
 
-        result = subprocess.run([sys.executable, "4_de_8", "--test"], check=False, capture_output=True, text=True, timeout=20)
+        result = subprocess.run(
+            [sys.executable, "4_de_8", "--test"], check=False, capture_output=True, text=True, timeout=20
+        )
         if "tests completed" in result.stdout.lower():
             print("✅ 4/8 (Mutation) - Tests completed")
             return True
@@ -85,7 +91,9 @@ def test_module_5():
     try:
         import subprocess
 
-        result = subprocess.run([sys.executable, "5_de_8", "--test"], check=False, capture_output=True, text=True, timeout=20)
+        result = subprocess.run(
+            [sys.executable, "5_de_8", "--test"], check=False, capture_output=True, text=True, timeout=20
+        )
         if "All tests passed" in result.stdout or "tests completed" in result.stdout.lower():
             print("✅ 5/8 (Crucible) - Tests passed")
             return True
