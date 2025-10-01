@@ -31,11 +31,13 @@ from penin.math.penin_master_equation import (
 def create_test_loss_fn():
     """Create a simple loss function for testing."""
 
+    LOSS_SQRT_COEFF = 0.01
+
     def loss_fn(state: np.ndarray, evidence: Any, policies: dict) -> float:
         # Optimized quadratic loss: use dot product instead of sum + norm
         # This is faster as it reuses the same computation
         dot_product = np.dot(state, state)
-        return dot_product + 0.01 * np.sqrt(dot_product)
+        return dot_product + LOSS_SQRT_COEFF * np.sqrt(dot_product)
 
     return loss_fn
 
