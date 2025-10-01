@@ -515,7 +515,8 @@ class TestNextPyModifierConcurrencyAndRobustness:
         adapter.status = IntegrationStatus.INITIALIZED
 
         # Generate mutations sequentially to avoid timestamp collision issues
-        # (since mutation IDs use int(time.time()) which has 1-second granularity)
+        # WARNING: mutation IDs use int(time.time()) which has 1-second granularity and can cause collisions.
+        # For better uniqueness, consider using UUIDs for mutation ID generation in production code.
         results = []
         for i in range(5):
             result = await adapter.execute(
