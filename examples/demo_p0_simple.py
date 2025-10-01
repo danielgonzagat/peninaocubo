@@ -11,7 +11,7 @@ import tempfile
 import time
 from pathlib import Path
 
-from penin.omega.caos import quick_caos_phi
+from penin.omega import quick_caos_phi
 
 # Imports dos módulos Omega
 from penin.omega.ethics_metrics import EthicsCalculator, EthicsGate

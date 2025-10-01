@@ -39,8 +39,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-# Re-export basic implementation
-from penin.math.agape import agape_index as agape_basic
+# Import complete implementation from ethics module
+from penin.ethics.agape import AgapeIndex, compute_agape_score
 
 
 @dataclass

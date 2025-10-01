@@ -107,7 +107,7 @@ def test_imports_work():
     from penin.cache import SecureCache
 
     # Test specific imports
-    from penin.omega.caos import phi_caos
+    from penin.omega import phi_caos
     from penin.router import MultiLLMRouterComplete as MultiLLMRouter
 
     # Verify functions/classes exist
