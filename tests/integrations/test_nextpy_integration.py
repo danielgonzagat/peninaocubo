@@ -271,9 +271,9 @@ class TestNextPyModifierWithWORMLedger:
         import tempfile
         import os
 
-        # Create WORM ledger with temporary file
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
-            ledger_path = f.name
+        # Create WORM ledger with unique temporary file path
+        fd, ledger_path = tempfile.mkstemp(suffix='.jsonl')
+        os.close(fd)
         
         try:
             ledger = create_worm_ledger(ledger_path)
