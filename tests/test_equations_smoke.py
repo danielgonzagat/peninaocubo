@@ -45,12 +45,12 @@ class TestEquation01PeninUpdate:
 
     def test_basic_update(self):
         """Smoke test: basic state update"""
-        state = PeninState(params=np.array([1.0, 2.0, 3.0]))
+        state = PeninState(parameters=np.array([1.0, 2.0, 3.0]))
         gradient = np.array([0.1, 0.2, 0.3])
         alpha = 0.1
         new_state = penin_update(state, gradient, alpha, project_fn=None)
         assert isinstance(new_state, PeninState)
-        assert len(new_state.params) == 3
+        assert len(new_state.parameters) == 3
         assert new_state.iteration == state.iteration + 1
 
 
