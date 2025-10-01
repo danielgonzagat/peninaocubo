@@ -214,7 +214,7 @@ def validate_documentation_files():
     assert "Troubleshooting" in guide_content
     assert "FAQ" in guide_content
     
-    print(f"✓ docs/guides/CAOS_PLUS_GUIDE.md criado (tamanho: {len(guide_content)} chars)")
+    print(f"✓ docs/guides/CAOS_PLUS_GUIDE.md created (size: {len(guide_content)} chars)")
     
     print("\n✅ Todos os arquivos de documentação foram atualizados!\n")
 
