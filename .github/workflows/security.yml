@@ -1,7 +1,9 @@
+---
 name: security
 on: [push, pull_request]
 jobs:
   gitleaks:
+    name: Secrets Scanning
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -10,3 +12,102 @@ jobs:
       - uses: gitleaks/gitleaks-action@v2
         with:
           args: --redact --no-git
+
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Generate SBOM with CycloneDX
+        run: |
+          pip install cyclonedx-bom
+          cyclonedx-py requirements requirements.txt -o sbom-cyclonedx.json
+
+      - name: Install Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Generate SBOM with Syft
+        run: |
+          syft dir:. -o cyclonedx-json=sbom-syft.json
+          syft dir:. -o spdx-json=sbom-syft-spdx.json
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-reports
+          path: |
+            sbom-*.json
+          retention-days: 90
+
+  sca:
+    name: Software Composition Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | \
+            sudo apt-key add -
+          echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | \
+            sudo tee -a /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update -q
+          sudo apt-get install -y trivy
+
+      - name: Run Trivy filesystem scan
+        run: |
+          trivy fs --severity HIGH,CRITICAL --format json --output trivy-report.json .
+          trivy fs --severity HIGH,CRITICAL --format table .
+        continue-on-error: true
+
+      - name: Install Grype
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Run Grype scan
+        run: |
+          grype dir:. --output json --file grype-report.json
+          grype dir:. --output table
+        continue-on-error: true
+
+      - name: Run pip-audit
+        run: |
+          pip install pip-audit
+          pip-audit --format json --output pip-audit-report.json || true
+          pip-audit || true
+        continue-on-error: true
+
+      - name: Upload SCA reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sca-reports
+          path: |
+            trivy-report.json
+            grype-report.json
+            pip-audit-report.json
+          retention-days: 90

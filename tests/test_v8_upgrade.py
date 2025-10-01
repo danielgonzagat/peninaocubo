@@ -97,6 +97,15 @@ def test_github_workflows_valid():
 
     security_content = (workflows_dir / "security.yml").read_text()
     assert "gitleaks" in security_content, "Security should run gitleaks"
+    
+    # Check SBOM generation is present
+    assert "sbom" in security_content.lower(), "Security workflow should generate SBOM"
+    assert "cyclonedx" in security_content.lower() or "syft" in security_content.lower(), \
+        "Security workflow should use CycloneDX or Syft for SBOM generation"
+    
+    # Check SCA tools are present
+    assert "trivy" in security_content.lower() or "grype" in security_content.lower() or "pip-audit" in security_content.lower(), \
+        "Security workflow should run SCA tools (Trivy, Grype, or pip-audit)"
 
 
 def test_imports_work():

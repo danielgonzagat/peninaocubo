@@ -181,7 +181,7 @@ penin pcag verify --artifact pcag_2025-10-01_abc123.json
 **Generation:**
 ```bash
 pip install cyclonedx-bom
-cyclonedx-py --format json --output sbom.json
+cyclonedx-py requirements requirements.txt -o sbom.json
 ```
 
 **Contents:**
@@ -195,9 +195,10 @@ cyclonedx-py --format json --output sbom.json
 # CI/CD workflow
 - name: Generate SBOM
   run: |
-    cyclonedx-py --format json --output sbom.json
+    pip install cyclonedx-bom
+    cyclonedx-py requirements requirements.txt -o sbom.json
     cp sbom.json artifacts/sbom-$(date +%Y%m%d).json
-    
+
 - name: Upload SBOM
   uses: actions/upload-artifact@v4
   with:
@@ -692,7 +693,9 @@ repos:
   uses: gitleaks/gitleaks-action@v2
   
 - name: SBOM Generation
-  run: cyclonedx-py --format json --output sbom.json
+  run: |
+    pip install cyclonedx-bom
+    cyclonedx-py requirements requirements.txt -o sbom.json
   
 - name: Vulnerability Scan
   run: trivy fs --severity HIGH,CRITICAL --exit-code 1 .
