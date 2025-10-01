@@ -13,6 +13,7 @@ Welcome to the complete documentation for PENIN-Ω — the self-evolving AI syst
 
 ### 📖 Core Guides
 - [**Complete Equations Guide**](guides/PENIN_OMEGA_COMPLETE_EQUATIONS_GUIDE.md) - Detailed explanation of all 15 core equations
+- [**CAOS⁺ Complete Guide**](caos_guide.md) - Deep dive into the CAOS⁺ evolutionary engine with examples
 - [**IA ao Cubo Vision**](guides/README_IA_CUBED_V1.md) - Vision and philosophy of IAAA system
 
 ### 📊 Technical Documentation

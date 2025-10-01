@@ -106,9 +106,20 @@ CAOS⁺ = (1 + κ · C · A)^(O · S)
 
 - **κ (kappa)**: Amplification gain (≥ 20, auto-tuned)
 
+**Mathematical Rationale:**
+
+The CAOS⁺ formula was designed with a base-exponent structure for three key reasons:
+
+1. **Separation of Concerns**: Base (1 + κ·C·A) controls magnitude; exponent (O·S) controls aggressiveness
+2. **Mathematical Properties**: Identity (CAOS⁺(0,0,0,0) = 1), monotonicity (∂CAOS⁺/∂X > 0), compositionality
+3. **Learning Alignment**: 
+   - Exploit when safe (high C, low O): moderate amplification
+   - Explore when uncertain (high O, high S): aggressive amplification
+   - Caution when risky (low C or S): conservative
+
 **Implementation:**
 ```python
-from penin.equations.caos_plus import compute_caos_plus_exponential, CAOSConfig
+from penin.core.caos import compute_caos_plus_exponential
 
 C = 0.88  # high consistency
 A = 0.40  # moderate improvement/cost
@@ -116,9 +127,35 @@ O = 0.35  # some uncertainty
 S = 0.82  # high signal quality
 kappa = 20.0
 
-config = CAOSConfig(kappa=kappa)
-caos_plus = compute_caos_plus_exponential(C, A, O, S, config)
+caos_plus = compute_caos_plus_exponential(C, A, O, S, kappa)
 # caos_plus ≈ 1.86 (boost factor for step size)
+```
+
+**Complete Pipeline with Metrics:**
+```python
+from penin.core.caos import (
+    ConsistencyMetrics, AutoevolutionMetrics,
+    IncognoscibleMetrics, SilenceMetrics,
+    CAOSConfig, CAOSState, compute_caos_plus_complete
+)
+
+# Collect raw metrics
+consistency = ConsistencyMetrics(pass_at_k=0.92, ece=0.008, external_verification=0.88)
+autoevolution = AutoevolutionMetrics(delta_linf=0.06, cost_normalized=0.15)
+incognoscible = IncognoscibleMetrics(epistemic_uncertainty=0.35, ood_score=0.28)
+silence = SilenceMetrics(noise_ratio=0.08, redundancy_ratio=0.12)
+
+# Configure engine
+config = CAOSConfig(kappa=25.0, ema_half_life=5)
+state = CAOSState()
+
+# Compute CAOS⁺ with EMA smoothing and full audit trail
+caos_plus, details = compute_caos_plus_complete(
+    consistency, autoevolution, incognoscible, silence, config, state
+)
+
+# Use in evolution pipeline
+alpha_effective = alpha_base * caos_plus
 ```
 
 **Usage:**
@@ -130,6 +167,10 @@ caos_plus = compute_caos_plus_exponential(C, A, O, S, config)
 - EMA smoothing (half-life 3-10 iterations)
 - Clamp derivatives (avoid numerical instability)
 - Log-space comparison for large ranges
+- Start with κ=20, auto-tune based on ΔL∞/cost
+- Monitor stability via coefficient of variation
+
+**See Also:** [Complete CAOS⁺ Guide](caos_guide.md) for detailed examples, use cases, and mathematical deep-dive
 
 ---
 
