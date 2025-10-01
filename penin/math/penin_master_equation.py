@@ -160,7 +160,7 @@ def estimate_gradient_fast(
     loss_current = loss_fn(state, evidence, policies)
     
     # Pre-allocate gradient array
-    gradient = np.empty(n, dtype=np.float64)
+    gradient = np.empty(n, dtype=state.dtype)
     state_perturbed = state.copy()
     
     # Pre-compute inverse epsilon
