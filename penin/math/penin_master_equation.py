@@ -66,7 +66,7 @@ def estimate_gradient(
         loss_fn: Loss function to minimize
         finite_diff_epsilon: Step size for finite differences
         method: 'forward' (O(n)) or 'central' (O(2n), more accurate)
-        batch_size: If >0, use batched evaluation (experimental, requires batch-aware loss_fn)
+        batch_size: (Unused) Reserved for future batched evaluation support.
 
     Returns:
         Gradient estimate G (same shape as state)
