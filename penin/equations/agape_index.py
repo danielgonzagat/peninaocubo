@@ -40,7 +40,6 @@ import math
 from dataclasses import dataclass
 
 # Import complete implementation from ethics module
-from penin.ethics.agape import AgapeIndex, compute_agape_score
 
 
 @dataclass
