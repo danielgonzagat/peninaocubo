@@ -434,6 +434,117 @@ result = adapter.execute(task_input, context)
 
 ## 5. SEGURANÇA E ÉTICA
 
+### 5.0 F7: Coerência Fractal (Fractal Coherence)
+
+**Hipótese Central**: Uma decisão é fractalmente coerente se a lógica usada para tomá-la é consistente em diferentes "escalas" de abstração.
+
+#### Teoria
+
+A coerência fractal é uma métrica fundamental para avaliar a consistência interna das decisões do sistema PENIN-Ω. Baseada na teoria dos fractais, onde padrões se repetem em diferentes escalas, esta métrica mede se as políticas e configurações do sistema mantêm consistência ao longo da hierarquia de decisão.
+
+**Propriedades Matemáticas:**
+
+1. **Definição**: Seja `T` uma árvore de decisão com nó raiz `r` e configuração `C_r`. Para cada nó `n_i` na árvore com configuração `C_i`, definimos a similaridade local como:
+
+   ```
+   s(n_i, r) = |C_r ∩ C_i| / |C_r|
+   ```
+
+   A coerência fractal é então:
+
+   ```
+   FC(T) = (1/N) Σ s(n_i, r)  para i = 1..N
+   ```
+
+   onde N é o número de nós não-raiz na árvore.
+
+2. **Intervalo**: `FC(T) ∈ [0, 1]`
+   - `FC = 1.0`: Coerência perfeita (todas as configurações idênticas)
+   - `FC = 0.0`: Coerência nula (sem valores compartilhados)
+
+3. **Interpretação por Nível**:
+   - `FC ≥ 0.95`: Excelente - Sistema altamente coerente
+   - `0.85 ≤ FC < 0.95`: Bom - Coerência adequada
+   - `0.70 ≤ FC < 0.85`: Aceitável - Requer monitoramento
+   - `FC < 0.70`: Crítico - Divergência significativa detectada
+
+#### Implementação
+
+A implementação encontra-se em dois módulos principais:
+
+1. **`penin/omega/fractal.py`**: 
+   - `fractal_coherence(root: OmegaNode) -> float`: Algoritmo core
+   - `build_fractal(root_cfg, depth, branching)`: Construtor de árvore
+   - `propagate_update(root, patch)`: Propagação de atualizações
+
+2. **`penin/sr/sr_service.py`**:
+   - Endpoint: `POST /sr/fractal_coherence`
+   - Métrica Prometheus: `penin_fractal_coherence`
+   - Integração com SR-Ω∞ Service
+
+**Algoritmo Core:**
+
+```python
+def fractal_coherence(root: OmegaNode) -> float:
+    """
+    1. Coleta todos os nós via travessia em profundidade
+    2. Usa configuração da raiz como referência
+    3. Para cada nó filho:
+       - Calcula similaridade = keys_matching / total_keys
+    4. Retorna média das similaridades
+    """
+    # Implementação em penin/omega/fractal.py
+```
+
+#### Uso no SR-Ω∞
+
+A coerência fractal é integrada ao Self-Reflection Service para:
+
+1. **Detecção de Drift**: Identificar quando políticas divergem entre níveis
+2. **Validação de Promoção**: Gate adicional em Champion-Challenger
+3. **Auditoria Contínua**: Monitoramento via Prometheus
+4. **Auto-Correção**: Trigger para reconciliação de configurações
+
+**Exemplo de Requisição:**
+
+```bash
+curl -X POST http://localhost:8012/sr/fractal_coherence \
+  -H "Content-Type: application/json" \
+  -d '{
+    "root_config": {"alpha": 0.001, "beta": 0.9, "kappa": 25},
+    "depth": 3,
+    "branching": 2
+  }'
+```
+
+**Resposta:**
+
+```json
+{
+  "fractal_coherence": 0.987,
+  "tree_depth": 3,
+  "branching_factor": 2,
+  "total_nodes": 15,
+  "metric_name": "penin_fractal_coherence"
+}
+```
+
+#### Aplicações em IA³
+
+1. **Gate de Promoção**: `FC ≥ 0.85` como requisito para promoção de challenger
+2. **Alerta de Divergência**: Notificar quando `FC < 0.70`
+3. **Meta-Aprendizado**: Usar histórico de FC para ajustar estratégias de mutação
+4. **Federação (Fase 2)**: Comparar FC entre instâncias distribuídas
+5. **Auto-Arquitetura (Fase 3)**: Validar mudanças arquiteturais via FC
+
+#### Referências
+
+- **Implementação**: `penin/omega/fractal.py`, `penin/sr/sr_service.py`
+- **Testes**: `tests/test_vida_plus.py::TestFractal`
+- **Documentação API**: `http://localhost:8012/docs` (Swagger UI)
+
+---
+
 ### 5.1 Leis Originárias (LO-01 a LO-14)
 
 Embutidas em `ΣEA/LO-14` via `penin.omega.ethics_metrics`:
@@ -566,6 +677,7 @@ penin_daily_spend_usd             # Gasto atual
 penin_router_hit_rate             # Taxa de hit do cache
 penin_provider_success_total{provider}  # Sucesso por provider
 penin_provider_latency_seconds{provider}  # Latência por provider
+penin_fractal_coherence           # F7: Coerência fractal (0.0-1.0)
 ```
 
 ### 6.2 Logs Estruturados (JSON)
