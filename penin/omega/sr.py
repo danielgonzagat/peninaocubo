@@ -348,7 +348,9 @@ class SROmegaEngine:
             sr_score = math.exp(log_sum)
         else:
             # p-norm geral
-            powered_sum = sum(w * (max(self.epsilon, x) ** self.p_norm) for w, x in zip(weights_list, comp_list, strict=False))
+            powered_sum = sum(
+                w * (max(self.epsilon, x) ** self.p_norm) for w, x in zip(weights_list, comp_list, strict=False)
+            )
             sr_score = powered_sum ** (1.0 / self.p_norm)
 
         details = {

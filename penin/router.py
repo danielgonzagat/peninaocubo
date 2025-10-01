@@ -72,11 +72,7 @@ class BudgetTracker:
     def snapshot(self) -> dict[str, Any]:
         self._reset_if_needed()
         budget_remaining = self.remaining_budget()
-        usage_pct = (
-            0.0
-            if self.daily_budget_usd == 0
-            else (self.current_spend_usd / self.daily_budget_usd) * 100
-        )
+        usage_pct = 0.0 if self.daily_budget_usd == 0 else (self.current_spend_usd / self.daily_budget_usd) * 100
         return {
             "daily_budget_usd": self.daily_budget_usd,
             "daily_spend_usd": round(self.current_spend_usd, 6),
@@ -315,7 +311,9 @@ class MultiLLMRouter:
                 stats.total_cost_usd = float(stats_payload.get("total_cost_usd", stats.total_cost_usd))
                 stats.total_tokens_in = int(stats_payload.get("total_tokens_in", stats.total_tokens_in))
                 stats.total_tokens_out = int(stats_payload.get("total_tokens_out", stats.total_tokens_out))
-                stats.total_latency_s = float(stats_payload.get("avg_latency_s", 0.0)) * max(1, stats.successful_requests)
+                stats.total_latency_s = float(stats_payload.get("avg_latency_s", 0.0)) * max(
+                    1, stats.successful_requests
+                )
                 stats.consecutive_failures = int(stats_payload.get("consecutive_failures", stats.consecutive_failures))
                 last_error = stats_payload.get("last_error")
                 if last_error:
@@ -481,9 +479,7 @@ class MultiLLMRouter:
         return stats
 
 
-def create_router(
-    providers: Iterable[BaseProvider], daily_budget_usd: float = 5.0, **kwargs: Any
-) -> MultiLLMRouter:
+def create_router(providers: Iterable[BaseProvider], daily_budget_usd: float = 5.0, **kwargs: Any) -> MultiLLMRouter:
     """Helper factory kept for backwards compatibility with earlier guides."""
 
     return MultiLLMRouter(providers=providers, daily_budget_usd=daily_budget_usd, **kwargs)

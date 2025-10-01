@@ -168,7 +168,8 @@ class WORMLedger:
                 cursor.execute("PRAGMA wal_autocheckpoint=1000")
 
             # Criar tabela principal
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS run_records (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     run_id TEXT UNIQUE NOT NULL,
@@ -203,7 +204,8 @@ class WORMLedger:
                     
                     FOREIGN KEY (parent_run_id) REFERENCES run_records(run_id)
                 )
-            """)
+            """
+            )
 
             # Índices
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_run_id ON run_records(run_id)")
@@ -213,14 +215,16 @@ class WORMLedger:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_decision ON run_records(decision_json)")
 
             # Tabela de champion pointer (para rollback atômico)
-            cursor.execute("""
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS champion_pointer (
                     id INTEGER PRIMARY KEY CHECK (id = 1),
                     run_id TEXT NOT NULL,
                     updated_at REAL NOT NULL,
                     FOREIGN KEY (run_id) REFERENCES run_records(run_id)
                 )
-            """)
+            """
+            )
 
             conn.commit()
 
@@ -497,9 +501,11 @@ class WORMLedger:
         with sqlite3.connect(str(self.db_path)) as conn:
             cursor = conn.cursor()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT run_id FROM champion_pointer WHERE id = 1
-            """)
+            """
+            )
 
             row = cursor.fetchone()
             if not row:
@@ -513,11 +519,13 @@ class WORMLedger:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT run_id, prev_hash, record_hash, 
                        metrics_json, gates_json, decision_json
                 FROM run_records ORDER BY id
-            """)
+            """
+            )
 
             prev_hash = "genesis"
 
@@ -548,11 +556,13 @@ class WORMLedger:
             cursor.execute("SELECT COUNT(*) FROM run_records")
             total_records = cursor.fetchone()[0]
 
-            cursor.execute("""
+            cursor.execute(
+                """
                 SELECT decision_json, COUNT(*) 
                 FROM run_records 
                 GROUP BY decision_json
-            """)
+            """
+            )
 
             decisions = {}
             for row in cursor.fetchall():

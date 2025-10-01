@@ -47,9 +47,13 @@ class DependencyUpdater:
         """Check for security vulnerabilities."""
         try:
             # Try to use safety if available
-            result = subprocess.run([sys.executable, "-m", "pip", "install", "safety"], check=False, capture_output=True, text=True)
+            result = subprocess.run(
+                [sys.executable, "-m", "pip", "install", "safety"], check=False, capture_output=True, text=True
+            )
 
-            result = subprocess.run([sys.executable, "-m", "safety", "check", "--json"], check=False, capture_output=True, text=True)
+            result = subprocess.run(
+                [sys.executable, "-m", "safety", "check", "--json"], check=False, capture_output=True, text=True
+            )
 
             if result.returncode == 0:
                 vulnerabilities = json.loads(result.stdout)

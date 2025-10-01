@@ -12,8 +12,8 @@ def quick_harmonic(values: list[float], weights: list[float] = None, eps: float 
 def harmonic_mean_weighted(values: list[float], weights: list[float], eps: float = 1e-9) -> float:
     wsum = sum(weights) or eps
     den = 0.0
-    for v, w in zip(values, weights, strict=False):
-        v = max(eps, float(v))
+    for value, w in zip(values, weights, strict=False):
+        v = max(eps, float(value))
         den += w / v
     return wsum / max(eps, den)
 

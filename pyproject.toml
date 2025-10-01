@@ -155,6 +155,12 @@ ignore = [
 "scripts/*.py" = ["F841", "PLW1510", "PLW2901", "C901", "E501"]
 "penin/omega/*.py" = ["E741"]
 "penin/omega/ledger.py" = ["W291", "W293", "E501"]
+"penin/cli.py" = ["C901", "PLR0911"]
+"penin/omega/life_eq.py" = ["PLR0911"]
+"penin/omega/life_hook_patch.py" = ["C901"]
+"penin/omega/runners.py" = ["B023"]
+"penin/omega/sr.py" = ["F811", "PLR0911"]
+"scripts/check_dependency_drift.py" = ["PLR0911"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["penin"]

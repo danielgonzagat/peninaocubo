@@ -31,6 +31,7 @@ except ImportError:
 # Pydantic for validation
 try:
     from pydantic import BaseModel, Field  # noqa: F401
+
     HAS_PYDANTIC = True
 except ImportError:
     HAS_PYDANTIC = False

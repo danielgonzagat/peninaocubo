@@ -245,11 +245,13 @@ class EvolutionRunner:
             challenger_id = challenger["challenger_id"]
 
             # Create mock model function for evaluation
+            # Bind challenger locally to avoid late-binding in nested function
+            _cfg_local = dict(challenger["config"])
+
             def mock_model_fn(input_text: str) -> str:
                 # In a real implementation, this would call the actual model
                 # For now, return a simple response based on config
-                config = challenger["config"]
-                temp = config.get("temperature", 0.7)
+                temp = _cfg_local.get("temperature", 0.7)
 
                 # Simulate different responses based on temperature
                 if temp < 0.3:

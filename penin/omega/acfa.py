@@ -297,22 +297,26 @@ class LeagueOrchestrator:
     def get_deployment_status(self) -> dict[str, Any]:
         """Get current deployment status"""
         return {
-            "champion": {
-                "candidate_id": self.champion.candidate_id if self.champion else None,
-                "stage": self.champion.deployment_stage.value if self.champion else None,
-                "traffic_fraction": self.champion.traffic_fraction if self.champion else 0,
-                "metrics": self.champion.metrics if self.champion else {},
-            }
-            if self.champion
-            else None,
-            "challenger": {
-                "candidate_id": self.challenger.candidate_id if self.challenger else None,
-                "stage": self.challenger.deployment_stage.value if self.challenger else None,
-                "traffic_fraction": self.challenger.traffic_fraction if self.challenger else 0,
-                "metrics": self.challenger.metrics if self.challenger else {},
-            }
-            if self.challenger
-            else None,
+            "champion": (
+                {
+                    "candidate_id": self.champion.candidate_id if self.champion else None,
+                    "stage": self.champion.deployment_stage.value if self.champion else None,
+                    "traffic_fraction": self.champion.traffic_fraction if self.champion else 0,
+                    "metrics": self.champion.metrics if self.champion else {},
+                }
+                if self.champion
+                else None
+            ),
+            "challenger": (
+                {
+                    "candidate_id": self.challenger.candidate_id if self.challenger else None,
+                    "stage": self.challenger.deployment_stage.value if self.challenger else None,
+                    "traffic_fraction": self.challenger.traffic_fraction if self.challenger else 0,
+                    "metrics": self.challenger.metrics if self.challenger else {},
+                }
+                if self.challenger
+                else None
+            ),
             "deployment_history_count": len(self.deployment_history),
         }
 

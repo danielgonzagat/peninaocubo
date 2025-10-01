@@ -105,14 +105,14 @@ def compute_caos_plus_exponential(C: float, A: float, O: float, S: float, kappa:
     """
     Alternative CAOS⁺ formula using pure exponential form:
     CAOS⁺ = (1 + κ·C·A)^(O·S)
-    
+
     This is monotonic in C, A, O, S; κ shifts the base.
     Historically used in engine/caos_plus.py, now consolidated here.
-    
+
     Args:
         C, A, O, S: CAOS components (0-1 range)
         kappa: Base amplification factor (default 20.0)
-    
+
     Returns:
         CAOS+ score (unbounded, typically > 1.0)
     """
