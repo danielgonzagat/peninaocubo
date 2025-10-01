@@ -29,6 +29,7 @@ class MessageType(str, Enum):
     # Metrics & Status
     METRICS_BROADCAST = "metrics_broadcast"
     STATUS_REQUEST = "status_request"
+    STATUS_QUERY = "status_request"  # Alias for STATUS_REQUEST
     STATUS_RESPONSE = "status_response"
 
     # Consensus & Governance
@@ -207,3 +208,13 @@ class PeninProtocol:
         return self.create_message(
             MessageType.ERROR, {"error": error_msg, "context": context or {}, "timestamp": time.time()}
         )
+
+    def create_status_query(self, target_peer_id: str | None = None) -> PeninMessage:
+        """Create status query message"""
+        return self.create_message(
+            MessageType.STATUS_QUERY, {"requester_id": self.node_id, "target_peer_id": target_peer_id}
+        )
+
+    def create_status_response(self, mental_state: dict[str, Any]) -> PeninMessage:
+        """Create status response message with mental state"""
+        return self.create_message(MessageType.STATUS_RESPONSE, {"mental_state": mental_state})
