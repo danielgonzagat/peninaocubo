@@ -39,9 +39,7 @@ except ImportError:
 
         from penin.omega.evaluators import ComprehensiveEvaluator
         from penin.omega.ledger import WORMLedger
-        from penin.omega.mutators import ChallengerGenerator
         from penin.omega.runners import BatchRunner, CycleConfig, EvolutionRunner
-        from penin.omega.tuner import PeninAutoTuner
     except ImportError as e2:
         print(f"❌ Erro ao importar módulos PENIN: {e2}")
         print("   Certifique-se de que todos os módulos estão no PYTHONPATH")

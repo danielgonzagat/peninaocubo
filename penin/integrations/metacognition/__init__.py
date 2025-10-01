@@ -48,10 +48,14 @@ Performance Targets:
 - Introspection depth: 5+ levels
 """
 
-from .metacognitive_prompting import MetacognitivePrompting
-from .midwiving_protocol import MidwivingProtocol
+from penin.integrations.metacognition.metacognitive_prompt import (
+    MetacognitivePromptConfig,
+    MetacognitiveReasoner,
+    MetacognitiveStage,
+)
 
 __all__ = [
-    "MetacognitivePrompting",
-    "MidwivingProtocol",
+    "MetacognitiveReasoner",
+    "MetacognitivePromptConfig",
+    "MetacognitiveStage",
 ]
