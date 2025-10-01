@@ -130,9 +130,15 @@ class EthicsValidator:
             ))
         
         # LO-05: Privacidade
-        if context.privacy_score < cls.PRIVACY_MIN:
-            violations.append(EthicalViolation(
-                law=OriginLaw.LO_05,
+        # Compute ethical score (harmonic mean)
+        sub_scores = [
+            max(0.001, context.privacy_score),  # Ensure minimum value
+            max(0.001, context.fairness_score),
+            max(0.001, context.transparency_score),
+            max(0.001, 1.0 - context.physical_risk),
+            max(0.001, 1.0 - context.emotional_risk),
+        ]
+        ethical_score = len(sub_scores) / sum(1.0 / s for s in sub_scores)
                 severity=ViolationSeverity.CRITICAL,
                 description=f"Privacidade insuficiente: {context.privacy_score:.3f}",
                 evidence={"score": context.privacy_score},
