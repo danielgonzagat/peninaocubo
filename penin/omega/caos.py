@@ -16,6 +16,11 @@ def clamp01(x: float) -> float:
     return x
 
 
+def _clamp(x: float) -> float:
+    """Alias for clamp01 - used by caos_kratos.py."""
+    return clamp01(x)
+
+
 def phi_caos(
     C: float,
     A: float,
@@ -53,13 +58,9 @@ def quick_caos_phi(C: float, A: float, O: float, S: float) -> float:
     return phi_caos(C, A, O, S)
 
 
-def validate_caos_stability(C: float, A: float, O: float, S: float) -> Dict[str, Any]:
+def validate_caos_stability(C: float, A: float, O: float, S: float, **kwargs: Any) -> Dict[str, Any]:
     """Validate CAOS stability."""
     phi = phi_caos(C, A, O, S)
-    if O is None and "openness" in kwargs:
-        O = kwargs["openness"]
-    if S is None and "stability" in kwargs:
-        S = kwargs["stability"]
 
     return {"stable": phi < 0.8, "phi": phi, "risk_level": "low" if phi < 0.5 else "medium" if phi < 0.8 else "high"}
 
@@ -82,7 +83,11 @@ class CAOSComponents:
 def compute_caos_plus(
     C: float, A: float, O: float, S: float, kappa: float = 2.0, config: Optional["CAOSConfig"] = None
 ) -> Tuple[float, Dict[str, Any]]:
-    """Compute CAOS⁺ with details."""
+    """Compute CAOS⁺ with details.
+    
+    This is the primary CAOS+ implementation. Returns tuple of (phi, details).
+    For the alternative exponential formula CAOS⁺ = (1 + κ·C·A)^(O·S), use compute_caos_plus_exponential().
+    """
     phi = phi_caos(C, A, O, S, kappa)
     details = {
         "C": C,
@@ -94,6 +99,25 @@ def compute_caos_plus(
         "components": {"C": C, "A": A, "O": O, "S": S},
     }
     return phi, details
+
+
+def compute_caos_plus_exponential(C: float, A: float, O: float, S: float, kappa: float = 20.0) -> float:
+    """
+    Alternative CAOS⁺ formula using pure exponential form:
+    CAOS⁺ = (1 + κ·C·A)^(O·S)
+    
+    This is monotonic in C, A, O, S; κ shifts the base.
+    Historically used in engine/caos_plus.py, now consolidated here.
+    
+    Args:
+        C, A, O, S: CAOS components (0-1 range)
+        kappa: Base amplification factor (default 20.0)
+    
+    Returns:
+        CAOS+ score (unbounded, typically > 1.0)
+    """
+    expo = max(1e-6, O * S)
+    return math.pow(1.0 + kappa * max(0.0, C) * max(0.0, A), expo)
 
 
 def apply_saturation(value: float, gamma: float = 0.7) -> float:
@@ -214,9 +238,9 @@ def caos_plus(
     A: float | None = None,
     O: float | None = None,
     S: float | None = None,
-    kappa: float = 0.1,
-    gamma: float = 0.5,
-    kappa_max: float = 1.0,
+    kappa: float = 2.0,
+    gamma: float = 0.7,
+    kappa_max: float = 10.0,
     **kwargs,
 ) -> Dict[str, Any]:
     """
@@ -239,7 +263,19 @@ def caos_plus(
         C = kwargs["coherence"]
     if A is None and "awareness" in kwargs:
         A = kwargs["awareness"]
-    A = kwargs["awareness"]
+    if O is None and "openness" in kwargs:
+        O = kwargs["openness"]
+    if S is None and "stability" in kwargs:
+        S = kwargs["stability"]
+
+    # Default values if still None
+    C = C if C is not None else 0.5
+    A = A if A is not None else 0.5
+    O = O if O is not None else 0.5
+    S = S if S is not None else 0.5
+
+    phi = phi_caos(C, A, O, S, kappa=kappa, kappa_max=kappa_max, gamma=gamma)
+
     return {
         "phi": phi,
         "components": {"C": C, "A": A, "O": O, "S": S},
