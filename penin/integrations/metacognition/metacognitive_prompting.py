@@ -372,22 +372,22 @@ Provide a calibrated confidence score and explanation.
                     self.log_event({
                         "event": "metacognitive_stage_completed",
                         "stage": stage.value,
-                        "iteration": state.num_iterations,
-                    })
+                elif stage == MetacognitiveStage.UNDERSTANDING:
+                    state.understanding = response
+                    # Parse understanding score from response
+                    state.understanding_score = self._extract_confidence_from_response(response, "understanding")
                 
-            except Exception as e:
-                logger.error(f"Metacognitive stage {stage.value} failed: {e}")
-                # Continue with other stages (fail-soft)
-        
-        # Calibrate confidence if configured
-        if self.mc_config.calibrate_confidence:
-            state.confidence_score = self._calibrate_confidence(state.confidence_score)
-        
-        return state.decision, state
-    
-    def _calibrate_confidence(self, raw_confidence: float) -> float:
-        """Calibrate confidence based on historical accuracy"""
-        if not self.calibration_history:
+                elif stage == MetacognitiveStage.CONFIDENCE:
+                    # Extract actual confidence score from LLM response
+                    import re
+                    confidence_match = re.search(r'confidence.*?(\d+(?:\.\d+)?)', response.lower())
+                    if confidence_match:
+                        state.confidence_score = min(float(confidence_match.group(1)), 1.0)
+                    else:
+                        state.confidence_score = 0.5  # Default if parsing fails
+                    
+                    # Parse confidence factors
+                    state.confidence_factors = self._parse_confidence_factors(response)
             return raw_confidence
         
         # Simple calibration: adjust based on historical over/under-confidence
