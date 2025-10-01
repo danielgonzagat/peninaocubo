@@ -8,6 +8,39 @@ except Exception:
     yaml = None  # fallback
 sys.path.append("scripts")
 from _common_fusion import (
+
+# ## _common_fusion fallback (idempotente)
+try:
+    from _common_fusion import worm_write, repo_slug, _norm_url, jitter_metrics, WORM_DIR
+except Exception:  # fallback mínimo
+    from pathlib import Path as _Path
+    import json, time, re as _re
+    def _norm_url(u: str) -> str:
+        if not u: return ""
+        u = u.strip()
+        if u.endswith(".git"): u = u[:-4]
+        if u.endswith("/"):    u = u[:-1]
+        return u
+    def repo_slug(u: str) -> str:
+        u = _norm_url(u or "")
+        if "://" in u: u = u.split("://",1)[1]
+        u = u.replace("/", "-")
+        return _re.sub(r"[^a-zA-Z0-9._-]+","-", u).lower() or "unknown"
+    WORM_DIR = _Path("penin/ledger/fusion")
+    def worm_write(entry: dict, src_url: str):
+        WORM_DIR.mkdir(parents=True, exist_ok=True)
+        ts   = time.strftime("%Y%m%d_%H%M%S")
+        uniq = str(int(time.time()*1000) % 1000000)
+        slug = repo_slug(src_url)
+        e = dict(entry or {})
+        e["fusion"] = slug
+        genes = dict(e.get("genes") or {})
+        genes["source_url"] = _norm_url(src_url)
+        e["genes"] = genes
+        out = WORM_DIR / f"fusion_{slug}_{ts}_{uniq}.json"
+        out.write_text(json.dumps(e, indent=2), encoding="utf-8")
+        return out
+    def jitter_metrics(m: dict, jitter: float=0.0, **_): return dict(m)
     _norm_url, repo_slug, load_worms, vectorize, novelty, global_mean_vector,
     latest_for_slug, content_hash, jitter_metrics, worm_write, git_reachable
 )
