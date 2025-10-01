@@ -14,7 +14,7 @@ class OptimizedQuadraticLoss:
     def __init__(self, regularization: float = 0.01):
         self.reg = regularization
         # Pre-compute regularization factor
-        self.reg_factor = 0.01
+        self.reg_factor = regularization
 
     def __call__(self, state: np.ndarray, evidence=None, policies=None) -> float:
         """
