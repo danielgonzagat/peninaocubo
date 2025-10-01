@@ -383,7 +383,7 @@ class WORMLedger:
 
                 f.write(data.decode() + "\n")
         except Exception as e:
-            raise OSError(f"Failed to write to ledger: {e}")
+            raise OSError(f"Failed to write to ledger: {e}") from e
 
         # Update metadata
         self._last_hash = event.event_hash
