@@ -1,0 +1,62 @@
+apiVersion: penin.ai/v1alpha1
+kind: PeninOmegaCluster
+metadata:
+  name: penin-production
+  namespace: penin-prod
+spec:
+  version: "0.9.0"
+  
+  # High-availability replica counts
+  replicas:
+    omegaMeta: 2
+    sigmaGuard: 3  # Critical fail-closed gates need redundancy
+    srOmegaInfinity: 2
+    acfaLeague: 2
+  
+  # Production resource limits
+  resources:
+    omegaMeta:
+      cpu: "1000m"
+      memory: "1Gi"
+    sigmaGuard:
+      cpu: "500m"
+      memory: "512Mi"
+    srOmegaInfinity:
+      cpu: "500m"
+      memory: "512Mi"
+    acfaLeague:
+      cpu: "1000m"
+      memory: "1Gi"
+  
+  # PENIN-Ω Configuration
+  config:
+    budgetDailyUsd: 50.0
+    
+    caosPlus:
+      maxBoost: 0.05
+      kappa: 20.0
+    
+    sigmaGuard:
+      eceThreshold: 0.01
+      biasThreshold: 1.05
+    
+    evolution:
+      seed: 42
+  
+  # Full observability stack
+  observability:
+    metrics: true
+    tracing: true
+    logging:
+      level: "INFO"
+  
+  # Production storage
+  storage:
+    wormLedger:
+      enabled: true
+      storageClass: "ssd"
+      size: "100Gi"
+    
+    cache:
+      enabled: true
+      type: "redis"
