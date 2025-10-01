@@ -1,0 +1,31 @@
+source_repo: megaIAAA
+source_url: https://github.com/danielgonzagat/megaIAAA.git
+
+strategy:
+  mode: plugin_adapters
+  rationale: respect_licenses_and_enable_emergent_fusion
+
+plugins:
+  - name: evox
+    pip: "evox>=1.2.2"
+    license: "GPL-3.0-or-later"
+    adapter: "penin/integrations/evolution/neuroevo_evox_ray.py"
+    features: ["neuroevolution","population","fitness","ray-distributed"]
+  - name: ray
+    pip: "ray>=2.10.0"
+    features: ["distributed_runtime","actors","tasks","serve"]
+  - name: transformers
+    pip: "transformers>=4.44.0"
+    features: ["llm_backbone","tokenization","hf_pipelines"]
+  - name: dspy
+    pip: "dspy-ai>=2.4.9"
+    features: ["programs","teleprompters","few-shot-automation"]
+
+acceptance:
+  min_delta_linf: 0.0
+  min_caos_ratio: 1.00
+  min_sr: 0.80
+  min_G: 0.85
+  max_ece: 0.01
+  max_rho_bias: 1.05
+  max_fp: 0.05
