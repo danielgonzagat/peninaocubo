@@ -250,3 +250,25 @@ def worm_write(entry: dict, src_url: str):
     out = WORM_DIR / f"fusion_{slug}_{ts}_{uniq}.json"
     out.write_text(json.dumps(e, indent=2), encoding="utf-8")
     return out
+
+import os
+import yaml
+from pathlib import Path
+
+def _policy_suffix():
+    pol = (os.environ.get("FUSE_POLICY") or "").strip().lower()
+    if pol in ("staging", "strict"):
+        return f".{pol}.yaml"
+    return ".yaml"
+
+def load_plan(base: str = "fusion/megaIAAA.plan"):
+    # Ex.: base="fusion/megaIAAA.plan" -> usa .staging/.strict/.yaml conforme FUSE_POLICY
+    base = base.replace(".yml", "").replace(".yaml", "")
+    candidate = Path(f"{base}{_policy_suffix()}")
+    if not candidate.exists():
+        candidate = Path(f"{base}.yaml")
+    with candidate.open("r", encoding="utf-8") as f:
+        y = yaml.safe_load(f)
+    if isinstance(y, dict):
+        y["_policy_file"] = str(candidate)
+    return y
