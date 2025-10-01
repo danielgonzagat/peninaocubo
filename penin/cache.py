@@ -9,7 +9,23 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-import orjson  # os testes exigem import e uso de orjson
+try:
+    import orjson  # type: ignore  # os testes usam orjson quando disponível
+except ModuleNotFoundError:  # pragma: no cover - shim for lightweight environments
+    import json
+
+    class _OrjsonShim:
+        @staticmethod
+        def dumps(obj: Any) -> bytes:
+            return json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+
+        @staticmethod
+        def loads(data: bytes | bytearray | str) -> Any:
+            if isinstance(data, (bytes, bytearray)):
+                data = data.decode("utf-8")
+            return json.loads(data)
+
+    orjson = _OrjsonShim()  # type: ignore
 
 logger = logging.getLogger("penin.cache")
 
@@ -45,7 +61,8 @@ class SecureCache:
         self._l1: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
 
         # métricas básicas
-        self._hits: Dict[str, int] = {"l1": 0, "l2": 0}
+        self._hits: Dict[str, int] = {"l1": 0, "l2": 0, "misses": 0}
+        self._evictions = 0
 
     # ---------- utilidades ----------
     def _path(self, key: str) -> Path:
@@ -73,6 +90,7 @@ class SecureCache:
         self._l1.move_to_end(key)
         if len(self._l1) > self.l1_size:
             self._l1.popitem(last=False)
+            self._evictions += 1
 
     def get(self, key: str) -> Optional[Any]:
         # L1
@@ -117,6 +135,7 @@ class SecureCache:
             self._l1.move_to_end(key)
             if len(self._l1) > self.l1_size:
                 self._l1.popitem(last=False)
+                self._evictions += 1
 
             self._hits["l2"] += 1
             return val
@@ -142,13 +161,17 @@ class SecureCache:
         hits_l1 = self._hits.get("l1", 0)
         hits_l2 = self._hits.get("l2", 0)
         misses = self._hits.get("misses", 0)
+        total_requests = hits_l1 + hits_l2 + misses
+        hit_rate = (hits_l1 + hits_l2) / total_requests if total_requests else 0.0
         return {
             "hits": hits_l1 + hits_l2,
             "misses": misses,
-            "l1": hits_l1,
-            "l2": hits_l2,
-            "l1_items": len(self._l1),
-            "l2_files": l2_files,
+            "l1_hits": hits_l1,
+            "l2_hits": hits_l2,
+            "evictions": self._evictions,
+            "l1_size": len(self._l1),
+            "l2_size": l2_files,
+            "hit_rate": hit_rate,
         }
 
     def close(self) -> None:

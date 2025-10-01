@@ -1,13 +1,15 @@
-__version__ = "0.1.0"
+"""PENIN multi-API orchestration package."""
 
-"""PENIN multi-API orchestration package.
+from __future__ import annotations
 
-Contains configuration, provider adapters, a multi-LLM router, tool schemas,
-and ingestion helpers (Kaggle/HuggingFace/papers). All components are optional
-and import lazily so existing modules can run without these dependencies.
-"""
+from importlib import metadata
 
-__all__ = [
-    "config",
-    "router",
-]
+from .config import settings  # noqa: F401
+from .router import MultiLLMRouter  # noqa: F401
+
+try:  # pragma: no cover - resolved at runtime when package is installed
+    __version__ = metadata.version("peninaocubo")
+except metadata.PackageNotFoundError:  # pragma: no cover - local source tree
+    __version__ = "0.8.0"
+
+__all__ = ["MultiLLMRouter", "settings", "__version__"]
