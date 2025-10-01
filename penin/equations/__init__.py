@@ -37,14 +37,14 @@ from penin.equations.acfa_epv import EPVConfig, expected_possession_value
 from penin.equations.agape_index import AgapeConfig, compute_agape_index
 from penin.equations.anabolization import AnabolizationConfig, anabolize_penin
 from penin.equations.auto_tuning import AutoTuningConfig, auto_tune_hyperparams
-from penin.equations.caos_plus import CAOSConfig, compute_caos_plus_complete
+from penin.core.caos import CAOSConfig, compute_caos_plus_complete
 from penin.equations.death_equation import DeathConfig, death_gate_check
 from penin.equations.delta_linf_growth import (
     DeltaLInfConfig,
     delta_linf_compound_growth,
 )
 from penin.equations.ir_ic_contractive import ContractivityConfig, ir_to_ic
-from penin.equations.linf_meta import LInfConfig, compute_linf_meta
+from penin.math.linf import LInfConfig, compute_linf_meta
 from penin.equations.lyapunov_contractive import LyapunovConfig, lyapunov_check
 from penin.equations.oci_closure import OCIConfig, organizational_closure_index
 from penin.equations.omega_sea_total import OmegaSEAConfig, omega_sea_coherence

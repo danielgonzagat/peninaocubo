@@ -37,7 +37,7 @@ from typing import Any
 
 from penin.engine.caos_plus import compute_caos_plus
 from penin.engine.master_equation import MasterState, step_master
-from penin.equations.linf_meta import compute_linf_meta
+from penin.math.linf import compute_linf_meta
 from penin.equations.omega_sea_total import omega_sea_coherence
 from penin.guard.sigma_guard_complete import (
     GateMetrics,
