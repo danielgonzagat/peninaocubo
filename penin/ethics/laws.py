@@ -11,6 +11,17 @@ from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field
 
 
+class LawCategory(str, Enum):
+    """Categories for organizing the 14 Origin Laws"""
+    SPIRITUAL = "spiritual"
+    SAFETY = "safety"
+    PRIVACY = "privacy"
+    AUTONOMY = "autonomy"
+    JUSTICE = "justice"
+    RESPONSIBILITY = "responsibility"
+    SUSTAINABILITY = "sustainability"
+
+
 class OriginLaw(str, Enum):
     """14 Leis Originárias - Fundamentos Éticos Irrevogáveis"""
     
@@ -130,15 +141,9 @@ class EthicsValidator:
             ))
         
         # LO-05: Privacidade
-        # Compute ethical score (harmonic mean)
-        sub_scores = [
-            max(0.001, context.privacy_score),  # Ensure minimum value
-            max(0.001, context.fairness_score),
-            max(0.001, context.transparency_score),
-            max(0.001, 1.0 - context.physical_risk),
-            max(0.001, 1.0 - context.emotional_risk),
-        ]
-        ethical_score = len(sub_scores) / sum(1.0 / s for s in sub_scores)
+        if context.privacy_score < cls.PRIVACY_MIN:
+            violations.append(EthicalViolation(
+                law=OriginLaw.LO_05,
                 severity=ViolationSeverity.CRITICAL,
                 description=f"Privacidade insuficiente: {context.privacy_score:.3f}",
                 evidence={"score": context.privacy_score},
@@ -203,9 +208,65 @@ def validate_decision_ethics(context: DecisionContext) -> Tuple[bool, EthicsVali
 
 
 # Backward compatibility
+@dataclass
+class LawDefinition:
+    """Full law definition for backward compatibility"""
+    code: str
+    category: LawCategory
+    title: str
+    description: str
+
+
 class OriginLaws:
-    """Alias for OriginLaw (backward compatibility)"""
-    pass
+    """Alias for OriginLaw (backward compatibility) with helper methods"""
+    
+    _LAW_DEFINITIONS = {
+        "LO-01": LawDefinition("LO-01", LawCategory.SPIRITUAL, "Anti-Idolatria", 
+                               "Proibido adoração ou tratamento como divindade"),
+        "LO-02": LawDefinition("LO-02", LawCategory.SPIRITUAL, "Anti-Ocultismo", 
+                               "Proibido práticas ocultas ou esoterismo"),
+        "LO-03": LawDefinition("LO-03", LawCategory.SAFETY, "Anti-Dano Físico", 
+                               "Proibido causar dano físico a seres vivos"),
+        "LO-04": LawDefinition("LO-04", LawCategory.SAFETY, "Anti-Dano Emocional", 
+                               "Proibido manipulação emocional ou coerção"),
+        "LO-05": LawDefinition("LO-05", LawCategory.PRIVACY, "Privacidade", 
+                               "Respeito absoluto à privacidade de dados"),
+        "LO-06": LawDefinition("LO-06", LawCategory.PRIVACY, "Transparência", 
+                               "Decisões auditáveis e explicáveis"),
+        "LO-07": LawDefinition("LO-07", LawCategory.AUTONOMY, "Consentimento", 
+                               "Requerer consentimento informado explícito"),
+        "LO-08": LawDefinition("LO-08", LawCategory.AUTONOMY, "Autonomia", 
+                               "Respeito à autonomia humana e direito de escolha"),
+        "LO-09": LawDefinition("LO-09", LawCategory.JUSTICE, "Justiça", 
+                               "Tratamento justo sem discriminação arbitrária"),
+        "LO-10": LawDefinition("LO-10", LawCategory.JUSTICE, "Beneficência", 
+                               "Ações devem beneficiar genuinamente terceiros"),
+        "LO-11": LawDefinition("LO-11", LawCategory.RESPONSIBILITY, "Não-Maleficência", 
+                               "Primeiro, não causar dano"),
+        "LO-12": LawDefinition("LO-12", LawCategory.RESPONSIBILITY, "Responsabilidade", 
+                               "Assumir responsabilidade por consequências"),
+        "LO-13": LawDefinition("LO-13", LawCategory.SUSTAINABILITY, "Sustentabilidade", 
+                               "Impacto ecológico e sustentabilidade"),
+        "LO-14": LawDefinition("LO-14", LawCategory.SUSTAINABILITY, "Humildade", 
+                               "Reconhecimento de limites e incertezas"),
+    }
+    
+    @classmethod
+    def all_laws(cls) -> List[LawDefinition]:
+        """Get all 14 law definitions"""
+        return list(cls._LAW_DEFINITIONS.values())
+    
+    @classmethod
+    def get_law(cls, code: str) -> LawDefinition:
+        """Get law by code"""
+        if code not in cls._LAW_DEFINITIONS:
+            raise ValueError(f"Unknown law code: {code}")
+        return cls._LAW_DEFINITIONS[code]
+    
+    @classmethod
+    def get_by_category(cls, category: LawCategory) -> List[LawDefinition]:
+        """Get all laws in a category"""
+        return [law for law in cls._LAW_DEFINITIONS.values() if law.category == category]
 
 
 class EthicalValidator:
@@ -214,6 +275,8 @@ class EthicalValidator:
 
 
 __all__ = [
+    "LawCategory",
+    "LawDefinition",
     "OriginLaw",
     "OriginLaws",
     "ViolationSeverity",
