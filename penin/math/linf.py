@@ -1,8 +1,7 @@
 import math
-from typing import Dict
 
 
-def harmonic_noncomp(metrics: Dict[str, float], weights: Dict[str, float], eps: float = 1e-6) -> float:
+def harmonic_noncomp(metrics: dict[str, float], weights: dict[str, float], eps: float = 1e-6) -> float:
     num = 0.0
     den = 0.0
     for k, v in metrics.items():
@@ -12,6 +11,6 @@ def harmonic_noncomp(metrics: Dict[str, float], weights: Dict[str, float], eps: 
     return num / max(eps, den)
 
 
-def linf_score(metrics: Dict[str, float], weights: Dict[str, float], cost: float, lambda_c: float = 0.01) -> float:
+def linf_score(metrics: dict[str, float], weights: dict[str, float], cost: float, lambda_c: float = 0.01) -> float:
     base = harmonic_noncomp(metrics, weights)
     return base * math.exp(-lambda_c * max(0.0, cost))

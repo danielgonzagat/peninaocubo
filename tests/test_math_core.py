@@ -14,9 +14,9 @@ from penin.math.caos_plus_complete import (
     caos_plus_simple,
     compute_A_autoevolution,
     compute_C_consistency,
+    compute_caos_plus,
     compute_O_unknowable,
     compute_S_silence,
-    compute_caos_plus,
 )
 from penin.math.ir_ic_contractivity import (
     RiskProfile,
@@ -27,8 +27,8 @@ from penin.math.ir_ic_contractivity import (
 )
 from penin.math.linf_complete import (
     check_min_improvement,
-    compute_Linf,
     compute_delta_Linf,
+    compute_Linf,
 )
 from penin.math.penin_master_equation import (
     MasterEquationState,

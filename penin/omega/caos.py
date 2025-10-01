@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import math
-from typing import Dict, Any, Tuple, Optional
 from dataclasses import dataclass
+from typing import Any
 
 EPS = 1e-9
 
@@ -58,7 +58,7 @@ def quick_caos_phi(C: float, A: float, O: float, S: float) -> float:
     return phi_caos(C, A, O, S)
 
 
-def validate_caos_stability(C: float, A: float, O: float, S: float, **kwargs: Any) -> Dict[str, Any]:
+def validate_caos_stability(C: float, A: float, O: float, S: float, **kwargs: Any) -> dict[str, Any]:
     """Validate CAOS stability."""
     phi = phi_caos(C, A, O, S)
 
@@ -75,14 +75,14 @@ class CAOSComponents:
         self.O = max(0.0, min(1.0, O))
         self.S = max(0.0, min(1.0, S))
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         """Convert to dictionary."""
         return {"C": self.C, "A": self.A, "O": self.O, "S": self.S}
 
 
 def compute_caos_plus(
-    C: float, A: float, O: float, S: float, kappa: float = 2.0, config: Optional["CAOSConfig"] = None
-) -> Tuple[float, Dict[str, Any]]:
+    C: float, A: float, O: float, S: float, kappa: float = 2.0, config: CAOSConfig | None = None
+) -> tuple[float, dict[str, Any]]:
     """Compute CAOS⁺ with details.
     
     This is the primary CAOS+ implementation. Returns tuple of (phi, details).
@@ -134,7 +134,7 @@ def compute_caos_harmony(C: float, A: float, O: float, S: float) -> float:
     return product**0.25
 
 
-def caos_gradient(C: float, A: float, O: float, S: float, kappa: float) -> Dict[str, float]:
+def caos_gradient(C: float, A: float, O: float, S: float, kappa: float) -> dict[str, float]:
     """Compute CAOS gradients."""
     eps = 1e-6
 
@@ -168,7 +168,7 @@ class CAOSTracker:
         self.history = []
         self.ema_value = None
 
-    def update(self, C: float, A: float, O: float, S: float, kappa: float = 2.0) -> Tuple[float, float]:
+    def update(self, C: float, A: float, O: float, S: float, kappa: float = 2.0) -> tuple[float, float]:
         """Update with new CAOS values."""
         caos_val = phi_caos(C, A, O, S, kappa)
 
@@ -212,7 +212,7 @@ class CAOSPlusEngine:
         """Compute CAOS⁺ phi value."""
         return phi_caos(C, A, O, S, self.kappa, gamma=self.gamma)
 
-    def compute_phi(self, components) -> Tuple[float, Dict[str, Any]]:
+    def compute_phi(self, components) -> tuple[float, dict[str, Any]]:
         """Compute CAOS⁺ phi value from components."""
         if hasattr(components, "to_dict"):
             comp_dict = components.to_dict()
@@ -242,7 +242,7 @@ def caos_plus(
     gamma: float = 0.7,
     kappa_max: float = 10.0,
     **kwargs,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Computa CAOS⁺ com saturação log-space
 

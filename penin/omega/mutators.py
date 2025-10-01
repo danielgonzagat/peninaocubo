@@ -5,11 +5,11 @@ PENIN-Ω Mutators Module
 Implements mutation strategies for model parameters, prompts, and configurations.
 """
 
+import hashlib
 import json
 import random
-import hashlib
-from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -18,9 +18,9 @@ class MutationConfig:
 
     seed: int = 42
     max_variants: int = 8
-    temperature_range: Tuple[float, float] = (0.1, 1.5)
-    top_p_range: Tuple[float, float] = (0.5, 1.0)
-    max_tokens_options: List[int] = None
+    temperature_range: tuple[float, float] = (0.1, 1.5)
+    top_p_range: tuple[float, float] = (0.5, 1.0)
+    max_tokens_options: list[int] = None
 
     def __post_init__(self):
         if self.max_tokens_options is None:
@@ -32,8 +32,8 @@ class MutationResult:
     """Result of a mutation operation"""
 
     variant_id: str
-    original_config: Dict[str, Any]
-    mutated_config: Dict[str, Any]
+    original_config: dict[str, Any]
+    mutated_config: dict[str, Any]
     mutation_type: str
     config_hash: str
     seed_used: int
@@ -46,7 +46,7 @@ class ParameterMutator:
         self.config = config or MutationConfig()
         self.rng = random.Random(self.config.seed)
 
-    def mutate_parameters(self, base_config: Dict[str, Any], n_variants: int = None) -> List[MutationResult]:
+    def mutate_parameters(self, base_config: dict[str, Any], n_variants: int = None) -> list[MutationResult]:
         """Generate parameter variants from base configuration"""
         n_variants = n_variants or self.config.max_variants
         variants = []
@@ -86,15 +86,15 @@ class ParameterMutator:
 
         return variants
 
-    def _hash_config(self, config: Dict[str, Any]) -> str:
+    def _hash_config(self, config: dict[str, Any]) -> str:
         """Create deterministic hash of configuration"""
         config_str = json.dumps(config, sort_keys=True)
         return hashlib.sha256(config_str.encode()).hexdigest()
 
 
 def generate_parameter_variants(
-    base_config: Dict[str, Any], n_variants: int = 8, seed: int = 42
-) -> List[Dict[str, Any]]:
+    base_config: dict[str, Any], n_variants: int = 8, seed: int = 42
+) -> list[dict[str, Any]]:
     """Quick function to generate parameter variants"""
     config = MutationConfig(seed=seed, max_variants=n_variants)
     mutator = ParameterMutator(config)

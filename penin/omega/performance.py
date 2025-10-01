@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Performance Optimization Module for PENIN-Ω
 
@@ -10,12 +9,13 @@ This module provides performance optimizations including:
 - Memory management
 """
 
-import time
 import threading
-from typing import Any, Dict, Optional, Callable, Tuple
-from functools import lru_cache, wraps
-from dataclasses import dataclass
+import time
 import weakref
+from collections.abc import Callable
+from dataclasses import dataclass
+from functools import lru_cache, wraps
+from typing import Any
 
 
 @dataclass
@@ -40,10 +40,10 @@ class PerformanceOptimizer:
         self.cache_ttl = cache_ttl
         self.max_cache_size = max_cache_size
         self.metrics = PerformanceMetrics()
-        self._cache: Dict[str, Tuple[Any, float]] = {}
+        self._cache: dict[str, tuple[Any, float]] = {}
         self._lock = threading.RLock()
 
-    def cached(self, ttl: Optional[float] = None, key_func: Optional[Callable] = None):
+    def cached(self, ttl: float | None = None, key_func: Callable | None = None):
         """Decorator for caching function results"""
 
         def decorator(func: Callable) -> Callable:
@@ -104,7 +104,7 @@ class PerformanceOptimizer:
         with self._lock:
             self._cache.clear()
 
-    def get_cache_stats(self) -> Dict[str, Any]:
+    def get_cache_stats(self) -> dict[str, Any]:
         """Get cache statistics"""
         with self._lock:
             return {
@@ -121,7 +121,7 @@ class ResourceMonitor:
     def __init__(self, update_interval: float = 5.0):
         self.update_interval = update_interval
         self._last_update = 0.0
-        self._cached_values: Dict[str, float] = {}
+        self._cached_values: dict[str, float] = {}
         self._lock = threading.RLock()
 
     def get_cpu_usage(self) -> float:
@@ -235,7 +235,7 @@ _resource_monitor = ResourceMonitor()
 _memory_manager = MemoryManager()
 
 
-def cached(ttl: Optional[float] = None, key_func: Optional[Callable] = None):
+def cached(ttl: float | None = None, key_func: Callable | None = None):
     """Global cached decorator"""
     return _performance_optimizer.cached(ttl, key_func)
 
@@ -250,7 +250,7 @@ def get_memory_usage() -> float:
     return _resource_monitor.get_memory_usage()
 
 
-def get_performance_stats() -> Dict[str, Any]:
+def get_performance_stats() -> dict[str, Any]:
     """Get performance statistics"""
     return {
         "cache_stats": _performance_optimizer.get_cache_stats(),

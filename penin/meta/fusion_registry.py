@@ -1,6 +1,7 @@
-from typing import Dict, Any, Callable
+from collections.abc import Callable
+from typing import Any
 
-_REGISTRY: Dict[str, Callable[..., Any]] = {}
+_REGISTRY: dict[str, Callable[..., Any]] = {}
 
 def register(name: str, factory: Callable[..., Any]) -> None:
     _REGISTRY[name] = factory

@@ -52,7 +52,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 # Constants
 EPS = 1e-9  # Estabilizador numérico global
@@ -64,7 +64,7 @@ class CAOSComponent(Enum):
     """Componentes do CAOS⁺"""
 
     CONSISTENCY = "C"  # Consistência
-    AUTOEVOLUTION = "A"  # Autoevolução  
+    AUTOEVOLUTION = "A"  # Autoevolução
     INCOGNOSCIBLE = "O"  # Incognoscível/OOD
     SILENCE = "S"  # Silêncio
 
@@ -285,7 +285,7 @@ class CAOSConfig:
     normalize_output: bool = False  # [0, 1] output
 
     # Determinismo
-    seed: Optional[int] = None
+    seed: int | None = None
 
 
 # =============================================================================
@@ -317,7 +317,7 @@ class CAOSState:
     caos_plus: float = 1.0
 
     # Histórico (últimas N amostras)
-    history: List[float] = field(default_factory=list)
+    history: list[float] = field(default_factory=list)
     max_history_length: int = 100
 
     # Contador de atualizações
@@ -468,7 +468,7 @@ def compute_caos_plus_simple(
     O: float,
     S: float,
     kappa: float = DEFAULT_KAPPA,
-    config: Optional[CAOSConfig] = None,
+    config: CAOSConfig | None = None,
 ) -> float:
     """
     Wrapper simplificado quando já se tem C, A, O, S normalizados.
@@ -516,9 +516,9 @@ def compute_caos_plus_complete(
     autoevolution_metrics: AutoevolutionMetrics,
     incognoscible_metrics: IncognoscibleMetrics,
     silence_metrics: SilenceMetrics,
-    config: Optional[CAOSConfig] = None,
-    state: Optional[CAOSState] = None,
-) -> Tuple[float, Dict[str, Any]]:
+    config: CAOSConfig | None = None,
+    state: CAOSState | None = None,
+) -> tuple[float, dict[str, Any]]:
     """
     Computação CAOS⁺ completa com métricas detalhadas, EMA e auditoria.
     
@@ -550,7 +550,7 @@ def compute_caos_plus_complete(
     if state is None:
         state = CAOSState()
 
-    details: Dict[str, Any] = {}
+    details: dict[str, Any] = {}
 
     # 1. Computar componentes C, A, O, S
     c_raw = consistency_metrics.compute_c()
@@ -671,8 +671,8 @@ def compute_caos_plus(
     O: float,
     S: float,
     kappa: float = 2.0,
-    config: Optional[CAOSConfig] = None,
-) -> Tuple[float, Dict[str, Any]]:
+    config: CAOSConfig | None = None,
+) -> tuple[float, dict[str, Any]]:
     """
     Wrapper de compatibilidade com assinatura antiga de penin/omega/caos.py
     
@@ -706,7 +706,7 @@ def caos_plus(
     gamma: float = DEFAULT_GAMMA,
     kappa_max: float = 10.0,
     **kwargs,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Wrapper de compatibilidade com função caos_plus() de penin/omega/caos.py
     
@@ -763,7 +763,7 @@ def geometric_mean(c: float, a: float, o: float, s: float) -> float:
     return product**0.25
 
 
-def caos_gradient(c: float, a: float, o: float, s: float, kappa: float) -> Dict[str, float]:
+def caos_gradient(c: float, a: float, o: float, s: float, kappa: float) -> dict[str, float]:
     """Calcula gradientes numéricos de CAOS⁺ (para otimização)"""
     eps = 1e-6
 
@@ -797,7 +797,7 @@ class CAOSTracker:
         self,
         alpha: float = 0.2,
         max_history: int = 100,
-        config: Optional[CAOSConfig] = None,
+        config: CAOSConfig | None = None,
     ):
         self.alpha = alpha
         self.max_history = max_history
@@ -805,7 +805,7 @@ class CAOSTracker:
         self.history = []
         self.ema_value = None
 
-    def update(self, c: float, a: float, o: float, s: float, kappa: float = 2.0) -> Tuple[float, float]:
+    def update(self, c: float, a: float, o: float, s: float, kappa: float = 2.0) -> tuple[float, float]:
         """Atualiza tracker com novos valores CAOS"""
         caos_val = phi_caos(c, a, o, s, kappa)
 

@@ -41,8 +41,8 @@ Performance Targets:
 - Energy: 1000× lower for neuromorphic hardware
 """
 
-from .spiking_jelly_adapter import SpikingJellyAdapter
 from .spiking_brain_adapter import SpikingBrainAdapter
+from .spiking_jelly_adapter import SpikingJellyAdapter
 
 __all__ = [
     "SpikingJellyAdapter",

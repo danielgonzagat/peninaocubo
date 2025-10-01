@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 PENIN-Ω P0 Audit Corrections Test Suite
 ========================================
@@ -11,13 +10,13 @@ Tests for all P0 critical corrections:
 4. Router cost-aware scoring with budget limits
 """
 
-import sys
-import os
 import asyncio
-import pytest
 import sqlite3
+import sys
 import tempfile
 from pathlib import Path
+
+import pytest
 
 # Add workspace to path
 sys.path.insert(0, "/workspace")
@@ -27,7 +26,7 @@ def test_p0_1_ethics_metrics():
     """Test P0-1: Ethics metrics calculation"""
     print("\n=== P0-1: Ethics Metrics ===")
 
-    from penin.omega.ethics_metrics import EthicsCalculator, EthicsMetrics, EthicsGate
+    from penin.omega.ethics_metrics import EthicsCalculator
 
     # Create synthetic data
     n = 100
@@ -66,7 +65,7 @@ def test_p0_1_ethics_metrics():
     assert hasattr(all_metrics, "rho_bias"), "All metrics should include bias ratio"
     assert hasattr(all_metrics, "fairness"), "All metrics should include fairness"
 
-    print(f"✓ All metrics calculated: EthicsMetrics object")
+    print("✓ All metrics calculated: EthicsMetrics object")
     print(f"  ECE={all_metrics.ece:.4f}, ρ={all_metrics.rho_bias:.4f}, F={all_metrics.fairness:.4f}")
 
     # Test fail-closed behavior
@@ -92,8 +91,8 @@ def test_p0_2_metrics_security():
     # Note: observability module was consolidated into penin package
     # This test is kept for historical reference but marked as skipped
     pytest.skip("observability module consolidated - test needs update for new structure")
-    
-    from observability import ObservabilityConfig, MetricsServer, MetricsCollector
+
+    from observability import MetricsCollector, MetricsServer, ObservabilityConfig
 
     # Test default config
     config = ObservabilityConfig()
@@ -154,13 +153,14 @@ def test_p0_3_worm_wal():
 def test_p0_4_router_cost_budget():
     """Test P0-4: Router with cost-aware scoring and budget"""
     print("\n=== P0-4: Router Cost & Budget ===")
-    
+
     # Note: Router internal tracking implementation may vary
     pytest.skip("Router budget tracking test needs update for current implementation")
 
-    from penin.router import MultiLLMRouter
-    from penin.providers.base import LLMResponse, BaseProvider
-    from typing import List, Optional, Dict, Any
+    from typing import Any
+
+    from penin.providers.base import BaseProvider, LLMResponse
+    from penin.router import MultiLLMRouterComplete as MultiLLMRouter
 
     # Mock provider
     class MockProvider(BaseProvider):
@@ -172,9 +172,9 @@ def test_p0_4_router_cost_budget():
 
         async def chat(
             self,
-            messages: List[Dict[str, Any]],
-            tools: Optional[List[Dict[str, Any]]] = None,
-            system: Optional[str] = None,
+            messages: list[dict[str, Any]],
+            tools: list[dict[str, Any]] | None = None,
+            system: str | None = None,
             temperature: float = 0.7,
         ) -> LLMResponse:
             await asyncio.sleep(0.01)  # Simulate network
@@ -207,7 +207,7 @@ def test_p0_4_router_cost_budget():
     # Check initial budget - router stores it internally
     # Note: MultiLLMRouter may use different attribute names internally
     # We just verify it accepts the budget parameter and tracks spending
-    print(f"✓ Router initialized with budget parameter")
+    print("✓ Router initialized with budget parameter")
 
     # Make request
     async def test_request():
@@ -216,7 +216,7 @@ def test_p0_4_router_cost_budget():
 
     response = asyncio.run(test_request())
     assert response.content == "Mock response"
-    print(f"✓ Request succeeded")
+    print("✓ Request succeeded")
 
     # Check usage stats (router may use get_usage_stats or similar method)
     try:

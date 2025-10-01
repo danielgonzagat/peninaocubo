@@ -1,7 +1,7 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
 import math
 
+from fastapi import FastAPI
+from pydantic import BaseModel
 
 app = FastAPI(title="SR-Omega", version="0.1.0")
 

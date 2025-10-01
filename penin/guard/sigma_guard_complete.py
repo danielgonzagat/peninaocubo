@@ -23,9 +23,9 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class GateStatus(str, Enum):
@@ -64,7 +64,7 @@ class GateResult:
     threshold: float
     passed: bool
     reason: str
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 
 @dataclass
@@ -73,11 +73,11 @@ class SigmaGuardVerdict:
 
     verdict: GateStatus
     passed: bool
-    gates: List[GateResult]
+    gates: list[GateResult]
     aggregate_score: float
     reason: str
     action: str  # "promote", "rollback", "canary", "quarantine"
-    timestamp: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     hash_proof: str = ""
 
     def __post_init__(self):
@@ -318,7 +318,7 @@ class SigmaGuard:
         kappa: float,
         consent: bool,
         eco_ok: bool,
-        metadata: Optional[Dict[str, Any]] = None,
+        metadata: dict[str, Any] | None = None,
     ) -> SigmaGuardVerdict:
         """
         Validate all gates and return verdict.
@@ -339,7 +339,7 @@ class SigmaGuard:
         Returns:
             SigmaGuardVerdict with detailed gate results
         """
-        gates: List[GateResult] = []
+        gates: list[GateResult] = []
 
         # Gate 1: Contractivity (ρ < 1)
         rho_passed = rho < self.rho_max

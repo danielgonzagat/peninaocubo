@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 PENIN-Ω System Integration Tests
 ==================================
@@ -11,12 +10,13 @@ End-to-end tests for the complete PENIN-Ω system including:
 - WORM ledger operations
 """
 
-import pytest
-import sys
-import os
 import asyncio
+import sys
 import tempfile
+from datetime import UTC
 from pathlib import Path
+
+import pytest
 
 # Add workspace to path
 sys.path.insert(0, "/workspace")
@@ -26,7 +26,7 @@ def test_ethics_pipeline_integration():
     """Test complete ethics pipeline from calculation to attestation"""
     print("\n=== Integration: Ethics Pipeline ===")
 
-    from penin.omega.ethics_metrics import EthicsCalculator, compute_ethics_attestation, EthicsAttestation, sigma_guard
+    from penin.omega.ethics_metrics import EthicsAttestation, EthicsCalculator, compute_ethics_attestation, sigma_guard
 
     # Generate synthetic data
     n = 200
@@ -83,13 +83,14 @@ def test_ethics_pipeline_integration():
 def test_router_with_observability():
     """Test router integration with observability and budget tracking"""
     print("\n=== Integration: Router + Observability ===")
-    
+
     # Note: observability module consolidated - skip for now
     pytest.skip("observability module consolidated - test needs update")
 
-    from penin.router import MultiLLMRouter
-    from penin.providers.base import LLMResponse, BaseProvider
-    from observability import ObservabilityManager, ObservabilityConfig
+    from observability import ObservabilityConfig, ObservabilityManager
+
+    from penin.providers.base import BaseProvider, LLMResponse
+    from penin.router import MultiLLMRouterComplete as MultiLLMRouter
 
     # Mock provider
     class TestProvider(BaseProvider):
@@ -153,8 +154,8 @@ def test_scoring_integration():
     """Test scoring module integration with all components"""
     print("\n=== Integration: Scoring System ===")
 
-    from penin.omega.scoring import harmonic_mean_weighted, linf_harmonic, normalize_series
     from penin.omega.caos import caos_plus
+    from penin.omega.scoring import linf_harmonic
     from penin.omega.sr import sr_omega
 
     # Step 1: Calculate component scores
@@ -200,7 +201,7 @@ def test_ledger_operations():
     print("\n=== Integration: WORM Ledger ===")
 
     import sqlite3
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = Path(tmpdir) / "integration_ledger.db"
@@ -237,7 +238,7 @@ def test_ledger_operations():
                 "cycle": i,
                 "action": "evaluate",
                 "score": 0.8 + i * 0.01,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
             data_str = json.dumps(event_data, sort_keys=True)
@@ -245,7 +246,7 @@ def test_ledger_operations():
 
             conn.execute(
                 "INSERT INTO events (timestamp, event_type, cycle_id, data, hash, prev_hash) VALUES (?, ?, ?, ?, ?, ?)",
-                (datetime.now(timezone.utc).timestamp(), "CYCLE", f"cycle_{i}", data_str, current_hash, prev_hash),
+                (datetime.now(UTC).timestamp(), "CYCLE", f"cycle_{i}", data_str, current_hash, prev_hash),
             )
 
             events.append(current_hash)

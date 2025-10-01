@@ -5,7 +5,7 @@ from __future__ import annotations
 from importlib import metadata
 
 from .config import settings  # noqa: F401
-from .router import MultiLLMRouter  # noqa: F401
+from .router import MultiLLMRouterComplete as MultiLLMRouter  # noqa: F401
 
 try:  # pragma: no cover - resolved at runtime when package is installed
     __version__ = metadata.version("peninaocubo")

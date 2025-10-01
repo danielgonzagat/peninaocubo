@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Tuple
 
 
 @dataclass
@@ -137,7 +136,7 @@ def compute_sr_score(
     metacognition: float,
     epsilon: float = 1e-6,
     return_components: bool = False,
-) -> Tuple[float, SRComponents]:
+) -> tuple[float, SRComponents]:
     """
     Compute SR-Ω∞ reflexive score using harmonic mean.
 

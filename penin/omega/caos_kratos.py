@@ -1,4 +1,4 @@
-from .caos import phi_caos, _clamp  # _clamp existe em caos.py
+from .caos import _clamp, phi_caos  # _clamp existe em caos.py
 
 
 def phi_kratos(

@@ -1,21 +1,20 @@
 import time
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 import orjson
-
 
 LOG = Path.home() / ".penin_omega" / "knowledge" / "api_io.jsonl"
 LOG.parent.mkdir(parents=True, exist_ok=True)
 
 
-def record_call(provider: str, endpoint: str, req: Dict[str, Any], resp: Dict[str, Any]) -> None:
+def record_call(provider: str, endpoint: str, req: dict[str, Any], resp: dict[str, Any]) -> None:
     item = {"t": time.time(), "p": provider, "e": endpoint, "req": req, "resp": resp}
     with LOG.open("ab") as f:
         f.write(orjson.dumps(item) + b"\n")
 
 
-def suggest_replay(prompt: str) -> Dict[str, Any]:
+def suggest_replay(prompt: str) -> dict[str, Any]:
     best = None
     best_len = 10**12
     if not LOG.exists():

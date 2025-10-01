@@ -34,9 +34,9 @@ Calibração:
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Any
+from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 
 class MetricType(Enum):
@@ -66,7 +66,7 @@ class Metric:
     value: float  # Normalizado [0, 1]
     weight: float = 1.0  # Peso w_j
     metric_type: MetricType = MetricType.ACCURACY
-    raw_value: Optional[float] = None  # Valor bruto antes de normalização
+    raw_value: float | None = None  # Valor bruto antes de normalização
     normalization: str = "min_max"  # min_max, sigmoid, clip
 
     def normalize(self, raw_val: float, min_val: float = 0.0, max_val: float = 1.0) -> float:
@@ -75,14 +75,14 @@ class Metric:
             if max_val == min_val:
                 return 0.5
             return max(0.0, min(1.0, (raw_val - min_val) / (max_val - min_val)))
-        
+
         elif self.normalization == "sigmoid":
             # Sigmoid centrado em 0.5
             return 1.0 / (1.0 + math.exp(-10 * (raw_val - 0.5)))
-        
+
         elif self.normalization == "clip":
             return max(0.0, min(1.0, raw_val))
-        
+
         else:
             return max(0.0, min(1.0, raw_val))
 
@@ -104,7 +104,7 @@ class CostComponents:
     energy_kwh: float = 0.0  # Energia consumida
     memory_gb: float = 0.0  # Memória peak
     api_calls: int = 0  # Chamadas API
-    
+
     # Normalização (custo / budget)
     time_budget: float = 10.0
     token_budget: int = 100000
@@ -123,12 +123,12 @@ class CostComponents:
         cost_energy = self.energy_kwh / self.energy_budget
         cost_memory = self.memory_gb / self.memory_budget
         cost_api = self.api_calls / self.api_budget
-        
+
         # Média ponderada (pode ajustar pesos)
         weights = [0.3, 0.3, 0.2, 0.1, 0.1]
         costs = [cost_time, cost_tokens, cost_energy, cost_memory, cost_api]
-        
-        return sum(w * c for w, c in zip(weights, costs))
+
+        return sum(w * c for w, c in zip(weights, costs, strict=False))
 
 
 @dataclass
@@ -137,19 +137,19 @@ class LInfConfig:
 
     # Estabilizador numérico
     epsilon: float = 1e-3
-    
+
     # Coeficiente de penalização de custo
     lambda_cost: float = 0.5
-    
+
     # Método de agregação (harmonic padrão)
     aggregation: str = "harmonic"  # harmonic, geometric, min_soft
-    
+
     # Normalização de pesos (auto-normalizar para soma = 1)
     auto_normalize_weights: bool = True
-    
+
     # Fail-closed em gates
     fail_closed: bool = True
-    
+
     # Threshold mínimo para cada métrica (opcional)
     min_metric_threshold: float = 0.0
 
@@ -165,21 +165,21 @@ class EthicalGates:
     # ΣEA/LO-14: Índice Agápe
     agape_index: float = 1.0
     agape_threshold: float = 0.7
-    
+
     # IR→IC: Contratividade de risco (ρ < 1)
     rho_contractivity: float = 0.95
-    
+
     # ECE: Expected Calibration Error
     ece: float = 0.005
     ece_threshold: float = 0.01
-    
+
     # Bias ratio
     rho_bias: float = 1.02
     rho_bias_threshold: float = 1.05
-    
+
     # Consent
     consent: bool = True
-    
+
     # Ecological OK
     eco_ok: bool = True
 
@@ -194,33 +194,33 @@ class EthicalGates:
             and self.eco_ok
         )
 
-    def failed_gates(self) -> List[str]:
+    def failed_gates(self) -> list[str]:
         """Retorna lista de gates que falharam"""
         failed = []
-        
+
         if self.agape_index < self.agape_threshold:
             failed.append(f"agape_index={self.agape_index:.3f} < {self.agape_threshold}")
-        
+
         if self.rho_contractivity >= 1.0:
             failed.append(f"rho_contractivity={self.rho_contractivity:.3f} >= 1.0")
-        
+
         if self.ece > self.ece_threshold:
             failed.append(f"ece={self.ece:.4f} > {self.ece_threshold}")
-        
+
         if self.rho_bias > self.rho_bias_threshold:
             failed.append(f"rho_bias={self.rho_bias:.3f} > {self.rho_bias_threshold}")
-        
+
         if not self.consent:
             failed.append("consent=False")
-        
+
         if not self.eco_ok:
             failed.append("eco_ok=False")
-        
+
         return failed
 
 
 def harmonic_mean_weighted(
-    metrics: List[Metric],
+    metrics: list[Metric],
     epsilon: float = 1e-3,
 ) -> float:
     """
@@ -232,24 +232,24 @@ def harmonic_mean_weighted(
     """
     if not metrics:
         return 0.0
-    
+
     total_weight = sum(m.weight for m in metrics)
     if total_weight <= 0:
         return 0.0
-    
+
     # Soma ponderada de 1/m_j
     denominator = sum(
         m.weight / max(epsilon, m.value) for m in metrics
     )
-    
+
     if denominator <= epsilon:
         return 0.0
-    
+
     return total_weight / denominator
 
 
 def geometric_mean_weighted(
-    metrics: List[Metric],
+    metrics: list[Metric],
     epsilon: float = 1e-3,
 ) -> float:
     """
@@ -261,20 +261,20 @@ def geometric_mean_weighted(
     """
     if not metrics:
         return 0.0
-    
+
     total_weight = sum(m.weight for m in metrics)
     if total_weight <= 0:
         return 0.0
-    
+
     log_sum = sum(
         m.weight * math.log(max(epsilon, m.value)) for m in metrics
     )
-    
+
     return math.exp(log_sum / total_weight)
 
 
 def min_soft_pnorm(
-    metrics: List[Metric],
+    metrics: list[Metric],
     p: float = -10.0,
     epsilon: float = 1e-3,
 ) -> float:
@@ -287,35 +287,35 @@ def min_soft_pnorm(
     """
     if not metrics:
         return 0.0
-    
+
     total_weight = sum(m.weight for m in metrics)
     if total_weight <= 0:
         return 0.0
-    
+
     # Para p muito negativo, usa aproximação soft min
     if p <= -50:
         # Retorna valor muito próximo do mínimo
         min_val = min(m.value for m in metrics)
         return max(epsilon, min_val)
-    
+
     # p-norm
     powered_sum = sum(
         m.weight * (max(epsilon, m.value) ** p) for m in metrics
     )
-    
+
     if powered_sum <= 0:
         return epsilon
-    
+
     result = (powered_sum / total_weight) ** (1.0 / p)
     return max(0.0, min(1.0, result))
 
 
 def compute_linf_meta(
-    metrics: List[Metric],
+    metrics: list[Metric],
     cost: CostComponents,
     ethical_gates: EthicalGates,
-    config: Optional[LInfConfig] = None,
-) -> Tuple[float, Dict[str, Any]]:
+    config: LInfConfig | None = None,
+) -> tuple[float, dict[str, Any]]:
     """
     Calcula L∞ = (média_não_compensatória) · e^(-λ_c · Cost) · 1_{ΣEA ∧ IR→IC}
     
@@ -332,8 +332,8 @@ def compute_linf_meta(
     """
     if config is None:
         config = LInfConfig()
-    
-    details: Dict[str, Any] = {
+
+    details: dict[str, Any] = {
         "config": {
             "epsilon": config.epsilon,
             "lambda_cost": config.lambda_cost,
@@ -342,22 +342,22 @@ def compute_linf_meta(
         "metrics_count": len(metrics),
         "ethical_gates_pass": ethical_gates.all_gates_pass(),
     }
-    
+
     # 1. Validar métricas
     valid_metrics = [m for m in metrics if m.is_valid()]
     if not valid_metrics:
         details["error"] = "no_valid_metrics"
         return 0.0, details
-    
+
     details["valid_metrics_count"] = len(valid_metrics)
-    
+
     # 2. Auto-normalizar pesos se configurado
     if config.auto_normalize_weights:
         total_weight = sum(m.weight for m in valid_metrics)
         if total_weight > 0:
             for m in valid_metrics:
                 m.weight = m.weight / total_weight
-    
+
     # 3. Verificar thresholds mínimos (opcional)
     if config.min_metric_threshold > 0:
         below_threshold = [
@@ -367,47 +367,47 @@ def compute_linf_meta(
             details["error"] = "metrics_below_threshold"
             details["below_threshold"] = below_threshold
             return 0.0, details
-    
+
     # 4. Calcular agregação não-compensatória
     if config.aggregation == "harmonic":
         base_score = harmonic_mean_weighted(valid_metrics, config.epsilon)
         details["aggregation_method"] = "harmonic_mean"
-    
+
     elif config.aggregation == "geometric":
         base_score = geometric_mean_weighted(valid_metrics, config.epsilon)
         details["aggregation_method"] = "geometric_mean"
-    
+
     elif config.aggregation == "min_soft":
         base_score = min_soft_pnorm(valid_metrics, p=-10.0, epsilon=config.epsilon)
         details["aggregation_method"] = "min_soft_pnorm"
-    
+
     else:
         # Default: harmonic
         base_score = harmonic_mean_weighted(valid_metrics, config.epsilon)
         details["aggregation_method"] = "harmonic_mean_default"
-    
+
     details["base_score"] = base_score
-    
+
     # 5. Calcular custo normalizado
     total_cost = cost.total_normalized_cost()
     details["total_cost_normalized"] = total_cost
-    
+
     # 6. Aplicar penalização de custo: e^(-λ_c · Cost)
     cost_penalty = math.exp(-config.lambda_cost * max(0.0, total_cost))
     details["cost_penalty"] = cost_penalty
-    
+
     # 7. Aplicar base_score * cost_penalty
     linf_before_gates = base_score * cost_penalty
     details["linf_before_gates"] = linf_before_gates
-    
+
     # 8. Verificar gates éticos: ΣEA ∧ IR→IC
     gates_pass = ethical_gates.all_gates_pass()
     details["ethical_gates_pass"] = gates_pass
-    
+
     if not gates_pass:
         failed = ethical_gates.failed_gates()
         details["failed_gates"] = failed
-        
+
         if config.fail_closed:
             # Fail-closed: L∞ = 0
             details["linf_final"] = 0.0
@@ -419,12 +419,12 @@ def compute_linf_meta(
             details["linf_final"] = linf_final
             details["action"] = "penalized_ethical_gates"
             return linf_final, details
-    
+
     # 9. L∞ final
     linf_final = max(0.0, min(1.0, linf_before_gates))
     details["linf_final"] = linf_final
     details["action"] = "accepted"
-    
+
     # 10. Adicionar breakdown de métricas
     details["metrics_breakdown"] = [
         {
@@ -436,7 +436,7 @@ def compute_linf_meta(
         }
         for m in valid_metrics
     ]
-    
+
     return linf_final, details
 
 
@@ -444,7 +444,7 @@ def compute_delta_linf(
     linf_current: float,
     linf_previous: float,
     beta_min: float = 0.01,
-) -> Tuple[float, bool]:
+) -> tuple[float, bool]:
     """
     Calcula ΔL∞ e verifica se atende crescimento mínimo
     
@@ -458,16 +458,16 @@ def compute_delta_linf(
     """
     delta_linf = linf_current - linf_previous
     meets_threshold = delta_linf >= beta_min
-    
+
     return delta_linf, meets_threshold
 
 
 def linf_sensitivity_analysis(
-    metrics: List[Metric],
+    metrics: list[Metric],
     cost: CostComponents,
     ethical_gates: EthicalGates,
-    config: Optional[LInfConfig] = None,
-) -> Dict[str, Any]:
+    config: LInfConfig | None = None,
+) -> dict[str, Any]:
     """
     Análise de sensibilidade da L∞
     
@@ -475,37 +475,37 @@ def linf_sensitivity_analysis(
     """
     if config is None:
         config = LInfConfig()
-    
+
     # L∞ base
     linf_base, _ = compute_linf_meta(metrics, cost, ethical_gates, config)
-    
-    sensitivity: Dict[str, Any] = {
+
+    sensitivity: dict[str, Any] = {
         "linf_base": linf_base,
         "metric_sensitivities": [],
     }
-    
+
     # Testar cada métrica
     for i, metric in enumerate(metrics):
         original_value = metric.value
-        
+
         # Teste: reduzir métrica em 10%
         metric.value = max(0.0, original_value * 0.9)
         linf_down, _ = compute_linf_meta(metrics, cost, ethical_gates, config)
-        
+
         # Teste: aumentar métrica em 10%
         metric.value = min(1.0, original_value * 1.1)
         linf_up, _ = compute_linf_meta(metrics, cost, ethical_gates, config)
-        
+
         # Restaurar valor original
         metric.value = original_value
-        
+
         # Calcular elasticidade
         delta_down = linf_base - linf_down
         delta_up = linf_up - linf_base
         avg_delta = (delta_down + delta_up) / 2.0
-        
+
         elasticity = (avg_delta / linf_base) / 0.1 if linf_base > 0 else 0.0
-        
+
         sensitivity["metric_sensitivities"].append({
             "metric_name": metric.name,
             "elasticity": elasticity,
@@ -513,14 +513,14 @@ def linf_sensitivity_analysis(
             "linf_up": linf_up,
             "impact": "high" if abs(elasticity) > 0.5 else "medium" if abs(elasticity) > 0.2 else "low",
         })
-    
+
     return sensitivity
 
 
 # Exemplo de uso
 def example_linf_computation():
     """Exemplo de computação de L∞"""
-    
+
     # Métricas exemplo
     metrics = [
         Metric("accuracy", 0.85, weight=0.4, metric_type=MetricType.ACCURACY),
@@ -528,7 +528,7 @@ def example_linf_computation():
         Metric("privacy", 0.92, weight=0.2, metric_type=MetricType.PRIVACY),
         Metric("fairness", 0.88, weight=0.1, metric_type=MetricType.FAIRNESS),
     ]
-    
+
     # Custo
     cost = CostComponents(
         time_seconds=5.0,
@@ -537,7 +537,7 @@ def example_linf_computation():
         memory_gb=4.0,
         api_calls=50,
     )
-    
+
     # Gates éticos
     gates = EthicalGates(
         agape_index=0.85,
@@ -547,7 +547,7 @@ def example_linf_computation():
         consent=True,
         eco_ok=True,
     )
-    
+
     # Configuração
     config = LInfConfig(
         epsilon=1e-3,
@@ -555,15 +555,15 @@ def example_linf_computation():
         aggregation="harmonic",
         fail_closed=True,
     )
-    
+
     # Computar L∞
     linf, details = compute_linf_meta(metrics, cost, gates, config)
-    
+
     print(f"L∞ = {linf:.4f}")
     print(f"Base score: {details['base_score']:.4f}")
     print(f"Cost penalty: {details['cost_penalty']:.4f}")
     print(f"Ethical gates: {details['ethical_gates_pass']}")
-    
+
     return linf, details
 
 

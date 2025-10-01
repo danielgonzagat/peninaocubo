@@ -1,4 +1,7 @@
-import json, os, sys, time, subprocess
+import json
+import subprocess
+import sys
+import time
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -8,7 +11,7 @@ WORM_DIR = ROOT / "penin" / "ledger" / "fusion"
 
 def load_yaml(p: Path):
     import yaml
-    with open(p, "r", encoding="utf-8") as f:
+    with open(p, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 def acceptance_ok(m, acc) -> bool:

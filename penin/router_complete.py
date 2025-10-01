@@ -25,11 +25,12 @@ import hmac
 import json
 import time
 from collections import deque
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any
 
 try:
     import orjson
@@ -41,7 +42,6 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 from penin.config import settings
 from penin.providers.base import BaseProvider, LLMResponse
-
 
 # ============================================================================
 # Constants and Configuration
@@ -94,7 +94,7 @@ class BudgetTracker:
     - Historical tracking (30 days rolling)
     - Persistence support
     """
-    
+
     daily_budget_usd: float
     current_spend_usd: float = 0.0
     total_tokens: int = 0
@@ -144,7 +144,7 @@ class BudgetTracker:
         """Check if hard cutoff reached (100%)."""
         return self.usage_percent() >= BUDGET_HARD_CUTOFF * 100.0
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         """Get current budget snapshot."""
         self._reset_if_needed()
         return {
@@ -160,7 +160,7 @@ class BudgetTracker:
             "history": list(self.spend_history),
         }
 
-    def reset(self, new_budget_usd: Optional[float] = None) -> None:
+    def reset(self, new_budget_usd: float | None = None) -> None:
         """Manually reset budget."""
         if new_budget_usd is not None:
             self.daily_budget_usd = float(new_budget_usd)
@@ -187,7 +187,7 @@ class ProviderStats:
     - Consecutive failures for circuit breaker
     - Health status
     """
-    
+
     provider_id: str
     total_requests: int = 0
     successful_requests: int = 0
@@ -197,9 +197,9 @@ class ProviderStats:
     total_tokens_in: int = 0
     total_tokens_out: int = 0
     consecutive_failures: int = 0
-    last_error: Optional[str] = None
-    last_success_at: Optional[float] = None
-    last_failure_at: Optional[float] = None
+    last_error: str | None = None
+    last_success_at: float | None = None
+    last_failure_at: float | None = None
     health: ProviderHealth = ProviderHealth.HEALTHY
 
     def record_success(self, response: LLMResponse, latency_s: float) -> None:
@@ -215,7 +215,7 @@ class ProviderStats:
         self.consecutive_failures = 0
         self.last_error = None
         self.last_success_at = time.time()
-        
+
         # Update health based on success rate
         if self.success_rate() >= 0.9:
             self.health = ProviderHealth.HEALTHY
@@ -229,7 +229,7 @@ class ProviderStats:
         self.consecutive_failures += 1
         self.last_error = str(error)
         self.last_failure_at = time.time()
-        
+
         # Update health based on consecutive failures
         if self.consecutive_failures >= 5:
             self.health = ProviderHealth.CIRCUIT_OPEN
@@ -260,7 +260,7 @@ class ProviderStats:
         """Get total tokens (in + out)."""
         return self.total_tokens_in + self.total_tokens_out
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "provider_id": self.provider_id,
@@ -301,7 +301,7 @@ class CircuitBreaker:
     - CIRCUIT_OPEN + timeout → DEGRADED (half-open)
     - success in DEGRADED → HEALTHY
     """
-    
+
     def __init__(
         self,
         failure_threshold: int = CB_FAILURE_THRESHOLD,
@@ -322,7 +322,7 @@ class CircuitBreaker:
             return True
 
         now = time.monotonic()
-        
+
         # Check if circuit can transition from OPEN to half-open (DEGRADED)
         if self._state == ProviderHealth.CIRCUIT_OPEN:
             if now - self._last_failure_time >= self.recovery_timeout_s:
@@ -350,7 +350,7 @@ class CircuitBreaker:
         """Record failed call."""
         self._failure_count += 1
         self._last_failure_time = time.monotonic()
-        
+
         if self._failure_count >= self.failure_threshold:
             self._state = ProviderHealth.CIRCUIT_OPEN
         else:
@@ -368,14 +368,14 @@ class CircuitBreaker:
 
 class CacheEntry:
     """Cache entry with HMAC integrity."""
-    
+
     def __init__(self, key: str, value: Any, ttl: float):
         self.key = key
         self.value = value
         self.created_at = time.time()
         self.ttl = ttl
         self.hmac = self._compute_hmac()
-    
+
     def _compute_hmac(self) -> str:
         """Compute HMAC-SHA256 for integrity."""
         data = f"{self.key}:{self.value}:{self.created_at}:{self.ttl}"
@@ -384,13 +384,13 @@ class CacheEntry:
             data.encode(),
             hashlib.sha256
         ).hexdigest()
-    
+
     def is_valid(self) -> bool:
         """Check if entry is valid (not expired and integrity intact)."""
         if time.time() - self.created_at > self.ttl:
             return False
         return self.hmac == self._compute_hmac()
-    
+
     def verify_integrity(self) -> bool:
         """Verify HMAC integrity."""
         return self.hmac == self._compute_hmac()
@@ -406,7 +406,7 @@ class HMACCache:
     - TTL support
     - LRU eviction
     """
-    
+
     def __init__(
         self,
         max_size_l1: int = CACHE_L1_MAX_SIZE,
@@ -416,21 +416,21 @@ class HMACCache:
         self.max_size_l1 = max_size_l1
         self.max_size_l2 = max_size_l2
         self.ttl = ttl
-        self._l1: Dict[str, CacheEntry] = {}
-        self._l2: Dict[str, CacheEntry] = {}
+        self._l1: dict[str, CacheEntry] = {}
+        self._l2: dict[str, CacheEntry] = {}
         self._hit_count = 0
         self._miss_count = 0
         self._integrity_failures = 0
-    
-    def _make_key(self, messages: List[Dict[str, Any]], **kwargs) -> str:
+
+    def _make_key(self, messages: list[dict[str, Any]], **kwargs) -> str:
         """Create cache key from request parameters."""
         if ORJSON_AVAILABLE:
             data = orjson.dumps({"messages": messages, **kwargs}, option=orjson.OPT_SORT_KEYS)
         else:
             data = json.dumps({"messages": messages, **kwargs}, sort_keys=True).encode()
         return hashlib.sha256(data).hexdigest()
-    
-    def get(self, key: str) -> Optional[Any]:
+
+    def get(self, key: str) -> Any | None:
         """Get from cache with integrity check."""
         # Check L1
         if key in self._l1:
@@ -442,7 +442,7 @@ class HMACCache:
                 del self._l1[key]
                 if not entry.verify_integrity():
                     self._integrity_failures += 1
-        
+
         # Check L2
         if key in self._l2:
             entry = self._l2[key]
@@ -457,42 +457,42 @@ class HMACCache:
                 del self._l2[key]
                 if not entry.verify_integrity():
                     self._integrity_failures += 1
-        
+
         self._miss_count += 1
         return None
-    
+
     def put(self, key: str, value: Any) -> None:
         """Put in cache."""
         entry = CacheEntry(key, value, self.ttl)
-        
+
         # Add to L1
         self._l1[key] = entry
-        
+
         # Evict if needed
         if len(self._l1) > self.max_size_l1:
             self._evict_l1()
-    
+
     def _evict_l1(self) -> None:
         """Evict oldest from L1 to L2."""
         if not self._l1:
             return
-        
+
         # Move oldest to L2
         oldest_key = next(iter(self._l1))
         oldest_entry = self._l1.pop(oldest_key)
-        
+
         if oldest_entry.is_valid():
             self._l2[oldest_key] = oldest_entry
-            
+
             # Evict from L2 if needed
             if len(self._l2) > self.max_size_l2:
                 self._l2.pop(next(iter(self._l2)))
-    
-    def stats(self) -> Dict[str, Any]:
+
+    def stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         total = self._hit_count + self._miss_count
         hit_rate = self._hit_count / total if total > 0 else 0.0
-        
+
         return {
             "l1_size": len(self._l1),
             "l2_size": len(self._l2),
@@ -501,7 +501,7 @@ class HMACCache:
             "hit_rate": round(hit_rate, 4),
             "integrity_failures": self._integrity_failures,
         }
-    
+
     def clear(self) -> None:
         """Clear cache."""
         self._l1.clear()
@@ -526,114 +526,114 @@ class MultiLLMRouterComplete:
     - Cost-conscious selection
     - WORM ledger integration ready
     """
-    
+
     def __init__(
         self,
         providers: Iterable[BaseProvider],
-        daily_budget_usd: Optional[float] = None,
+        daily_budget_usd: float | None = None,
         cost_weight: float = 0.3,
         latency_weight: float = 0.3,
         quality_weight: float = 0.4,
         enable_circuit_breaker: bool = True,
         enable_cache: bool = True,
         mode: RouterMode = RouterMode.PRODUCTION,
-        state_path: Optional[Path] = None,
+        state_path: Path | None = None,
     ) -> None:
         """Initialize router."""
         # Providers
         provider_list = list(providers)
         max_parallel = max(1, int(getattr(settings, "PENIN_MAX_PARALLEL_PROVIDERS", len(provider_list) or 1)))
-        self.providers: List[BaseProvider] = provider_list[:max_parallel]
-        
+        self.providers: list[BaseProvider] = provider_list[:max_parallel]
+
         # Weights
         self.cost_weight = cost_weight
         self.latency_weight = latency_weight
         self.quality_weight = quality_weight
-        
+
         # Features
         self.enable_circuit_breaker = enable_circuit_breaker
         self.enable_cache = enable_cache
         self.mode = mode
-        
+
         # State persistence
         self._state_path = state_path or Path.home() / ".penin_router_complete_state.json"
-        
+
         # Budget
         daily_budget = daily_budget_usd if daily_budget_usd is not None else settings.PENIN_BUDGET_DAILY_USD
         self._budget = BudgetTracker(daily_budget_usd=float(daily_budget))
         self._budget_lock = asyncio.Lock()
-        
+
         # Provider tracking
-        self._provider_ids: Dict[int, str] = {}
-        self.provider_stats: Dict[str, ProviderStats] = {}
-        self._provider_locks: Dict[str, asyncio.Lock] = {}
-        self.circuit_breakers: Dict[str, CircuitBreaker] = {}
-        
+        self._provider_ids: dict[int, str] = {}
+        self.provider_stats: dict[str, ProviderStats] = {}
+        self._provider_locks: dict[str, asyncio.Lock] = {}
+        self.circuit_breakers: dict[str, CircuitBreaker] = {}
+
         # Initialize providers
         self._initialize_providers()
-        
+
         # Cache
-        self._cache: Optional[HMACCache] = HMACCache() if enable_cache else None
-        
+        self._cache: HMACCache | None = HMACCache() if enable_cache else None
+
         # Persistence
         self._persistence_lock = asyncio.Lock()
         self._load_state()
-    
+
     def _initialize_providers(self) -> None:
         """Initialize provider tracking."""
-        seen: Dict[str, int] = {}
-        
+        seen: dict[str, int] = {}
+
         for provider in self.providers:
             base = getattr(provider, "name", provider.__class__.__name__).lower()
             suffix = seen.get(base, 0)
             provider_id = f"{base}-{suffix}" if suffix else base
             seen[base] = suffix + 1
-            
+
             # Store mapping
             self._provider_ids[id(provider)] = provider_id
-            
+
             # Set provider ID on provider object
             if not getattr(provider, "provider_id", None):
-                setattr(provider, "provider_id", provider_id)
-            
+                provider.provider_id = provider_id
+
             # Initialize stats
             self.provider_stats[provider_id] = ProviderStats(provider_id=provider_id)
             self._provider_locks[provider_id] = asyncio.Lock()
-            
+
             # Initialize circuit breaker
             if self.enable_circuit_breaker:
                 self.circuit_breakers[provider_id] = CircuitBreaker()
-    
+
     def _load_state(self) -> None:
         """Load persisted state."""
         try:
             if not self._state_path.exists():
                 return
-            
+
             if ORJSON_AVAILABLE:
                 data = orjson.loads(self._state_path.read_bytes())
             else:
                 data = json.loads(self._state_path.read_text())
         except Exception:
             return
-        
+
         # Load budget
         budget = data.get("budget", {})
         if budget:
             self._budget.current_spend_usd = float(budget.get("daily_spend_usd", 0.0))
             self._budget.total_tokens = int(budget.get("total_tokens", 0))
             self._budget.request_count = int(budget.get("request_count", 0))
-            
+
             last_reset = budget.get("last_reset")
             if last_reset:
                 try:
                     self._budget.last_reset = date.fromisoformat(last_reset)
                 except ValueError:
                     pass
-            
+
             history = budget.get("history", [])
             self._budget.spend_history.extend(history)
-        
+
         # Load provider stats
         for pid, stats_data in data.get("providers", {}).items():
             if pid in self.provider_stats:
@@ -648,7 +648,7 @@ class MultiLLMRouterComplete:
                 stats.total_latency_s = avg_latency * max(1, stats.successful_requests)
                 stats.consecutive_failures = int(stats_data.get("consecutive_failures", 0))
                 stats.last_error = stats_data.get("last_error")
-    
+
     async def _persist_state(self) -> None:
         """Persist state to disk."""
         payload = {
@@ -657,14 +657,14 @@ class MultiLLMRouterComplete:
             "budget": self._budget.snapshot(),
             "providers": {pid: stats.to_dict() for pid, stats in self.provider_stats.items()},
         }
-        
+
         if self._cache:
             payload["cache"] = self._cache.stats()
-        
+
         try:
             async with self._persistence_lock:
                 self._state_path.parent.mkdir(parents=True, exist_ok=True)
-                
+
                 if ORJSON_AVAILABLE:
                     data = orjson.dumps(payload, option=orjson.OPT_INDENT_2)
                     self._state_path.write_bytes(data)
@@ -674,11 +674,11 @@ class MultiLLMRouterComplete:
         except Exception:
             # Persistence failures should not break routing
             pass
-    
+
     def _provider_id(self, provider: BaseProvider) -> str:
         """Get provider ID."""
         return self._provider_ids[id(provider)]
-    
+
     def _score_response(self, response: LLMResponse, stats: ProviderStats) -> float:
         """
         Score response using weighted metrics.
@@ -691,18 +691,18 @@ class MultiLLMRouterComplete:
         """
         # Content check
         has_content = 1.0 if getattr(response, "content", None) else 0.0
-        
+
         # Latency score (lower is better)
         latency = getattr(response, "latency_s", None) or stats.avg_latency() or 1.0
         latency_score = 1.0 / (1.0 + latency)
-        
+
         # Cost score (lower is better)
         cost = float(getattr(response, "cost_usd", 0.0) or 0.0)
         cost_score = 1.0 / (1.0 + cost * 100)
-        
+
         # Quality score (success rate)
         quality_score = stats.success_rate()
-        
+
         # Weighted sum
         return (
             has_content * 0.2 +
@@ -710,24 +710,24 @@ class MultiLLMRouterComplete:
             cost_score * self.cost_weight +
             quality_score * self.quality_weight
         )
-    
+
     async def _invoke_provider(
         self,
         provider: BaseProvider,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         *,
-        tools: Optional[List[Dict[str, Any]]],
-        system: Optional[str],
+        tools: list[dict[str, Any]] | None,
+        system: str | None,
         temperature: float,
-    ) -> Tuple[LLMResponse, str]:
+    ) -> tuple[LLMResponse, str]:
         """Invoke single provider with circuit breaker."""
         provider_id = self._provider_id(provider)
-        
+
         # Check circuit breaker
         breaker = self.circuit_breakers.get(provider_id)
         if breaker and not breaker.can_call():
             raise RuntimeError(f"Circuit breaker open for provider '{provider_id}'")
-        
+
         # Call provider
         start = time.monotonic()
         try:
@@ -744,41 +744,41 @@ class MultiLLMRouterComplete:
                 if breaker:
                     breaker.record_failure()
             raise
-        
+
         # Record success
         latency = time.monotonic() - start
         if getattr(response, "latency_s", 0) in (0, None):
             response.latency_s = latency
         if not getattr(response, "provider", None):
             response.provider = provider_id
-        
+
         async with self._provider_locks[provider_id]:
             stats = self.provider_stats[provider_id]
             stats.record_success(response, latency)
             if breaker:
                 breaker.record_success()
-        
+
         return response, provider_id
-    
-    def _aggregate_usage(self, responses: Iterable[LLMResponse]) -> Tuple[float, int]:
+
+    def _aggregate_usage(self, responses: Iterable[LLMResponse]) -> tuple[float, int]:
         """Aggregate cost and tokens from responses."""
         total_cost = 0.0
         total_tokens = 0
-        
+
         for response in responses:
             total_cost += float(getattr(response, "cost_usd", 0.0) or 0.0)
             tokens_in = int(getattr(response, "tokens_in", 0) or 0)
             tokens_out = int(getattr(response, "tokens_out", 0) or 0)
             total_tokens += tokens_in + tokens_out
-        
+
         return total_cost, total_tokens
-    
+
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=0.5))
     async def ask(
         self,
-        messages: List[Dict[str, Any]],
-        system: Optional[str] = None,
-        tools: Optional[List[Dict[str, Any]]] = None,
+        messages: list[dict[str, Any]],
+        system: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
         temperature: float = 0.7,
         force_budget_override: bool = False,
         use_cache: bool = True,
@@ -811,7 +811,7 @@ class MultiLLMRouterComplete:
             cached = self._cache.get(cache_key)
             if cached is not None:
                 return cached
-        
+
         # Check budget (hard cutoff)
         async with self._budget_lock:
             if not force_budget_override and self._budget.is_hard_cutoff():
@@ -820,12 +820,12 @@ class MultiLLMRouterComplete:
                     f"${self._budget.current_spend_usd:.2f} >= "
                     f"${self._budget.daily_budget_usd:.2f}"
                 )
-            
+
             # Warn on soft cutoff
             if self._budget.is_soft_cutoff():
                 # Log warning (structured logging integration point)
                 pass
-        
+
         # Dry-run mode: return mock response
         if self.mode == RouterMode.DRY_RUN:
             return LLMResponse(
@@ -836,7 +836,7 @@ class MultiLLMRouterComplete:
                 tokens_out=0,
                 latency_s=0.0,
             )
-        
+
         # Invoke providers in parallel
         tasks = [
             self._invoke_provider(
@@ -848,88 +848,88 @@ class MultiLLMRouterComplete:
             )
             for provider in self.providers
         ]
-        
+
         if not tasks:
             raise RuntimeError("Router configured without providers")
-        
+
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        
+
         # Separate successes and failures
-        successful: List[Tuple[LLMResponse, str]] = []
-        errors: List[str] = []
-        
+        successful: list[tuple[LLMResponse, str]] = []
+        errors: list[str] = []
+
         for result in results:
             if isinstance(result, Exception):
                 errors.append(str(result))
                 continue
             successful.append(result)
-        
+
         if not successful:
             raise RuntimeError(f"All providers failed. Errors: {errors}")
-        
+
         # Score and select best response
         scored = [
             (response, provider_id, self._score_response(response, self.provider_stats[provider_id]))
             for response, provider_id in successful
         ]
         best_response, best_provider_id, best_score = max(scored, key=lambda item: item[2])
-        
+
         # Update budget
         async with self._budget_lock:
             total_cost, total_tokens = self._aggregate_usage([resp for resp, _ in successful])
             if total_cost or total_tokens:
                 self._budget.add_usage(total_cost, total_tokens)
-        
+
         # Cache result
         if use_cache and self._cache:
             self._cache.put(cache_key, best_response)
-        
+
         # Periodic persistence (every 10 requests)
         if self._budget.request_count % 10 == 0:
             await self._persist_state()
-        
+
         # Shadow mode: log but don't affect production
         if self.mode == RouterMode.SHADOW:
             # Shadow logging integration point
             pass
-        
+
         # Ensure provider is set
         best_response.provider = best_response.provider or best_provider_id
-        
+
         return best_response
-    
+
     # ========================================================================
     # Public API
     # ========================================================================
-    
-    def get_usage_stats(self) -> Dict[str, Any]:
+
+    def get_usage_stats(self) -> dict[str, Any]:
         """Get comprehensive usage statistics."""
         data = self._budget.snapshot()
         data["providers"] = {
             pid: stats.to_dict()
             for pid, stats in self.provider_stats.items()
         }
-        
+
         if self.enable_circuit_breaker:
             data["circuit_breakers"] = {
                 pid: breaker.state.value
                 for pid, breaker in self.circuit_breakers.items()
             }
-        
+
         if self._cache:
             data["cache"] = self._cache.stats()
-        
+
         return data
-    
-    def get_budget_status(self) -> Dict[str, Any]:
+
+    def get_budget_status(self) -> dict[str, Any]:
         """Get budget status."""
         return self._budget.snapshot()
-    
-    def reset_daily_budget(self, new_budget: Optional[float] = None) -> None:
+
+    def reset_daily_budget(self, new_budget: float | None = None) -> None:
         """Reset daily budget."""
         self._budget.reset(new_budget)
-    
-    def get_analytics(self) -> Dict[str, Any]:
+
+    def get_analytics(self) -> dict[str, Any]:
         """Get full analytics."""
         stats = self.get_usage_stats()
         stats["config"] = {
@@ -941,7 +941,7 @@ class MultiLLMRouterComplete:
             "cache_enabled": self.enable_cache,
         }
         return stats
-    
+
     def clear_cache(self) -> None:
         """Clear cache."""
         if self._cache:

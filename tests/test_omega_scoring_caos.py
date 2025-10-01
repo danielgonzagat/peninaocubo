@@ -1,7 +1,6 @@
-import math
 
-from penin.omega.scoring import harmonic_mean_weighted, linf_harmonic, score_gate
 from penin.omega.caos import phi_caos
+from penin.omega.scoring import harmonic_mean_weighted, linf_harmonic, score_gate
 
 
 def test_harmonic_mean_weighted_basic():

@@ -30,7 +30,7 @@ print("\n" + "=" * 70)
 print("1. WORM LEDGER DEMO")
 print("=" * 70)
 
-from penin.ledger.worm_ledger_complete import create_worm_ledger, create_pcag
+from penin.ledger.worm_ledger_complete import create_pcag, create_worm_ledger
 
 # Create ledger
 ledger = create_worm_ledger("/tmp/penin_quickstart_ledger.jsonl")
@@ -70,7 +70,7 @@ else:
 
 # Statistics
 stats = ledger.get_statistics()
-print(f"\n📊 Statistics:")
+print("\n📊 Statistics:")
 print(f"  Events: {stats['total_events']}")
 print(f"  Merkle Root: {stats['merkle_root'][:16]}...")
 print(f"  Size: {stats['ledger_size_bytes']} bytes")
@@ -79,7 +79,7 @@ print("\n" + "=" * 70)
 print("2. ΣGUARD DEMO")
 print("=" * 70)
 
-from penin.guard.sigma_guard_complete import SigmaGuard, GateMetrics
+from penin.guard.sigma_guard_complete import GateMetrics, SigmaGuard
 
 guard = SigmaGuard()
 
@@ -140,14 +140,14 @@ lambda_c = 0.5
 linf_obj = Linf(weights=weights, lambda_c=lambda_c)
 linf = linf_obj.compute(metrics_vals, cost_norm, ethical_ok=True)
 
-print(f"\n  L∞ (Meta-Function):")
+print("\n  L∞ (Meta-Function):")
 print(f"    Metrics: {metrics_vals}")
 print(f"    Weights: {weights}")
 print(f"    Cost: {cost_norm}")
 print(f"    Result: {linf:.4f}")
 
 # CAOS⁺
-from penin.omega.caos import compute_caos, CAOSInput
+from penin.omega.caos import CAOSInput, compute_caos
 
 caos_input = CAOSInput(
     consistency=0.88,
@@ -158,7 +158,7 @@ caos_input = CAOSInput(
 kappa = 20.0
 
 caos_plus = compute_caos(caos_input, kappa)
-print(f"\n  CAOS⁺ (Evolution Engine):")
+print("\n  CAOS⁺ (Evolution Engine):")
 print(f"    C: {caos_input.consistency:.2f}")
 print(f"    A: {caos_input.autoevolution:.2f}")
 print(f"    O: {caos_input.incognoscivel:.2f}")

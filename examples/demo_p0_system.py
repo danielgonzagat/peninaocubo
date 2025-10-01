@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Demonstração do Sistema PENIN-Ω com Correções P0
 ===============================================
@@ -12,20 +11,20 @@ Demonstra o sistema funcionando com todas as correções P0 implementadas:
 """
 
 import asyncio
-import time
 import tempfile
 from pathlib import Path
 
+from observability import ObservabilityConfig, ObservabilityManager
+
+from penin.omega.caos import CAOSComponents, CAOSPlusEngine
+
 # Imports do sistema
 from penin.omega.ethics_metrics import calculate_and_validate_ethics
-from penin.omega.scoring import USCLScorer, LInfinityScorer
-from penin.omega.caos import CAOSPlusEngine, CAOSComponents
-from penin.omega.sr import SROmegaEngine, SRComponents
-from penin.omega.guards import GuardOrchestrator
 from penin.omega.ledger import WORMLedger, create_run_record
-from penin.router import MultiLLMRouter
+from penin.omega.scoring import LInfinityScorer, USCLScorer
+from penin.omega.sr import SRComponents, SROmegaEngine
 from penin.providers.base import LLMResponse
-from observability import ObservabilityManager, ObservabilityConfig
+from penin.router import MultiLLMRouterComplete as MultiLLMRouter
 
 
 class MockProvider:

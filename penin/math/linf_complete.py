@@ -20,15 +20,14 @@ References:
 from __future__ import annotations
 
 import math
-from typing import Dict, List, Union
 
 # Default epsilon for numerical stability
 DEFAULT_EPSILON = 1e-3
 
 
 def compute_Linf(
-    metrics: Union[List[float], Dict[str, float]],
-    weights: Union[List[float], Dict[str, float]],
+    metrics: list[float] | dict[str, float],
+    weights: list[float] | dict[str, float],
     cost_norm: float = 0.0,
     lambda_c: float = 0.5,
     ethical_ok: bool = True,
@@ -84,7 +83,7 @@ def compute_Linf(
     # Harmonic mean (non-compensatory)
     # 1 / Σ(w_j / max(ε, m_j))
     epsilon = max(epsilon, 1e-12)
-    denom = sum(w / max(epsilon, m) for w, m in zip(w_vals, m_vals))
+    denom = sum(w / max(epsilon, m) for w, m in zip(w_vals, m_vals, strict=False))
 
     if denom <= epsilon:
         return 0.0

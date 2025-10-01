@@ -26,9 +26,7 @@ References:
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 
 @dataclass
@@ -183,7 +181,7 @@ def compute_caos_plus(
     S: float,
     kappa: float = 20.0,
     return_components: bool = False,
-) -> Tuple[float, Optional[CAOSComponents]]:
+) -> tuple[float, CAOSComponents | None]:
     """
     Compute CAOS⁺ score.
 

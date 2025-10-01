@@ -33,21 +33,21 @@ Princípios invioláveis (ΣEA/LO-14):
 - Nenhuma melhoria técnica compensa violação ética
 """
 
-from penin.equations.penin_equation import penin_update, PeninState
-from penin.equations.linf_meta import compute_linf_meta, LInfConfig
-from penin.equations.caos_plus import compute_caos_plus_complete, CAOSConfig
-from penin.equations.sr_omega_infinity import compute_sr_omega_infinity, SRConfig
-from penin.equations.death_equation import death_gate, DeathConfig
-from penin.equations.ir_ic_contractive import ir_to_ic, ContractivityConfig
-from penin.equations.acfa_epv import expected_possession_value, EPVConfig
-from penin.equations.agape_index import compute_agape_index, AgapeConfig
-from penin.equations.omega_sea_total import omega_sea_coherence, OmegaSEAConfig
-from penin.equations.auto_tuning import auto_tune_hyperparams, AutoTuningConfig
-from penin.equations.lyapunov_contractive import lyapunov_check, LyapunovConfig
-from penin.equations.oci_closure import organizational_closure_index, OCIConfig
-from penin.equations.delta_linf_growth import delta_linf_compound_growth, DeltaLInfConfig
-from penin.equations.anabolization import anabolize_penin, AnabolizationConfig
-from penin.equations.sigma_guard_gate import sigma_guard_check, SigmaGuardConfig
+from penin.equations.acfa_epv import EPVConfig, expected_possession_value
+from penin.equations.agape_index import AgapeConfig, compute_agape_index
+from penin.equations.anabolization import AnabolizationConfig, anabolize_penin
+from penin.equations.auto_tuning import AutoTuningConfig, auto_tune_hyperparams
+from penin.equations.caos_plus import CAOSConfig, compute_caos_plus_complete
+from penin.equations.death_equation import DeathConfig, death_gate_check
+from penin.equations.delta_linf_growth import DeltaLInfConfig, delta_linf_compound_growth
+from penin.equations.ir_ic_contractive import ContractivityConfig, ir_to_ic
+from penin.equations.linf_meta import LInfConfig, compute_linf_meta
+from penin.equations.lyapunov_contractive import LyapunovConfig, lyapunov_check
+from penin.equations.oci_closure import OCIConfig, organizational_closure_index
+from penin.equations.omega_sea_total import OmegaSEAConfig, omega_sea_coherence
+from penin.equations.penin_equation import PeninState, penin_update
+from penin.equations.sigma_guard_gate import SigmaGuardConfig, sigma_guard_check
+from penin.equations.sr_omega_infinity import SRConfig, compute_sr_omega_infinity
 
 __all__ = [
     # Equation 1: Penin Equation
@@ -63,7 +63,7 @@ __all__ = [
     "compute_sr_omega_infinity",
     "SRConfig",
     # Equation 5: Death Equation
-    "death_gate",
+    "death_gate_check",
     "DeathConfig",
     # Equation 6: IR→IC
     "ir_to_ic",
