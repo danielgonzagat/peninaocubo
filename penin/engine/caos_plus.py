@@ -11,9 +11,9 @@ from penin.omega.caos import compute_caos_plus_exponential
 def compute_caos_plus(C: float, A: float, O: float, S: float, kappa: float = 20.0) -> float:
     """
     CAOS⁺ exponential formula: (1 + κ·C·A)^(O·S)
-    
+
     Monotonic in C, A, O, S; κ shifts the base.
-    
+
     This is a wrapper around the consolidated implementation in penin.omega.caos.
     For the primary CAOS+ implementation with details, use penin.omega.caos.compute_caos_plus().
     """

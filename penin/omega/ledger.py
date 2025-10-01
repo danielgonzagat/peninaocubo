@@ -11,17 +11,16 @@ Implementa:
 - Rollback atômico via champion pointer
 """
 
-import json
-import time
-import sqlite3
 import hashlib
+import json
+import sqlite3
 import threading
+import time
 import uuid
-from pathlib import Path
-from datetime import datetime
-from typing import Dict, Any, List, Optional
-from typing_extensions import Tuple
 from contextlib import contextmanager
+from datetime import datetime
+from pathlib import Path
+from typing import Any
 
 try:
     import portalocker
@@ -62,8 +61,8 @@ class GuardResults(BaseModel):
     caos_gate_ok: bool = Field(description="CAOS⁺ gate passou")
 
     # Detalhes das violações
-    violations: List[Dict[str, Any]] = Field(default_factory=list)
-    evidence_hash: Optional[str] = Field(None, description="Hash da evidência ética")
+    violations: list[dict[str, Any]] = Field(default_factory=list)
+    evidence_hash: str | None = Field(None, description="Hash da evidência ética")
 
 
 class DecisionInfo(BaseModel):
@@ -88,13 +87,13 @@ class RunRecord(BaseModel):
     cycle: int = Field(ge=0, description="Número do ciclo")
 
     # Contexto técnico
-    git_sha: Optional[str] = Field(None, description="SHA do commit")
-    seed: Optional[int] = Field(None, description="Seed usado")
+    git_sha: str | None = Field(None, description="SHA do commit")
+    seed: int | None = Field(None, description="Seed usado")
     config_hash: str = Field(description="Hash da configuração")
 
     # Provider/modelo
     provider_id: str = Field(description="ID do provider usado")
-    model_name: Optional[str] = Field(None, description="Nome do modelo")
+    model_name: str | None = Field(None, description="Nome do modelo")
     candidate_cfg_hash: str = Field(description="Hash da config do candidato")
 
     # Métricas
@@ -107,8 +106,8 @@ class RunRecord(BaseModel):
     decision: DecisionInfo = Field(description="Decisão tomada")
 
     # Metadados
-    artifacts_path: Optional[str] = Field(None, description="Caminho dos artifacts")
-    parent_run_id: Optional[str] = Field(None, description="Run pai (se challenger)")
+    artifacts_path: str | None = Field(None, description="Caminho dos artifacts")
+    parent_run_id: str | None = Field(None, description="Run pai (se challenger)")
 
     class Config:
         # Pydantic v2 compatibility
@@ -127,7 +126,7 @@ class WORMLedger:
     - Artifacts em diretórios separados
     """
 
-    def __init__(self, db_path: Optional[Path] = None, runs_dir: Optional[Path] = None, enable_wal: bool = True):
+    def __init__(self, db_path: Path | None = None, runs_dir: Path | None = None, enable_wal: bool = True):
         """
         Args:
             db_path: Caminho do banco SQLite
@@ -266,7 +265,7 @@ class WORMLedger:
             # Lock é liberado automaticamente quando arquivo fecha
             pass
 
-    def append_record(self, record: RunRecord | str, artifacts: Optional[Dict[str, Any]] = None) -> str:
+    def append_record(self, record: RunRecord | str, artifacts: dict[str, Any] | None = None) -> str:
         """
         Adiciona record ao ledger (append-only)
 
@@ -374,7 +373,7 @@ class WORMLedger:
 
                 return record_hash
 
-    def get_record(self, run_id: str) -> Optional[RunRecord]:
+    def get_record(self, run_id: str) -> RunRecord | None:
         """Recupera record por run_id"""
         with sqlite3.connect(str(self.db_path)) as conn:
             conn.row_factory = sqlite3.Row
@@ -415,8 +414,8 @@ class WORMLedger:
                 return None
 
     def list_records(
-        self, limit: int = 100, offset: int = 0, provider_id: Optional[str] = None, verdict: Optional[str] = None
-    ) -> List[RunRecord]:
+        self, limit: int = 100, offset: int = 0, provider_id: str | None = None, verdict: str | None = None
+    ) -> list[RunRecord]:
         """Lista records com filtros"""
         with sqlite3.connect(str(self.db_path)) as conn:
             conn.row_factory = sqlite3.Row
@@ -493,7 +492,7 @@ class WORMLedger:
                     conn.commit()
                     return True
 
-    def get_champion(self) -> Optional[RunRecord]:
+    def get_champion(self) -> RunRecord | None:
         """Obtém record do champion atual"""
         with sqlite3.connect(str(self.db_path)) as conn:
             cursor = conn.cursor()
@@ -508,7 +507,7 @@ class WORMLedger:
 
             return self.get_record(row[0])
 
-    def verify_chain_integrity(self) -> Tuple[bool, Optional[str]]:
+    def verify_chain_integrity(self) -> tuple[bool, str | None]:
         """Verifica integridade da hash chain"""
         with sqlite3.connect(str(self.db_path)) as conn:
             conn.row_factory = sqlite3.Row
@@ -540,7 +539,7 @@ class WORMLedger:
 
             return True, None
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Estatísticas do ledger"""
         with sqlite3.connect(str(self.db_path)) as conn:
             cursor = conn.cursor()
@@ -561,7 +560,7 @@ class WORMLedger:
                     decision_data = json.loads(row[0])
                     verdict = decision_data.get("verdict", "unknown")
                     decisions[verdict] = row[1]
-                except:
+                except Exception:
                     decisions["parse_error"] = decisions.get("parse_error", 0) + row[1]
 
             # Champion info
@@ -588,7 +587,7 @@ from dataclasses import dataclass as _dc
 class WORMEvent:
     event_type: str
     cycle_id: str
-    data: Dict[str, Any]
+    data: dict[str, Any]
 
 
 class SQLiteWORMLedger:
@@ -651,13 +650,13 @@ class SQLiteWORMLedger:
             self._tail = record_hash
             return record_hash
 
-    def query(self, limit: int = 100) -> List[Dict[str, Any]]:
+    def query(self, limit: int = 100) -> list[dict[str, Any]]:
         c = self._conn.cursor()
         c.execute("SELECT etype, data, ts, prev, hash FROM events ORDER BY id DESC LIMIT ?", (limit,))
         rows = c.fetchall()
         return [{"etype": r[0], "data": json.loads(r[1]), "ts": r[2], "prev": r[3], "hash": r[4]} for r in rows]
 
-    def verify_chain(self) -> Tuple[bool, Optional[str]]:
+    def verify_chain(self) -> tuple[bool, str | None]:
         c = self._conn.cursor()
         c.execute("SELECT etype, data, ts, prev, hash FROM events ORDER BY id")
         prev = "genesis"
@@ -687,9 +686,9 @@ class JSONLWORMLedger:
 
 # Funções de conveniência
 def create_run_record(
-    run_id: Optional[str] = None,
+    run_id: str | None = None,
     provider_id: str = "unknown",
-    metrics: Optional[Dict[str, float]] = None,
+    metrics: dict[str, float] | None = None,
     decision_verdict: str = "pending",
 ) -> RunRecord:
     """Cria RunRecord com defaults"""
@@ -717,9 +716,9 @@ def create_run_record(
 def quick_ledger_append(
     ledger: WORMLedger,
     provider_id: str,
-    metrics: Dict[str, float],
+    metrics: dict[str, float],
     verdict: str,
-    artifacts: Optional[Dict[str, Any]] = None,
+    artifacts: dict[str, Any] | None = None,
 ) -> str:
     """Append rápido ao ledger"""
     record = create_run_record(provider_id=provider_id, metrics=metrics, decision_verdict=verdict)

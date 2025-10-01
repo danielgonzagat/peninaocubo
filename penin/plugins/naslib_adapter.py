@@ -1,9 +1,9 @@
-from typing import Dict, Any
+from typing import Any
 
 
-def propose_with_naslib(space: str = "ResNet") -> Dict[str, Any]:
+def propose_with_naslib(space: str = "ResNet") -> dict[str, Any]:
     try:
-        import naslib  # type: ignore
+        pass  # type: ignore
     except Exception as e:
         raise ImportError("NASLib não instalado. Instale com `pip install naslib` ou desative este plugin.") from e
 

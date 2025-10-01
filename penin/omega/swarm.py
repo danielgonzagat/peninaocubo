@@ -1,4 +1,7 @@
-import os, sqlite3, time, json
+import json
+import os
+import sqlite3
+import time
 from pathlib import Path
 
 ROOT = Path(os.getenv("PENIN_ROOT", Path.home() / ".penin_omega"))
@@ -30,7 +33,7 @@ def sample_global_state(window_s: float = 60.0):
         for k, v in p.items():
             try:
                 agg[k] = agg.get(k, 0.0) + float(v)
-            except:
+            except Exception:
                 pass
     n = max(1, len(data))
     return {k: (v / n) for k, v in agg.items()}

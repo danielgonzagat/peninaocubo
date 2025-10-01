@@ -3,16 +3,14 @@ OPA/Rego Policy Integration for PENIN-Ω System.
 Implements policy-as-code for Σ-Guard, IR→IC, and evolution control.
 """
 
-import json
-import os
-from typing import Any, Dict, List, Optional, Union
 from pathlib import Path
+from typing import Any
 
 
 class OPAPolicyEngine:
     """OPA Policy Engine for PENIN-Ω system."""
 
-    def __init__(self, policies_dir: Optional[str] = None):
+    def __init__(self, policies_dir: str | None = None):
         """Initialize OPA policy engine."""
         self.policies_dir = Path(policies_dir or "/workspace/policies")
         self.policies = {}
@@ -25,10 +23,10 @@ class OPAPolicyEngine:
 
         for rego_file in self.policies_dir.glob("*.rego"):
             policy_name = rego_file.stem
-            with open(rego_file, "r") as f:
+            with open(rego_file) as f:
                 self.policies[policy_name] = f.read()
 
-    def evaluate_policy(self, policy_name: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    def evaluate_policy(self, policy_name: str, input_data: dict[str, Any]) -> dict[str, Any]:
         """Evaluate a policy with given input data."""
         if policy_name not in self.policies:
             raise ValueError(f"Policy '{policy_name}' not found")
@@ -37,7 +35,7 @@ class OPAPolicyEngine:
         # In production, this would integrate with actual OPA server
         return self._evaluate_policy_python(policy_name, input_data)
 
-    def _evaluate_policy_python(self, policy_name: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _evaluate_policy_python(self, policy_name: str, input_data: dict[str, Any]) -> dict[str, Any]:
         """Python-based policy evaluation (fallback when OPA server not available)."""
         if policy_name == "sigma_guard":
             return self._evaluate_sigma_guard(input_data)
@@ -48,7 +46,7 @@ class OPAPolicyEngine:
         else:
             return {"error": f"Unknown policy: {policy_name}"}
 
-    def _evaluate_sigma_guard(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _evaluate_sigma_guard(self, input_data: dict[str, Any]) -> dict[str, Any]:
         """Evaluate Σ-Guard policies."""
         result = {
             "allow": False,
@@ -101,7 +99,7 @@ class OPAPolicyEngine:
 
         return result
 
-    def _evaluate_budget_policies(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _evaluate_budget_policies(self, input_data: dict[str, Any]) -> dict[str, Any]:
         """Evaluate budget policies."""
         result = {
             "allow_budget_operation": False,
@@ -173,7 +171,7 @@ class OPAPolicyEngine:
 
         return result
 
-    def _evaluate_evolution_policies(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _evaluate_evolution_policies(self, input_data: dict[str, Any]) -> dict[str, Any]:
         """Evaluate evolution policies."""
         result = {
             "allow_evolution": False,
@@ -260,7 +258,7 @@ class OPAPolicyEngine:
         ]
         return any(pattern in content.lower() for pattern in pii_patterns)
 
-    def _classify_input(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _classify_input(self, input_data: dict[str, Any]) -> dict[str, Any]:
         """Classify input based on content and context."""
         content = input_data.get("content", "")
         content_type = input_data.get("content_type", "text")
@@ -284,7 +282,7 @@ class OPAPolicyEngine:
 
         return {"classification": classification, "risk_level": risk_level, "requires_review": requires_review}
 
-    def _calculate_cost_optimization(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
+    def _calculate_cost_optimization(self, input_data: dict[str, Any]) -> dict[str, Any]:
         """Calculate cost optimization recommendations."""
         providers = input_data.get("providers", [])
         current_provider = input_data.get("current_provider", {})
@@ -304,7 +302,7 @@ class OPAPolicyEngine:
             "quality_tradeoff": "acceptable" if quality_drop <= 0.1 else "significant",
         }
 
-    def _select_mutation_strategy(self, input_data: Dict[str, Any]) -> str:
+    def _select_mutation_strategy(self, input_data: dict[str, Any]) -> str:
         """Select mutation strategy based on current state."""
         stability = input_data.get("stability", {})
         performance = input_data.get("performance", {})
@@ -324,7 +322,7 @@ class OPAPolicyEngine:
         else:
             return "conservative"
 
-    def _get_evolution_parameters(self, strategy: str) -> Dict[str, Any]:
+    def _get_evolution_parameters(self, strategy: str) -> dict[str, Any]:
         """Get evolution parameters based on strategy."""
         params = {
             "conservative": {
@@ -351,19 +349,19 @@ class OPAPolicyEngine:
 
 
 # Policy evaluation functions for easy integration
-def evaluate_sigma_guard(input_data: Dict[str, Any]) -> Dict[str, Any]:
+def evaluate_sigma_guard(input_data: dict[str, Any]) -> dict[str, Any]:
     """Evaluate Σ-Guard policies."""
     engine = OPAPolicyEngine()
     return engine.evaluate_policy("sigma_guard", input_data)
 
 
-def evaluate_budget_policies(input_data: Dict[str, Any]) -> Dict[str, Any]:
+def evaluate_budget_policies(input_data: dict[str, Any]) -> dict[str, Any]:
     """Evaluate budget policies."""
     engine = OPAPolicyEngine()
     return engine.evaluate_policy("budget_policies", input_data)
 
 
-def evaluate_evolution_policies(input_data: Dict[str, Any]) -> Dict[str, Any]:
+def evaluate_evolution_policies(input_data: dict[str, Any]) -> dict[str, Any]:
     """Evaluate evolution policies."""
     engine = OPAPolicyEngine()
     return engine.evaluate_policy("evolution_policies", input_data)
