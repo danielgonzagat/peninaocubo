@@ -63,6 +63,15 @@ jobs:
           mkdir -p security/
           mv sbom.json security/sbom.json
           mv sbom.xml security/sbom.xml
+          git add security/sbom.* || true
+          git diff --staged --quiet || git commit -m "chore(security): update SBOM [skip ci]"
+          git pull --rebase origin main || true
+          git push || true
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          mkdir -p security/
+          mv sbom.json security/sbom.json
+          mv sbom.xml security/sbom.xml
           git add security/sbom.*
           git commit -m "chore(security): update SBOM [skip ci]" || true
           git push || true
