@@ -11,7 +11,11 @@ from __future__ import annotations
 
 # CAOS+ metrics - Consolidated to penin.core.caos
 # Import from definitive implementation
+# Import new dataclasses and engine
 from penin.core.caos import (
+    CAOSComponents,
+    CAOSConfig,
+    CAOSPlusEngine,
     CAOSTracker,
     caos_plus,
     compute_caos_plus,
@@ -19,16 +23,6 @@ from penin.core.caos import (
     phi_caos,
 )
 
-# Create compatibility aliases for renamed/missing symbols
-try:
-    from penin.core.caos import CAOSComponent as CAOSComponents
-except ImportError:
-    CAOSComponents = None
-
-try:
-    from penin.core.caos import CAOSFormula as CAOSPlusEngine
-except ImportError:
-    CAOSPlusEngine = None
 
 # Create stub functions for missing quick_ variants
 def quick_caos_phi(*args, **kwargs):
@@ -55,6 +49,7 @@ __all__ = [
     "quick_caos_phi",
     "validate_caos_stability",
     "CAOSComponents",
+    "CAOSConfig",
     "CAOSPlusEngine",
     "CAOSTracker",
     # Ethics

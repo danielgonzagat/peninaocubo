@@ -81,45 +81,45 @@ def estimate_gradient(
     """
     n = len(state)
     gradient = np.zeros(n, dtype=state.dtype)
-    
+
     if method == "forward":
         # Forward differences: O(n) evaluations
         loss_current = loss_fn(state, evidence, policies)
         state_perturbed = state.copy()
-        
+
         for i in range(n):
             # Perturb dimension i
             original_value = state_perturbed[i]
             state_perturbed[i] = original_value + finite_diff_epsilon
-            
+
             # Compute loss with perturbation
             loss_perturbed = loss_fn(state_perturbed, evidence, policies)
             gradient[i] = (loss_perturbed - loss_current) / finite_diff_epsilon
-            
+
             # Restore original value for next iteration
             state_perturbed[i] = original_value
-    
+
     elif method == "central":
         # Central differences: O(2n) evaluations, more accurate
         state_perturbed = state.copy()
-        
+
         for i in range(n):
             original_value = state_perturbed[i]
-            
+
             # Forward perturbation
             state_perturbed[i] = original_value + finite_diff_epsilon
             loss_forward = loss_fn(state_perturbed, evidence, policies)
-            
+
             # Backward perturbation
             state_perturbed[i] = original_value - finite_diff_epsilon
             loss_backward = loss_fn(state_perturbed, evidence, policies)
-            
+
             # Central difference
             gradient[i] = (loss_forward - loss_backward) / (2 * finite_diff_epsilon)
-            
+
             # Restore original value
             state_perturbed[i] = original_value
-    
+
     else:
         raise ValueError(f"Unknown gradient method: {method}")
 
@@ -158,21 +158,21 @@ def estimate_gradient_fast(
     """
     n = len(state)
     loss_current = loss_fn(state, evidence, policies)
-    
+
     # Pre-allocate gradient array
     gradient = np.empty(n, dtype=state.dtype)
     state_perturbed = state.copy()
-    
+
     # Pre-compute inverse epsilon
     inv_eps = 1.0 / finite_diff_epsilon
-    
+
     # Hot loop: compute each gradient component
     for i in range(n):
         orig = state_perturbed[i]
         state_perturbed[i] = orig + finite_diff_epsilon
         gradient[i] = (loss_fn(state_perturbed, evidence, policies) - loss_current) * inv_eps
         state_perturbed[i] = orig
-    
+
     # Negate for descent direction (vectorized)
     np.negative(gradient, out=gradient)
     return gradient

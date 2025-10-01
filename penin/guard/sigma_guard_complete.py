@@ -59,7 +59,7 @@ class GateMetrics:
     kappa: float
     consent: bool
     eco_ok: bool
-    
+
     # Optional: decision context for ethical validation (LO-14)
     decision_output: str = ""
     has_pii: bool = False
@@ -161,7 +161,7 @@ class SigmaGuard:
         self.consent_required = consent_required
         self.eco_ok_required = eco_ok_required
         self.enable_ethical_validator = enable_ethical_validator
-        
+
         # Initialize EthicalValidator (LO-14)
         if self.enable_ethical_validator and EthicalValidator is not None:
             self.ethical_validator = EthicalValidator(strict_mode=True)
@@ -341,10 +341,10 @@ class SigmaGuard:
                 "hash": True,
                 "timestamp": True,
             }
-            
+
             ethical_result = self.ethical_validator.validate_all(decision, context)
             passed = ethical_result.passed
-            
+
             violation_str = ", ".join(ethical_result.violations[:3]) if ethical_result.violations else "none"
             gates.append(
                 GateResult(

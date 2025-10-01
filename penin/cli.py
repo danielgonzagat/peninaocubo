@@ -356,7 +356,6 @@ class PeninCLI:
 
     def cmd_query_status(self, args) -> int:
         """Comando: penin query-status"""
-        import asyncio
 
         from penin.omega.sr import SROmegaService
         from penin.p2p.node import PeninNode

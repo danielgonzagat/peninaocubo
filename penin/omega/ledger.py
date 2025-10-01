@@ -25,7 +25,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from penin.ledger.hash_utils import compute_hash, hash_json
+from penin.ledger.hash_utils import hash_json
 
 try:
     import portalocker

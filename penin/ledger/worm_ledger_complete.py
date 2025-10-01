@@ -31,7 +31,6 @@ from typing import Any
 
 from penin.ledger.hash_utils import (
     HASH_ALGORITHM,
-    HASH_VERSION,
     compute_hash,
     hash_json,
 )
