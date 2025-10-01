@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from penin.omega.sr import Outcome, Recommendation, SROmegaService
+from penin.omega.sr import Recommendation, SROmegaService
 from penin.p2p.node import PeninNode
 from penin.p2p.protocol import MessageType, PeninProtocol
 
