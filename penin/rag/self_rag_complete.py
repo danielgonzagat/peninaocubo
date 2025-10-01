@@ -157,7 +157,7 @@ class RetrievalResult:
 class BM25:
     """
     BM25 ranking function for document retrieval.
-    
+
     Parameters:
     - k1: term frequency saturation (default: 1.5)
     - b: length normalization (default: 0.75)
@@ -182,7 +182,7 @@ class BM25:
     def fit(self, documents: list[tuple[str, str]]) -> None:
         """
         Fit BM25 on corpus.
-        
+
         Args:
             documents: List of (doc_id, content) tuples
         """
@@ -217,11 +217,11 @@ class BM25:
     def score(self, query: str, doc_idx: int) -> float:
         """
         Compute BM25 score for query against document.
-        
+
         Args:
             query: Query string
             doc_idx: Document index
-        
+
         Returns:
             BM25 score
         """
@@ -254,11 +254,11 @@ class BM25:
     def search(self, query: str, top_k: int = 10) -> list[tuple[str, float]]:
         """
         Search corpus with query.
-        
+
         Args:
             query: Query string
             top_k: Number of top results
-        
+
         Returns:
             List of (doc_id, score) tuples sorted by score
         """
@@ -279,7 +279,7 @@ class BM25:
 class EmbeddingRetriever:
     """
     Dense embedding retriever using sentence transformers.
-    
+
     Uses cosine similarity for ranking.
     """
 
@@ -304,7 +304,7 @@ class EmbeddingRetriever:
     def fit(self, documents: list[tuple[str, str]]) -> None:
         """
         Fit embeddings on corpus.
-        
+
         Args:
             documents: List of (doc_id, content) tuples
         """
@@ -326,11 +326,11 @@ class EmbeddingRetriever:
     def search(self, query: str, top_k: int = 10) -> list[tuple[str, float]]:
         """
         Search corpus with query.
-        
+
         Args:
             query: Query string
             top_k: Number of top results
-        
+
         Returns:
             List of (doc_id, score) tuples sorted by score
         """
@@ -361,7 +361,7 @@ class EmbeddingRetriever:
 class TextChunker:
     """
     Text chunker with overlapping windows.
-    
+
     Supports:
     - Fixed-size chunking
     - Sentence boundary preservation (optional)
@@ -382,10 +382,10 @@ class TextChunker:
     def chunk(self, doc: Document) -> list[Chunk]:
         """
         Chunk document into overlapping chunks.
-        
+
         Args:
             doc: Document to chunk
-        
+
         Returns:
             List of Chunk objects
         """
@@ -513,10 +513,10 @@ class Deduplicator:
     def deduplicate(self, chunks: list[Chunk]) -> list[Chunk]:
         """
         Deduplicate chunks based on similarity.
-        
+
         Args:
             chunks: List of chunks
-        
+
         Returns:
             Deduplicated list of chunks
         """
@@ -584,17 +584,17 @@ class Deduplicator:
 def fractal_coherence(results: list[RetrievalResult]) -> float:
     """
     Compute fractal coherence across multiple retrieval results.
-    
+
     Measures multi-level consistency:
     - Document-level: are results from same documents?
     - Semantic-level: are results semantically similar?
     - Rank-level: are top results consistent?
-    
+
     Returns value in [0, 1] where 1 = perfect coherence.
-    
+
     Args:
         results: List of retrieval results
-    
+
     Returns:
         Coherence score [0, 1]
     """
@@ -636,7 +636,7 @@ def fractal_coherence(results: list[RetrievalResult]) -> float:
 class SelfRAG:
     """
     Self-Reflective Retrieval Augmented Generation system.
-    
+
     Features:
     - Hybrid BM25 + embedding retrieval
     - Deduplication
@@ -718,12 +718,12 @@ class SelfRAG:
     ) -> list[RetrievalResult]:
         """
         Search corpus with query.
-        
+
         Args:
             query: Query string
             top_k: Number of results (default: self.top_k)
             method: "bm25", "embedding", or "hybrid"
-        
+
         Returns:
             List of RetrievalResult sorted by score
         """
@@ -853,13 +853,13 @@ def create_self_rag(
 ) -> SelfRAG:
     """
     Create Self-RAG system.
-    
+
     Args:
         chunk_size: Size of text chunks
         chunk_overlap: Overlap between chunks
         top_k: Number of top results
         use_embeddings: Use embedding retriever
-    
+
     Returns:
         SelfRAG instance
     """

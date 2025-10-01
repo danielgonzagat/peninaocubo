@@ -53,7 +53,7 @@ class CAOSComponent(Enum):
 class ConsistencyMetrics:
     """
     Métricas de Consistência (C)
-    
+
     C = média(pass@k, 1-ECE, v_ext)
     """
 
@@ -93,9 +93,9 @@ class ConsistencyMetrics:
 class AutoevolutionMetrics:
     """
     Métricas de Autoevolução (A)
-    
+
     A = ΔL∞⁺ / (Cost_norm + ε)
-    
+
     Mede ganho de performance por unidade de custo
     """
 
@@ -135,9 +135,9 @@ class AutoevolutionMetrics:
 class IncognoscibleMetrics:
     """
     Métricas de Incognoscível (O)
-    
+
     O = média(incerteza_epistêmica, OOD_score, ensemble_disagreement)
-    
+
     Mede grau de desconhecimento → mais O libera exploração
     """
 
@@ -176,9 +176,9 @@ class IncognoscibleMetrics:
 class SilenceMetrics:
     """
     Métricas de Silêncio (S)
-    
+
     S = v1·(1-ruído) + v2·(1-redundância) + v3·(1-entropia)
-    
+
     Mede qualidade de sinal (anti-ruído, anti-redundância, anti-entropia)
     Ponderação sugerida: v1:v2:v3 = 2:1:1
     """
@@ -243,7 +243,7 @@ class CAOSConfig:
 class CAOSState:
     """
     Estado do CAOS⁺ com histórico EMA
-    
+
     Mantém valores suavizados via Exponential Moving Average
     """
 
@@ -272,14 +272,14 @@ class CAOSState:
     def update_ema(self, new_value: float, current_ema: float, alpha: float) -> float:
         """
         Atualiza EMA
-        
+
         EMA_t = α · value_t + (1-α) · EMA_{t-1}
-        
+
         Args:
             new_value: Novo valor observado
             current_ema: EMA atual
             alpha: Fator de suavização (0 = sem mudança, 1 = esquece passado)
-        
+
         Returns:
             EMA atualizado
         """
@@ -299,12 +299,12 @@ class CAOSState:
 def compute_ema_alpha(half_life: int) -> float:
     """
     Calcula α para EMA dado half-life
-    
+
     Half-life: número de amostras para peso cair para 50%
-    
+
     Args:
         half_life: Half-life em número de amostras
-    
+
     Returns:
         α (fator de suavização)
     """
@@ -324,14 +324,14 @@ def compute_caos_plus_raw(
 ) -> float:
     """
     Calcula CAOS⁺ = (1 + κ · C · A)^(O · S)
-    
+
     Args:
         c: Consistência [0, 1]
         a: Autoevolução [0, 1]
         o: Incognoscível [0, 1]
         s: Silêncio [0, 1]
         kappa: Ganho base ≥ 20
-    
+
     Returns:
         CAOS⁺ ≥ 1
     """
@@ -364,7 +364,7 @@ def compute_caos_plus_complete(
 ) -> tuple[float, dict[str, Any]]:
     """
     Calcula CAOS⁺ completo com todas as métricas e suavização EMA
-    
+
     Args:
         consistency_metrics: Métricas de C
         autoevolution_metrics: Métricas de A
@@ -372,7 +372,7 @@ def compute_caos_plus_complete(
         silence_metrics: Métricas de S
         config: Configuração do CAOS⁺
         state: Estado com histórico EMA
-    
+
     Returns:
         (caos_plus, details_dict)
         - caos_plus: Valor CAOS⁺
@@ -478,7 +478,7 @@ def compute_caos_plus_simple(
 ) -> float:
     """
     Versão simplificada quando já se tem C, A, O, S
-    
+
     Args:
         C: Consistência [0, 1]
         A: Autoevolução [0, 1]
@@ -486,7 +486,7 @@ def compute_caos_plus_simple(
         S: Silêncio [0, 1]
         kappa: Ganho base
         config: Configuração opcional
-    
+
     Returns:
         CAOS⁺
     """

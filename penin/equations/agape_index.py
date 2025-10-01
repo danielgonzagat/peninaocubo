@@ -84,18 +84,18 @@ def compute_agape_index(
 ) -> tuple[float, bool]:
     """
     Compute Agápe Index using Choquet integral.
-    
+
     Args:
         virtues: Dict mapping virtue name to score [0, 1]
         sacrificial_cost: Cost incurred for others (normalized)
         ethical_violations: List of violations (fail-closed if any)
         config: Optional configuration
-        
+
     Returns:
         Tuple of:
         - Agápe score [0, 1]
         - Ethical pass/fail (False if any violation)
-        
+
     Example:
         >>> virtues = {"patience": 0.9, "kindness": 0.85, "humility": 0.8}
         >>> score, ok = compute_agape_index(virtues, sacrificial_cost=0.1)
@@ -131,7 +131,7 @@ def _choquet_integral(
 ) -> float:
     """
     Compute Choquet integral (non-compensatory aggregation).
-    
+
     Simplified implementation using sorted values and fuzzy measures.
     Full Choquet requires power set, but we use harmonic approximation.
     """
@@ -161,14 +161,14 @@ def check_ethical_laws(
 ) -> list[EthicalViolation]:
     """
     Check compliance with LO-01 to LO-14.
-    
+
     Args:
         data: Data/decision to check
         context: Contextual information
-        
+
     Returns:
         List of violations (empty if compliant)
-        
+
     Example:
         >>> violations = check_ethical_laws({"content": "..."}, {"user": "..."})
         >>> assert len(violations) == 0  # Compliant

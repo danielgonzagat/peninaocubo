@@ -83,7 +83,7 @@ class SpikingJellyConfig:
 class SpikingJellyAdapter(BaseIntegration):
     """
     Adapter for SpikingJelly framework
-    
+
     Provides neuromorphic SNN capabilities with 100× efficiency gains.
     """
 
@@ -186,11 +186,11 @@ class SpikingJellyAdapter(BaseIntegration):
     def convert_model_to_snn(self, ann_model, input_shape: tuple[int, ...]) -> Any:
         """
         Convert ANN model to SNN
-        
+
         Args:
             ann_model: PyTorch ANN model
             input_shape: Input tensor shape
-        
+
         Returns:
             SNN model
         """
@@ -224,11 +224,11 @@ class SpikingJellyAdapter(BaseIntegration):
     def forward_snn(self, input_data, model=None) -> tuple[Any, dict[str, Any]]:
         """
         Forward pass through SNN
-        
+
         Args:
             input_data: Input tensor
             model: SNN model (uses self.snn_model if None)
-        
+
         Returns:
             (output, metrics_dict)
         """
@@ -290,11 +290,11 @@ class SpikingJellyAdapter(BaseIntegration):
     def estimate_speedup(self, model_size: int, batch_size: int = 1) -> dict[str, float]:
         """
         Estimate speedup vs dense ANN
-        
+
         Args:
             model_size: Number of parameters
             batch_size: Batch size
-        
+
         Returns:
             Speedup estimates
         """

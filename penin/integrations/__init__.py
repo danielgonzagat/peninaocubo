@@ -56,10 +56,10 @@ registry.register(MetacognitivePrompting())
 for cycle in evolution_loop():
     # Neuromorphic forward pass (100× faster)
     output = registry.get('spiking_jelly').forward(input_data)
-    
+
     # Metacognitive reflection
     reflection = registry.get('metacognition').reflect(output)
-    
+
     # Update with SR-Ω∞
     sr_score = compute_sr_omega(reflection)
 ```

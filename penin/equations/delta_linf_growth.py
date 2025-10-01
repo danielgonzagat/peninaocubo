@@ -27,7 +27,7 @@ def delta_linf_compound_growth(
 ) -> tuple[bool, float]:
     """
     Check if L∞ growth meets compound threshold.
-    
+
     Returns:
         (meets_threshold, actual_growth_rate)
     """

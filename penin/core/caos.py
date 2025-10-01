@@ -16,7 +16,7 @@ SINGLE SOURCE OF TRUTH para cálculo de CAOS⁺ no sistema PENIN-Ω.
 Dimensões (todas normalizadas [0,1]):
 -------------------------------------
 - C (Consistência): média(pass@k, 1-ECE, verificação_externa)
-- A (Autoevolução): ΔL∞⁺ / (Cost_norm + ε) 
+- A (Autoevolução): ΔL∞⁺ / (Cost_norm + ε)
 - O (Incognoscível): incerteza epistêmica + OOD + disagreement
 - S (Silêncio): anti-ruído, anti-redundância, anti-entropia
 
@@ -95,13 +95,13 @@ def clamp(x: float, min_val: float, max_val: float) -> float:
 def compute_ema_alpha(half_life: int) -> float:
     """
     Calcula α para EMA dado half-life
-    
+
     Half-life: número de amostras para peso cair para 50%
     Fórmula: α = 1 - exp(-ln(2) / half_life)
-    
+
     Args:
         half_life: Half-life em número de amostras (típico: 3-10)
-    
+
     Returns:
         α (fator de suavização) em [0, 1]
     """
@@ -119,9 +119,9 @@ def compute_ema_alpha(half_life: int) -> float:
 class ConsistencyMetrics:
     """
     Métricas de Consistência (C)
-    
+
     C = w1·pass@k + w2·(1-ECE) + w3·v_ext
-    
+
     Componentes:
     - pass@k: Taxa de sucesso em k tentativas [0, 1]
     - ECE: Expected Calibration Error [0, 1] (menor é melhor)
@@ -157,9 +157,9 @@ class ConsistencyMetrics:
 class AutoevolutionMetrics:
     """
     Métricas de Autoevolução (A)
-    
+
     A = ΔL∞⁺ / (Cost_norm + ε)
-    
+
     Mede ganho de performance por unidade de custo.
     Só considera ganhos positivos (ΔL∞⁺ = max(0, ΔL∞)).
     """
@@ -186,9 +186,9 @@ class AutoevolutionMetrics:
 class IncognoscibleMetrics:
     """
     Métricas de Incognoscível (O)
-    
+
     O = média ponderada(epistemic_uncertainty, ood_score, ensemble_disagreement)
-    
+
     Mede grau de desconhecimento → mais O libera exploração.
     """
 
@@ -220,9 +220,9 @@ class IncognoscibleMetrics:
 class SilenceMetrics:
     """
     Métricas de Silêncio (S)
-    
+
     S = v1·(1-ruído) + v2·(1-redundância) + v3·(1-entropia)
-    
+
     Ponderação sugerida: v1:v2:v3 = 2:1:1
     Mede qualidade de sinal (anti-ruído, anti-redundância, anti-entropia).
     """
@@ -297,7 +297,7 @@ class CAOSConfig:
 class CAOSState:
     """
     Estado do CAOS⁺ com histórico e EMA
-    
+
     Mantém valores raw e suavizados via Exponential Moving Average.
     """
 
@@ -326,7 +326,7 @@ class CAOSState:
     def update_ema(self, new_value: float, current_ema: float, alpha: float) -> float:
         """
         Atualiza EMA: EMA_t = α · value_t + (1-α) · EMA_{t-1}
-        
+
         Na primeira atualização, inicializa EMA com valor observado.
         """
         if self.update_count == 0:
@@ -342,7 +342,7 @@ class CAOSState:
     def get_stability(self) -> float:
         """
         Retorna estabilidade (inverse coefficient of variation)
-        
+
         Stability = 1 / (1 + CV) onde CV = σ / μ
         """
         if len(self.history) < 2:
@@ -372,20 +372,20 @@ def compute_caos_plus_exponential(
 ) -> float:
     """
     Fórmula CAOS⁺ exponencial pura: (1 + κ·C·A)^(O·S)
-    
+
     Esta é a fórmula matemática canônica original.
     Monotônica em C, A, O, S; κ amplifica a base.
-    
+
     Args:
         c: Consistência [0, 1]
         a: Autoevolução [0, 1]
         o: Incognoscível [0, 1]
         s: Silêncio [0, 1]
         kappa: Ganho base ≥ 1
-    
+
     Returns:
         CAOS⁺ ≥ 1 (sem teto, unbounded)
-    
+
     Propriedades:
         - CAOS⁺(0,0,0,0) = 1
         - CAOS⁺(1,1,1,1) = (1 + κ)^1 = 1 + κ
@@ -421,19 +421,19 @@ def phi_caos(
 ) -> float:
     """
     Fórmula CAOS⁺ com saturação: tanh(γ · log(CAOS⁺_exponencial))
-    
+
     Variante histórica com output limitado a [0, 1) via tanh.
     Útil para composições com outras métricas normalizadas.
-    
+
     Args:
         c, a, o, s: Componentes [0, 1]
         kappa: Ganho [1, kappa_max]
         kappa_max: Limite superior de kappa
         gamma: Saturação [0.1, 2.0]
-    
+
     Returns:
         φ_CAOS em [0, 1) aproximadamente
-    
+
     Nota:
         Esta fórmula é mantida para compatibilidade com código histórico
         em penin/omega/caos.py, mas a fórmula exponencial é preferida
@@ -472,12 +472,12 @@ def compute_caos_plus_simple(
 ) -> float:
     """
     Wrapper simplificado quando já se tem C, A, O, S normalizados.
-    
+
     Args:
         C, A, O, S: Componentes [0, 1]
         kappa: Ganho base
         config: Configuração opcional (se None, usa defaults)
-    
+
     Returns:
         CAOS⁺ (scaled e clamped conforme config)
     """
@@ -521,7 +521,7 @@ def compute_caos_plus_complete(
 ) -> tuple[float, dict[str, Any]]:
     """
     Computação CAOS⁺ completa com métricas detalhadas, EMA e auditoria.
-    
+
     Pipeline:
     1. Calcula componentes C, A, O, S a partir de métricas raw
     2. Atualiza estado (valores current)
@@ -530,7 +530,7 @@ def compute_caos_plus_complete(
     5. Aplica clamps e normalização
     6. Atualiza histórico
     7. Retorna score e details para auditoria
-    
+
     Args:
         consistency_metrics: Métricas de C
         autoevolution_metrics: Métricas de A
@@ -538,7 +538,7 @@ def compute_caos_plus_complete(
         silence_metrics: Métricas de S
         config: Configuração (se None, usa defaults)
         state: Estado com histórico EMA (se None, cria novo)
-    
+
     Returns:
         (caos_plus_final, details_dict)
         - caos_plus_final: Valor CAOS⁺ final
@@ -675,7 +675,7 @@ def compute_caos_plus(
 ) -> tuple[float, dict[str, Any]]:
     """
     Wrapper de compatibilidade com assinatura antiga de penin/omega/caos.py
-    
+
     Retorna tupla (phi, details) como esperado por código legado.
     """
     if config is None:
@@ -709,7 +709,7 @@ def caos_plus(
 ) -> dict[str, Any]:
     """
     Wrapper de compatibilidade com função caos_plus() de penin/omega/caos.py
-    
+
     Aceita nomes alternativos (coherence, awareness, openness, stability).
     """
     # Accept alternative keyword names
@@ -785,7 +785,7 @@ def caos_gradient(c: float, a: float, o: float, s: float, kappa: float) -> dict[
 class CAOSTracker:
     """
     Tracker para monitorar CAOS⁺ ao longo do tempo.
-    
+
     Features:
     - EMA automático
     - Histórico limitado

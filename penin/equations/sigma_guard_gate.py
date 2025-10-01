@@ -44,14 +44,14 @@ def sigma_guard_check(
 ) -> tuple[bool, str]:
     """
     Execute Σ-Guard gate (fail-closed).
-    
+
     Args:
         metrics: Dict with keys: rho, ece, rho_bias, consent, eco_ok
         config: Optional configuration
-        
+
     Returns:
         (gate_pass, reason_if_fail)
-        
+
     Example:
         >>> metrics = {"rho": 0.95, "ece": 0.005, "rho_bias": 1.02, "consent": True, "eco_ok": True}
         >>> ok, reason = sigma_guard_check(metrics)

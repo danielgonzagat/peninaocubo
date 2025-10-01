@@ -179,12 +179,12 @@ class Mutation:
 class MutationGenerator:
     """
     Generate safe code mutations.
-    
+
     Supports:
     - Parameter tuning (safe value ranges)
     - Architecture tweaks (small changes)
     - Algorithm swaps (alternative implementations)
-    
+
     Safety:
     - AST-based (no exec/eval)
     - Sandboxed
@@ -204,12 +204,12 @@ class MutationGenerator:
     ) -> Mutation:
         """
         Generate parameter tuning mutation.
-        
+
         Args:
             function_name: Name of function to tune
             parameters: Current parameters
             perturbation: Perturbation magnitude (0-1)
-        
+
         Returns:
             Mutation object
         """
@@ -250,12 +250,12 @@ class MutationGenerator:
     ) -> Mutation:
         """
         Generate architecture tweak mutation.
-        
+
         Args:
             function_name: Name of function
             original_code: Original function code
             tweak_type: Type of tweak
-        
+
         Returns:
             Mutation object
         """
@@ -291,10 +291,10 @@ class MutationGenerator:
     ) -> Mutation:
         """
         Generate random mutation from function registry.
-        
+
         Args:
             function_registry: Available functions
-        
+
         Returns:
             Mutation object
         """
@@ -384,7 +384,7 @@ class ChallengerEvaluation:
 class ChampionChallengerFramework:
     """
     Champion-Challenger evaluation framework.
-    
+
     Workflow:
     1. Champion: current production model
     2. Challenger: proposed mutation
@@ -443,11 +443,11 @@ class ChampionChallengerFramework:
     ) -> ChallengerEvaluation:
         """
         Evaluate challenger in shadow mode.
-        
+
         Args:
             mutation: Challenger mutation
             sample_count: Number of samples
-        
+
         Returns:
             ChallengerEvaluation
         """
@@ -491,11 +491,11 @@ class ChampionChallengerFramework:
     ) -> ChallengerEvaluation:
         """
         Evaluate challenger in canary mode.
-        
+
         Args:
             mutation: Challenger mutation
             traffic_pct: Traffic percentage (default: self.canary_traffic)
-        
+
         Returns:
             ChallengerEvaluation
         """
@@ -540,10 +540,10 @@ class ChampionChallengerFramework:
     ) -> tuple[bool, str]:
         """
         Decide whether to promote challenger.
-        
+
         Args:
             evaluation: Challenger evaluation
-        
+
         Returns:
             Tuple of (should_promote, reason)
         """
@@ -580,11 +580,11 @@ class ChampionChallengerFramework:
     ) -> ProofCarryingArtifact:
         """
         Promote challenger to champion.
-        
+
         Args:
             mutation: Challenger mutation
             evaluation: Evaluation results
-        
+
         Returns:
             ProofCarryingArtifact
         """
@@ -635,11 +635,11 @@ class ChampionChallengerFramework:
     ) -> ProofCarryingArtifact:
         """
         Rollback challenger.
-        
+
         Args:
             mutation: Challenger mutation
             reason: Rollback reason
-        
+
         Returns:
             ProofCarryingArtifact
         """
@@ -685,7 +685,7 @@ class ChampionChallengerFramework:
 class OmegaMeta:
     """
     Complete Ω-META orchestrator.
-    
+
     Manages:
     - Mutation generation
     - Champion-challenger evaluation
@@ -732,12 +732,12 @@ class OmegaMeta:
     ) -> ChallengerEvaluation:
         """
         Propose and evaluate challenger.
-        
+
         Args:
             mutation: Mutation to evaluate
             shadow_samples: Shadow sample count
             run_canary: Run canary evaluation
-        
+
         Returns:
             Final evaluation
         """
@@ -777,10 +777,10 @@ class OmegaMeta:
     ) -> ProofCarryingArtifact:
         """
         Promote or rollback based on evaluation.
-        
+
         Args:
             evaluation: Challenger evaluation
-        
+
         Returns:
             ProofCarryingArtifact
         """
@@ -814,12 +814,12 @@ def create_omega_meta(
 ) -> OmegaMeta:
     """
     Create Ω-META orchestrator.
-    
+
     Args:
         ledger_path: Path to WORM ledger
         beta_min: Minimum improvement threshold
         seed: Random seed for determinism
-    
+
     Returns:
         OmegaMeta instance
     """

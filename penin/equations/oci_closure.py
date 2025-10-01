@@ -40,7 +40,7 @@ def organizational_closure_index(
 ) -> tuple[float, bool]:
     """
     Compute OCI from dependency graph.
-    
+
     Returns:
         (OCI_score, gate_pass)
     """

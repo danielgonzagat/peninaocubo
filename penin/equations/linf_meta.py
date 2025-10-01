@@ -58,7 +58,7 @@ class MetricType(Enum):
 class Metric:
     """
     Métrica individual m_j
-    
+
     Deve ser normalizada em [0, 1] onde 1 = melhor
     """
 
@@ -95,7 +95,7 @@ class Metric:
 class CostComponents:
     """
     Componentes de custo
-    
+
     Todos normalizados para [0, ∞)
     """
 
@@ -115,7 +115,7 @@ class CostComponents:
     def total_normalized_cost(self) -> float:
         """
         Custo total normalizado
-        
+
         Soma ponderada de todos os custos normalizados
         """
         cost_time = self.time_seconds / self.time_budget
@@ -158,7 +158,7 @@ class LInfConfig:
 class EthicalGates:
     """
     Gates éticos (ΣEA ∧ IR→IC)
-    
+
     Se qualquer gate falhar e fail_closed=True, L∞ = 0
     """
 
@@ -225,9 +225,9 @@ def harmonic_mean_weighted(
 ) -> float:
     """
     Média harmônica ponderada
-    
+
     Formula: H = (Σ w_j) / (Σ w_j / max(ε, m_j))
-    
+
     Propriedade não-compensatória: se qualquer m_j → 0, então H → 0
     """
     if not metrics:
@@ -254,9 +254,9 @@ def geometric_mean_weighted(
 ) -> float:
     """
     Média geométrica ponderada
-    
+
     Formula: G = exp(Σ w_j · ln(max(ε, m_j)) / Σ w_j)
-    
+
     Também não-compensatória (multiplicativa)
     """
     if not metrics:
@@ -280,9 +280,9 @@ def min_soft_pnorm(
 ) -> float:
     """
     Aproximação soft do mínimo via p-norm negativo
-    
+
     Formula: (Σ w_j · m_j^p)^(1/p)
-    
+
     Para p << 0, aproxima min(m_j)
     """
     if not metrics:
@@ -318,13 +318,13 @@ def compute_linf_meta(
 ) -> tuple[float, dict[str, Any]]:
     """
     Calcula L∞ = (média_não_compensatória) · e^(-λ_c · Cost) · 1_{ΣEA ∧ IR→IC}
-    
+
     Args:
         metrics: Lista de métricas normalizadas m_j com pesos w_j
         cost: Componentes de custo
         ethical_gates: Gates éticos (ΣEA, IR→IC)
         config: Configuração da L∞
-    
+
     Returns:
         (linf_score, details_dict)
         - linf_score: Valor L∞ em [0, 1]
@@ -447,12 +447,12 @@ def compute_delta_linf(
 ) -> tuple[float, bool]:
     """
     Calcula ΔL∞ e verifica se atende crescimento mínimo
-    
+
     Args:
         linf_current: L∞ atual
         linf_previous: L∞ anterior
         beta_min: Crescimento mínimo exigido (default 1%)
-    
+
     Returns:
         (delta_linf, meets_threshold)
     """
@@ -470,7 +470,7 @@ def linf_sensitivity_analysis(
 ) -> dict[str, Any]:
     """
     Análise de sensibilidade da L∞
-    
+
     Testa o impacto de variações em cada métrica
     """
     if config is None:

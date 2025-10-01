@@ -84,7 +84,7 @@ def compute_caos_plus(
     C: float, A: float, O: float, S: float, kappa: float = 2.0, config: CAOSConfig | None = None
 ) -> tuple[float, dict[str, Any]]:
     """Compute CAOS⁺ with details.
-    
+
     This is the primary CAOS+ implementation. Returns tuple of (phi, details).
     For the alternative exponential formula CAOS⁺ = (1 + κ·C·A)^(O·S), use compute_caos_plus_exponential().
     """
@@ -105,14 +105,14 @@ def compute_caos_plus_exponential(C: float, A: float, O: float, S: float, kappa:
     """
     Alternative CAOS⁺ formula using pure exponential form:
     CAOS⁺ = (1 + κ·C·A)^(O·S)
-    
+
     This is monotonic in C, A, O, S; κ shifts the base.
     Historically used in engine/caos_plus.py, now consolidated here.
-    
+
     Args:
         C, A, O, S: CAOS components (0-1 range)
         kappa: Base amplification factor (default 20.0)
-    
+
     Returns:
         CAOS+ score (unbounded, typically > 1.0)
     """

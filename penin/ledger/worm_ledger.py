@@ -50,7 +50,7 @@ ENCODING = "utf-8"
 class ProofCarryingArtifact:
     """
     Proof-Carrying Artifact for auditable decision making.
-    
+
     Contains:
     - Decision ID and type
     - Metrics snapshot
@@ -164,7 +164,7 @@ class ProofCarryingArtifact:
 class WORMEvent:
     """
     Immutable event for WORM ledger.
-    
+
     Each event contains:
     - Event type and ID
     - UTC timestamp
@@ -265,7 +265,7 @@ class WORMEvent:
 class WORMLedger:
     """
     Write-Once-Read-Many immutable audit ledger.
-    
+
     Features:
     - Append-only JSONL storage
     - SHA-256 hash chain
@@ -273,12 +273,12 @@ class WORMLedger:
     - Chain integrity verification
     - PCAg support
     - UTC timestamps
-    
+
     Storage format:
     - One JSON object per line (JSONL)
     - Each event contains hash of previous event
     - Sequence numbers for ordering
-    
+
     Guarantees:
     - Immutability: no updates or deletes
     - Integrity: hash chain verification
@@ -289,7 +289,7 @@ class WORMLedger:
     def __init__(self, ledger_path: str | Path):
         """
         Initialize WORM ledger.
-        
+
         Args:
             ledger_path: Path to ledger file (JSONL)
         """
@@ -349,15 +349,15 @@ class WORMLedger:
     ) -> WORMEvent:
         """
         Append event to ledger.
-        
+
         Args:
             event_type: Type of event (e.g., "promote", "rollback")
             event_id: Unique event identifier
             payload: Event data (must be JSON-serializable)
-        
+
         Returns:
             Created WORMEvent
-        
+
         Raises:
             ValueError: If event data is invalid
             IOError: If write fails
@@ -396,10 +396,10 @@ class WORMLedger:
     def append_pcag(self, pcag: ProofCarryingArtifact) -> WORMEvent:
         """
         Append Proof-Carrying Artifact to ledger.
-        
+
         Args:
             pcag: ProofCarryingArtifact to append
-        
+
         Returns:
             Created WORMEvent
         """
@@ -420,7 +420,7 @@ class WORMLedger:
     def read_all(self) -> Iterator[WORMEvent]:
         """
         Read all events from ledger.
-        
+
         Yields:
             WORMEvent instances
         """
@@ -452,10 +452,10 @@ class WORMLedger:
     def read_by_type(self, event_type: str) -> Iterator[WORMEvent]:
         """
         Read events filtered by type.
-        
+
         Args:
             event_type: Event type to filter
-        
+
         Yields:
             Matching WORMEvent instances
         """
@@ -466,10 +466,10 @@ class WORMLedger:
     def read_by_id(self, event_id: str) -> Iterator[WORMEvent]:
         """
         Read events filtered by ID.
-        
+
         Args:
             event_id: Event ID to filter
-        
+
         Yields:
             Matching WORMEvent instances
         """
@@ -480,7 +480,7 @@ class WORMLedger:
     def verify_chain(self) -> tuple[bool, str | None]:
         """
         Verify integrity of entire hash chain.
-        
+
         Returns:
             Tuple of (is_valid, error_message)
         """
@@ -506,7 +506,7 @@ class WORMLedger:
     def compute_merkle_root(self) -> str | None:
         """
         Compute Merkle root of all event hashes.
-        
+
         Returns:
             Merkle root hash or None if ledger is empty
         """
@@ -530,7 +530,7 @@ class WORMLedger:
     def get_statistics(self) -> dict[str, Any]:
         """
         Get ledger statistics.
-        
+
         Returns:
             Dictionary with statistics
         """
@@ -557,7 +557,7 @@ class WORMLedger:
     def export_audit_report(self, output_path: str | Path) -> None:
         """
         Export full audit report.
-        
+
         Args:
             output_path: Path to output JSON file
         """
@@ -585,10 +585,10 @@ class WORMLedger:
 def create_worm_ledger(ledger_path: str | Path | None = None) -> WORMLedger:
     """
     Create WORM ledger with default path.
-    
+
     Args:
         ledger_path: Path to ledger file (default: ~/.penin_omega/worm.jsonl)
-    
+
     Returns:
         WORMLedger instance
     """
@@ -609,7 +609,7 @@ def create_pcag(
 ) -> ProofCarryingArtifact:
     """
     Create Proof-Carrying Artifact.
-    
+
     Args:
         decision_id: Unique decision identifier
         decision_type: Type of decision (promote, rollback, etc.)
@@ -618,7 +618,7 @@ def create_pcag(
         reason: Human-readable reason
         previous_hash: Hash of previous PCAg (for chaining)
         metadata: Additional metadata
-    
+
     Returns:
         ProofCarryingArtifact instance
     """
@@ -640,7 +640,7 @@ def create_pcag(
 def verify_ledger_cli(ledger_path: str | Path) -> None:
     """
     CLI helper to verify ledger integrity.
-    
+
     Args:
         ledger_path: Path to ledger file
     """

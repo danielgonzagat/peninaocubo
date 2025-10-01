@@ -80,7 +80,7 @@ class SpikingBrainConfig:
 class SpikingBrainAdapter(BaseIntegration):
     """
     Adapter for SpikingBrain-7B neuromorphic LLM
-    
+
     Provides 100× speedup for long-context inference.
     """
 
@@ -162,12 +162,12 @@ class SpikingBrainAdapter(BaseIntegration):
     ) -> tuple[str, dict[str, Any]]:
         """
         Generate text using spiking neural network
-        
+
         Args:
             prompt: Input prompt
             max_tokens: Maximum tokens to generate
             **kwargs: Additional generation parameters
-        
+
         Returns:
             (generated_text, metrics)
         """
@@ -210,12 +210,12 @@ class SpikingBrainAdapter(BaseIntegration):
     ) -> tuple[str, dict[str, Any]]:
         """
         Hybrid generation: SNN first, fallback to traditional if quality low
-        
+
         Args:
             prompt: Input prompt
             fallback_model: Traditional LLM for fallback
             **kwargs: Generation parameters
-        
+
         Returns:
             (generated_text, metrics)
         """
@@ -251,7 +251,7 @@ class SpikingBrainAdapter(BaseIntegration):
     def estimate_speedup(self, sequence_length: int) -> dict[str, float]:
         """
         Estimate speedup for given sequence length
-        
+
         SpikingBrain-7B shows 100× speedup for 4M tokens.
         Speedup increases with sequence length due to event-driven processing.
         """

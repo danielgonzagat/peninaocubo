@@ -3,7 +3,7 @@
 PENIN-Ω Core Module
 ===================
 
-Core implementation of the PENIN-Ω auto-evolution system with CAOS+, 
+Core implementation of the PENIN-Ω auto-evolution system with CAOS+,
 ethics metrics, and comprehensive evaluation modules.
 """
 
