@@ -483,7 +483,7 @@ def compute_caos_plus_exponential(
         ...     s=0.70,  # Silêncio moderado
         ...     kappa=35.0  # Agressivo
         ... )
-        >>> print(f"CAOS⁺ exploratório: {caos:.2f}")  # ~5.0-8.0
+        >>> print(f"CAOS⁺ exploratório: {caos:.2f}")  # ~3.2
         
         >>> # Exemplo 3: Uso típico em pipeline de evolução
         >>> from penin.core.caos import ConsistencyMetrics, AutoevolutionMetrics
