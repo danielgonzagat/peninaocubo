@@ -12,7 +12,6 @@ import pytest
 
 from penin.ethics.laws import (
     DecisionContext,
-    EthicsValidator,
     OriginLaw,
     ViolationSeverity,
     validate_decision_ethics,
