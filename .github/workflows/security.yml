@@ -36,7 +36,15 @@ jobs:
 
       - name: Install Syft
         run: |
-          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          SYFT_VERSION="v1.0.0"
+          SYFT_URL="https://github.com/anchore/syft/releases/download/${SYFT_VERSION}/syft_${SYFT_VERSION#v}_linux_amd64.tar.gz"
+          SYFT_SHA256_URL="https://github.com/anchore/syft/releases/download/${SYFT_VERSION}/syft_${SYFT_VERSION#v}_checksums.txt"
+          curl -sSL "$SYFT_URL" -o syft.tar.gz
+          curl -sSL "$SYFT_SHA256_URL" -o syft_checksums.txt
+          grep "syft_${SYFT_VERSION#v}_linux_amd64.tar.gz" syft_checksums.txt | sha256sum -c -
+          tar -xzf syft.tar.gz
+          install syft /usr/local/bin/syft
+          rm syft syft.tar.gz syft_checksums.txt
 
       - name: Generate SBOM with Syft
         run: |
