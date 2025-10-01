@@ -41,6 +41,9 @@ except Exception:  # fallback mínimo
         out.write_text(json.dumps(e, indent=2), encoding="utf-8")
         return out
     def jitter_metrics(m: dict, jitter: float=0.0, **_): return dict(m)
+    def git_reachable(url: str) -> bool:
+        # Fallback: always return False
+        return False
     _norm_url, repo_slug, load_worms, vectorize, novelty, global_mean_vector,
     latest_for_slug, content_hash, jitter_metrics, worm_write, git_reachable
 )
