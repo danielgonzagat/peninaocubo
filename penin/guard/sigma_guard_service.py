@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 
-
 app = FastAPI(title="Sigma-Guard", version="0.1.0")
 
 

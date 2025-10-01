@@ -1,6 +1,11 @@
 from __future__ import annotations
-import importlib, math, random, statistics as st
-from typing import Any, Dict
+
+import importlib
+import math
+import random
+import statistics as st
+from typing import Any
+
 
 class NeuroEvoHybrid:
     """
@@ -22,7 +27,7 @@ class NeuroEvoHybrid:
         except Exception:
             return None
 
-    def describe(self) -> Dict[str, Any]:
+    def describe(self) -> dict[str, Any]:
         deps = []
         if self._evox: deps.append("evox")
         if self._ray: deps.append("ray")
@@ -37,7 +42,7 @@ class NeuroEvoHybrid:
         }
 
     # ---------- runner principal ----------
-    def run(self, mode: str = "auto") -> Dict[str, float]:
+    def run(self, mode: str = "auto") -> dict[str, float]:
         if mode == "shadow":
             return self.run_shadow()
         if mode == "real" or (mode == "auto" and self._ray):
@@ -49,10 +54,9 @@ class NeuroEvoHybrid:
         return self.run_shadow()
 
     # ---------- modo real (Ray) ----------
-    def run_real(self) -> Dict[str, float]:
+    def run_real(self) -> dict[str, float]:
         # Execução real leve: avalia população em paralelo com Ray.
         # Se transformers estiver presente, usa um custo sintético por token p/ dar "textura".
-        import time
         ray = self._ray
         if not ray.is_initialized():
             ray.init(ignore_reinit_error=True, include_dashboard=False, logging_level="ERROR", local_mode=True)
@@ -92,7 +96,7 @@ class NeuroEvoHybrid:
         }
 
     # ---------- modo sombra (determinístico) ----------
-    def run_shadow(self) -> Dict[str, float]:
+    def run_shadow(self) -> dict[str, float]:
         caos_pre   = 0.72
         caos_pos   = 0.75
         delta_linf = 0.012

@@ -1,6 +1,6 @@
-from penin.engine.master_equation import MasterState, step_master
-from penin.engine.fibonacci import alpha_fib
 from penin.engine.caos_plus import compute_caos_plus
+from penin.engine.fibonacci import alpha_fib
+from penin.engine.master_equation import MasterState, step_master
 from penin.math.linf import linf_score
 
 

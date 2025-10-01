@@ -11,7 +11,7 @@ import asyncio
 from penin.config import settings
 from penin.providers.deepseek_provider import DeepSeekProvider
 from penin.providers.openai_provider import OpenAIProvider
-from penin.router import MultiLLMRouter
+from penin.router import MultiLLMRouterComplete as MultiLLMRouter
 
 
 async def main():
@@ -34,7 +34,7 @@ async def main():
     # Create router with budget
     router = MultiLLMRouter(providers, daily_budget_usd=5.0)
     print(f"\n📊 Router initialized with {len(providers)} provider(s)")
-    print(f"💰 Daily budget: $5.00\n")
+    print("💰 Daily budget: $5.00\n")
 
     # Test request
     print("📤 Sending request...")
@@ -57,7 +57,7 @@ async def main():
 
     # Show budget status
     budget_info = router.get_budget_status()
-    print(f"\n💰 Budget Status:")
+    print("\n💰 Budget Status:")
     print(f"   Spent today: ${budget_info['current_spend_usd']:.6f}")
     print(f"   Remaining: ${budget_info['remaining_usd']:.6f}")
     print(f"   Requests: {budget_info['request_count']}")

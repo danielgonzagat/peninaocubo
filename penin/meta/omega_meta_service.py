@@ -1,17 +1,17 @@
+from pathlib import Path
+from random import random
+from typing import Any
+
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import Dict, Any, Optional
-from random import random
 
 from penin.meta.guard_client import GuardClient, SRClient
 from penin.omega.caos import phi_caos
 from penin.omega.ledger import SQLiteWORMLedger, WORMEvent
-from pathlib import Path
-from penin.plugins.nextpy_adapter import propose_with_nextpy
-from penin.plugins.naslib_adapter import propose_with_naslib
 from penin.plugins.mammoth_adapter import continual_step_mammoth
+from penin.plugins.naslib_adapter import propose_with_naslib
+from penin.plugins.nextpy_adapter import propose_with_nextpy
 from penin.plugins.symbolicai_adapter import verify_with_symbolicai
-
 
 app = FastAPI(title="Omega-META", version="0.1.0")
 
@@ -89,7 +89,7 @@ class Proposal(BaseModel):
     kind: str
     expected_gain: float
     cost: float
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: dict[str, Any] | None = None
 
 
 @app.post("/meta/propose")
@@ -141,9 +141,9 @@ async def promote(pid: str, dlinf: float, caos_plus: float, sr: float, guard: Gu
 class PipelineInput(BaseModel):
     id: str
     plugin: str
-    payload: Dict[str, Any] = {}
-    caos_components: Dict[str, float] = {"C": 0.6, "A": 0.6, "O": 1.0, "S": 1.0}
-    sr_probe: Dict[str, float] = {"ece": 0.006, "rho": 0.95, "risk": 0.2, "dlinf_dc": 1.0}
+    payload: dict[str, Any] = {}
+    caos_components: dict[str, float] = {"C": 0.6, "A": 0.6, "O": 1.0, "S": 1.0}
+    sr_probe: dict[str, float] = {"ece": 0.006, "rho": 0.95, "risk": 0.2, "dlinf_dc": 1.0}
     guard_metrics: GuardMetrics
 
 

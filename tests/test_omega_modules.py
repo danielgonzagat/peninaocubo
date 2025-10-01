@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Test suite for PENIN-Ω Omega modules
 =====================================
@@ -12,10 +11,8 @@ Tests the new modular components:
 - SR-Ω∞ scoring
 """
 
-import sys
 import math
-import json
-from pathlib import Path
+import sys
 
 # Add workspace to path
 sys.path.insert(0, "/workspace")
@@ -103,7 +100,7 @@ def test_guards():
     print("\n[TEST] Guards (Σ-Guard and IR→IC)")
 
     try:
-        from penin.omega.guards import sigma_guard, ir_to_ic_contractive, SigmaGuardPolicy, combined_guard_check
+        from penin.omega.guards import SigmaGuardPolicy, combined_guard_check, ir_to_ic_contractive, sigma_guard
 
         # Test Σ-Guard with passing metrics
         good_metrics = {
@@ -170,15 +167,15 @@ def test_scoring():
 
     try:
         from penin.omega.scoring import (
-            normalize_series,
-            ema,
-            linf_harmonic,
-            score_gate,
+            ScoreTracker,
             ScoreVerdict,
-            harmonic_mean,
             aggregate_scores,
             compute_delta_linf,
-            ScoreTracker,
+            ema,
+            harmonic_mean,
+            linf_harmonic,
+            normalize_series,
+            score_gate,
         )
 
         # Test normalization
@@ -261,12 +258,12 @@ def test_caos():
 
     try:
         from penin.omega.caos import (
-            compute_caos_plus,
-            apply_saturation,
-            compute_caos_harmony,
-            caos_gradient,
             CAOSConfig,
             CAOSTracker,
+            apply_saturation,
+            caos_gradient,
+            compute_caos_harmony,
+            compute_caos_plus,
         )
 
         # Test basic CAOS⁺ computation
@@ -337,15 +334,15 @@ def test_sr():
 
     try:
         from penin.omega.sr import (
-            compute_sr_omega,
-            harmonic_mean,
-            geometric_mean,
-            min_soft_pnorm,
-            compute_awareness_score,
-            compute_autocorrection_score,
-            compute_metacognition_score,
             SRConfig,
             SRTracker,
+            compute_autocorrection_score,
+            compute_awareness_score,
+            compute_metacognition_score,
+            compute_sr_omega,
+            geometric_mean,
+            harmonic_mean,
+            min_soft_pnorm,
         )
 
         # Test basic SR computation

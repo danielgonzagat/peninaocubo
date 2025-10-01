@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Dict, List, Optional
 
 
 @dataclass
@@ -89,7 +88,7 @@ def compute_risk_entropy(
 def apply_Lpsi_operator(
     risk_profile: RiskProfile,
     rho: float,
-    policies: Optional[Dict[str, float]] = None,
+    policies: dict[str, float] | None = None,
 ) -> RiskProfile:
     """
     Apply L_ψ operator: risk reduction by factor ρ.

@@ -20,12 +20,11 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
-import time
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any
 
 try:
     import orjson
@@ -59,31 +58,31 @@ class ProofCarryingArtifact:
     - Hash proofs
     - Timestamp
     """
-    
+
     decision_id: str
     decision_type: str  # promote, rollback, canary, shadow, etc.
     timestamp: str
-    metrics: Dict[str, Any]
-    gates: Dict[str, Any]
+    metrics: dict[str, Any]
+    gates: dict[str, Any]
     reason: str
     artifact_hash: str
-    previous_hash: Optional[str] = None
-    metadata: Dict[str, Any] = field(default_factory=dict)
-    
+    previous_hash: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+
     @classmethod
     def create(
         cls,
         decision_id: str,
         decision_type: str,
-        metrics: Dict[str, Any],
-        gates: Dict[str, Any],
+        metrics: dict[str, Any],
+        gates: dict[str, Any],
         reason: str,
-        previous_hash: Optional[str] = None,
-        metadata: Optional[Dict[str, Any]] = None,
+        previous_hash: str | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> ProofCarryingArtifact:
         """Create new PCAg with computed hash."""
-        timestamp = datetime.now(timezone.utc).isoformat()
-        
+        timestamp = datetime.now(UTC).isoformat()
+
         # Compute hash
         data = {
             "decision_id": decision_id,
@@ -95,14 +94,14 @@ class ProofCarryingArtifact:
             "previous_hash": previous_hash,
             "metadata": metadata or {},
         }
-        
+
         if ORJSON_AVAILABLE:
             canonical = orjson.dumps(data, option=orjson.OPT_SORT_KEYS)
         else:
             canonical = json.dumps(data, sort_keys=True).encode()
-        
+
         artifact_hash = hashlib.sha256(canonical).hexdigest()
-        
+
         return cls(
             decision_id=decision_id,
             decision_type=decision_type,
@@ -114,8 +113,8 @@ class ProofCarryingArtifact:
             previous_hash=previous_hash,
             metadata=metadata or {},
         )
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "decision_id": self.decision_id,
@@ -128,7 +127,7 @@ class ProofCarryingArtifact:
             "previous_hash": self.previous_hash,
             "metadata": self.metadata,
         }
-    
+
     def verify_hash(self) -> bool:
         """Verify hash integrity."""
         data = {
@@ -141,15 +140,15 @@ class ProofCarryingArtifact:
             "previous_hash": self.previous_hash,
             "metadata": self.metadata,
         }
-        
+
         if ORJSON_AVAILABLE:
             canonical = orjson.dumps(data, option=orjson.OPT_SORT_KEYS)
         else:
             canonical = json.dumps(data, sort_keys=True).encode()
-        
+
         computed_hash = hashlib.sha256(canonical).hexdigest()
         return computed_hash == self.artifact_hash
-    
+
     def __str__(self) -> str:
         return (
             f"PCAg({self.decision_type}:{self.decision_id} "
@@ -173,27 +172,27 @@ class WORMEvent:
     - Hash (SHA-256 of canonical form)
     - Previous hash (for chain integrity)
     """
-    
+
     event_type: str
     event_id: str
     timestamp: str
-    payload: Dict[str, Any]
+    payload: dict[str, Any]
     event_hash: str
-    previous_hash: Optional[str] = None
+    previous_hash: str | None = None
     sequence_number: int = 0
-    
+
     @classmethod
     def create(
         cls,
         event_type: str,
         event_id: str,
-        payload: Dict[str, Any],
-        previous_hash: Optional[str] = None,
+        payload: dict[str, Any],
+        previous_hash: str | None = None,
         sequence_number: int = 0,
     ) -> WORMEvent:
         """Create new event with computed hash."""
-        timestamp = datetime.now(timezone.utc).isoformat()
-        
+        timestamp = datetime.now(UTC).isoformat()
+
         # Compute hash
         data = {
             "event_type": event_type,
@@ -203,14 +202,14 @@ class WORMEvent:
             "previous_hash": previous_hash,
             "sequence_number": sequence_number,
         }
-        
+
         if ORJSON_AVAILABLE:
             canonical = orjson.dumps(data, option=orjson.OPT_SORT_KEYS)
         else:
             canonical = json.dumps(data, sort_keys=True).encode()
-        
+
         event_hash = hashlib.sha256(canonical).hexdigest()
-        
+
         return cls(
             event_type=event_type,
             event_id=event_id,
@@ -220,8 +219,8 @@ class WORMEvent:
             previous_hash=previous_hash,
             sequence_number=sequence_number,
         )
-    
-    def to_dict(self) -> Dict[str, Any]:
+
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "event_type": self.event_type,
@@ -232,7 +231,7 @@ class WORMEvent:
             "previous_hash": self.previous_hash,
             "sequence_number": self.sequence_number,
         }
-    
+
     def verify_hash(self) -> bool:
         """Verify hash integrity."""
         data = {
@@ -243,15 +242,15 @@ class WORMEvent:
             "previous_hash": self.previous_hash,
             "sequence_number": self.sequence_number,
         }
-        
+
         if ORJSON_AVAILABLE:
             canonical = orjson.dumps(data, option=orjson.OPT_SORT_KEYS)
         else:
             canonical = json.dumps(data, sort_keys=True).encode()
-        
+
         computed_hash = hashlib.sha256(canonical).hexdigest()
         return computed_hash == self.event_hash
-    
+
     def __str__(self) -> str:
         return (
             f"WORMEvent({self.event_type}:{self.event_id} "
@@ -286,7 +285,7 @@ class WORMLedger:
     - Auditability: full provenance
     - Tamper-evidence: any modification breaks chain
     """
-    
+
     def __init__(self, ledger_path: str | Path):
         """
         Initialize WORM ledger.
@@ -295,38 +294,38 @@ class WORMLedger:
             ledger_path: Path to ledger file (JSONL)
         """
         self.ledger_path = Path(ledger_path)
-        self._last_hash: Optional[str] = None
+        self._last_hash: str | None = None
         self._sequence_number: int = 0
         self._ensure_initialized()
-    
+
     def _ensure_initialized(self) -> None:
         """Ensure ledger directory and file exist."""
         self.ledger_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         if not self.ledger_path.exists():
             # Create empty ledger with header
             header = {
                 "ledger_version": LEDGER_VERSION,
-                "created_at": datetime.now(timezone.utc).isoformat(),
+                "created_at": datetime.now(UTC).isoformat(),
                 "hash_algorithm": HASH_ALGORITHM,
             }
-            
+
             if ORJSON_AVAILABLE:
                 data = orjson.dumps(header)
             else:
                 data = json.dumps(header).encode()
-            
+
             self.ledger_path.write_bytes(data + b"\n")
         else:
             # Load last hash and sequence number
             self._load_metadata()
-    
+
     def _load_metadata(self) -> None:
         """Load last hash and sequence number from existing ledger."""
         try:
-            with open(self.ledger_path, "r", encoding=ENCODING) as f:
+            with open(self.ledger_path, encoding=ENCODING) as f:
                 lines = f.readlines()
-            
+
             if len(lines) > 1:  # Skip header
                 last_line = lines[-1].strip()
                 if last_line:
@@ -334,19 +333,19 @@ class WORMLedger:
                         data = orjson.loads(last_line)
                     else:
                         data = json.loads(last_line)
-                    
+
                     self._last_hash = data.get("event_hash")
                     self._sequence_number = data.get("sequence_number", 0)
         except Exception:
             # If loading fails, start fresh
             self._last_hash = None
             self._sequence_number = 0
-    
+
     def append(
         self,
         event_type: str,
         event_id: str,
-        payload: Dict[str, Any],
+        payload: dict[str, Any],
     ) -> WORMEvent:
         """
         Append event to ledger.
@@ -371,11 +370,11 @@ class WORMLedger:
             previous_hash=self._last_hash,
             sequence_number=self._sequence_number + 1,
         )
-        
+
         # Verify event integrity
         if not event.verify_hash():
             raise ValueError("Event hash verification failed")
-        
+
         # Write to ledger (append-only)
         try:
             with open(self.ledger_path, "a", encoding=ENCODING) as f:
@@ -383,17 +382,17 @@ class WORMLedger:
                     data = orjson.dumps(event.to_dict())
                 else:
                     data = json.dumps(event.to_dict()).encode()
-                
+
                 f.write(data.decode() + "\n")
         except Exception as e:
-            raise IOError(f"Failed to write to ledger: {e}")
-        
+            raise OSError(f"Failed to write to ledger: {e}")
+
         # Update metadata
         self._last_hash = event.event_hash
         self._sequence_number = event.sequence_number
-        
+
         return event
-    
+
     def append_pcag(self, pcag: ProofCarryingArtifact) -> WORMEvent:
         """
         Append Proof-Carrying Artifact to ledger.
@@ -407,7 +406,7 @@ class WORMLedger:
         # Verify PCAg integrity
         if not pcag.verify_hash():
             raise ValueError("PCAg hash verification failed")
-        
+
         # Create event from PCAg
         return self.append(
             event_type=f"pcag_{pcag.decision_type}",
@@ -417,7 +416,7 @@ class WORMLedger:
                 "artifact_hash": pcag.artifact_hash,
             }
         )
-    
+
     def read_all(self) -> Iterator[WORMEvent]:
         """
         Read all events from ledger.
@@ -427,29 +426,29 @@ class WORMLedger:
         """
         if not self.ledger_path.exists():
             return
-        
-        with open(self.ledger_path, "r", encoding=ENCODING) as f:
+
+        with open(self.ledger_path, encoding=ENCODING) as f:
             for line_num, line in enumerate(f, 1):
                 line = line.strip()
                 if not line:
                     continue
-                
+
                 # Skip header (first line)
                 if line_num == 1 and "ledger_version" in line:
                     continue
-                
+
                 try:
                     if ORJSON_AVAILABLE:
                         data = orjson.loads(line)
                     else:
                         data = json.loads(line)
-                    
+
                     event = WORMEvent(**data)
                     yield event
                 except Exception:
                     # Skip malformed lines
                     continue
-    
+
     def read_by_type(self, event_type: str) -> Iterator[WORMEvent]:
         """
         Read events filtered by type.
@@ -463,7 +462,7 @@ class WORMLedger:
         for event in self.read_all():
             if event.event_type == event_type:
                 yield event
-    
+
     def read_by_id(self, event_id: str) -> Iterator[WORMEvent]:
         """
         Read events filtered by ID.
@@ -477,8 +476,8 @@ class WORMLedger:
         for event in self.read_all():
             if event.event_id == event_id:
                 yield event
-    
-    def verify_chain(self) -> Tuple[bool, Optional[str]]:
+
+    def verify_chain(self) -> tuple[bool, str | None]:
         """
         Verify integrity of entire hash chain.
         
@@ -486,25 +485,25 @@ class WORMLedger:
             Tuple of (is_valid, error_message)
         """
         events = list(self.read_all())
-        
+
         if not events:
             return True, None
-        
+
         # Verify each event's hash
         for event in events:
             if not event.verify_hash():
                 return False, f"Event {event.sequence_number} has invalid hash"
-        
+
         # Verify chain integrity
         previous_hash = None
         for event in events:
             if event.previous_hash != previous_hash:
                 return False, f"Chain broken at event {event.sequence_number}"
             previous_hash = event.event_hash
-        
+
         return True, None
-    
-    def compute_merkle_root(self) -> Optional[str]:
+
+    def compute_merkle_root(self) -> str | None:
         """
         Compute Merkle root of all event hashes.
         
@@ -512,10 +511,10 @@ class WORMLedger:
             Merkle root hash or None if ledger is empty
         """
         hashes = [event.event_hash for event in self.read_all()]
-        
+
         if not hashes:
             return None
-        
+
         # Build Merkle tree
         while len(hashes) > 1:
             next_level = []
@@ -525,10 +524,10 @@ class WORMLedger:
                 combined = (left + right).encode()
                 next_level.append(hashlib.sha256(combined).hexdigest())
             hashes = next_level
-        
+
         return hashes[0]
-    
-    def get_statistics(self) -> Dict[str, Any]:
+
+    def get_statistics(self) -> dict[str, Any]:
         """
         Get ledger statistics.
         
@@ -536,13 +535,13 @@ class WORMLedger:
             Dictionary with statistics
         """
         events = list(self.read_all())
-        
+
         event_types = {}
         for event in events:
             event_types[event.event_type] = event_types.get(event.event_type, 0) + 1
-        
+
         is_valid, error = self.verify_chain()
-        
+
         return {
             "total_events": len(events),
             "last_sequence": self._sequence_number,
@@ -554,7 +553,7 @@ class WORMLedger:
             "ledger_path": str(self.ledger_path),
             "ledger_size_bytes": self.ledger_path.stat().st_size if self.ledger_path.exists() else 0,
         }
-    
+
     def export_audit_report(self, output_path: str | Path) -> None:
         """
         Export full audit report.
@@ -563,15 +562,15 @@ class WORMLedger:
             output_path: Path to output JSON file
         """
         report = {
-            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_at": datetime.now(UTC).isoformat(),
             "ledger_version": LEDGER_VERSION,
             "statistics": self.get_statistics(),
             "events": [event.to_dict() for event in self.read_all()],
         }
-        
+
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        
+
         if ORJSON_AVAILABLE:
             data = orjson.dumps(report, option=orjson.OPT_INDENT_2)
             output_path.write_bytes(data)
@@ -583,7 +582,7 @@ class WORMLedger:
 # Factory Functions
 # ============================================================================
 
-def create_worm_ledger(ledger_path: Optional[str | Path] = None) -> WORMLedger:
+def create_worm_ledger(ledger_path: str | Path | None = None) -> WORMLedger:
     """
     Create WORM ledger with default path.
     
@@ -595,18 +594,18 @@ def create_worm_ledger(ledger_path: Optional[str | Path] = None) -> WORMLedger:
     """
     if ledger_path is None:
         ledger_path = Path.home() / ".penin_omega" / "worm.jsonl"
-    
+
     return WORMLedger(ledger_path)
 
 
 def create_pcag(
     decision_id: str,
     decision_type: str,
-    metrics: Dict[str, Any],
-    gates: Dict[str, Any],
+    metrics: dict[str, Any],
+    gates: dict[str, Any],
     reason: str,
-    previous_hash: Optional[str] = None,
-    metadata: Optional[Dict[str, Any]] = None,
+    previous_hash: str | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> ProofCarryingArtifact:
     """
     Create Proof-Carrying Artifact.
@@ -647,27 +646,27 @@ def verify_ledger_cli(ledger_path: str | Path) -> None:
     """
     ledger = WORMLedger(ledger_path)
     stats = ledger.get_statistics()
-    
+
     print(f"WORM Ledger Analysis: {ledger_path}")
     print("=" * 60)
     print(f"Total Events: {stats['total_events']}")
     print(f"Last Sequence: {stats['last_sequence']}")
     print(f"Merkle Root: {stats['merkle_root']}")
     print(f"Chain Valid: {stats['chain_valid']}")
-    
+
     if not stats['chain_valid']:
         print(f"Chain Error: {stats['chain_error']}")
-    
+
     print("\nEvent Types:")
     for event_type, count in stats['event_types'].items():
         print(f"  {event_type}: {count}")
-    
+
     print(f"\nLedger Size: {stats['ledger_size_bytes']} bytes")
 
 
 if __name__ == "__main__":
     import sys
-    
+
     if len(sys.argv) > 1:
         verify_ledger_cli(sys.argv[1])
     else:

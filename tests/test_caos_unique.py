@@ -1,8 +1,6 @@
 """Teste para garantir unicidade de phi_caos em caos.py"""
 
-import importlib
-import types
-import penin.omega.caos as caos
+from penin.omega import caos
 
 
 def test_phi_caos_single_definition():

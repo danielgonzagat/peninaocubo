@@ -1,5 +1,4 @@
-import pytest
-from penin.policies import OPAPolicyEngine, evaluate_sigma_guard, evaluate_budget_policies, evaluate_evolution_policies
+from penin.policies import evaluate_budget_policies, evaluate_evolution_policies, evaluate_sigma_guard
 
 
 def test_sigma_guard_allow():

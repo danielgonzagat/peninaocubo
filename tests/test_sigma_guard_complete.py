@@ -9,7 +9,6 @@ import pytest
 from penin.guard.sigma_guard_complete import (
     GateStatus,
     SigmaGuard,
-    SigmaGuardVerdict,
 )
 
 

@@ -4,29 +4,27 @@ Orchestrates evolution with Life Equation gate and all safety mechanisms
 """
 
 import time
-import json
-from pathlib import Path
-from typing import Dict, Any, List, Optional
-from dataclasses import dataclass, asdict
-
-# Import all Vida+ modules
-from .life_eq import life_equation
-from .fractal import build_fractal, propagate_update, fractal_coherence
-from .swarm import heartbeat, sample_global_state, compute_swarm_coherence
-from .caos_kratos import phi_kratos, compute_exploration_metrics
-from .market import InternalMarket, Need, Offer
-from .neural_chain import add_block, verify_chain, get_latest_hash
-from .self_rag import ingest_text, query as rag_query, self_cycle
-from .api_metabolizer import record_call, suggest_replay
-from .immunity import guard as immunity_guard, detect_anomalies
-from .checkpoint import save_snapshot, restore_snapshot
-from .game import AdaptiveGAME
-from .darwin_audit import Variant, darwinian_score, select_survivors, EvolutionTracker
-from .zero_consciousness import comprehensive_consciousness_check
+from dataclasses import asdict, dataclass
+from typing import Any
 
 # Import existing modules
 from .caos import phi_caos
+from .caos_kratos import compute_exploration_metrics
+from .checkpoint import restore_snapshot, save_snapshot
+from .darwin_audit import EvolutionTracker, Variant, darwinian_score, select_survivors
+from .fractal import build_fractal, propagate_update
+from .game import AdaptiveGAME
+from .immunity import detect_anomalies
+from .immunity import guard as immunity_guard
+
+# Import all Vida+ modules
+from .life_eq import life_equation
+from .market import InternalMarket
+from .neural_chain import add_block, get_latest_hash, verify_chain
+from .self_rag import ingest_text, self_cycle
 from .sr import sr_omega
+from .swarm import compute_swarm_coherence, heartbeat, sample_global_state
+from .zero_consciousness import comprehensive_consciousness_check
 
 
 @dataclass
@@ -42,7 +40,7 @@ class VidaState:
     L_inf: float
     dL_inf: float
     spi: float
-    metrics: Dict[str, float]
+    metrics: dict[str, float]
     timestamp: float
 
 
@@ -52,7 +50,7 @@ class VidaPlusRunner:
     Implements complete Lemniscata 8+1 with fail-closed gates
     """
 
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: dict[str, Any] | None = None):
         """Initialize Vida+ system"""
         self.config = config or self._default_config()
 
@@ -72,12 +70,12 @@ class VidaPlusRunner:
         self.current_state = None
         self.checkpoint_id = None
         self.generation = 0
-        self.variants: List[Variant] = []
+        self.variants: list[Variant] = []
 
         # Initialize knowledge base
         self._init_knowledge_base()
 
-    def _default_config(self) -> Dict[str, Any]:
+    def _default_config(self) -> dict[str, Any]:
         """Default configuration"""
         return {
             "base_alpha": 1e-3,
@@ -289,7 +287,7 @@ class VidaPlusRunner:
                 },
             )
 
-    def _compute_metrics(self, swarm_state: Dict[str, float]) -> Dict[str, float]:
+    def _compute_metrics(self, swarm_state: dict[str, float]) -> dict[str, float]:
         """Compute current system metrics"""
         base_metrics = {
             "accuracy": 0.8 + self.generation * 0.01,
@@ -311,7 +309,7 @@ class VidaPlusRunner:
 
         return base_metrics
 
-    def _extract_caos_components(self, metrics: Dict[str, float]) -> tuple:
+    def _extract_caos_components(self, metrics: dict[str, float]) -> tuple:
         """Extract CAOS components from metrics"""
         C = metrics.get("coherence", 0.7)
         A = metrics.get("awareness", 0.8)
@@ -319,12 +317,12 @@ class VidaPlusRunner:
         S = metrics.get("stability", 0.9)
         return (C, A, O, S)
 
-    def _get_risk_series(self) -> Dict[str, float]:
+    def _get_risk_series(self) -> dict[str, float]:
         """Get risk time series"""
         # Simulated decreasing risk over generations
         return {f"r{i}": max(0.1, 0.9 - i * 0.05 - self.generation * 0.01) for i in range(3)}
 
-    def _get_action_history(self) -> List[str]:
+    def _get_action_history(self) -> list[str]:
         """Get recent action history"""
         return ["evolve", "checkpoint", "swarm_update", "rag_query", "evolve"]
 
@@ -344,7 +342,7 @@ class VidaPlusRunner:
             timestamp=time.time(),
         )
 
-    def run_canary(self, cycles: int = 5) -> Dict[str, Any]:
+    def run_canary(self, cycles: int = 5) -> dict[str, Any]:
         """
         Run canary test with multiple cycles
 
@@ -397,7 +395,7 @@ class VidaPlusRunner:
         }
 
         print(f"\n{'=' * 50}")
-        print(f"📊 CANARY SUMMARY")
+        print("📊 CANARY SUMMARY")
         print(f"{'=' * 50}")
         print(f"  Cycles: {summary['cycles_completed']}/{cycles}")
         print(f"  Success rate: {summary['successful_cycles']}/{summary['cycles_completed']}")

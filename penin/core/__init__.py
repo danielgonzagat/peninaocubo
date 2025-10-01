@@ -32,38 +32,38 @@ __version__ = "1.0.0-alpha"
 
 # Core CAOS+ module
 from .caos import (
-    # Enums
-    CAOSComponent,
-    CAOSFormula,
-    # Metrics
-    ConsistencyMetrics,
-    AutoevolutionMetrics,
-    IncognoscibleMetrics,
-    SilenceMetrics,
-    # Config & State
-    CAOSConfig,
-    CAOSState,
-    # Core computation functions
-    compute_caos_plus_exponential,
-    phi_caos,
-    compute_caos_plus_simple,
-    compute_caos_plus_complete,
-    # Compatibility wrappers
-    compute_caos_plus,
-    caos_plus,
-    # Helpers
-    clamp01,
-    clamp,
-    compute_ema_alpha,
-    harmonic_mean,
-    geometric_mean,
-    caos_gradient,
-    # Tracker
-    CAOSTracker,
+    DEFAULT_GAMMA,
+    DEFAULT_KAPPA,
     # Constants
     EPS,
-    DEFAULT_KAPPA,
-    DEFAULT_GAMMA,
+    AutoevolutionMetrics,
+    # Enums
+    CAOSComponent,
+    # Config & State
+    CAOSConfig,
+    CAOSFormula,
+    CAOSState,
+    # Tracker
+    CAOSTracker,
+    # Metrics
+    ConsistencyMetrics,
+    IncognoscibleMetrics,
+    SilenceMetrics,
+    caos_gradient,
+    caos_plus,
+    clamp,
+    # Helpers
+    clamp01,
+    # Compatibility wrappers
+    compute_caos_plus,
+    compute_caos_plus_complete,
+    # Core computation functions
+    compute_caos_plus_exponential,
+    compute_caos_plus_simple,
+    compute_ema_alpha,
+    geometric_mean,
+    harmonic_mean,
+    phi_caos,
 )
 
 # Public API

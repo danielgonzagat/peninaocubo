@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Any
 
 import requests
 
@@ -14,7 +14,7 @@ class GuardClient:
         except Exception:
             return False
 
-    def eval(self, metrics: Dict[str, Any]) -> Dict[str, Any]:
+    def eval(self, metrics: dict[str, Any]) -> dict[str, Any]:
         r = requests.post(f"{self.base}/sigma_guard/eval", json=metrics, timeout=5)
         r.raise_for_status()
         return r.json()
@@ -31,7 +31,7 @@ class SRClient:
         except Exception:
             return False
 
-    def eval(self, ece: float, rho: float, risk: float, dlinf_dc: float) -> Dict[str, Any]:
+    def eval(self, ece: float, rho: float, risk: float, dlinf_dc: float) -> dict[str, Any]:
         r = requests.post(
             f"{self.base}/sr/eval",
             json={"ece": ece, "rho": rho, "risk": risk, "dlinf_dc": dlinf_dc},

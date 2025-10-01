@@ -1,10 +1,13 @@
-import asyncio, time
+import asyncio
+import time
+
 from penin.providers.pricing import estimate_cost, get_first_available, get_pricing
+
 from .base import BaseProvider, LLMResponse, Message, Tool
 
 # SDK real pode não estar presente nos testes; os testes já monkeypatcham.
 try:  # pragma: no cover
-    from xai_sdk import Client, x_system, user
+    from xai_sdk import Client, user, x_system
 except Exception:  # pragma: no cover
 
     class Client:

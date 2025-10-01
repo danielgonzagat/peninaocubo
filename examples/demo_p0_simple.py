@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 Demonstração Simples do Sistema PENIN-Ω com Correções P0
 ========================================================
@@ -7,18 +6,19 @@ Demonstração Simples do Sistema PENIN-Ω com Correções P0
 Demonstra as correções P0 implementadas sem dependências externas.
 """
 
-import tempfile
 import sqlite3
+import tempfile
 import time
 from pathlib import Path
 
+from penin.omega.caos import quick_caos_phi
+
 # Imports dos módulos Omega
 from penin.omega.ethics_metrics import EthicsCalculator, EthicsGate
-from penin.omega.scoring import quick_harmonic, quick_score_gate
-from penin.omega.caos import quick_caos_phi
-from penin.omega.sr import quick_sr_harmonic
-from penin.omega.guards import quick_sigma_guard_check_simple, full_guard_check
+from penin.omega.guards import quick_sigma_guard_check_simple
 from penin.omega.ledger import WORMLedger
+from penin.omega.scoring import quick_harmonic, quick_score_gate
+from penin.omega.sr import quick_sr_harmonic
 
 
 def demo_ethics_calculation():

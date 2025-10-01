@@ -23,7 +23,7 @@ except (ImportError, AttributeError):
 
 # New complete implementations
 try:
-    from .linf_complete import compute_Linf, compute_delta_Linf, check_min_improvement
+    from .linf_complete import check_min_improvement, compute_delta_Linf, compute_Linf
 except ImportError:
     compute_Linf = None
     compute_delta_Linf = None
@@ -31,10 +31,10 @@ except ImportError:
 
 try:
     from .caos_plus_complete import (
-        compute_caos_plus,
         caos_plus_simple,
-        compute_C_consistency,
         compute_A_autoevolution,
+        compute_C_consistency,
+        compute_caos_plus,
         compute_O_unknowable,
         compute_S_silence,
     )
@@ -48,11 +48,11 @@ except ImportError:
 
 try:
     from .sr_omega_infinity import (
-        compute_sr_score,
         compute_alpha_effective,
-        compute_awareness,
         compute_autocorrection,
+        compute_awareness,
         compute_metacognition,
+        compute_sr_score,
     )
 except ImportError:
     compute_sr_score = None
@@ -63,10 +63,10 @@ except ImportError:
 
 try:
     from .vida_morte_gates import (
+        auto_tune_beta_min,
+        compute_lyapunov_quadratic,
         death_gate,
         life_gate_lyapunov,
-        compute_lyapunov_quadratic,
-        auto_tune_beta_min,
     )
 except ImportError:
     death_gate = None
@@ -77,9 +77,9 @@ except ImportError:
 try:
     from .ir_ic_contractivity import (
         RiskProfile,
-        compute_risk_entropy,
         apply_Lpsi_operator,
         check_contractivity,
+        compute_risk_entropy,
         iterative_refinement,
     )
 except ImportError:
@@ -91,11 +91,11 @@ except ImportError:
 
 try:
     from .penin_master_equation import (
-        penin_update,
-        master_equation_cycle,
         MasterEquationState,
-        project_to_safe_set,
         compute_phi_saturation,
+        master_equation_cycle,
+        penin_update,
+        project_to_safe_set,
     )
 except ImportError:
     penin_update = None

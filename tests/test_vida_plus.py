@@ -3,28 +3,27 @@ Comprehensive tests for Vida+ modules
 Tests all 13 new modules with integration scenarios
 """
 
-import pytest
-import time
 import sys
-import os
 from pathlib import Path
+
+import pytest
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from penin.omega.life_eq import life_equation, LifeVerdict
-from penin.omega.fractal import build_fractal, propagate_update, fractal_coherence
-from penin.omega.swarm import heartbeat, sample_global_state, compute_swarm_coherence
-from penin.omega.caos_kratos import phi_kratos, compute_exploration_metrics, kratos_gate
+from penin.omega.api_metabolizer import get_provider_stats, record_call, suggest_replay
+from penin.omega.caos_kratos import kratos_gate, phi_kratos
+from penin.omega.checkpoint import restore_snapshot, save_snapshot, verify_checkpoint
+from penin.omega.darwin_audit import Variant, darwinian_score, select_survivors
+from penin.omega.fractal import build_fractal, fractal_coherence, propagate_update
+from penin.omega.game import AdaptiveGAME, GradientTracker, ema_grad
+from penin.omega.immunity import anomaly_score, guard
+from penin.omega.life_eq import LifeVerdict, life_equation
 from penin.omega.market import InternalMarket, Need, Offer
-from penin.omega.neural_chain import add_block, verify_chain, get_latest_hash
+from penin.omega.neural_chain import add_block, get_latest_hash, verify_chain
 from penin.omega.self_rag import ingest_text, query, self_cycle
-from penin.omega.api_metabolizer import record_call, suggest_replay, get_provider_stats
-from penin.omega.immunity import anomaly_score, guard, detect_anomalies
-from penin.omega.checkpoint import save_snapshot, restore_snapshot, verify_checkpoint
-from penin.omega.game import ema_grad, GradientTracker, AdaptiveGAME
-from penin.omega.darwin_audit import darwinian_score, select_survivors, Variant
-from penin.omega.zero_consciousness import spi_proxy, assert_zero_consciousness, detect_self_reference
+from penin.omega.swarm import compute_swarm_coherence, heartbeat, sample_global_state
+from penin.omega.zero_consciousness import assert_zero_consciousness, detect_self_reference, spi_proxy
 
 
 class TestLifeEquation:

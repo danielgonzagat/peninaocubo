@@ -28,8 +28,9 @@ References:
 from __future__ import annotations
 
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 
@@ -49,7 +50,7 @@ class MasterEquationState:
 def estimate_gradient(
     state: np.ndarray,
     evidence: Any,
-    policies: Dict[str, Any],
+    policies: dict[str, Any],
     loss_fn: Callable,
     finite_diff_epsilon: float = 1e-4,
 ) -> np.ndarray:
@@ -85,9 +86,9 @@ def estimate_gradient(
 
 def project_to_safe_set(
     state: np.ndarray,
-    H_constraints: Optional[Dict[str, tuple]] = None,
-    S_constraints: Optional[Dict[str, Any]] = None,
-    clip_norm: Optional[float] = None,
+    H_constraints: dict[str, tuple] | None = None,
+    S_constraints: dict[str, Any] | None = None,
+    clip_norm: float | None = None,
 ) -> np.ndarray:
     """
     Project state onto feasible set Π_{H∩S}.
@@ -166,8 +167,8 @@ def penin_update(
     I_n: np.ndarray,
     G: np.ndarray,
     alpha_n: float,
-    H_constraints: Optional[Dict[str, tuple]] = None,
-    S_constraints: Optional[Dict[str, Any]] = None,
+    H_constraints: dict[str, tuple] | None = None,
+    S_constraints: dict[str, Any] | None = None,
 ) -> np.ndarray:
     """
     Execute one Master Equation update step.
@@ -203,14 +204,14 @@ def penin_update(
 def master_equation_cycle(
     state: MasterEquationState,
     evidence: Any,
-    policies: Dict[str, Any],
+    policies: dict[str, Any],
     loss_fn: Callable,
     alpha_0: float,
     caos_plus: float,
     sr_score: float,
     gamma: float = 0.8,
-    H_constraints: Optional[Dict[str, tuple]] = None,
-    S_constraints: Optional[Dict[str, Any]] = None,
+    H_constraints: dict[str, tuple] | None = None,
+    S_constraints: dict[str, Any] | None = None,
 ) -> MasterEquationState:
     """
     Execute complete Master Equation cycle.

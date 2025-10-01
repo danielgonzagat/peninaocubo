@@ -115,7 +115,7 @@ def get_first_available(usage: Any, *keys: str) -> int:
     """
     if not usage:
         return 0
-    
+
     # Try dict-like access
     if isinstance(usage, dict):
         for key in keys:
@@ -125,7 +125,7 @@ def get_first_available(usage: Any, *keys: str) -> int:
                 except (TypeError, ValueError):
                     continue
         return 0
-    
+
     # Try attribute access
     for key in keys:
         if hasattr(usage, key):
