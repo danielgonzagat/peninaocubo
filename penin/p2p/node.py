@@ -6,7 +6,6 @@ handle status queries, and exchange knowledge with other nodes.
 """
 
 import asyncio
-import json
 from typing import Any
 
 from penin.omega.sr import SROmegaService
@@ -16,7 +15,7 @@ from penin.p2p.protocol import MessageType, PeninMessage, PeninProtocol
 class PeninNode:
     """
     PENIN-Ω P2P Node
-    
+
     Handles P2P communication, including status queries and knowledge exchange.
     Integrates with SROmegaService to provide mental state introspection.
     """
@@ -24,7 +23,7 @@ class PeninNode:
     def __init__(self, node_id: str, sr_service: SROmegaService | None = None):
         """
         Initialize PENIN node
-        
+
         Args:
             node_id: Unique identifier for this node
             sr_service: Optional SROmegaService instance (creates new one if not provided)
@@ -34,7 +33,7 @@ class PeninNode:
         self.sr_service = sr_service or SROmegaService()
         self.peers: dict[str, dict[str, Any]] = {}
         self.status_responses: dict[str, dict[str, Any]] = {}  # Store responses by peer_id
-        
+
         # Register message handlers
         self._register_handlers()
 
@@ -48,29 +47,29 @@ class PeninNode:
     async def _handle_status_query(self, message: PeninMessage) -> PeninMessage:
         """
         Handle incoming status query by returning mental state
-        
+
         Args:
             message: Incoming status query message
-            
+
         Returns:
             Status response message with mental state
         """
         # Get mental state from SR service
         mental_state = self.sr_service.get_mental_state()
-        
+
         # Create response
         return self.protocol.create_status_response(mental_state)
 
     async def _handle_status_response(self, message: PeninMessage) -> None:
         """
         Handle incoming status response
-        
+
         Args:
             message: Status response message containing mental state
         """
         sender_id = message.sender_id
         mental_state = message.payload.get("mental_state", {})
-        
+
         # Store response
         self.status_responses[sender_id] = {
             "mental_state": mental_state,
@@ -80,10 +79,10 @@ class PeninNode:
     async def _handle_heartbeat(self, message: PeninMessage) -> PeninMessage:
         """
         Handle heartbeat message
-        
+
         Args:
             message: Heartbeat message
-            
+
         Returns:
             Heartbeat response
         """
@@ -92,21 +91,21 @@ class PeninNode:
     async def query_peer_status(self, peer_id: str, timeout: float = 5.0) -> dict[str, Any] | None:
         """
         Query the mental state of a peer node
-        
+
         Args:
             peer_id: ID of the peer to query
             timeout: Timeout in seconds
-            
+
         Returns:
             Mental state dictionary or None if query failed
         """
         # Create status query
-        query = self.protocol.create_status_query(peer_id)
-        
+        self.protocol.create_status_query(peer_id)
+
         # In a real implementation, this would send via network
         # For now, we simulate the response handling
         # This is a placeholder that would be replaced with actual network code
-        
+
         # Wait for response (in real implementation, this would wait for network response)
         start_time = asyncio.get_event_loop().time()
         while asyncio.get_event_loop().time() - start_time < timeout:
@@ -114,16 +113,16 @@ class PeninNode:
                 response = self.status_responses.pop(peer_id)
                 return response["mental_state"]
             await asyncio.sleep(0.1)
-        
+
         return None
 
     async def handle_message(self, message: PeninMessage) -> PeninMessage | None:
         """
         Handle incoming message
-        
+
         Args:
             message: Incoming message
-            
+
         Returns:
             Response message or None
         """

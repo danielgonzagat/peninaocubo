@@ -9,7 +9,7 @@ import json
 import time
 from dataclasses import asdict, dataclass
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 
 class MessageType(str, Enum):
