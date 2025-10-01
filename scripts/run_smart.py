@@ -65,11 +65,13 @@ def main():
             "--population", str(args.pop),
             "--generations", str(args.gen),
             "--jitter", str(args.jitter),
-        ]
-        subprocess.run(cmd, check=False)
+        try:
+            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as e:
+            print(f"   ❌ Error processing {url}: {e}")
+            print(f"   stderr: {e.stderr}")
+            continue
         # ler novidade do último WORM do slug
-        last = latest_for_slug(slug)
-        nov = ((last or {}).get("novelty") or {}).get("vs_global")
         if nov is not None:
             roll.append(nov)
             if len(roll) > args.stop_window:
