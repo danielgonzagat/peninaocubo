@@ -3,7 +3,7 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![Tests](https://img.shields.io/badge/tests-57%20passing-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/tests-68%20passing-brightgreen.svg)](tests/)
 [![IA³](https://img.shields.io/badge/IA%C2%B3-Production%20Beta-success.svg)](docs/architecture.md)
 
 **PENIN-Ω** is a self-evolving AI system implementing the Master Equation with CAOS+, SR-Ω∞, and L∞ aggregation for ethical, auditable, and production-ready machine learning operations.
@@ -22,7 +22,7 @@
 4. **🛡️ Ethically Bounded**: Fail-closed gates (ΣEA/LO-14, Σ-Guard) that block violations
 5. **📊 Auditable**: WORM ledger, Proof-Carrying Artifacts (PCAg), cryptographic proofs
 
-**PENIN-Ω implements all 5 pillars** with **15 mathematical equations**, **3 SOTA integrations**, and **57 passing tests**.
+**PENIN-Ω implements all 5 pillars** with **15 mathematical equations**, **3 SOTA integrations**, and **68 passing tests** (including 11 chaos engineering tests).
 
 ---
 
@@ -203,11 +203,14 @@ peninaocubo/
 ├── examples/                 # Usage examples
 │   └── demo_60s_complete.py  [60s Demo] ✅
 │
-├── tests/                    # Test suite (57 passing)
+├── tests/                    # Test suite (68 passing)
 │   ├── integrations/         # SOTA integration tests (37 tests)
 │   ├── test_caos*.py         # CAOS+ tests
 │   ├── test_omega*.py        # Omega module tests
-│   └── test_router*.py       # Router tests
+│   ├── test_router*.py       # Router tests
+│   ├── test_chaos_engineering.py  # Chaos engineering tests (11 tests) 🌪️
+│   ├── chaos_utils.py        # Chaos testing utilities
+│   └── CHAOS_TESTING.md      # Chaos testing documentation
 │
 ├── docs/                     # Documentation
 │   ├── architecture.md       [1100+ lines, comprehensive]
@@ -225,8 +228,9 @@ peninaocubo/
 
 ## 🧪 Testing
 
+### **Core Tests**
 ```bash
-# Run core + integration tests (57 tests)
+# Run core + integration tests (68 tests total)
 pytest tests/integrations/ tests/test_caos*.py tests/test_omega*.py \
        tests/test_router*.py tests/test_cache*.py -v
 
@@ -239,13 +243,41 @@ pytest tests/integrations/test_spikingjelly.py -v
 pytest --cov=penin --cov-report=term-missing
 ```
 
+### **🌪️ Chaos Engineering Tests**
+Comprehensive resilience testing to validate fail-closed guarantees:
+
+```bash
+# Run all chaos tests (11 tests)
+pytest tests/test_chaos_engineering.py -v
+
+# Run quick chaos tests only
+pytest tests/test_chaos_engineering.py -m "chaos and not slow" -v
+
+# Run with Toxiproxy for realistic network chaos
+docker-compose -f deploy/docker-compose.chaos.yml up
+pytest tests/test_chaos_engineering.py -v
+
+# Use helper script
+./scripts/run_chaos_tests.sh --full --verbose
+```
+
+**Chaos Scenarios**:
+1. 💀 **Service Death**: Kill Σ-Guard during validation → promotion fails safely
+2. 🐌 **Network Latency**: Inject delays between services → timeouts handled correctly
+3. 🗑️ **Data Corruption**: Send malformed data → system remains stable
+4. 🌊 **Combined Failures**: Multiple simultaneous failures → fail-closed maintained
+5. 🔒 **Fail-Closed Guarantee**: Core principle validated across all scenarios
+
+See [Chaos Testing Guide](tests/CHAOS_TESTING.md) for details.
+
 **Test Results**:
-- ✅ **57/57 critical tests passing (100%)**
-- ✅ NextPy AMS: 9/9 tests
-- ✅ Metacognitive-Prompting: 17/17 tests
-- ✅ SpikingJelly: 11/11 tests
-- ✅ CAOS+ & L∞: 10/10 tests
-- ✅ Router & Cache: 10/10 tests
+- ✅ **68/68 tests passing (100%)**
+  - ✅ NextPy AMS: 9/9 tests
+  - ✅ Metacognitive-Prompting: 17/17 tests
+  - ✅ SpikingJelly: 11/11 tests
+  - ✅ **Chaos Engineering: 11/11 tests** 🌪️
+  - ✅ CAOS+ & L∞: 10/10 tests
+  - ✅ Router & Cache: 10/10 tests
 
 ---
 
