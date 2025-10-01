@@ -426,17 +426,17 @@ def compute_caos_plus_exponential(
 
         >>> # Exemplo 2: Alta consistência e autoevolução, baixa incerteza
         >>> compute_caos_plus_exponential(c=0.9, a=0.5, o=0.2, s=0.8, kappa=20.0)
-        1.7863...  # Amplificação moderada
+        1.4454...  # Amplificação moderada (expoente baixo O·S=0.16)
 
         >>> # Exemplo 3: Alta incerteza → exploração mais agressiva
         >>> compute_caos_plus_exponential(c=0.8, a=0.4, o=0.8, s=0.9, kappa=20.0)
-        2.8457...  # Amplificação alta devido a O·S = 0.72
+        4.2252...  # Amplificação ALTA devido a O·S = 0.72
 
         >>> # Exemplo 4: Efeito de κ na amplificação
         >>> compute_caos_plus_exponential(c=0.7, a=0.3, o=0.5, s=0.5, kappa=10.0)
-        1.5396...
+        1.3269...
         >>> compute_caos_plus_exponential(c=0.7, a=0.3, o=0.5, s=0.5, kappa=50.0)
-        2.4492...  # Maior κ → maior amplificação
+        1.8415...  # Maior κ → maior amplificação
 
     Uso no Pipeline PENIN-Ω
     -----------------------
@@ -525,21 +525,21 @@ def phi_caos(
     Examples:
         >>> # Exemplo 1: Valores baixos → phi próximo de zero
         >>> phi_caos(c=0.1, a=0.1, o=0.1, s=0.1, kappa=2.0, gamma=0.7)
-        0.0020...
+        0.0001...
 
         >>> # Exemplo 2: Valores moderados
         >>> phi_caos(c=0.7, a=0.5, o=0.6, s=0.8, kappa=2.0, gamma=0.7)
-        0.4523...
+        0.1764...
 
         >>> # Exemplo 3: Valores altos → saturação próxima de 1
         >>> phi_caos(c=0.9, a=0.9, o=0.9, s=0.9, kappa=10.0, gamma=0.7)
-        0.8912...
+        0.8489...
 
         >>> # Exemplo 4: Efeito do parâmetro gamma
         >>> phi_caos(c=0.8, a=0.6, o=0.7, s=0.7, kappa=5.0, gamma=0.3)  # suave
-        0.4156...
+        0.1780...
         >>> phi_caos(c=0.8, a=0.6, o=0.7, s=0.7, kappa=5.0, gamma=1.5)  # íngreme
-        0.7821...
+        0.7160...
 
     Nota:
         Esta fórmula é mantida para compatibilidade com código histórico
