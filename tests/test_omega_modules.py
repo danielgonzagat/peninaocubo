@@ -44,7 +44,6 @@ def test_ethics_metrics():
         assert 0 <= ece <= 1, "ECE should be in [0,1]"
 
         # Test bias ratio
-        group_outcomes = {"group_a": [0.8, 0.85, 0.9], "group_b": [0.6, 0.65, 0.7], "group_c": [0.75, 0.8, 0.85]}
 
         calc = EthicsCalculator()
         rho_bias, bias_details = calc.calculate_bias_ratio(predictions, labels, [g for g, _ in groups])

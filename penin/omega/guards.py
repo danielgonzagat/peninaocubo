@@ -258,14 +258,6 @@ class SigmaGuard:
 
         try:
             # Calcular métricas éticas reais
-            config = {
-                "ethics": {
-                    "ece_max": self.ece_max,
-                    "rho_bias_max": self.rho_bias_max,
-                    "consent_required": self.require_consent,
-                    "eco_ok_required": self.require_eco,
-                }
-            }
 
             # Use provided metrics directly for now
             metrics = state_dict

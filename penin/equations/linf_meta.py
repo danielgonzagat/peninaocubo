@@ -238,9 +238,7 @@ def harmonic_mean_weighted(
         return 0.0
 
     # Soma ponderada de 1/m_j
-    denominator = sum(
-        m.weight / max(epsilon, m.value) for m in metrics
-    )
+    denominator = sum(m.weight / max(epsilon, m.value) for m in metrics)
 
     if denominator <= epsilon:
         return 0.0
@@ -266,9 +264,7 @@ def geometric_mean_weighted(
     if total_weight <= 0:
         return 0.0
 
-    log_sum = sum(
-        m.weight * math.log(max(epsilon, m.value)) for m in metrics
-    )
+    log_sum = sum(m.weight * math.log(max(epsilon, m.value)) for m in metrics)
 
     return math.exp(log_sum / total_weight)
 
@@ -299,9 +295,7 @@ def min_soft_pnorm(
         return max(epsilon, min_val)
 
     # p-norm
-    powered_sum = sum(
-        m.weight * (max(epsilon, m.value) ** p) for m in metrics
-    )
+    powered_sum = sum(m.weight * (max(epsilon, m.value) ** p) for m in metrics)
 
     if powered_sum <= 0:
         return epsilon
@@ -360,9 +354,7 @@ def compute_linf_meta(
 
     # 3. Verificar thresholds mínimos (opcional)
     if config.min_metric_threshold > 0:
-        below_threshold = [
-            m.name for m in valid_metrics if m.value < config.min_metric_threshold
-        ]
+        below_threshold = [m.name for m in valid_metrics if m.value < config.min_metric_threshold]
         if below_threshold and config.fail_closed:
             details["error"] = "metrics_below_threshold"
             details["below_threshold"] = below_threshold
@@ -485,7 +477,7 @@ def linf_sensitivity_analysis(
     }
 
     # Testar cada métrica
-    for i, metric in enumerate(metrics):
+    for _i, metric in enumerate(metrics):
         original_value = metric.value
 
         # Teste: reduzir métrica em 10%
@@ -506,13 +498,15 @@ def linf_sensitivity_analysis(
 
         elasticity = (avg_delta / linf_base) / 0.1 if linf_base > 0 else 0.0
 
-        sensitivity["metric_sensitivities"].append({
-            "metric_name": metric.name,
-            "elasticity": elasticity,
-            "linf_down": linf_down,
-            "linf_up": linf_up,
-            "impact": "high" if abs(elasticity) > 0.5 else "medium" if abs(elasticity) > 0.2 else "low",
-        })
+        sensitivity["metric_sensitivities"].append(
+            {
+                "metric_name": metric.name,
+                "elasticity": elasticity,
+                "linf_down": linf_down,
+                "linf_up": linf_up,
+                "impact": "high" if abs(elasticity) > 0.5 else "medium" if abs(elasticity) > 0.2 else "low",
+            }
+        )
 
     return sensitivity
 

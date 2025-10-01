@@ -10,7 +10,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
-    from penin.integrations.base import BaseIntegrationAdapter, IntegrationStatus
+    from penin.integrations.base import BaseIntegrationAdapter
 
 logger = logging.getLogger(__name__)
 

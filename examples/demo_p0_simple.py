@@ -27,12 +27,6 @@ def demo_ethics_calculation():
     print("=" * 50)
 
     # Estado simulado do sistema
-    state_dict = {
-        "consent": True,
-        "eco": True,
-        "rho": 0.7,
-        "risk_history": [1.0, 0.8, 0.6, 0.5],  # Série contrativa
-    }
 
     # Configuração de thresholds
     config = {"ethics": {"ece_max": 0.01, "rho_bias_max": 1.05, "consent_required": True, "eco_ok_required": True}}

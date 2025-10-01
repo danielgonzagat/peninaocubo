@@ -6,7 +6,6 @@ Validates basic functionality and expected behavior ranges.
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from penin.equations import (
     AnabolizationConfig,
@@ -21,8 +20,8 @@ from penin.equations import (
     OCIConfig,
     OmegaSEAConfig,
     PeninState,
-    SRConfig,
     SigmaGuardConfig,
+    SRConfig,
     anabolize_penin,
     auto_tune_hyperparams,
     compute_agape_index,
@@ -158,9 +157,15 @@ class TestEquation07ACFAEPV:
         """Smoke test: EPV value function"""
         state = "state_A"
         action = "action_X"
-        reward_fn = lambda s, a: 1.0
-        transition_fn = lambda s, a: {"state_B": 1.0}
-        value_fn = lambda s: 0.5
+
+        def reward_fn(s, a):
+            return 1.0
+
+        def transition_fn(s, a):
+            return {"state_B": 1.0}
+
+        def value_fn(s):
+            return 0.5
 
         config = EPVConfig(gamma=0.9)
         epv = expected_possession_value(state, action, reward_fn, transition_fn, value_fn, config)
@@ -269,9 +274,7 @@ class TestEquation15SigmaGuardGate:
 
     def test_all_pass(self):
         """Smoke test: Σ-Guard passing all conditions"""
-        config = SigmaGuardConfig(
-            rho_max=1.0, ece_max=0.01, bias_max=1.05, consent_required=True, eco_ok_required=True
-        )
+        config = SigmaGuardConfig(rho_max=1.0, ece_max=0.01, bias_max=1.05, consent_required=True, eco_ok_required=True)
 
         metrics = {
             "rho": 0.95,

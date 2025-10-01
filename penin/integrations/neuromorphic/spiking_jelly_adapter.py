@@ -117,6 +117,7 @@ class SpikingJellyAdapter(BaseIntegration):
         """Check if SpikingJelly is installed"""
         try:
             import spikingjelly
+
             self.spikingjelly_available = True
             return True
         except ImportError:
@@ -133,10 +134,12 @@ class SpikingJellyAdapter(BaseIntegration):
             # Create neuron model
             if self.snn_config.neuron_type == "LIF":
                 from spikingjelly.activation_based.neuron import LIFNode
+
                 self.neuron_class = LIFNode
             else:
                 logger.warning(f"Neuron type {self.snn_config.neuron_type} not yet supported, using LIF")
                 from spikingjelly.activation_based.neuron import LIFNode
+
                 self.neuron_class = LIFNode
 
             # Create encoder/decoder
@@ -144,12 +147,14 @@ class SpikingJellyAdapter(BaseIntegration):
             self.decoder = self._create_decoder()
 
             self.initialized = True
-            self.log_event({
-                "event": "spiking_jelly_initialized",
-                "neuron_type": self.snn_config.neuron_type,
-                "encoding": self.snn_config.encoding_type,
-                "time_steps": self.snn_config.time_steps,
-            })
+            self.log_event(
+                {
+                    "event": "spiking_jelly_initialized",
+                    "neuron_type": self.snn_config.neuron_type,
+                    "encoding": self.snn_config.encoding_type,
+                    "time_steps": self.snn_config.time_steps,
+                }
+            )
 
             logger.info("SpikingJelly initialized successfully")
             return True
@@ -175,10 +180,12 @@ class SpikingJellyAdapter(BaseIntegration):
 
     def _create_decoder(self):
         """Create output decoder"""
+
         # Simple rate decoder: count spikes
         def rate_decoder(spikes):
             """Decode spike train as firing rate"""
             import torch
+
             return torch.mean(spikes, dim=0)  # Average over time
 
         return rate_decoder
@@ -203,17 +210,19 @@ class SpikingJellyAdapter(BaseIntegration):
 
             # Convert model
             snn_model = ann2snn.Converter(
-                mode='max',
+                mode="max",
                 dataloader=None,  # Can provide calibration data
             ).convert(ann_model)
 
             self.snn_model = snn_model
 
-            self.log_event({
-                "event": "ann_to_snn_conversion",
-                "input_shape": input_shape,
-                "model_layers": len(list(ann_model.modules())),
-            })
+            self.log_event(
+                {
+                    "event": "ann_to_snn_conversion",
+                    "input_shape": input_shape,
+                    "model_layers": len(list(ann_model.modules())),
+                }
+            )
 
             return snn_model
 
@@ -252,7 +261,7 @@ class SpikingJellyAdapter(BaseIntegration):
             spike_outputs = []
             spike_counts = []
 
-            for t in range(self.snn_config.time_steps):
+            for _t in range(self.snn_config.time_steps):
                 spike_out = model(spike_input)
                 spike_outputs.append(spike_out)
                 spike_counts.append(torch.sum(spike_out).item())
@@ -276,10 +285,12 @@ class SpikingJellyAdapter(BaseIntegration):
 
             # Log if configured
             if self.snn_config.log_spike_patterns:
-                self.log_event({
-                    "event": "snn_forward",
-                    "metrics": metrics,
-                })
+                self.log_event(
+                    {
+                        "event": "snn_forward",
+                        "metrics": metrics,
+                    }
+                )
 
             return output, metrics
 
@@ -348,27 +359,33 @@ class SpikingJellyAdapter(BaseIntegration):
         checks = []
 
         # LO-01: No anthropomorphism
-        checks.append({
-            "law": "LO-01",
-            "check": "no_anthropomorphism",
-            "passed": True,
-            "note": "SNNs are computational models, not biological neurons",
-        })
+        checks.append(
+            {
+                "law": "LO-01",
+                "check": "no_anthropomorphism",
+                "passed": True,
+                "note": "SNNs are computational models, not biological neurons",
+            }
+        )
 
         # LO-04: IR→IC (contractivity)
         # SNNs initially increase uncertainty but should converge
-        checks.append({
-            "law": "LO-04",
-            "check": "contractivity",
-            "passed": True,  # Needs runtime validation
-            "note": "Requires ρ<1 validation during operation",
-        })
+        checks.append(
+            {
+                "law": "LO-04",
+                "check": "contractivity",
+                "passed": True,  # Needs runtime validation
+                "note": "Requires ρ<1 validation during operation",
+            }
+        )
 
         # Logging
-        checks.append({
-            "check": "worm_logging",
-            "passed": self.snn_config.log_spike_patterns,
-        })
+        checks.append(
+            {
+                "check": "worm_logging",
+                "passed": self.snn_config.log_spike_patterns,
+            }
+        )
 
         all_passed = all(c["passed"] for c in checks)
 

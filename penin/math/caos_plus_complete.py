@@ -225,9 +225,7 @@ def compute_caos_plus(
     caos_plus = max(1.0, caos_plus)
 
     if return_components:
-        components = CAOSComponents(
-            C=C, A=A, O=O, S=S, kappa=kappa, base=base, exponent=exponent, caos_plus=caos_plus
-        )
+        components = CAOSComponents(C=C, A=A, O=O, S=S, kappa=kappa, base=base, exponent=exponent, caos_plus=caos_plus)
         return caos_plus, components
 
     return caos_plus, None

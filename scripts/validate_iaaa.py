@@ -147,7 +147,10 @@ def test_basic_functionality() -> bool:
                 return linf  # Placeholder
 
             new_state, update_info = penin_update(
-                state, evidence, policy, constraints,
+                state,
+                evidence,
+                policy,
+                constraints,
                 objective_fn=simple_objective,
                 caos_phi=0.5,
                 sr_score=0.85,
@@ -156,7 +159,7 @@ def test_basic_functionality() -> bool:
 
             print(f"✅ Update: {update_info['action']}")
             print(f"   - State changed: {update_info['state_changed']}")
-            if 'alpha_eff' in update_info:
+            if "alpha_eff" in update_info:
                 print(f"   - α_eff: {update_info['alpha_eff']:.6f}")
 
         return True
@@ -235,7 +238,7 @@ def test_ethical_fail_closed() -> bool:
         cost = CostComponents()
         gates_bad = EthicalGates(
             rho_contractivity=1.5,  # VIOLAÇÃO!
-            consent=False,          # VIOLAÇÃO!
+            consent=False,  # VIOLAÇÃO!
         )
         config = LInfConfig(fail_closed=True)
 
@@ -274,6 +277,7 @@ def test_worm_ledger() -> bool:
 
         # Modificar temporariamente LEDGER para teste
         import penin.ledger.worm_ledger as worm
+
         original_ledger = worm.LEDGER
         worm.LEDGER = test_ledger
 
@@ -328,7 +332,7 @@ def test_mathematical_guarantees() -> bool:
         print("Teste 1: Contratividade Lyapunov...")
         state_current = np.array([1.0, 2.0, 3.0])
         state_next_good = np.array([0.9, 1.8, 2.7])  # Mais perto de 0
-        state_next_bad = np.array([1.1, 2.2, 3.3])   # Mais longe de 0
+        state_next_bad = np.array([1.1, 2.2, 3.3])  # Mais longe de 0
 
         is_contractive, V_curr, V_next = lyapunov_check(state_current, state_next_good)
         if is_contractive and V_next < V_curr:
@@ -396,7 +400,8 @@ def test_mathematical_guarantees() -> bool:
 
 def main():
     """Run all validation tests"""
-    print("""
+    print(
+        """
 ╔══════════════════════════════════════════════════════════════════╗
 ║                                                                  ║
 ║              PENIN-Ω IAAA Validation Suite                       ║
@@ -407,7 +412,8 @@ def main():
 ║                      Version 1.0.0                               ║
 ║                                                                  ║
 ╚══════════════════════════════════════════════════════════════════╝
-    """)
+    """
+    )
 
     results = {}
 

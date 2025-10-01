@@ -31,6 +31,7 @@ except ImportError:
 @dataclass
 class SigmaGuardConfig:
     """Configuration for Σ-Guard."""
+
     rho_threshold: float = 1.0
     ece_threshold: float = 0.01
     bias_rho_threshold: float = 1.05
@@ -38,10 +39,7 @@ class SigmaGuardConfig:
     require_eco_ok: bool = True
 
 
-def sigma_guard_check(
-    metrics: dict[str, float],
-    config: SigmaGuardConfig | None = None
-) -> tuple[bool, str]:
+def sigma_guard_check(metrics: dict[str, float], config: SigmaGuardConfig | None = None) -> tuple[bool, str]:
     """
     Execute Σ-Guard gate (fail-closed).
 

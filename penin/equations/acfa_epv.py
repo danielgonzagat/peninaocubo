@@ -39,6 +39,7 @@ from typing import Any
 @dataclass
 class EPVConfig:
     """Configuration for EPV computation."""
+
     gamma: float = 0.95  # Discount factor
     max_iterations: int = 100
     convergence_epsilon: float = 1e-4
@@ -48,6 +49,7 @@ class EPVConfig:
 @dataclass
 class State:
     """Represents a system state."""
+
     config: dict[str, Any]
     metrics: dict[str, float]
     timestamp: float
@@ -56,6 +58,7 @@ class State:
 @dataclass
 class Action:
     """Represents a mutation/action."""
+
     type: str  # "param_update", "arch_change", "policy_update"
     delta: dict[str, Any]
     cost_estimate: float
@@ -66,7 +69,7 @@ def expected_possession_value(
     actions: list[Action],
     reward_fn: Callable[[State, Action], float],
     transition_fn: Callable[[State, Action], list[tuple[State, float]]],
-    config: EPVConfig | None = None
+    config: EPVConfig | None = None,
 ) -> dict[Action, float]:
     """
     Compute EPV for each action from given state.
@@ -97,8 +100,7 @@ def expected_possession_value(
 
         # Expected future value
         transitions = transition_fn(state, action)
-        future_value = sum(prob * _value_estimate(next_state, config)
-                          for next_state, prob in transitions)
+        future_value = sum(prob * _value_estimate(next_state, config) for next_state, prob in transitions)
 
         # Total EPV
         epv = immediate_reward + config.gamma * future_value
@@ -119,11 +121,7 @@ def _value_estimate(state: State, config: EPVConfig) -> float:
 
 
 def compute_q_values(
-    state: State,
-    actions: list[Action],
-    reward_fn: Callable,
-    transition_fn: Callable,
-    config: EPVConfig | None = None
+    state: State, actions: list[Action], reward_fn: Callable, transition_fn: Callable, config: EPVConfig | None = None
 ) -> dict[tuple[State, Action], float]:
     """
     Compute Q(s, a) values for state-action pairs.
@@ -144,17 +142,13 @@ def compute_q_values(
     for action in actions:
         q = reward_fn(state, action)
         transitions = transition_fn(state, action)
-        q += config.gamma * sum(prob * _value_estimate(next_state, config)
-                                for next_state, prob in transitions)
+        q += config.gamma * sum(prob * _value_estimate(next_state, config) for next_state, prob in transitions)
         q_values[(state, action)] = q
 
     return q_values
 
 
-def extract_policy(
-    epv_scores: dict[Action, float],
-    exploration_rate: float = 0.0
-) -> Action:
+def extract_policy(epv_scores: dict[Action, float], exploration_rate: float = 0.0) -> Action:
     """
     Extract greedy policy from EPV scores (with optional ε-greedy).
 

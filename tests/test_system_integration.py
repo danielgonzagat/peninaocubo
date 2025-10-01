@@ -123,7 +123,7 @@ def test_router_with_observability():
         metrics_bind_host="127.0.0.1",
         enable_json_logs=True,
     )
-    obs = ObservabilityManager(obs_config)
+    ObservabilityManager(obs_config)
     print("✓ Observability configured")
 
     # Make requests
@@ -169,7 +169,7 @@ def test_scoring_integration():
     # Step 2: Calculate CAOS+
     caos_result = caos_plus(coherence=0.85, awareness=0.90, openness=0.75, stability=0.88, kappa=1.5, gamma=2.0)
     # caos_plus returns a dict with 'phi' key
-    caos_score = caos_result['phi'] if isinstance(caos_result, dict) else caos_result
+    caos_score = caos_result["phi"] if isinstance(caos_result, dict) else caos_result
     print(f"✓ CAOS⁺ score: {caos_score:.4f}")
 
     # Step 3: Calculate SR
@@ -212,7 +212,8 @@ def test_ledger_operations():
         conn.execute("PRAGMA busy_timeout=3000")
 
         # Create schema
-        conn.execute("""
+        conn.execute(
+            """
             CREATE TABLE IF NOT EXISTS events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp REAL NOT NULL,
@@ -222,7 +223,8 @@ def test_ledger_operations():
                 hash TEXT NOT NULL,
                 prev_hash TEXT
             )
-        """)
+        """
+        )
 
         print("✓ Ledger created with WAL mode")
 

@@ -34,24 +34,28 @@ from dataclasses import dataclass, field
 @dataclass
 class AutoTuningConfig:
     """Configuration for auto-tuning."""
+
     eta_base: float = 0.1  # Base learning rate
     grad_clip: float = 1.0  # Gradient clipping threshold
     warmup_steps: int = 10  # Steps before enabling tuning
     epsilon: float = 1e-8  # Numerical stability
 
     # Bounds for hyperparameters
-    bounds: dict[str, tuple[float, float]] = field(default_factory=lambda: {
-        "kappa": (20.0, 100.0),
-        "lambda_c": (0.1, 2.0),
-        "beta_min": (0.001, 0.1),
-        "alpha_base": (0.01, 0.5),
-        "gamma_saturation": (0.5, 1.5),
-    })
+    bounds: dict[str, tuple[float, float]] = field(
+        default_factory=lambda: {
+            "kappa": (20.0, 100.0),
+            "lambda_c": (0.1, 2.0),
+            "beta_min": (0.001, 0.1),
+            "alpha_base": (0.01, 0.5),
+            "gamma_saturation": (0.5, 1.5),
+        }
+    )
 
 
 @dataclass
 class HyperparamState:
     """State tracker for a hyperparameter."""
+
     name: str
     current_value: float
     grad_sum_squares: float = 0.0
@@ -72,24 +76,14 @@ class AutoTuner:
         self.hyperparams: dict[str, HyperparamState] = {}
         self.meta_loss_history: list = []
 
-    def register_hyperparam(
-        self,
-        name: str,
-        initial_value: float
-    ) -> None:
+    def register_hyperparam(self, name: str, initial_value: float) -> None:
         """Register a hyperparameter for tuning."""
         if name in self.hyperparams:
             return
 
-        self.hyperparams[name] = HyperparamState(
-            name=name,
-            current_value=initial_value
-        )
+        self.hyperparams[name] = HyperparamState(name=name, current_value=initial_value)
 
-    def compute_meta_loss(
-        self,
-        metrics: dict[str, float]
-    ) -> float:
+    def compute_meta_loss(self, metrics: dict[str, float]) -> float:
         """
         Compute meta-loss (higher = worse hyperparameters).
 
@@ -105,22 +99,12 @@ class AutoTuner:
         gate_failures = metrics.get("gate_failures", 0.0)
 
         # Weighted sum (tunable)
-        meta_loss = (
-            0.4 * linf_variance +
-            0.3 * convergence_time +
-            0.2 * caos_variance +
-            0.1 * gate_failures
-        )
+        meta_loss = 0.4 * linf_variance + 0.3 * convergence_time + 0.2 * caos_variance + 0.1 * gate_failures
 
         self.meta_loss_history.append(meta_loss)
         return meta_loss
 
-    def estimate_gradient(
-        self,
-        hyperparam_name: str,
-        loss_fn: Callable[[float], float],
-        delta: float = 1e-4
-    ) -> float:
+    def estimate_gradient(self, hyperparam_name: str, loss_fn: Callable[[float], float], delta: float = 1e-4) -> float:
         """
         Estimate gradient via finite differences.
 
@@ -149,11 +133,7 @@ class AutoTuner:
 
         return grad
 
-    def update_hyperparam(
-        self,
-        name: str,
-        gradient: float
-    ) -> float:
+    def update_hyperparam(self, name: str, gradient: float) -> float:
         """
         Update hyperparameter using AdaGrad-style adaptive learning rate.
 
@@ -175,7 +155,7 @@ class AutoTuner:
             return state.current_value
 
         # Accumulate squared gradients
-        state.grad_sum_squares += gradient ** 2
+        state.grad_sum_squares += gradient**2
 
         # Adaptive learning rate (AdaGrad)
         eta_t = self.config.eta_base / (1.0 + state.grad_sum_squares + self.config.epsilon)
@@ -197,10 +177,7 @@ class AutoTuner:
 
     def get_current_values(self) -> dict[str, float]:
         """Get current values of all hyperparameters."""
-        return {
-            name: state.current_value
-            for name, state in self.hyperparams.items()
-        }
+        return {name: state.current_value for name, state in self.hyperparams.items()}
 
     def get_diagnostics(self) -> dict:
         """Get tuning diagnostics for observability."""
@@ -218,9 +195,7 @@ class AutoTuner:
 
 
 def auto_tune_hyperparams(
-    current_hyperparams: dict[str, float],
-    metrics: dict[str, float],
-    config: AutoTuningConfig | None = None
+    current_hyperparams: dict[str, float], metrics: dict[str, float], config: AutoTuningConfig | None = None
 ) -> dict[str, float]:
     """
     One-shot auto-tuning function (stateless wrapper).

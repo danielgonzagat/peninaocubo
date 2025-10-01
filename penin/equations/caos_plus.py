@@ -80,11 +80,7 @@ class ConsistencyMetrics:
         ext_norm = max(0.0, min(1.0, self.external_verification))
 
         # Média ponderada
-        c = (
-            self.weight_pass * pass_norm
-            + self.weight_ece * ece_norm
-            + self.weight_external * ext_norm
-        )
+        c = self.weight_pass * pass_norm + self.weight_ece * ece_norm + self.weight_external * ext_norm
 
         return max(0.0, min(1.0, c))
 
@@ -163,11 +159,7 @@ class IncognoscibleMetrics:
         ens_norm = max(0.0, min(1.0, self.ensemble_disagreement))
 
         # Média ponderada
-        o = (
-            self.weight_epistemic * epist_norm
-            + self.weight_ood * ood_norm
-            + self.weight_ensemble * ens_norm
-        )
+        o = self.weight_epistemic * epist_norm + self.weight_ood * ood_norm + self.weight_ensemble * ens_norm
 
         return max(0.0, min(1.0, o))
 
@@ -349,7 +341,7 @@ def compute_caos_plus_raw(
     exponent = o * s
 
     # CAOS⁺
-    caos_plus = base ** exponent
+    caos_plus = base**exponent
 
     return caos_plus
 
@@ -448,9 +440,7 @@ def compute_caos_plus_complete(
     # 8. Normalizar saída (opcional, para [0, 1])
     if config.normalize_output:
         # Normalizar CAOS⁺ de [caos_min, caos_max] para [0, 1]
-        caos_normalized = (caos_plus_clamped - config.caos_min) / (
-            config.caos_max - config.caos_min
-        )
+        caos_normalized = (caos_plus_clamped - config.caos_min) / (config.caos_max - config.caos_min)
         caos_plus_final = max(0.0, min(1.0, caos_normalized))
         details["caos_plus_normalized"] = caos_plus_final
     else:
@@ -554,15 +544,15 @@ def example_caos_computation():
     state = CAOSState()
 
     # Computar CAOS⁺
-    caos_plus, details = compute_caos_plus_complete(
-        consistency, autoevolution, incognoscible, silence, config, state
-    )
+    caos_plus, details = compute_caos_plus_complete(consistency, autoevolution, incognoscible, silence, config, state)
 
     print(f"CAOS⁺ = {caos_plus:.4f}")
-    print(f"Components (smoothed): C={details['components_smoothed']['C']:.3f}, "
-          f"A={details['components_smoothed']['A']:.3f}, "
-          f"O={details['components_smoothed']['O']:.3f}, "
-          f"S={details['components_smoothed']['S']:.3f}")
+    print(
+        f"Components (smoothed): C={details['components_smoothed']['C']:.3f}, "
+        f"A={details['components_smoothed']['A']:.3f}, "
+        f"O={details['components_smoothed']['O']:.3f}, "
+        f"S={details['components_smoothed']['S']:.3f}"
+    )
     print(f"κ = {details['kappa']:.1f}")
 
     return caos_plus, details

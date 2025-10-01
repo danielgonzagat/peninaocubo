@@ -23,21 +23,20 @@ except ImportError:
 @dataclass
 class OCIConfig:
     """Configuration for OCI."""
+
     min_closure_threshold: float = 0.80
 
 
 @dataclass
 class Dependency:
     """Represents a dependency edge."""
+
     from_node: str
     to_node: str
     is_closed: bool  # Has feedback loop
 
 
-def organizational_closure_index(
-    dependencies: list[Dependency],
-    config: OCIConfig | None = None
-) -> tuple[float, bool]:
+def organizational_closure_index(dependencies: list[Dependency], config: OCIConfig | None = None) -> tuple[float, bool]:
     """
     Compute OCI from dependency graph.
 

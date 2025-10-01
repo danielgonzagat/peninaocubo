@@ -215,7 +215,7 @@ def estimate_gradient(
             value_minus = objective_fn(state_minus, evidence)
 
             # Gradient estimate
-            grad += noise * (value_plus - value_minus) / (2 * sigma ** 2)
+            grad += noise * (value_plus - value_minus) / (2 * sigma**2)
 
         grad /= n_samples
         return grad
@@ -277,7 +277,7 @@ def project_to_safe_set(
         projected.parameters = projected.parameters * (constraints.max_norm / current_norm)
 
     # 3. Verificações éticas (S ético) - FAIL-CLOSED
-    for constraint_name, constraint_fn in constraints.ethical_constraints.items():
+    for _constraint_name, constraint_fn in constraints.ethical_constraints.items():
         try:
             is_valid = constraint_fn(projected)
             if not is_valid:
@@ -382,16 +382,12 @@ def penin_update(
 
     try:
         # 1. Estimar G(I_t, E_t; P_t) - direção de melhoria
-        gradient = estimate_gradient(
-            state, evidence, policy, objective_fn, policy.gradient_method
-        )
+        gradient = estimate_gradient(state, evidence, policy, objective_fn, policy.gradient_method)
         gradient_norm = float(np.linalg.norm(gradient))
         update_info["gradient_norm"] = gradient_norm
 
         # 2. Calcular α_t^{eff} - passo adaptativo
-        alpha_eff = compute_adaptive_step_size(
-            policy.base_alpha, caos_phi, sr_score, r_score
-        )
+        alpha_eff = compute_adaptive_step_size(policy.base_alpha, caos_phi, sr_score, r_score)
         update_info["alpha_eff"] = alpha_eff
         update_info["caos_phi"] = caos_phi
         update_info["sr_score"] = sr_score
@@ -403,9 +399,7 @@ def penin_update(
         candidate_state.timestamp = state.timestamp + 1.0
 
         # 4. Projetar em H ∩ S: Π_{H∩S}[I']
-        projected_state, is_valid = project_to_safe_set(
-            candidate_state, constraints, allow_reject=True
-        )
+        projected_state, is_valid = project_to_safe_set(candidate_state, constraints, allow_reject=True)
 
         update_info["projection_valid"] = is_valid
 

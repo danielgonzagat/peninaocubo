@@ -28,6 +28,7 @@ from typing import Any
 
 try:
     import orjson
+
     ORJSON_AVAILABLE = True
 except ImportError:
     ORJSON_AVAILABLE = False
@@ -45,6 +46,7 @@ ENCODING = "utf-8"
 # ============================================================================
 # Proof-Carrying Artifact (PCAg)
 # ============================================================================
+
 
 @dataclass
 class ProofCarryingArtifact:
@@ -150,15 +152,13 @@ class ProofCarryingArtifact:
         return computed_hash == self.artifact_hash
 
     def __str__(self) -> str:
-        return (
-            f"PCAg({self.decision_type}:{self.decision_id} "
-            f"@ {self.timestamp} → {self.artifact_hash[:8]}...)"
-        )
+        return f"PCAg({self.decision_type}:{self.decision_id} " f"@ {self.timestamp} → {self.artifact_hash[:8]}...)"
 
 
 # ============================================================================
 # WORM Event
 # ============================================================================
+
 
 @dataclass
 class WORMEvent:
@@ -252,15 +252,13 @@ class WORMEvent:
         return computed_hash == self.event_hash
 
     def __str__(self) -> str:
-        return (
-            f"WORMEvent({self.event_type}:{self.event_id} "
-            f"#{self.sequence_number} @ {self.timestamp})"
-        )
+        return f"WORMEvent({self.event_type}:{self.event_id} " f"#{self.sequence_number} @ {self.timestamp})"
 
 
 # ============================================================================
 # WORM Ledger
 # ============================================================================
+
 
 class WORMLedger:
     """
@@ -414,7 +412,7 @@ class WORMLedger:
             payload={
                 "pcag": pcag.to_dict(),
                 "artifact_hash": pcag.artifact_hash,
-            }
+            },
         )
 
     def read_all(self) -> Iterator[WORMEvent]:
@@ -582,6 +580,7 @@ class WORMLedger:
 # Factory Functions
 # ============================================================================
 
+
 def create_worm_ledger(ledger_path: str | Path | None = None) -> WORMLedger:
     """
     Create WORM ledger with default path.
@@ -637,6 +636,7 @@ def create_pcag(
 # CLI Helper (for manual inspection)
 # ============================================================================
 
+
 def verify_ledger_cli(ledger_path: str | Path) -> None:
     """
     CLI helper to verify ledger integrity.
@@ -654,11 +654,11 @@ def verify_ledger_cli(ledger_path: str | Path) -> None:
     print(f"Merkle Root: {stats['merkle_root']}")
     print(f"Chain Valid: {stats['chain_valid']}")
 
-    if not stats['chain_valid']:
+    if not stats["chain_valid"]:
         print(f"Chain Error: {stats['chain_error']}")
 
     print("\nEvent Types:")
-    for event_type, count in stats['event_types'].items():
+    for event_type, count in stats["event_types"].items():
         print(f"  {event_type}: {count}")
 
     print(f"\nLedger Size: {stats['ledger_size_bytes']} bytes")

@@ -39,6 +39,7 @@ from penin.math.sr_omega_infinity import (
 @dataclass
 class SRConfig:
     """Configuration for SR-Ω∞ computation."""
+
     alpha_base: float = 0.1
     gamma_saturation: float = 0.8
     epsilon: float = 1e-6
@@ -46,11 +47,7 @@ class SRConfig:
 
 
 def compute_sr_omega_infinity(
-    awareness: float,
-    ethics_ok: bool,
-    autocorrection: float,
-    metacognition: float,
-    config: SRConfig | None = None
+    awareness: float, ethics_ok: bool, autocorrection: float, metacognition: float, config: SRConfig | None = None
 ) -> float:
     """
     Compute SR-Ω∞ score using harmonic mean.

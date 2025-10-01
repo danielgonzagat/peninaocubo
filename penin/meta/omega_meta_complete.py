@@ -69,8 +69,10 @@ ROLLBACK_TRIGGERS = [
 # Enums
 # ============================================================================
 
+
 class MutationType(str, Enum):
     """Type of mutation."""
+
     PARAMETER_TUNING = "parameter_tuning"
     ARCHITECTURE_TWEAK = "architecture_tweak"
     ALGORITHM_SWAP = "algorithm_swap"
@@ -79,6 +81,7 @@ class MutationType(str, Enum):
 
 class DeploymentStage(str, Enum):
     """Deployment stage."""
+
     SHADOW = "shadow"
     CANARY = "canary"
     ROLLOUT = "rollout"
@@ -87,6 +90,7 @@ class DeploymentStage(str, Enum):
 
 class MutationStatus(str, Enum):
     """Status of mutation."""
+
     PROPOSED = "proposed"
     SHADOW = "shadow"
     CANARY = "canary"
@@ -98,6 +102,7 @@ class MutationStatus(str, Enum):
 # ============================================================================
 # Mutation
 # ============================================================================
+
 
 @dataclass
 class Mutation:
@@ -176,6 +181,7 @@ class Mutation:
 # Mutation Generator
 # ============================================================================
 
+
 class MutationGenerator:
     """
     Generate safe code mutations.
@@ -222,6 +228,7 @@ class MutationGenerator:
             if isinstance(value, (int, float)):
                 # Add random perturbation
                 import random
+
                 if self.seed:
                     random.seed(self.seed + self._mutation_counter)
                 delta = value * perturbation * (random.random() * 2 - 1)
@@ -264,7 +271,7 @@ class MutationGenerator:
 
         # Parse AST
         try:
-            tree = ast.parse(original_code)
+            ast.parse(original_code)
         except SyntaxError:
             raise ValueError(f"Cannot parse code for {function_name}")
 
@@ -310,9 +317,7 @@ class MutationGenerator:
         # Get function signature
         sig = inspect.signature(function)
         parameters = {
-            name: param.default
-            for name, param in sig.parameters.items()
-            if param.default != inspect.Parameter.empty
+            name: param.default for name, param in sig.parameters.items() if param.default != inspect.Parameter.empty
         }
 
         # Generate parameter tuning
@@ -326,6 +331,7 @@ class MutationGenerator:
 # ============================================================================
 # Champion-Challenger Framework
 # ============================================================================
+
 
 @dataclass
 class ChallengerEvaluation:
@@ -682,6 +688,7 @@ class ChampionChallengerFramework:
 # Ω-META Orchestrator
 # ============================================================================
 
+
 class OmegaMeta:
     """
     Complete Ω-META orchestrator.
@@ -806,6 +813,7 @@ class OmegaMeta:
 # ============================================================================
 # Factory Function
 # ============================================================================
+
 
 def create_omega_meta(
     ledger_path: str | Path | None = None,
