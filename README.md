@@ -1,4 +1,4 @@
-# PENIN-Ω — Lemniscata 8+1 Auto-Evolution System
+# PENIN-Ω — Lemniscata ∞̸ Auto-Evolution System
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
