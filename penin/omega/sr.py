@@ -8,6 +8,7 @@ não-compensatório onde uma dimensão baixa compromete o score total.
 """
 
 import math
+import time
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -842,3 +843,187 @@ class SRTracker:
             return "declining"
         else:
             return "stable"
+
+
+@dataclass
+class Recommendation:
+    """Represents a recommendation made by SR-Omega"""
+
+    recommendation_id: str
+    task: str
+    timestamp: float
+    expected_sr: float
+    metadata: dict[str, Any]
+
+
+@dataclass
+class Outcome:
+    """Represents the outcome of a recommendation"""
+
+    recommendation_id: str
+    success: bool
+    timestamp: float
+    actual_sr: float | None
+    message: str
+
+
+class SROmegaService:
+    """
+    SR-Omega Service - Tracks mental state and provides introspection capabilities
+    
+    This service maintains state about:
+    - Pending recommendations that haven't been reported back on
+    - Recent outcomes (success/failure) of recommendations
+    - Current concerns (tasks/metrics with low success rates)
+    """
+
+    def __init__(self, max_pending: int = 100, max_outcomes: int = 50):
+        """
+        Initialize SR-Omega service
+        
+        Args:
+            max_pending: Maximum number of pending recommendations to track
+            max_outcomes: Maximum number of recent outcomes to track
+        """
+        self.pending_recommendations: list[Recommendation] = []
+        self.recent_outcomes: list[Outcome] = []
+        self.max_pending = max_pending
+        self.max_outcomes = max_outcomes
+        self.sr_tracker = SRTracker()
+        self.task_success_rates: dict[str, dict[str, Any]] = {}
+
+    def add_recommendation(
+        self, recommendation_id: str, task: str, expected_sr: float, metadata: dict[str, Any] | None = None
+    ) -> None:
+        """
+        Add a new recommendation to pending list
+        
+        Args:
+            recommendation_id: Unique identifier for the recommendation
+            task: Task name or description
+            expected_sr: Expected SR score
+            metadata: Additional metadata about the recommendation
+        """
+        rec = Recommendation(
+            recommendation_id=recommendation_id,
+            task=task,
+            timestamp=time.time(),
+            expected_sr=expected_sr,
+            metadata=metadata or {},
+        )
+        self.pending_recommendations.append(rec)
+
+        # Limit size
+        if len(self.pending_recommendations) > self.max_pending:
+            self.pending_recommendations.pop(0)
+
+    def report_outcome(
+        self, recommendation_id: str, success: bool, actual_sr: float | None = None, message: str = ""
+    ) -> None:
+        """
+        Report the outcome of a recommendation
+        
+        Args:
+            recommendation_id: ID of the recommendation
+            success: Whether the recommendation was successful
+            actual_sr: Actual SR score achieved (if available)
+            message: Additional message about the outcome
+        """
+        # Extract task name before removing from pending
+        task_name = None
+        for rec in self.pending_recommendations:
+            if rec.recommendation_id == recommendation_id:
+                task_name = rec.task
+                break
+
+        # Remove from pending
+        self.pending_recommendations = [r for r in self.pending_recommendations if r.recommendation_id != recommendation_id]
+
+        # Add to outcomes
+        outcome = Outcome(
+            recommendation_id=recommendation_id,
+            success=success,
+            timestamp=time.time(),
+            actual_sr=actual_sr,
+            message=message,
+        )
+        self.recent_outcomes.append(outcome)
+
+        # Limit size
+        if len(self.recent_outcomes) > self.max_outcomes:
+            self.recent_outcomes.pop(0)
+
+        # Update task success rates
+        if task_name:
+            self._update_task_success_rate(task_name, success)
+
+    def _update_task_success_rate(self, task: str, success: bool) -> None:
+        """Update success rate tracking for a task"""
+        if task not in self.task_success_rates:
+            self.task_success_rates[task] = {"total": 0, "successes": 0, "rate": 0.0}
+
+        self.task_success_rates[task]["total"] += 1
+        if success:
+            self.task_success_rates[task]["successes"] += 1
+
+        total = self.task_success_rates[task]["total"]
+        successes = self.task_success_rates[task]["successes"]
+        self.task_success_rates[task]["rate"] = successes / total if total > 0 else 0.0
+
+    def get_mental_state(self) -> dict[str, Any]:
+        """
+        Get the current mental state of the SR-Omega service
+        
+        Returns:
+            Dictionary containing:
+            - pending_recommendations: List of pending recommendations
+            - recent_outcomes: Log of recent outcomes
+            - current_concerns: List of tasks/metrics with low success rates
+        """
+        # Identify current concerns (tasks with low success rates)
+        concerns = []
+        for task, stats in self.task_success_rates.items():
+            if stats["total"] >= 3 and stats["rate"] < 0.5:  # At least 3 attempts and <50% success
+                concerns.append(
+                    {
+                        "task": task,
+                        "success_rate": stats["rate"],
+                        "total_attempts": stats["total"],
+                        "severity": "high" if stats["rate"] < 0.3 else "medium",
+                    }
+                )
+
+        # Format pending recommendations
+        pending_list = [
+            {
+                "id": rec.recommendation_id,
+                "task": rec.task,
+                "expected_sr": rec.expected_sr,
+                "age_seconds": time.time() - rec.timestamp,
+                "metadata": rec.metadata,
+            }
+            for rec in self.pending_recommendations
+        ]
+
+        # Format recent outcomes
+        outcomes_list = [
+            {
+                "id": out.recommendation_id,
+                "success": out.success,
+                "actual_sr": out.actual_sr,
+                "message": out.message,
+                "timestamp": out.timestamp,
+            }
+            for out in self.recent_outcomes
+        ]
+
+        # Get SR tracker stats
+        sr_stats = self.sr_tracker.get_stats()
+
+        return {
+            "pending_recommendations": pending_list,
+            "recent_outcomes": outcomes_list,
+            "current_concerns": concerns,
+            "sr_statistics": sr_stats,
+            "timestamp": time.time(),
+        }

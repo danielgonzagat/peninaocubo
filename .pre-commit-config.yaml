@@ -1,22 +1,106 @@
+# Pre-commit hooks for PENIN-Ω IA³
+# Install: pre-commit install
+# Run manually: pre-commit run --all-files
+
 repos:
+  # Ruff - Fast Python linter (replaces flake8, isort, etc.)
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.0
+    rev: v0.6.8
     hooks:
       - id: ruff
-        args: [--fix]
+        args: ["--fix"]
+        name: Ruff linter with auto-fix
       - id: ruff-format
+        name: Ruff formatter
+
+  # Black - Code formatter
   - repo: https://github.com/psf/black
-    rev: 23.12.1
+    rev: 24.8.0
     hooks:
       - id: black
-        args: [--line-length=120]
+        name: Black code formatter
+        language_version: python3.11
+
+  # Mypy - Static type checker
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.10.0
+    rev: v1.11.2
     hooks:
       - id: mypy
-        additional_dependencies: [types-all]
+        name: Mypy type checker
+        args: ["--ignore-missing-imports", "--no-strict-optional"]
+        additional_dependencies:
+          - pydantic>=2.0.0
+          - types-requests
+          - types-PyYAML
+
+  # Codespell - Check for common spelling mistakes
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.3.0
+    hooks:
+      - id: codespell
+        name: Check spelling
+        args: ["-L", "nd,sur,crate"]
+        exclude: ^(docs/archive/|\.git/|\.venv/)
+
+  # Bandit - Security linter
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.9
+    hooks:
+      - id: bandit
+        name: Bandit security linter
+        args: ["-q", "-r", "penin/", "-x", "penin/tests/"]
+        exclude: ^(tests/|docs/archive/)
+
+  # Gitleaks - Secrets detection
   - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.18.0
+    rev: v8.18.4
     hooks:
       - id: gitleaks
-        args: ["detect", "--no-git", "--redact"]
+        name: Gitleaks secrets scanner
+
+  # Standard pre-commit hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+      - id: end-of-file-fixer
+        name: Fix end of files
+      - id: check-yaml
+        name: Check YAML syntax
+        args: ["--safe"]
+      - id: check-json
+        name: Check JSON syntax
+      - id: check-toml
+        name: Check TOML syntax
+      - id: check-added-large-files
+        name: Check for large files
+        args: ["--maxkb=1024"]
+      - id: check-case-conflict
+        name: Check for case conflicts
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: detect-private-key
+        name: Detect private keys
+
+  # YAML formatting
+  - repo: https://github.com/macisamuele/language-formatters-pre-commit-hooks
+    rev: v2.14.0
+    hooks:
+      - id: pretty-format-yaml
+        name: Format YAML files
+        args: [--autofix, --indent, "2"]
+        exclude: ^(mkdocs.yml|\.github/)
+
+# CI configuration
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] auto fixes from pre-commit hooks
+
+    for more information, see https://pre-commit.ci
+  autofix_prs: true
+  autoupdate_branch: ''
+  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_schedule: weekly
+  skip: [gitleaks, bandit]
+  submodules: false

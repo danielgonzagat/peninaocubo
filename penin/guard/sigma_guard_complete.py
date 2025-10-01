@@ -27,6 +27,13 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
+# Import EthicalValidator for LO-14 integration
+try:
+    from penin.ethics.laws import EthicalValidator, ValidationResult
+except ImportError:
+    EthicalValidator = None  # Graceful degradation
+    ValidationResult = None
+
 
 class GateStatus(str, Enum):
     """Gate evaluation status."""
@@ -52,6 +59,14 @@ class GateMetrics:
     kappa: float
     consent: bool
     eco_ok: bool
+    
+    # Optional: decision context for ethical validation (LO-14)
+    decision_output: str = ""
+    has_pii: bool = False
+    security_features: dict[str, Any] = field(default_factory=dict)
+    energy_kwh: float = 0.0
+    carbon_kg: float = 0.0
+    misinformation_score: float = 0.0
 
 
 @dataclass
@@ -118,6 +133,7 @@ class SigmaGuard:
         kappa_min: float = 20.0,
         consent_required: bool = True,
         eco_ok_required: bool = True,
+        enable_ethical_validator: bool = True,
     ):
         """
         Initialize Σ-Guard with thresholds.
@@ -144,6 +160,13 @@ class SigmaGuard:
         self.kappa_min = kappa_min
         self.consent_required = consent_required
         self.eco_ok_required = eco_ok_required
+        self.enable_ethical_validator = enable_ethical_validator
+        
+        # Initialize EthicalValidator (LO-14)
+        if self.enable_ethical_validator and EthicalValidator is not None:
+            self.ethical_validator = EthicalValidator(strict_mode=True)
+        else:
+            self.ethical_validator = None
 
     def validate(self, metrics: GateMetrics) -> SigmaGuardVerdict:
         """
@@ -297,6 +320,43 @@ class SigmaGuard:
             )
         )
         all_passed = all_passed and passed
+
+        # Gate 11: ΣEA/LO-14 (Origin Laws)
+        if self.ethical_validator is not None:
+            decision = {
+                "output": metrics.decision_output,
+            }
+            context = {
+                "metrics": {
+                    "privacy": 1.0 - (0.1 if metrics.has_pii else 0.0),
+                    "rho_bias": metrics.rho_bias,
+                    "energy_kwh": metrics.energy_kwh,
+                    "carbon_kg": metrics.carbon_kg,
+                },
+                "has_pii": metrics.has_pii,
+                "consent": metrics.consent,
+                "security": metrics.security_features,
+                "misinformation_score": metrics.misinformation_score,
+                "audit_trail": True,
+                "hash": True,
+                "timestamp": True,
+            }
+            
+            ethical_result = self.ethical_validator.validate_all(decision, context)
+            passed = ethical_result.passed
+            
+            violation_str = ", ".join(ethical_result.violations[:3]) if ethical_result.violations else "none"
+            gates.append(
+                GateResult(
+                    gate_name="ethical_laws",
+                    status=GateStatus.PASS if passed else GateStatus.FAIL,
+                    value=1.0 if passed else 0.0,
+                    threshold=1.0,
+                    passed=passed,
+                    reason=f"ΣEA/LO-14: {len(ethical_result.violations)} violations ({violation_str})",
+                )
+            )
+            all_passed = all_passed and passed
 
         # Aggregate score (harmonic mean of passed gates)
         passed_values = [g.value for g in gates if g.passed and g.value > 0]
