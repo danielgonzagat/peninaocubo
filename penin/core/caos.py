@@ -473,7 +473,7 @@ def compute_caos_plus_exponential(
         ...     s=0.85,  # Alto silêncio (dados limpos)
         ...     kappa=15.0  # Conservador
         ... )
-        >>> print(f"CAOS⁺ conservador: {caos:.2f}")  # ~1.5-2.0
+        >>> print(f"CAOS⁺ conservador: {caos:.2f}")  # ~1.3
         
         >>> # Exemplo 2: Sistema exploratório (pesquisa)
         >>> caos = compute_caos_plus_exponential(
