@@ -396,3 +396,80 @@ def quick_sr_score(
     metacognition = min(1.0, max(0.0, delta_linf / delta_cost)) if delta_cost > 0 else 0.0
     
     return compute_sr_score(awareness, ethics_ok, autocorrection, metacognition)
+
+
+# ============================================================================
+# FastAPI Application
+# ============================================================================
+
+try:
+    from fastapi import FastAPI, HTTPException
+    from pydantic import BaseModel, Field
+    
+    app = FastAPI(
+        title="SR-Ω∞ Service",
+        description="Self-Reflection & Metacognition Service",
+        version="1.0.0",
+    )
+    
+    # Global SR service instance
+    _global_sr_service = SRService()
+    
+    class ScoreRequest(BaseModel):
+        """Request model for SR score computation."""
+        ece: float = Field(default=0.01, ge=0.0, le=1.0, description="Expected Calibration Error")
+        rho: float = Field(default=0.90, ge=0.0, le=2.0, description="Contractividade ratio")
+        delta_linf: float = Field(default=0.05, ge=-1.0, le=1.0, description="Change in L∞")
+        delta_cost: float = Field(default=0.10, ge=0.0, description="Change in cost")
+    
+    @app.get("/health")
+    async def health():
+        """Health check endpoint."""
+        return {"ok": True, "service": "SR-Ω∞", "version": "1.0.0"}
+    
+    @app.get("/sr/score")
+    async def get_latest_score():
+        """Get latest SR-Ω∞ score."""
+        score = _global_sr_service.get_latest_score()
+        if not score:
+            return {"error": "No scores available", "sr_score": 0.0}
+        return {
+            "sr_score": score.sr_score,
+            "awareness": score.awareness,
+            "ethics_ok": score.ethics_ok,
+            "autocorrection": score.autocorrection,
+            "metacognition": score.metacognition,
+            "timestamp": score.timestamp,
+        }
+    
+    @app.post("/sr/compute")
+    async def compute_score(request: ScoreRequest):
+        """Compute new SR-Ω∞ score."""
+        score = _global_sr_service.compute_score(
+            ece=request.ece,
+            rho=request.rho,
+            delta_linf=request.delta_linf,
+            delta_cost=request.delta_cost,
+        )
+        return {
+            "sr_score": score.sr_score,
+            "awareness": score.awareness,
+            "ethics_ok": score.ethics_ok,
+            "autocorrection": score.autocorrection,
+            "metacognition": score.metacognition,
+            "timestamp": score.timestamp,
+        }
+    
+    @app.get("/sr/health_report")
+    async def get_health_report():
+        """Get detailed health report."""
+        return _global_sr_service.get_health_report()
+    
+    @app.get("/sr/average")
+    async def get_average(window: int = 10):
+        """Get average SR-Ω∞ score over window."""
+        return {"sr_avg": _global_sr_service.get_average_score(window=window)}
+
+except ImportError:
+    # FastAPI not available - service can still be used programmatically
+    app = None

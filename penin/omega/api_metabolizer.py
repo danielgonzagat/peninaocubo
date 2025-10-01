@@ -32,3 +32,71 @@ def suggest_replay(prompt: str) -> dict[str, Any]:
                     best_len = diff
                     best = it
     return best.get("resp", {"note": "no-similar-found"}) if best else {"note": "no-similar-found"}
+
+
+def get_provider_stats(provider: str | None = None) -> dict[str, Any]:
+    """
+    Get statistics about API provider usage.
+    
+    Args:
+        provider: Optional provider name to filter stats (e.g., "openai", "anthropic")
+    
+    Returns:
+        Dict with stats: total_calls, providers, recent_calls, etc.
+    """
+    if not LOG.exists():
+        return {
+            "total_calls": 0,
+            "providers": {},
+            "note": "no-log",
+        }
+    
+    stats = {
+        "total_calls": 0,
+        "providers": {},
+        "recent_calls": [],
+    }
+    
+    with LOG.open("rb") as f:
+        for line in f:
+            try:
+                it = orjson.loads(line)
+                p = it.get("p", "unknown")
+                
+                # Filter by provider if specified
+                if provider and p != provider:
+                    continue
+                
+                stats["total_calls"] += 1
+                
+                if p not in stats["providers"]:
+                    stats["providers"][p] = {
+                        "calls": 0,
+                        "endpoints": set(),
+                        "first_call": it.get("t"),
+                        "last_call": it.get("t"),
+                    }
+                
+                stats["providers"][p]["calls"] += 1
+                stats["providers"][p]["last_call"] = it.get("t")
+                
+                endpoint = it.get("e")
+                if endpoint:
+                    stats["providers"][p]["endpoints"].add(endpoint)
+                
+                # Keep last 10 calls
+                if len(stats["recent_calls"]) < 10:
+                    stats["recent_calls"].append({
+                        "provider": p,
+                        "endpoint": endpoint,
+                        "timestamp": it.get("t"),
+                    })
+                
+            except Exception:
+                continue
+    
+    # Convert sets to lists for JSON serialization
+    for p in stats["providers"]:
+        stats["providers"][p]["endpoints"] = list(stats["providers"][p]["endpoints"])
+    
+    return stats

@@ -1241,8 +1241,11 @@ class CAOSTracker:
 
 
 # =============================================================================
-# EXPORTS
+# EXPORTS & ALIASES
 # =============================================================================
+
+# Backward compatibility aliases
+caos_plus_simple = compute_caos_plus_simple  # Alias for tests
 
 __all__ = [
     # Enums
@@ -1260,6 +1263,7 @@ __all__ = [
     "compute_caos_plus_exponential",
     "phi_caos",
     "compute_caos_plus_simple",
+    "caos_plus_simple",  # Alias
     "compute_caos_plus_complete",
     # Compatibility wrappers
     "compute_caos_plus",
@@ -1271,6 +1275,8 @@ __all__ = [
     "harmonic_mean",
     "geometric_mean",
     "caos_gradient",
+    # CAOSComponents for structured return
+    "CAOSComponents",
     # Tracker
     "CAOSTracker",
     # Constants

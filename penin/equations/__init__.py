@@ -52,7 +52,11 @@ from penin.equations.penin_equation import PeninState, penin_update
 from penin.equations.sigma_guard_gate import SigmaGuardConfig, sigma_guard_check
 
 # SR-Ω∞ moved to penin/math/sr_omega_infinity.py for better organization
-from penin.math.sr_omega_infinity import SRComponents, compute_sr_score
+from penin.math.sr_omega_infinity import (
+    SRComponents,
+    SRConfig,
+    compute_sr_score,
+)
 
 # Backward compatibility aliases
 SRScore = SRComponents  # Type alias for compatibility
@@ -62,6 +66,10 @@ __all__ = [
     # Equation 1: Penin Equation
     "penin_update",
     "PeninState",
+    # SR-Ω∞
+    "SRConfig",
+    "SRComponents",
+    "compute_sr_score",
     # Equation 2: L∞ Meta-Function
     "compute_linf_meta",
     "LInfConfig",
