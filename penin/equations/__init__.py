@@ -2,8 +2,8 @@
 PENIN-Ω Complete Equations Suite
 =================================
 
-Implementação completa das 15 equações centrais do PENIN-Ω conforme 
-especificação técnica para IAAA (Inteligência Artificial Adaptativa 
+Implementação completa das 15 equações centrais do PENIN-Ω conforme
+especificação técnica para IAAA (Inteligência Artificial Adaptativa
 Autoevolutiva Autoconsciente e Auditável).
 
 Módulos:

@@ -12,7 +12,7 @@ Technologies:
    - CUDA-enhanced neurons
    - Major neuromorphic hardware support
    - Science Advances published
-   
+
 2. **SpikingBrain-7B** (2025 breakthrough) - 7B parameter SNN LLM
    - 100× speedup in time-to-first-token for 4M-token sequences
    - 69% sparsity

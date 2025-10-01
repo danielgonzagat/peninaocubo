@@ -45,7 +45,7 @@ class GradientMethod(Enum):
 class PeninState:
     """
     Estado interno I da arquitetura
-    
+
     Representa parâmetros, políticas, memória e meta-estado
     """
 
@@ -91,7 +91,7 @@ class PeninState:
 class Evidence:
     """
     Evidências E do ambiente
-    
+
     Dados, feedback externo, tarefas, recompensas
     """
 
@@ -112,7 +112,7 @@ class Evidence:
 class ControlPolicy:
     """
     Políticas P de atualização/controle
-    
+
     Taxas, restrições, gates, thresholds
     """
 
@@ -136,7 +136,7 @@ class ControlPolicy:
 class ProjectionConstraints:
     """
     Conjunto H ∩ S de restrições
-    
+
     - H: técnico-seguro (box constraints, normas, limites)
     - S: ético-seguro (ΣEA/LO-14, privacidade, limites legais)
     """
@@ -170,14 +170,14 @@ def estimate_gradient(
 ) -> np.ndarray:
     """
     Estima G(I, E; P) - direção de melhoria
-    
+
     Args:
         state: Estado atual I_t
         evidence: Evidências E_t
         policy: Políticas P_t
         objective_fn: Função objetivo J(I; E) para otimizar
         method: Método de estimação de gradiente
-    
+
     Returns:
         Gradiente estimado G (mesma shape que state.parameters)
     """
@@ -251,12 +251,12 @@ def project_to_safe_set(
 ) -> tuple[PeninState, bool]:
     """
     Π_{H∩S}: Projeta estado no conjunto seguro H ∩ S
-    
+
     Args:
         state: Estado a projetar
         constraints: Restrições H ∩ S
         allow_reject: Se True, pode rejeitar estado completamente
-    
+
     Returns:
         (projected_state, is_valid)
         - projected_state: Estado projetado
@@ -321,14 +321,14 @@ def compute_adaptive_step_size(
 ) -> float:
     """
     Calcula α_t^{eff} = α_0 · φ(CAOS⁺) · R_t
-    
+
     Args:
         base_alpha: α_0 (taxa base)
         caos_phi: φ(CAOS⁺) - aceleração do motor CAOS
         sr_score: SR-Ω∞ - auto-reflexão
         r_score: R_t - score reflexivo composto
         gamma: Parâmetro de saturação
-    
+
     Returns:
         α_t^{eff} - passo adaptativo
     """
@@ -357,7 +357,7 @@ def penin_update(
 ) -> tuple[PeninState, dict[str, Any]]:
     """
     Equação de Penin: I_{t+1} = Π_{H∩S}[I_t + α_t · G(I_t, E_t; P_t)]
-    
+
     Args:
         state: Estado atual I_t
         evidence: Evidências E_t
@@ -368,7 +368,7 @@ def penin_update(
         sr_score: SR-Ω∞ atual
         r_score: R_t reflexivo
         ledger_fn: Função para registrar no WORM ledger
-    
+
     Returns:
         (new_state, update_info)
         - new_state: I_{t+1}
@@ -485,12 +485,12 @@ def penin_rollback(
 ) -> tuple[PeninState, bool]:
     """
     Rollback para versão anterior (segurança)
-    
+
     Args:
         current_state: Estado atual
         history: Histórico de estados
         target_version: Versão alvo para rollback
-    
+
     Returns:
         (rolled_back_state, success)
     """
@@ -506,7 +506,7 @@ def penin_rollback(
 def example_objective(state: PeninState, evidence: Evidence) -> float:
     """
     Exemplo de função objetivo J(I; E)
-    
+
     Pode ser: acurácia, reward, L∞, qualquer métrica a maximizar
     """
     # Placeholder: maximizar negativo da norma (regularização)
@@ -518,7 +518,7 @@ def example_objective(state: PeninState, evidence: Evidence) -> float:
 def example_ethical_constraint(state: PeninState) -> bool:
     """
     Exemplo de constraint ético S
-    
+
     Retorna True se passou, False se violou
     """
     # Placeholder: verificar norma não explode

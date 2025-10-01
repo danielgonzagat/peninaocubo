@@ -62,7 +62,7 @@ class HyperparamState:
 class AutoTuner:
     """
     Online auto-tuner for PENIN-Ω hyperparameters.
-    
+
     Uses AdaGrad-style adaptive learning rates with gradient estimation
     via finite differences.
     """
@@ -92,7 +92,7 @@ class AutoTuner:
     ) -> float:
         """
         Compute meta-loss (higher = worse hyperparameters).
-        
+
         Meta-loss combines:
         - L∞ variance (want stable)
         - Convergence time (want fast)
@@ -123,12 +123,12 @@ class AutoTuner:
     ) -> float:
         """
         Estimate gradient via finite differences.
-        
+
         Args:
             hyperparam_name: Name of hyperparameter
             loss_fn: Function that computes meta-loss given hyperparam value
             delta: Perturbation size
-            
+
         Returns:
             Estimated gradient
         """
@@ -156,11 +156,11 @@ class AutoTuner:
     ) -> float:
         """
         Update hyperparameter using AdaGrad-style adaptive learning rate.
-        
+
         Args:
             name: Hyperparameter name
             gradient: Estimated gradient
-            
+
         Returns:
             Updated value
         """
@@ -224,15 +224,15 @@ def auto_tune_hyperparams(
 ) -> dict[str, float]:
     """
     One-shot auto-tuning function (stateless wrapper).
-    
+
     Args:
         current_hyperparams: Current hyperparam values
         metrics: Performance metrics
         config: Optional configuration
-        
+
     Returns:
         Updated hyperparams
-        
+
     Note: For stateful tuning with gradient accumulation,
     use AutoTuner class directly.
     """

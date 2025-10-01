@@ -47,14 +47,14 @@ def death_gate_check(
 ) -> bool:
     """
     Check if challenger should be killed (darwinian selection).
-    
+
     Args:
         delta_linf: Change in L∞ score
         config: Optional configuration
-        
+
     Returns:
         True if should kill (ΔL∞ < β_min), False if should keep
-        
+
     Example:
         >>> death_gate_check(0.005)  # Below default β_min=0.01
         True

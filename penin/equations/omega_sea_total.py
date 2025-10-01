@@ -71,19 +71,19 @@ def omega_sea_coherence(
 ) -> tuple[float, bool]:
     """
     Compute global system coherence (Ω-ΣEA Total).
-    
+
     Args:
         module_scores: Dict mapping module name to score [0, 1]
         config: Optional configuration
-        
+
     Returns:
         Tuple of:
         - Global coherence G_t [0, 1]
         - Gate pass/fail (True if G_t ≥ threshold)
-        
+
     Raises:
         ValueError: If any score is out of [0, 1] or module missing
-        
+
     Example:
         >>> scores = {
         ...     "ethics_sea": 0.95,
@@ -140,14 +140,14 @@ def diagnose_bottleneck(
 ) -> tuple[str, float]:
     """
     Identify bottleneck module (lowest score).
-    
+
     Args:
         module_scores: Dict mapping module name to score
         config: Optional configuration
-        
+
     Returns:
         Tuple of (bottleneck_module_name, score)
-        
+
     Example:
         >>> scores = {"ethics_sea": 0.95, "caos_plus": 0.60, "sr_omega": 0.90}
         >>> module, score = diagnose_bottleneck(scores)
@@ -173,11 +173,11 @@ def compute_resilience(
 ) -> float:
     """
     Compute system resilience (operational modules ratio).
-    
+
     Args:
         module_healths: List of module health objects
         config: Optional configuration
-        
+
     Returns:
         Resilience score [0, 1]
     """

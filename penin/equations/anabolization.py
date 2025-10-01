@@ -38,7 +38,7 @@ def anabolize_penin(
 ) -> float:
     """
     Compute anabolic factor (evolution acceleration/deceleration).
-    
+
     Args:
         A_current: Current anabolic rate
         caos_plus: CAOS⁺ score
@@ -46,7 +46,7 @@ def anabolize_penin(
         oci_score: OCI score
         delta_linf: ΔL∞
         config: Optional configuration
-        
+
     Returns:
         A_next: New anabolic rate
     """

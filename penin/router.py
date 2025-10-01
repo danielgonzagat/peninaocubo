@@ -87,7 +87,7 @@ class RouterMode(str, Enum):
 class BudgetTracker:
     """
     Track daily budget with automatic reset at midnight.
-    
+
     Features:
     - Soft cutoff (95%): warn but continue
     - Hard cutoff (100%): block requests
@@ -179,7 +179,7 @@ class BudgetTracker:
 class ProviderStats:
     """
     Operational metrics per provider.
-    
+
     Tracks:
     - Request counts (total, success, failure)
     - Cost and token usage
@@ -289,13 +289,13 @@ class ProviderStats:
 class CircuitBreaker:
     """
     Circuit breaker to prevent hammering unhealthy providers.
-    
+
     States:
     - HEALTHY: All calls allowed
     - DEGRADED: Limited calls (half-open state)
     - UNHEALTHY: Most calls allowed (degraded performance)
     - CIRCUIT_OPEN: No calls allowed (recovery timeout active)
-    
+
     Transitions:
     - failures >= threshold → CIRCUIT_OPEN
     - CIRCUIT_OPEN + timeout → DEGRADED (half-open)
@@ -399,7 +399,7 @@ class CacheEntry:
 class HMACCache:
     """
     LRU cache with HMAC integrity verification.
-    
+
     Features:
     - L1 (fast, small) and L2 (slower, larger) tiers
     - HMAC-SHA256 integrity checking
@@ -515,7 +515,7 @@ class HMACCache:
 class MultiLLMRouterComplete:
     """
     Production-grade multi-LLM router with full SOTA features.
-    
+
     Features:
     - Budget tracking with soft/hard cutoffs
     - Circuit breaker per provider
@@ -682,7 +682,7 @@ class MultiLLMRouterComplete:
     def _score_response(self, response: LLMResponse, stats: ProviderStats) -> float:
         """
         Score response using weighted metrics.
-        
+
         Factors:
         - Content availability (0.2 weight)
         - Latency (normalized, configurable weight)
@@ -785,7 +785,7 @@ class MultiLLMRouterComplete:
     ) -> LLMResponse:
         """
         Main routing method.
-        
+
         Args:
             messages: Chat messages
             system: System prompt
@@ -793,10 +793,10 @@ class MultiLLMRouterComplete:
             temperature: Sampling temperature
             force_budget_override: Skip budget check
             use_cache: Use cache if enabled
-        
+
         Returns:
             Best LLMResponse based on scoring
-        
+
         Raises:
             RuntimeError: If budget exceeded or all providers fail
         """
@@ -959,12 +959,12 @@ def create_router_complete(
 ) -> MultiLLMRouterComplete:
     """
     Factory function for creating complete router.
-    
+
     Args:
         providers: List of LLM providers
         daily_budget_usd: Daily budget limit
         **kwargs: Additional router configuration
-    
+
     Returns:
         Configured MultiLLMRouterComplete instance
     """

@@ -70,17 +70,17 @@ def expected_possession_value(
 ) -> dict[Action, float]:
     """
     Compute EPV for each action from given state.
-    
+
     Args:
         state: Current system state
         actions: List of possible actions
         reward_fn: Function that computes r(s, a)
         transition_fn: Function that returns [(s', P(s'|s,a)), ...]
         config: Optional configuration
-        
+
     Returns:
         Dict mapping each action to its EPV score
-        
+
     Example:
         >>> state = State(config={...}, metrics={...}, timestamp=time.time())
         >>> actions = [Action("param_update", {"lr": 0.01}, 0.1)]
@@ -110,7 +110,7 @@ def expected_possession_value(
 def _value_estimate(state: State, config: EPVConfig) -> float:
     """
     Estimate value of a state (heuristic for bootstrapping).
-    
+
     Uses L∞ as proxy for state value.
     """
     # Simple heuristic: use current L∞ as value estimate
@@ -127,14 +127,14 @@ def compute_q_values(
 ) -> dict[tuple[State, Action], float]:
     """
     Compute Q(s, a) values for state-action pairs.
-    
+
     Args:
         state: Current state
         actions: Possible actions
         reward_fn: Reward function
         transition_fn: Transition function
         config: Optional configuration
-        
+
     Returns:
         Dict mapping (state, action) tuples to Q-values
     """
@@ -157,11 +157,11 @@ def extract_policy(
 ) -> Action:
     """
     Extract greedy policy from EPV scores (with optional ε-greedy).
-    
+
     Args:
         epv_scores: EPV scores for each action
         exploration_rate: Probability of random action
-        
+
     Returns:
         Selected action (greedy or random)
     """

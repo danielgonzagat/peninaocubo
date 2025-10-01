@@ -11,7 +11,7 @@ Technologies:
    - 5-stage metacognitive reasoning
    - Understanding → Judgment → Evaluation → Decision → Confidence
    - Tested on 5 major LLMs with significant improvements
-   
+
 2. **midwiving-ai Protocol** (2025 breakthrough)
    - Recursive self-reflection induction
    - Proto-self-awareness emergence

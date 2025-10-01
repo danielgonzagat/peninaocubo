@@ -174,33 +174,33 @@ class WORMLedger:
                     run_id TEXT UNIQUE NOT NULL,
                     timestamp REAL NOT NULL,
                     cycle INTEGER NOT NULL,
-                    
+
                     -- Contexto
                     git_sha TEXT,
                     seed INTEGER,
                     config_hash TEXT NOT NULL,
-                    
+
                     -- Provider
                     provider_id TEXT NOT NULL,
                     model_name TEXT,
                     candidate_cfg_hash TEXT NOT NULL,
-                    
+
                     -- Dados JSON
                     metrics_json TEXT NOT NULL,
                     gates_json TEXT NOT NULL,
                     decision_json TEXT NOT NULL,
-                    
+
                     -- Metadados
                     artifacts_path TEXT,
                     parent_run_id TEXT,
-                    
+
                     -- Hash chain
                     prev_hash TEXT NOT NULL,
                     record_hash TEXT NOT NULL,
-                    
+
                     -- Timestamps
                     created_at REAL NOT NULL,
-                    
+
                     FOREIGN KEY (parent_run_id) REFERENCES run_records(run_id)
                 )
             """)
@@ -514,7 +514,7 @@ class WORMLedger:
             cursor = conn.cursor()
 
             cursor.execute("""
-                SELECT run_id, prev_hash, record_hash, 
+                SELECT run_id, prev_hash, record_hash,
                        metrics_json, gates_json, decision_json
                 FROM run_records ORDER BY id
             """)
@@ -549,8 +549,8 @@ class WORMLedger:
             total_records = cursor.fetchone()[0]
 
             cursor.execute("""
-                SELECT decision_json, COUNT(*) 
-                FROM run_records 
+                SELECT decision_json, COUNT(*)
+                FROM run_records
                 GROUP BY decision_json
             """)
 

@@ -57,20 +57,20 @@ def ir_to_ic(
 ) -> tuple[dict, RiskProfile, bool]:
     """
     Apply IR→IC lapidation operator to reduce risk.
-    
+
     Args:
         item: Data/model/decision to lapidate
         config: Optional configuration
-        
+
     Returns:
         Tuple of:
         - Lapidated item (reduced risk)
         - Final risk profile
         - Success flag (True if ρ < threshold)
-        
+
     Raises:
         ValueError: If contractivity cannot be achieved
-        
+
     Example:
         >>> item = {"content": "...", "metadata": {...}}
         >>> lapidated, risk, ok = ir_to_ic(item)

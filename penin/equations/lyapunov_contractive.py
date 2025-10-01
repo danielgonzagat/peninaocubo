@@ -34,7 +34,7 @@ def lyapunov_check(
 ) -> tuple[bool, float]:
     """
     Check Lyapunov contractivity: V(I_next) < V(I_current).
-    
+
     Returns:
         (is_contractive, V_delta)
     """

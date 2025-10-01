@@ -54,17 +54,17 @@ def compute_sr_omega_infinity(
 ) -> float:
     """
     Compute SR-Ω∞ score using harmonic mean.
-    
+
     Args:
         awareness: Calibration score [0, 1]
         ethics_ok: ΣEA/IR→IC pass/fail
         autocorrection: Risk reduction [0, 1]
         metacognition: ΔL∞/ΔCost [0, 1]
         config: Optional configuration
-        
+
     Returns:
         SR score [0, 1]
-        
+
     Raises:
         ValueError: If any metric is out of [0, 1] range
     """
