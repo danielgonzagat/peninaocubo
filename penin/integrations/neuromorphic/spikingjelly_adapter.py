@@ -97,8 +97,11 @@ class SpikingNetworkAdapter(BaseIntegrationAdapter):
 
         try:
             # Import key modules
-            from spikingjelly.activation_based import neuron, surrogate  # type: ignore
-            from spikingjelly.activation_based import functional  # type: ignore
+            from spikingjelly.activation_based import (  # type: ignore
+                functional,  # type: ignore
+                neuron,
+                surrogate,
+            )
 
             self._neuron_module = neuron
             self._surrogate_module = surrogate

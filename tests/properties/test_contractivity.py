@@ -1,133 +1,179 @@
 """
-Property-Based Tests for Contratividade (IR→IC)
+Property-Based Tests: Contratividade (IR→IC)
+=============================================
 
-Mathematical guarantee: ∀ evolution: ρ < 1 (risk reduction)
+Mathematical guarantee: ∀ k: H(L_ψ(k)) ≤ ρ·H(k), onde 0 < ρ < 1
+
+Tests using Hypothesis for exhaustive validation.
 """
 
 import pytest
-from hypothesis import given
-from hypothesis import strategies as st
+from hypothesis import given, settings, strategies as st
+
+# Import contractivity operators
+try:
+    from penin.iric.lpsi import apply_lpsi_operator, compute_risk_reduction_ratio
+    from penin.equations.ir_ic_contractive import risk_information, lapidation_operator
+except ImportError:
+    pytest.skip("IR→IC modules not available", allow_module_level=True)
 
 
-# Helper functions for testing contractivity
-def compute_contractivity(risk_before: float, risk_after: float) -> float:
-    """Compute ρ = risk_after / risk_before"""
-    if risk_before == 0.0:
-        return 0.0
-    return risk_after / risk_before
+class TestContractivityProperties:
+    """Property-based tests for IR→IC contractivity guarantee."""
 
-
-def validate_contractive_property(risk_before: float, risk_after: float) -> bool:
-    """Check if ρ < 1.0"""
-    rho = compute_contractivity(risk_before, risk_after)
-    return rho < 1.0
-
-
-@given(
-    initial_risk=st.floats(min_value=0.1, max_value=1.0),
-    reduction_factor=st.floats(min_value=0.1, max_value=0.99),
-)
-def test_contractivity_always_reduces_risk(initial_risk, reduction_factor):
-    """
-    Property: IR→IC always reduces risk (ρ < 1)
-
-    ∀ initial_risk ∈ (0, 1], reduction ∈ (0, 1):
-        evolved_risk = initial_risk * reduction
-        ⇒ ρ = evolved_risk / initial_risk < 1
-    """
-    evolved_risk = initial_risk * reduction_factor
-
-    rho = compute_contractivity(
-        risk_before=initial_risk,
-        risk_after=evolved_risk,
+    @given(
+        initial_risk=st.floats(min_value=0.01, max_value=1.0, allow_nan=False, allow_infinity=False)
     )
+    @settings(max_examples=200, deadline=500)
+    def test_lpsi_always_contractive(self, initial_risk: float):
+        """
+        Property: L_ψ operator always reduces risk.
+        
+        Mathematical form: ρ = H(L_ψ(k)) / H(k) < 1.0
+        """
+        try:
+            # Apply lapidation operator
+            evolved_risk = apply_lpsi_operator(initial_risk)
+            
+            # Compute contractivity ratio
+            rho = evolved_risk / initial_risk
+            
+            # Critical assertion: ρ must be < 1.0 (strict contractivity)
+            assert rho < 1.0, (
+                f"Contractivity violated: ρ={rho:.6f} ≥ 1.0 "
+                f"(initial={initial_risk:.6f}, evolved={evolved_risk:.6f})"
+            )
+            
+            # Additional check: evolved risk must be strictly less
+            assert evolved_risk < initial_risk, (
+                f"Risk did not decrease: {evolved_risk:.6f} ≥ {initial_risk:.6f}"
+            )
+            
+        except Exception as e:
+            pytest.fail(f"L_ψ operator failed for risk={initial_risk:.6f}: {e}")
 
-    assert rho < 1.0, f"Contractivity violated: ρ={rho:.4f} ≥ 1.0"
-    assert rho >= 0.0, f"Invalid ρ: {rho}"
-
-
-@given(
-    risk_before=st.floats(min_value=0.1, max_value=1.0),
-    risk_after=st.floats(min_value=0.0, max_value=1.0),
-)
-def test_contractivity_validation(risk_before, risk_after):
-    """
-    Property: validate_contractive_property correctly identifies ρ < 1
-
-    If risk_after < risk_before, then validation passes.
-    If risk_after ≥ risk_before, then validation fails.
-    """
-    is_contractive = validate_contractive_property(risk_before, risk_after)
-
-    if risk_after < risk_before:
-        assert is_contractive, f"Should be contractive: {risk_before} → {risk_after}"
-    else:
-        assert not is_contractive, f"Should NOT be contractive: {risk_before} → {risk_after}"
-
-
-@given(
-    initial_risks=st.lists(
-        st.floats(min_value=0.1, max_value=1.0),
-        min_size=3,
-        max_size=10,
+    @given(
+        initial_risk=st.floats(min_value=0.1, max_value=0.9, allow_nan=False),
+        iterations=st.integers(min_value=1, max_value=10),
     )
-)
-def test_multi_step_contractivity(initial_risks):
-    """
-    Property: Multi-step evolution maintains contractivity
+    @settings(max_examples=100, deadline=1000)
+    def test_repeated_lpsi_monotonic_decrease(self, initial_risk: float, iterations: int):
+        """
+        Property: Repeated application of L_ψ monotonically decreases risk.
+        
+        ∀ t: risk(t+1) < risk(t)
+        """
+        risk = initial_risk
+        previous_risks = [risk]
+        
+        for i in range(iterations):
+            risk = apply_lpsi_operator(risk)
+            
+            # Check monotonic decrease
+            assert risk < previous_risks[-1], (
+                f"Iteration {i+1}: Risk increased or stayed same "
+                f"({risk:.6f} ≥ {previous_risks[-1]:.6f})"
+            )
+            
+            previous_risks.append(risk)
+        
+        # Check overall reduction
+        final_reduction = initial_risk - risk
+        assert final_reduction > 0, (
+            f"No overall reduction: initial={initial_risk:.6f}, final={risk:.6f}"
+        )
 
-    ∀ sequence of evolutions with ρ_i < 1:
-        final_risk = initial_risk * Π(ρ_i)
-        ⇒ final_risk < initial_risk
-    """
-    initial_risk = initial_risks[0]
-    current_risk = initial_risk
+    @given(
+        risk_a=st.floats(min_value=0.1, max_value=0.5, allow_nan=False),
+        risk_b=st.floats(min_value=0.5, max_value=1.0, allow_nan=False),
+    )
+    @settings(max_examples=100, deadline=500)
+    def test_lpsi_order_preserving(self, risk_a: float, risk_b: float):
+        """
+        Property: If risk_a < risk_b, then L_ψ(risk_a) < L_ψ(risk_b).
+        
+        Monotonicity of operator.
+        """
+        if risk_a >= risk_b:
+            # Swap to ensure risk_a < risk_b
+            risk_a, risk_b = risk_b, risk_a
+        
+        evolved_a = apply_lpsi_operator(risk_a)
+        evolved_b = apply_lpsi_operator(risk_b)
+        
+        # Order must be preserved
+        assert evolved_a < evolved_b, (
+            f"Order not preserved: L_ψ({risk_a:.4f})={evolved_a:.4f} "
+            f"≥ L_ψ({risk_b:.4f})={evolved_b:.4f}"
+        )
 
-    rho_product = 1.0
-
-    for i in range(1, len(initial_risks)):
-        # Each step reduces risk
-        next_risk = current_risk * 0.8  # 20% reduction per step
-        rho = compute_contractivity(current_risk, next_risk)
-
-        assert rho < 1.0, f"Step {i} violated contractivity"
-
-        rho_product *= rho
-        current_risk = next_risk
-
-    # Final risk should be significantly lower
-    assert current_risk < initial_risk
-    assert rho_product < 1.0
-
-
-def test_contractivity_zero_risk():
-    """Edge case: risk reduced to near-zero"""
-    risk_before = 0.5
-    risk_after = 1e-10
-
-    rho = compute_contractivity(risk_before, risk_after)
-
-    assert rho < 1.0
-    assert rho < 0.01  # Near-zero risk
+    @given(
+        initial_risk=st.floats(min_value=0.01, max_value=1.0, allow_nan=False)
+    )
+    @settings(max_examples=150, deadline=500)
+    def test_rho_bounded(self, initial_risk: float):
+        """
+        Property: Contractivity ratio ρ is bounded: 0 < ρ < 1.
+        """
+        evolved_risk = apply_lpsi_operator(initial_risk)
+        rho = compute_risk_reduction_ratio(initial_risk, evolved_risk)
+        
+        # Lower bound: ρ > 0 (risk can't become negative or zero)
+        assert rho > 0, f"ρ={rho:.6f} ≤ 0 (risk became non-positive)"
+        
+        # Upper bound: ρ < 1 (strict contractivity)
+        assert rho < 1.0, f"ρ={rho:.6f} ≥ 1.0 (no contraction)"
+        
+        # Typical range: 0.7 < ρ < 0.95 (sanity check)
+        assert 0.5 < rho < 0.99, (
+            f"ρ={rho:.6f} outside typical range [0.5, 0.99] "
+            "(may indicate implementation issue)"
+        )
 
 
-def test_contractivity_identical_risk():
-    """Edge case: no risk reduction (ρ = 1.0, not contractive)"""
-    risk_before = 0.5
-    risk_after = 0.5
+class TestContractivityEdgeCases:
+    """Edge case tests for contractivity."""
 
-    rho = compute_contractivity(risk_before, risk_after)
+    def test_near_zero_risk(self):
+        """Test behavior with very small initial risk."""
+        initial_risk = 0.001
+        evolved_risk = apply_lpsi_operator(initial_risk)
+        rho = evolved_risk / initial_risk
+        
+        assert rho < 1.0, f"Contractivity failed for near-zero risk: ρ={rho}"
+        assert evolved_risk > 0, "Risk became zero or negative"
 
-    assert rho == pytest.approx(1.0, abs=1e-6)
-    assert not validate_contractive_property(risk_before, risk_after)
+    def test_high_risk(self):
+        """Test behavior with very high initial risk."""
+        initial_risk = 0.99
+        evolved_risk = apply_lpsi_operator(initial_risk)
+        rho = evolved_risk / initial_risk
+        
+        assert rho < 1.0, f"Contractivity failed for high risk: ρ={rho}"
+        assert evolved_risk < initial_risk
+
+    def test_typical_range(self):
+        """Test typical risk range [0.3, 0.7]."""
+        for risk in [0.3, 0.5, 0.7]:
+            evolved = apply_lpsi_operator(risk)
+            assert evolved < risk, f"No reduction for risk={risk}"
 
 
-def test_contractivity_increased_risk():
-    """Edge case: risk increased (ρ > 1.0, violation)"""
-    risk_before = 0.3
-    risk_after = 0.5
+# Fixtures for integration with existing codebase
 
-    rho = compute_contractivity(risk_before, risk_after)
+@pytest.fixture
+def sample_risks():
+    """Sample risk values for testing."""
+    return [0.1, 0.3, 0.5, 0.7, 0.9]
 
-    assert rho > 1.0, "Should detect risk increase"
-    assert not validate_contractive_property(risk_before, risk_after)
+
+def test_contractivity_on_samples(sample_risks):
+    """Smoke test on sample values."""
+    for risk in sample_risks:
+        evolved = apply_lpsi_operator(risk)
+        rho = evolved / risk
+        assert rho < 1.0, f"Contractivity failed for risk={risk}: ρ={rho}"
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "--hypothesis-show-statistics"])

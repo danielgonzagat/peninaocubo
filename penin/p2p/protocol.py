@@ -7,9 +7,9 @@ Defines message types, serialization, and protocol handlers for PENIN-Ω P2P com
 import hashlib
 import json
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import asdict, dataclass
 from enum import Enum
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 
 class MessageType(str, Enum):
@@ -48,9 +48,9 @@ class PeninMessage:
     msg_type: MessageType
     sender_id: str
     timestamp: float
-    payload: Dict[str, Any]
-    signature: Optional[str] = None
-    msg_id: Optional[str] = None
+    payload: dict[str, Any]
+    signature: str | None = None
+    msg_id: str | None = None
 
     def __post_init__(self):
         if self.msg_id is None:
@@ -61,7 +61,7 @@ class PeninMessage:
         content = f"{self.msg_type}:{self.sender_id}:{self.timestamp}:{json.dumps(self.payload, sort_keys=True)}"
         return hashlib.sha256(content.encode()).hexdigest()[:16]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary"""
         return {
             "msg_type": self.msg_type.value,
@@ -73,7 +73,7 @@ class PeninMessage:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "PeninMessage":
+    def from_dict(cls, data: dict[str, Any]) -> "PeninMessage":
         """Deserialize from dictionary"""
         return cls(
             msg_type=MessageType(data["msg_type"]),
@@ -101,7 +101,7 @@ class PeerInfo:
     peer_id: str
     multiaddrs: list[str]
     specializations: list[str]
-    metrics: Dict[str, float]
+    metrics: dict[str, float]
     version: str
     timestamp: float
 
@@ -116,8 +116,8 @@ class KnowledgeAsset:
     description: str
     size_bytes: int
     hash: str  # Content hash (SHA-256)
-    metadata: Dict[str, Any]
-    performance: Dict[str, float]  # Metrics (accuracy, L∞, CAOS+, etc.)
+    metadata: dict[str, Any]
+    performance: dict[str, float]  # Metrics (accuracy, L∞, CAOS+, etc.)
     cost: float  # Training cost or value
     created_at: float
     owner_id: str
@@ -131,17 +131,17 @@ class PeninProtocol:
 
     def __init__(self, node_id: str):
         self.node_id = node_id
-        self.message_handlers: Dict[MessageType, callable] = {}
+        self.message_handlers: dict[MessageType, callable] = {}
 
     def register_handler(self, msg_type: MessageType, handler: callable):
         """Register message handler"""
         self.message_handlers[msg_type] = handler
 
-    def create_message(self, msg_type: MessageType, payload: Dict[str, Any]) -> PeninMessage:
+    def create_message(self, msg_type: MessageType, payload: dict[str, Any]) -> PeninMessage:
         """Create a new protocol message"""
         return PeninMessage(msg_type=msg_type, sender_id=self.node_id, timestamp=time.time(), payload=payload)
 
-    async def handle_message(self, message: PeninMessage) -> Optional[PeninMessage]:
+    async def handle_message(self, message: PeninMessage) -> PeninMessage | None:
         """Handle incoming message"""
         handler = self.message_handlers.get(message.msg_type)
         if handler:
@@ -151,7 +151,7 @@ class PeninProtocol:
     # --- Message Creators ---
 
     def create_peer_announce(
-        self, multiaddrs: list[str], specializations: list[str], metrics: Dict[str, float]
+        self, multiaddrs: list[str], specializations: list[str], metrics: dict[str, float]
     ) -> PeninMessage:
         """Create peer announcement message"""
         return self.create_message(
@@ -168,7 +168,7 @@ class PeninProtocol:
         """Create knowledge offer message"""
         return self.create_message(MessageType.KNOWLEDGE_OFFER, asdict(asset))
 
-    def create_knowledge_request(self, asset_id: str, offer_terms: Dict[str, Any]) -> PeninMessage:
+    def create_knowledge_request(self, asset_id: str, offer_terms: dict[str, Any]) -> PeninMessage:
         """Create knowledge request message"""
         return self.create_message(
             MessageType.KNOWLEDGE_REQUEST,
@@ -202,7 +202,7 @@ class PeninProtocol:
         """Create heartbeat message"""
         return self.create_message(MessageType.HEARTBEAT, {"status": status, "node_id": self.node_id})
 
-    def create_error(self, error_msg: str, context: Optional[Dict[str, Any]] = None) -> PeninMessage:
+    def create_error(self, error_msg: str, context: dict[str, Any] | None = None) -> PeninMessage:
         """Create error message"""
         return self.create_message(
             MessageType.ERROR, {"error": error_msg, "context": context or {}, "timestamp": time.time()}
