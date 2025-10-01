@@ -182,7 +182,8 @@ class TestNextPyWithCAOS:
             current_state["caos_score"] = caos_score
 
         # Verify CAOS+ scores improve over cycles
-        assert all(caos_history[i] <= caos_history[i + 1] for i in range(len(caos_history) - 1))
+        epsilon = 1e-8
+        assert all(caos_history[i + 1] > caos_history[i] + epsilon for i in range(len(caos_history) - 1))
         print(f"✓ CAOS+ evolution: {' → '.join(f'{s:.3f}' for s in caos_history)}")
 
     @pytest.mark.asyncio
