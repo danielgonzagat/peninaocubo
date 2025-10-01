@@ -1,0 +1,72 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'penin-omega'
+    environment: 'production'
+
+# AlertManager Configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Alert Rules
+rule_files:
+  - '/etc/prometheus/alerts/*.yml'
+
+# Scrape Configurations
+scrape_configs:
+  # PENIN-Ω Core Application
+  - job_name: 'penin-core'
+    static_configs:
+      - targets: ['penin-core:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # PENIN-Ω Services
+  - job_name: 'penin-services'
+    static_configs:
+      - targets:
+          - 'penin-core:8010'   # Ω-META
+          - 'penin-core:8011'   # Σ-Guard
+          - 'penin-core:8012'   # SR-Ω∞
+          - 'penin-core:8013'   # ACFA League
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # Prometheus Self-Monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Node Exporter (System Metrics)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+  # cAdvisor (Container Metrics)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+
+  # Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+
+  # Grafana
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+
+  # Loki
+  - job_name: 'loki'
+    static_configs:
+      - targets: ['loki:3100']
+
+  # Tempo
+  - job_name: 'tempo'
+    static_configs:
+      - targets: ['tempo:3200']

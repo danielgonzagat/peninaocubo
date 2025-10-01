@@ -1,0 +1,153 @@
+/* PENIN-Ω Custom Styles */
+
+:root {
+  --penin-primary: #5e72e4;
+  --penin-accent: #8b5cf6;
+  --penin-success: #10b981;
+  --penin-warning: #f59e0b;
+  --penin-danger: #ef4444;
+  --penin-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Hero Section */
+.hero {
+  background: var(--penin-gradient);
+  color: white;
+  padding: 4rem 2rem;
+  border-radius: 12px;
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.hero h1 {
+  font-size: 3rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+
+.hero p {
+  font-size: 1.25rem;
+  opacity: 0.9;
+}
+
+/* Badge Styles */
+.badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  margin: 0.25rem;
+}
+
+.badge-success {
+  background-color: var(--penin-success);
+  color: white;
+}
+
+.badge-warning {
+  background-color: var(--penin-warning);
+  color: white;
+}
+
+.badge-danger {
+  background-color: var(--penin-danger);
+  color: white;
+}
+
+.badge-primary {
+  background-color: var(--penin-primary);
+  color: white;
+}
+
+/* Equation Blocks */
+.equation-block {
+  background: rgba(94, 114, 228, 0.1);
+  border-left: 4px solid var(--penin-primary);
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin: 1.5rem 0;
+}
+
+.equation-block .title {
+  font-weight: 700;
+  color: var(--penin-primary);
+  margin-bottom: 0.5rem;
+}
+
+/* Metric Cards */
+.metric-card {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+  border: 1px solid rgba(94, 114, 228, 0.2);
+  border-radius: 12px;
+  padding: 1.5rem;
+  margin: 1rem 0;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.metric-card .metric-value {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--penin-primary);
+}
+
+.metric-card .metric-label {
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.7;
+}
+
+/* Code Blocks Enhancement */
+.highlight {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Admonition Custom Styles */
+.admonition.ia3 {
+  border-color: var(--penin-primary);
+}
+
+.admonition.ia3 > .admonition-title {
+  background-color: rgba(94, 114, 228, 0.1);
+  border-color: var(--penin-primary);
+}
+
+/* Table Enhancements */
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+table thead {
+  background: var(--penin-gradient);
+  color: white;
+}
+
+table tbody tr:hover {
+  background-color: rgba(94, 114, 228, 0.05);
+}
+
+/* Footer Custom */
+.md-footer {
+  background: var(--penin-gradient);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .hero h1 {
+    font-size: 2rem;
+  }
+  
+  .hero p {
+    font-size: 1rem;
+  }
+}
