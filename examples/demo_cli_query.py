@@ -102,7 +102,6 @@ def query_peer_status(peer_id: str, format_type: str = "text", timeout: float = 
             peer_service.report_outcome(f"rec-concern-{i}", success=success, actual_sr=0.8 if success else 0.3)
 
         # Get mental state
-        peer_node = PeninNode(peer_id, peer_service)
         mental_state = peer_service.get_mental_state()
 
         # Format output
