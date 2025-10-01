@@ -1,66 +1,105 @@
 """
-PENIN-Ω Core Mathematical Primitives
-=====================================
+PENIN-Ω Core Module
+===================
 
-This module contains the fundamental mathematical building blocks
-for the IA³ (IA ao cubo) system:
+Módulo central consolidado contendo implementações canônicas de:
+- CAOS⁺ (Consistência, Autoevolução, Incognoscível, Silêncio)
+- Equações fundamentais (L∞, Penin, Vida/Morte, IR→IC, Lyapunov)
+- Algoritmos de base (EMA, clamps, validações)
 
-- CAOS+ motor (Consistency, Autoevolution, Incognoscible, Silence)
-- L∞ meta-function (non-compensatory global scoring)
-- SR-Ω∞ singularity reflexive (metacognition)
-- Lyapunov stability enforcement
-- Validation gates
+Este módulo serve como SINGLE SOURCE OF TRUTH para toda lógica matemática
+e algorítmica fundamental do sistema PENIN-Ω.
+
+Migração de código legado:
+--------------------------
+- penin/engine/caos_plus.py → penin/core/caos.py
+- penin/omega/caos.py → penin/core/caos.py (consolidado)
+- penin/equations/caos_plus.py → penin/core/caos.py (consolidado)
+
+Uso:
+----
+    from penin.core.caos import compute_caos_plus_exponential, CAOSConfig
+    from penin.core import __version__
+
+    config = CAOSConfig(kappa=25.0)
+    caos_score = compute_caos_plus_exponential(0.9, 0.8, 0.3, 0.85, config.kappa)
 """
 
-from .caos_plus import (
-    CAOSPlus,
+from __future__ import annotations
+
+# Version
+__version__ = "1.0.0-alpha"
+
+# Core CAOS+ module
+from .caos import (
+    # Enums
     CAOSComponent,
-    compute_caos_plus,
+    CAOSFormula,
+    # Metrics
+    ConsistencyMetrics,
+    AutoevolutionMetrics,
+    IncognoscibleMetrics,
+    SilenceMetrics,
+    # Config & State
+    CAOSConfig,
+    CAOSState,
+    # Core computation functions
     compute_caos_plus_exponential,
     phi_caos,
-)
-from .linf import (
-    LInfinity,
-    compute_linf,
+    compute_caos_plus_simple,
+    compute_caos_plus_complete,
+    # Compatibility wrappers
+    compute_caos_plus,
+    caos_plus,
+    # Helpers
+    clamp01,
+    clamp,
+    compute_ema_alpha,
     harmonic_mean,
-)
-from .sr_omega import (
-    SingularityReflexive,
-    compute_sr_score,
-    ReflexiveAxis,
-)
-from .lyapunov import (
-    LyapunovStability,
-    verify_stability,
-    lyapunov_quadratic,
-)
-from .gates import (
-    ValidationGate,
-    GateResult,
-    sigma_guard_gate,
+    geometric_mean,
+    caos_gradient,
+    # Tracker
+    CAOSTracker,
+    # Constants
+    EPS,
+    DEFAULT_KAPPA,
+    DEFAULT_GAMMA,
 )
 
+# Public API
 __all__ = [
-    # CAOS+
-    "CAOSPlus",
+    # Version
+    "__version__",
+    # CAOS+ Enums
     "CAOSComponent",
-    "compute_caos_plus",
+    "CAOSFormula",
+    # CAOS+ Metrics
+    "ConsistencyMetrics",
+    "AutoevolutionMetrics",
+    "IncognoscibleMetrics",
+    "SilenceMetrics",
+    # CAOS+ Config & State
+    "CAOSConfig",
+    "CAOSState",
+    # CAOS+ Core functions
     "compute_caos_plus_exponential",
     "phi_caos",
-    # L∞
-    "LInfinity",
-    "compute_linf",
+    "compute_caos_plus_simple",
+    "compute_caos_plus_complete",
+    # CAOS+ Compatibility
+    "compute_caos_plus",
+    "caos_plus",
+    # CAOS+ Helpers
+    "clamp01",
+    "clamp",
+    "compute_ema_alpha",
     "harmonic_mean",
-    # SR-Ω∞
-    "SingularityReflexive",
-    "compute_sr_score",
-    "ReflexiveAxis",
-    # Lyapunov
-    "LyapunovStability",
-    "verify_stability",
-    "lyapunov_quadratic",
-    # Gates
-    "ValidationGate",
-    "GateResult",
-    "sigma_guard_gate",
+    "geometric_mean",
+    "caos_gradient",
+    # CAOS+ Tracker
+    "CAOSTracker",
+    # Constants
+    "EPS",
+    "DEFAULT_KAPPA",
+    "DEFAULT_GAMMA",
 ]
