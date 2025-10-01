@@ -464,7 +464,7 @@ Pipeline de Evolução:
   CAOS⁺: 1.8654
   α_eff: 0.1865 (amplificado 1.9×)
 
-✅ DECISÃO: ROLLBACK (CAOS⁺ 1.87 < 2.0)
+❌ DECISÃO: ROLLBACK (CAOS⁺ 1.87 < 2.0)
 
 📝 Entry registrado no WORM ledger
 ```
