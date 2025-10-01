@@ -7,10 +7,10 @@ Permite comunicação P2P entre instâncias PENIN-Ω para troca de conhecimento 
 Baseado em libp2p para máxima flexibilidade e descentralização.
 """
 
-from penin.p2p.node import PeninNode
-from penin.p2p.protocol import PeninProtocol, MessageType
 from penin.p2p.discovery import PeerDiscovery
 from penin.p2p.knowledge_exchange import KnowledgeExchangeService
+from penin.p2p.node import PeninNode
+from penin.p2p.protocol import MessageType, PeninProtocol
 
 __all__ = [
     "PeninNode",

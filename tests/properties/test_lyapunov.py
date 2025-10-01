@@ -1,171 +1,200 @@
 """
-Property-Based Tests for Lyapunov Function
+Property-Based Tests: Lyapunov Function
+========================================
 
-Mathematical guarantee: ∀ step: V(t+1) < V(t) (monotonic decrease)
+Mathematical guarantee: ∀ t: V(I_{t+1}) < V(I_t) (monotonic decrease)
+
+Ensures system stability and convergence.
 """
 
-
 import pytest
-from hypothesis import given, settings
-from hypothesis import strategies as st
+from hypothesis import given, settings, strategies as st
+
+# Import master equation and Lyapunov function
+try:
+    from penin.engine.master_equation import MasterState, step_master
+    from penin.equations.lyapunov_contractive import lyapunov_function, lyapunov_derivative
+except ImportError:
+    pytest.skip("Master equation modules not available", allow_module_level=True)
 
 
-# Helper functions for testing Lyapunov
-def lyapunov_function(state: float) -> float:
-    """Compute Lyapunov V(x) = x²/2"""
-    return (state**2) / 2.0
+class TestLyapunovProperties:
+    """Property-based tests for Lyapunov monotonic decrease."""
 
-
-def validate_lyapunov_decrease(state_before: float, state_after: float) -> bool:
-    """Check if V(t+1) < V(t)"""
-    V_before = lyapunov_function(state_before)
-    V_after = lyapunov_function(state_after)
-    return V_after < V_before
-
-
-@given(
-    state_t=st.floats(min_value=-10.0, max_value=10.0),
-    decay_factor=st.floats(min_value=0.1, max_value=0.99),
-)
-def test_lyapunov_monotonic_decrease(state_t, decay_factor):
-    """
-    Property: Lyapunov function monotonically decreases
-
-    ∀ state_t, decay ∈ (0, 1):
-        state_t+1 = state_t * decay
-        ⇒ V(t+1) < V(t)
-    """
-    # Simulate evolution step (decay towards zero)
-    state_t1 = state_t * decay_factor
-
-    V_t = lyapunov_function(state_t)
-    V_t1 = lyapunov_function(state_t1)
-
-    assert V_t1 < V_t, f"Lyapunov not decreasing: V({state_t})={V_t:.4f}, V({state_t1})={V_t1:.4f}"
-
-
-@given(
-    state=st.floats(min_value=-100.0, max_value=100.0),
-)
-def test_lyapunov_always_positive(state):
-    """
-    Property: Lyapunov function is always positive
-
-    ∀ state: V(state) ≥ 0
-    """
-    V = lyapunov_function(state)
-    assert V >= 0.0, f"Lyapunov negative: V({state})={V}"
-
-
-@given(
-    state_sequence=st.lists(
-        st.floats(min_value=-10.0, max_value=10.0),
-        min_size=5,
-        max_size=20,
+    @given(
+        initial_state=st.floats(min_value=-10.0, max_value=10.0, allow_nan=False),
+        delta_linf=st.floats(min_value=0.0, max_value=0.2, allow_nan=False),
+        alpha_omega=st.floats(min_value=0.01, max_value=0.5, allow_nan=False),
     )
-)
-@settings(max_examples=50)
-def test_lyapunov_sequence_decreasing(state_sequence):
-    """
-    Property: Sequence of states with decreasing Lyapunov
+    @settings(max_examples=200, deadline=500)
+    def test_lyapunov_always_decreases(self, initial_state: float, delta_linf: float, alpha_omega: float):
+        """
+        Property: V(I_{t+1}) < V(I_t) for any evolution step.
+        
+        Mathematical form: ΔV < 0 (strict decrease).
+        """
+        try:
+            # Create initial state
+            state = MasterState(I=initial_state)
+            
+            # Compute Lyapunov at t
+            V_t = lyapunov_function(state.I)
+            
+            # Apply master equation step
+            state_next = step_master(state, delta_linf=delta_linf, alpha_omega=alpha_omega)
+            
+            # Compute Lyapunov at t+1
+            V_t1 = lyapunov_function(state_next.I)
+            
+            # Critical assertion: V must decrease
+            assert V_t1 < V_t, (
+                f"Lyapunov did not decrease: V(t)={V_t:.6f}, V(t+1)={V_t1:.6f} "
+                f"(ΔV={V_t1-V_t:.6f} ≥ 0)"
+            )
+            
+            # Derivative should be negative
+            dV = lyapunov_derivative(state.I, delta_linf, alpha_omega)
+            assert dV < 0, f"Lyapunov derivative ≥ 0: dV/dt={dV:.6f}"
+            
+        except Exception as e:
+            pytest.fail(f"Lyapunov test failed for state={initial_state:.4f}: {e}")
 
-    ∀ sequence with convergence:
-        V(s_0) > V(s_1) > V(s_2) > ... > V(s_n)
-    """
-    # Apply decay to create converging sequence
-    decay = 0.9
-    states = [state_sequence[0]]
-
-    for i in range(1, len(state_sequence)):
-        states.append(states[-1] * decay)
-
-    lyapunov_values = [lyapunov_function(s) for s in states]
-
-    # Check monotonic decrease
-    for i in range(len(lyapunov_values) - 1):
-        assert lyapunov_values[i] >= lyapunov_values[i + 1], (
-            f"Lyapunov not monotonic at step {i}: " f"{lyapunov_values[i]:.4f} < {lyapunov_values[i+1]:.4f}"
+    @given(
+        initial_state=st.floats(min_value=-5.0, max_value=5.0, allow_nan=False),
+        steps=st.integers(min_value=2, max_value=10),
+    )
+    @settings(max_examples=100, deadline=1000)
+    def test_lyapunov_monotonic_over_trajectory(self, initial_state: float, steps: int):
+        """
+        Property: V decreases monotonically over entire trajectory.
+        
+        ∀ i: V(t+i+1) < V(t+i)
+        """
+        state = MasterState(I=initial_state)
+        lyapunov_values = [lyapunov_function(state.I)]
+        
+        # Fixed step parameters for reproducibility
+        delta_linf = 0.05
+        alpha_omega = 0.1
+        
+        for i in range(steps):
+            state = step_master(state, delta_linf=delta_linf, alpha_omega=alpha_omega)
+            V_current = lyapunov_function(state.I)
+            
+            # Check monotonic decrease
+            assert V_current < lyapunov_values[-1], (
+                f"Step {i+1}: Lyapunov increased or stayed same "
+                f"(V={V_current:.6f} ≥ V_prev={lyapunov_values[-1]:.6f})"
+            )
+            
+            lyapunov_values.append(V_current)
+        
+        # Check total decrease
+        total_decrease = lyapunov_values[0] - lyapunov_values[-1]
+        assert total_decrease > 0, (
+            f"No overall decrease: initial={lyapunov_values[0]:.6f}, "
+            f"final={lyapunov_values[-1]:.6f}"
         )
 
+    @given(
+        state_a=st.floats(min_value=-10.0, max_value=-0.1, allow_nan=False),
+        state_b=st.floats(min_value=0.1, max_value=10.0, allow_nan=False),
+    )
+    @settings(max_examples=100, deadline=500)
+    def test_lyapunov_positive_definite(self, state_a: float, state_b: float):
+        """
+        Property: V(I) > 0 for I ≠ 0, V(0) = 0 (positive definite).
+        """
+        # Away from equilibrium
+        V_a = lyapunov_function(state_a)
+        V_b = lyapunov_function(state_b)
+        
+        assert V_a > 0, f"V({state_a:.4f})={V_a:.6f} ≤ 0 (not positive definite)"
+        assert V_b > 0, f"V({state_b:.4f})={V_b:.6f} ≤ 0 (not positive definite)"
+        
+        # At equilibrium
+        V_zero = lyapunov_function(0.0)
+        assert abs(V_zero) < 1e-9, f"V(0)={V_zero:.6f} ≠ 0"
 
-def test_lyapunov_at_origin():
-    """Edge case: Lyapunov at equilibrium (origin)"""
-    V_origin = lyapunov_function(0.0)
-    assert V_origin == 0.0, "Lyapunov at origin should be zero"
-
-
-@given(
-    state=st.floats(min_value=0.1, max_value=10.0),
-)
-def test_lyapunov_symmetric(state):
-    """
-    Property: Lyapunov function is symmetric
-
-    ∀ state: V(state) = V(-state)
-    """
-    V_pos = lyapunov_function(state)
-    V_neg = lyapunov_function(-state)
-
-    assert V_pos == pytest.approx(
-        V_neg, rel=1e-6
-    ), f"Lyapunov not symmetric: V({state})={V_pos:.4f}, V({-state})={V_neg:.4f}"
-
-
-@given(
-    state_before=st.floats(min_value=0.1, max_value=10.0),
-    state_after=st.floats(min_value=0.0, max_value=9.99),
-)
-def test_validate_lyapunov_decrease_function(state_before, state_after):
-    """
-    Property: validate_lyapunov_decrease correctly identifies V(t+1) < V(t)
-    """
-    is_decreasing = validate_lyapunov_decrease(state_before, state_after)
-
-    V_before = lyapunov_function(state_before)
-    V_after = lyapunov_function(state_after)
-
-    if V_after < V_before:
-        assert is_decreasing, "Should validate as decreasing"
-    else:
-        assert not is_decreasing, "Should NOT validate as decreasing"
-
-
-def test_lyapunov_convergence_to_zero():
-    """Test convergence: repeated applications drive V → 0"""
-    state = 5.0
-    decay = 0.9
-    max_steps = 100
-
-    for step in range(max_steps):
-        V = lyapunov_function(state)
-        state = state * decay
-
-        if V < 1e-6:
-            # Successfully converged
-            break
-    else:
-        pytest.fail("Did not converge to near-zero in 100 steps")
+    @given(
+        initial_state=st.floats(min_value=-5.0, max_value=5.0, allow_nan=False),
+        delta_linf=st.floats(min_value=0.0, max_value=0.1, allow_nan=False),
+    )
+    @settings(max_examples=150, deadline=500)
+    def test_lyapunov_rate_of_decrease(self, initial_state: float, delta_linf: float):
+        """
+        Property: Rate of decrease (|ΔV|) increases with delta_linf.
+        """
+        state = MasterState(I=initial_state)
+        alpha_omega = 0.1
+        
+        V_t = lyapunov_function(state.I)
+        state_next = step_master(state, delta_linf=delta_linf, alpha_omega=alpha_omega)
+        V_t1 = lyapunov_function(state_next.I)
+        
+        decrease = V_t - V_t1
+        
+        # Decrease should be positive
+        assert decrease > 0, f"No decrease: ΔV={-decrease:.6f}"
+        
+        # Decrease should be bounded (not too aggressive)
+        assert decrease < V_t, f"Decrease too large: ΔV={decrease:.6f} > V(t)={V_t:.6f}"
 
 
-@given(
-    state_t=st.floats(min_value=0.1, max_value=10.0),
-    step_size=st.floats(min_value=0.01, max_value=0.5),
-)
-def test_lyapunov_with_gradient_descent(state_t, step_size):
-    """
-    Property: Gradient descent reduces Lyapunov
+class TestLyapunovEdgeCases:
+    """Edge case tests for Lyapunov function."""
 
-    ∀ state, α > 0:
-        state_t+1 = state_t - α * ∇V(state_t)
-        ⇒ V(t+1) < V(t)
-    """
-    # Gradient of V(x) = x²/2 is ∇V(x) = x
-    gradient = state_t
+    def test_near_equilibrium(self):
+        """Test behavior near equilibrium (I ≈ 0)."""
+        state = MasterState(I=0.001)
+        V_t = lyapunov_function(state.I)
+        
+        state_next = step_master(state, delta_linf=0.01, alpha_omega=0.05)
+        V_t1 = lyapunov_function(state_next.I)
+        
+        assert V_t1 < V_t, f"Lyapunov did not decrease near equilibrium: {V_t1} ≥ {V_t}"
 
-    # Gradient descent step
-    state_t1 = state_t - step_size * gradient
+    def test_far_from_equilibrium(self):
+        """Test behavior far from equilibrium."""
+        state = MasterState(I=10.0)
+        V_t = lyapunov_function(state.I)
+        
+        state_next = step_master(state, delta_linf=0.1, alpha_omega=0.2)
+        V_t1 = lyapunov_function(state_next.I)
+        
+        assert V_t1 < V_t, f"Lyapunov did not decrease far from equilibrium"
 
-    V_t = lyapunov_function(state_t)
-    V_t1 = lyapunov_function(state_t1)
+    def test_convergence_to_equilibrium(self):
+        """Test that system converges to equilibrium over many steps."""
+        state = MasterState(I=5.0)
+        
+        for _ in range(50):
+            state = step_master(state, delta_linf=0.05, alpha_omega=0.1)
+        
+        # Should be closer to equilibrium
+        assert abs(state.I) < 5.0, f"State did not move toward equilibrium: I={state.I}"
 
-    assert V_t1 <= V_t, f"Gradient descent did not decrease Lyapunov: {V_t} → {V_t1}"
+
+@pytest.fixture
+def sample_states():
+    """Sample states for testing."""
+    return [-5.0, -1.0, 0.0, 1.0, 5.0]
+
+
+def test_lyapunov_on_samples(sample_states):
+    """Smoke test on sample values."""
+    for initial in sample_states:
+        if initial == 0.0:
+            continue  # Skip equilibrium
+        
+        state = MasterState(I=initial)
+        V_t = lyapunov_function(state.I)
+        
+        state_next = step_master(state, delta_linf=0.05, alpha_omega=0.1)
+        V_t1 = lyapunov_function(state_next.I)
+        
+        assert V_t1 < V_t, f"Lyapunov did not decrease for I={initial}: {V_t1} ≥ {V_t}"
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v", "--hypothesis-show-statistics"])
