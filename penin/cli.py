@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 PENIN-Ω CLI - Command Line Interface
 ===================================
@@ -15,32 +14,30 @@ Comandos principais:
 Interface unificada para operação do sistema PENIN-Ω.
 """
 
-import sys
 import argparse
 import json
+import sys
 import time
 from pathlib import Path
 
 # Imports dos módulos Omega
 try:
-    from penin.omega.runners import EvolutionRunner, CycleConfig, BatchRunner
+    from observability import ObservabilityConfig, ObservabilityManager
+
     from penin.omega.evaluators import ComprehensiveEvaluator
     from penin.omega.ledger import WORMLedger
-    from penin.omega.mutators import ChallengerGenerator
-    from penin.omega.tuner import PeninAutoTuner
-    from observability import ObservabilityManager, ObservabilityConfig
+    from penin.omega.runners import BatchRunner, CycleConfig, EvolutionRunner
 except ImportError:
     # Fallback para desenvolvimento
     import sys
 
     # Package imports now work without sys.path hacks
     try:
-        from penin.omega.runners import EvolutionRunner, CycleConfig, BatchRunner
+        from observability import ObservabilityConfig, ObservabilityManager
+
         from penin.omega.evaluators import ComprehensiveEvaluator
         from penin.omega.ledger import WORMLedger
-        from penin.omega.mutators import ChallengerGenerator
-        from penin.omega.tuner import PeninAutoTuner
-        from observability import ObservabilityManager, ObservabilityConfig
+        from penin.omega.runners import BatchRunner, CycleConfig, EvolutionRunner
     except ImportError as e2:
         print(f"❌ Erro ao importar módulos PENIN: {e2}")
         print("   Certifique-se de que todos os módulos estão no PYTHONPATH")

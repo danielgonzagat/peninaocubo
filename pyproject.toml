@@ -145,11 +145,16 @@ ignore = [
     "PLR2004", # magic-value-comparison
     "E402",    # module-import-not-at-top-of-file
     "PLC0415", # import-outside-toplevel
+    "E501",    # line too long (allow for SQL, docs, logs)
+    "E741",    # ambiguous variable name (allow CAOS C,A,O,S)
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "test_*.py" = ["E402", "PLC0415", "PLR2004", "RUF001", "RUF002"]
 "examples/*.py" = ["E402", "T201"]
+"scripts/*.py" = ["F841", "PLW1510", "PLW2901", "C901", "E501"]
+"penin/omega/*.py" = ["E741"]
+"penin/omega/ledger.py" = ["W291", "W293", "E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["penin"]

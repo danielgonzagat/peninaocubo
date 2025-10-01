@@ -3,19 +3,18 @@ from __future__ import annotations
 import inspect
 import os
 import sys
-import types
 from functools import wraps
-from typing import Any, Dict, Optional
+from typing import Any
 
 from .life_eq import life_equation
 
 
-def _extract_metrics(*args, **kwargs) -> Dict[str, Any]:
+def _extract_metrics(*args, **kwargs) -> dict[str, Any]:
     """
     Extrai o máximo possível de métricas de args/kwargs/objetos típicos
     sem quebrar se não existir. Se não achar, retorna dict parcial.
     """
-    out: Dict[str, Any] = {}
+    out: dict[str, Any] = {}
     # 1) procurar em kwargs campos óbvios
     for k in (
         "ece",
@@ -90,7 +89,7 @@ def _extract_metrics(*args, **kwargs) -> Dict[str, Any]:
     return out
 
 
-def _vida_check_or_block() -> Optional[str]:
+def _vida_check_or_block() -> str | None:
     # variável de ambiente para modo estrito
     if os.getenv("PENIN_ENFORCE_VIDA_STRICT", "0") == "1":
         return "strict"
@@ -121,7 +120,7 @@ def _wrap_promote(fn, where: str):
     return wrapper
 
 
-def _try_patch(target_mod: str, attr: str, where: str, results: Dict[str, bool]):
+def _try_patch(target_mod: str, attr: str, where: str, results: dict[str, bool]):
     try:
         mod = __import__(target_mod, fromlist=[attr])
         f = getattr(mod, attr, None)
@@ -132,12 +131,12 @@ def _try_patch(target_mod: str, attr: str, where: str, results: Dict[str, bool])
         results[f"{target_mod}.{attr}"] = False
 
 
-def auto_patch() -> Dict[str, bool]:
+def auto_patch() -> dict[str, bool]:
     """
     Tenta patchar os pontos mais comuns de promoção/ciclo.
     Retorna dict indicando onde conseguiu aplicar o hook.
     """
-    patched: Dict[str, bool] = {}
+    patched: dict[str, bool] = {}
     # alvos prováveis
     _try_patch("penin.omega.league", "promote", "league.promote", patched)
     _try_patch("penin.omega.league", "promote_variant", "league.promote_variant", patched)

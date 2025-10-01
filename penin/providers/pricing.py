@@ -110,12 +110,12 @@ def calculate_cost(provider: str, model: str, prompt_tokens: int, completion_tok
 
 def get_first_available(usage: Any, *keys: str) -> int:
     """Extract the first available integer value from usage metadata.
-    
+
     This function tries multiple key names to handle different SDK response formats.
     """
     if not usage:
         return 0
-    
+
     # Try dict-like access
     if isinstance(usage, dict):
         for key in keys:
@@ -125,7 +125,7 @@ def get_first_available(usage: Any, *keys: str) -> int:
                 except (TypeError, ValueError):
                     continue
         return 0
-    
+
     # Try attribute access
     for key in keys:
         if hasattr(usage, key):

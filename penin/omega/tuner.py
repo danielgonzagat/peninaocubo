@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 
 class AdaGradTuner:
@@ -37,7 +37,7 @@ class PeninOmegaTuner:
         self.adagrad = AdaGradTuner()
         self.history = []
 
-    def update_from_cycle_result(self, metrics: Dict[str, Any]) -> Dict[str, float]:
+    def update_from_cycle_result(self, metrics: dict[str, Any]) -> dict[str, float]:
         """Atualiza parâmetros baseado no resultado do ciclo"""
         self.history.append(metrics)
 

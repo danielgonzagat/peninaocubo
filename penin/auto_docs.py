@@ -1,5 +1,5 @@
-from pathlib import Path
 import datetime
+from pathlib import Path
 
 
 def update_readme():

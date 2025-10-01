@@ -9,7 +9,6 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
 
 
 class DependencyUpdater:
@@ -23,12 +22,12 @@ class DependencyUpdater:
     def backup_requirements(self):
         """Create backup of current requirements."""
         if self.requirements_file.exists():
-            with open(self.requirements_file, "r") as src:
+            with open(self.requirements_file) as src:
                 with open(self.backup_file, "w") as dst:
                     dst.write(src.read())
             print(f"✅ Backed up requirements to {self.backup_file}")
 
-    def get_outdated_packages(self) -> List[Dict[str, str]]:
+    def get_outdated_packages(self) -> list[dict[str, str]]:
         """Get list of outdated packages."""
         try:
             result = subprocess.run(
@@ -44,13 +43,13 @@ class DependencyUpdater:
             print(f"❌ Error getting outdated packages: {e}")
             return []
 
-    def get_security_vulnerabilities(self) -> List[Dict[str, str]]:
+    def get_security_vulnerabilities(self) -> list[dict[str, str]]:
         """Check for security vulnerabilities."""
         try:
             # Try to use safety if available
-            result = subprocess.run([sys.executable, "-m", "pip", "install", "safety"], capture_output=True, text=True)
+            result = subprocess.run([sys.executable, "-m", "pip", "install", "safety"], check=False, capture_output=True, text=True)
 
-            result = subprocess.run([sys.executable, "-m", "safety", "check", "--json"], capture_output=True, text=True)
+            result = subprocess.run([sys.executable, "-m", "safety", "check", "--json"], check=False, capture_output=True, text=True)
 
             if result.returncode == 0:
                 vulnerabilities = json.loads(result.stdout)
@@ -62,7 +61,7 @@ class DependencyUpdater:
             print(f"⚠️  Could not check security vulnerabilities: {e}")
             return []
 
-    def update_package(self, package_name: str, target_version: Optional[str] = None) -> bool:
+    def update_package(self, package_name: str, target_version: str | None = None) -> bool:
         """Update a single package."""
         try:
             if target_version:
@@ -98,14 +97,14 @@ class DependencyUpdater:
 
         return all_passed
 
-    def update_requirements_file(self, updated_packages: Dict[str, str]):
+    def update_requirements_file(self, updated_packages: dict[str, str]):
         """Update requirements.txt with new versions."""
         if not self.requirements_file.exists():
             print("❌ Requirements file not found")
             return False
 
         # Read current requirements
-        with open(self.requirements_file, "r") as f:
+        with open(self.requirements_file) as f:
             lines = f.readlines()
 
         # Update lines with new versions
@@ -148,7 +147,7 @@ class DependencyUpdater:
     def rollback(self):
         """Rollback to backup if update failed."""
         if self.backup_file.exists():
-            with open(self.backup_file, "r") as src:
+            with open(self.backup_file) as src:
                 with open(self.requirements_file, "w") as dst:
                     dst.write(src.read())
             print("🔄 Rolled back to backup")

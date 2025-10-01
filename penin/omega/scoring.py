@@ -1,19 +1,18 @@
-from dataclasses import dataclass
-from typing import List, Dict
 import math
+from dataclasses import dataclass
 
 
-def quick_harmonic(values: List[float], weights: List[float] = None, eps: float = 1e-9) -> float:
+def quick_harmonic(values: list[float], weights: list[float] = None, eps: float = 1e-9) -> float:
     """Quick harmonic mean calculation with optional weights."""
     if weights is None:
         weights = [1.0] * len(values)
     return harmonic_mean_weighted(values, weights, eps)
 
 
-def harmonic_mean_weighted(values: List[float], weights: List[float], eps: float = 1e-9) -> float:
+def harmonic_mean_weighted(values: list[float], weights: list[float], eps: float = 1e-9) -> float:
     wsum = sum(weights) or eps
     den = 0.0
-    for v, w in zip(values, weights):
+    for v, w in zip(values, weights, strict=False):
         v = max(eps, float(v))
         den += w / v
     return wsum / max(eps, den)
@@ -63,7 +62,7 @@ def score_gate(
     return GateVerdict("fail", score)
 
 
-def normalize_series(values: List[float]) -> List[float]:
+def normalize_series(values: list[float]) -> list[float]:
     if not values:
         return []
     vmin = min(values)

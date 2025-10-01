@@ -6,11 +6,12 @@ import asyncio
 import json
 import time
 from collections import deque
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any
 
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -68,7 +69,7 @@ class BudgetTracker:
         self._reset_if_needed()
         return self.current_spend_usd >= self.daily_budget_usd
 
-    def snapshot(self) -> Dict[str, Any]:
+    def snapshot(self) -> dict[str, Any]:
         self._reset_if_needed()
         budget_remaining = self.remaining_budget()
         usage_pct = (
@@ -88,7 +89,7 @@ class BudgetTracker:
             "budget_exceeded": self.is_budget_exceeded(),
         }
 
-    def reset(self, new_budget_usd: Optional[float] = None) -> None:
+    def reset(self, new_budget_usd: float | None = None) -> None:
         if new_budget_usd is not None:
             self.daily_budget_usd = float(new_budget_usd)
         self.current_spend_usd = 0.0
@@ -111,9 +112,9 @@ class ProviderStats:
     total_tokens_in: int = 0
     total_tokens_out: int = 0
     consecutive_failures: int = 0
-    last_error: Optional[str] = None
-    last_success_at: Optional[float] = None
-    last_failure_at: Optional[float] = None
+    last_error: str | None = None
+    last_success_at: float | None = None
+    last_failure_at: float | None = None
     health: ProviderHealth = ProviderHealth.HEALTHY
 
     def record_success(self, response: LLMResponse, latency_s: float) -> None:
@@ -156,7 +157,7 @@ class ProviderStats:
     def total_tokens(self) -> int:
         return self.total_tokens_in + self.total_tokens_out
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "provider_id": self.provider_id,
             "total_requests": self.total_requests,
@@ -238,16 +239,16 @@ class MultiLLMRouter:
     def __init__(
         self,
         providers: Iterable[BaseProvider],
-        daily_budget_usd: Optional[float] = None,
+        daily_budget_usd: float | None = None,
         cost_weight: float = 0.3,
         latency_weight: float = 0.3,
         quality_weight: float = 0.4,
         enable_circuit_breaker: bool = True,
-        state_path: Optional[Path] = None,
+        state_path: Path | None = None,
     ) -> None:
         provider_list = list(providers)
         max_parallel = max(1, int(getattr(settings, "PENIN_MAX_PARALLEL_PROVIDERS", len(provider_list) or 1)))
-        self.providers: List[BaseProvider] = provider_list[:max_parallel]
+        self.providers: list[BaseProvider] = provider_list[:max_parallel]
         self.cost_weight = cost_weight
         self.latency_weight = latency_weight
         self.quality_weight = quality_weight
@@ -258,20 +259,20 @@ class MultiLLMRouter:
         self._budget = BudgetTracker(daily_budget_usd=float(daily_budget))
         self._budget_lock = asyncio.Lock()
 
-        self._provider_ids: Dict[int, str] = {}
-        self.provider_stats: Dict[str, ProviderStats] = {}
-        self._provider_locks: Dict[str, asyncio.Lock] = {}
-        self.circuit_breakers: Dict[str, CircuitBreaker] = {}
+        self._provider_ids: dict[int, str] = {}
+        self.provider_stats: dict[str, ProviderStats] = {}
+        self._provider_locks: dict[str, asyncio.Lock] = {}
+        self.circuit_breakers: dict[str, CircuitBreaker] = {}
 
-        seen: Dict[str, int] = {}
-        for idx, provider in enumerate(self.providers):
+        seen: dict[str, int] = {}
+        for _idx, provider in enumerate(self.providers):
             base = getattr(provider, "name", provider.__class__.__name__).lower()
             suffix = seen.get(base, 0)
             provider_id = _provider_identifier(provider, suffix)
             seen[base] = suffix + 1
             self._provider_ids[id(provider)] = provider_id
             if not getattr(provider, "provider_id", None):
-                setattr(provider, "provider_id", provider_id)
+                provider.provider_id = provider_id
             self.provider_stats[provider_id] = ProviderStats(provider_id=provider_id)
             self._provider_locks[provider_id] = asyncio.Lock()
             if enable_circuit_breaker:
@@ -357,12 +358,12 @@ class MultiLLMRouter:
     async def _invoke_provider(
         self,
         provider: BaseProvider,
-        messages: List[Dict[str, Any]],
+        messages: list[dict[str, Any]],
         *,
-        tools: Optional[List[Dict[str, Any]]],
-        system: Optional[str],
+        tools: list[dict[str, Any]] | None,
+        system: str | None,
         temperature: float,
-    ) -> Tuple[LLMResponse, str]:
+    ) -> tuple[LLMResponse, str]:
         provider_id = self._provider_id(provider)
         breaker = self.circuit_breakers.get(provider_id)
         if breaker and not breaker.can_call():
@@ -391,7 +392,7 @@ class MultiLLMRouter:
                 breaker.record_success()
         return response, provider_id
 
-    def _aggregate_usage(self, responses: Iterable[LLMResponse]) -> Tuple[float, int]:
+    def _aggregate_usage(self, responses: Iterable[LLMResponse]) -> tuple[float, int]:
         total_cost = 0.0
         total_tokens = 0
         for response in responses:
@@ -404,9 +405,9 @@ class MultiLLMRouter:
     @retry(stop=stop_after_attempt(2), wait=wait_exponential(multiplier=0.5))
     async def ask(
         self,
-        messages: List[Dict[str, Any]],
-        system: Optional[str] = None,
-        tools: Optional[List[Dict[str, Any]]] = None,
+        messages: list[dict[str, Any]],
+        system: str | None = None,
+        tools: list[dict[str, Any]] | None = None,
         temperature: float = 0.7,
         force_budget_override: bool = False,
     ) -> LLMResponse:
@@ -424,8 +425,8 @@ class MultiLLMRouter:
             raise RuntimeError("Router configured without providers")
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
-        successful: List[Tuple[LLMResponse, str]] = []
-        errors: List[str] = []
+        successful: list[tuple[LLMResponse, str]] = []
+        errors: list[str] = []
         for result in results:
             if isinstance(result, Exception):
                 errors.append(str(result))
@@ -456,20 +457,20 @@ class MultiLLMRouter:
     # ------------------------------------------------------------------
     # Public analytics helpers
     # ------------------------------------------------------------------
-    def get_usage_stats(self) -> Dict[str, Any]:
+    def get_usage_stats(self) -> dict[str, Any]:
         data = self._budget.snapshot()
         data["providers"] = {pid: stats.to_dict() for pid, stats in self.provider_stats.items()}
         if self.enable_circuit_breaker:
             data["circuit_breakers"] = {pid: breaker.state.value for pid, breaker in self.circuit_breakers.items()}
         return data
 
-    def get_budget_status(self) -> Dict[str, Any]:
+    def get_budget_status(self) -> dict[str, Any]:
         return self._budget.snapshot()
 
-    def reset_daily_budget(self, new_budget: Optional[float] = None) -> None:
+    def reset_daily_budget(self, new_budget: float | None = None) -> None:
         self._budget.reset(new_budget)
 
-    def get_analytics(self) -> Dict[str, Any]:
+    def get_analytics(self) -> dict[str, Any]:
         stats = self.get_usage_stats()
         stats["config"] = {
             "cost_weight": self.cost_weight,
