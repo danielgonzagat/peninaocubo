@@ -929,6 +929,13 @@ class SROmegaService:
             actual_sr: Actual SR score achieved (if available)
             message: Additional message about the outcome
         """
+        # Extract task name before removing from pending
+        task_name = None
+        for rec in self.pending_recommendations:
+            if rec.recommendation_id == recommendation_id:
+                task_name = rec.task
+                break
+
         # Remove from pending
         self.pending_recommendations = [r for r in self.pending_recommendations if r.recommendation_id != recommendation_id]
 
@@ -947,11 +954,8 @@ class SROmegaService:
             self.recent_outcomes.pop(0)
 
         # Update task success rates
-        # Extract task from recommendation if still in memory
-        for rec in self.pending_recommendations:
-            if rec.recommendation_id == recommendation_id:
-                self._update_task_success_rate(rec.task, success)
-                break
+        if task_name:
+            self._update_task_success_rate(task_name, success)
 
     def _update_task_success_rate(self, task: str, success: bool) -> None:
         """Update success rate tracking for a task"""
