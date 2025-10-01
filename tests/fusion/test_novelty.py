@@ -9,3 +9,12 @@ def test_vectorize_and_novelty():
     assert len(v)==7
     # mesma métrica => novelty ~ 0
     assert (novelty(v, v) or 0.0) < 1e-8
+    
+    # Test edge cases
+    v2 = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    v3 = [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    nov = novelty(v2, v3)
+    assert nov is not None and 0.0 <= nov <= 1.0
+    
+    # Test with None reference
+    assert novelty(v, None) is None
