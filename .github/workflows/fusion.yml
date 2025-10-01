@@ -1,0 +1,11 @@
+name: Fusion smoke
+on: [pull_request, push]
+jobs:
+  fusion:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - run: python -m venv .venv && . .venv/bin/activate && pip -q install -U pip pytest pyyaml
+      - run: . .venv/bin/activate && pytest -q tests/fusion/test_fusion_emergent.py
