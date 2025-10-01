@@ -35,6 +35,7 @@
 - **📊 SR-Ω∞ Service**: Self-reflection scoring with continuous assessment (4 dimensions)
 - **🏆 ACFA League**: Shadow/Canary deployment orchestration with automatic rollback
 - **📝 WORM Ledger**: Write-Once-Read-Many audit trail with Merkle chain
+- **🔐 Cryptographic Attestation**: Ed25519 signatures for mathematically verifiable model promotions
 - **🔍 Ethics Metrics**: ECE ≤ 0.01, bias ratios ρ_bias ≤ 1.05, and fairness scores with attestation
 - **🔌 Multi-Provider Router**: Cost-aware LLM routing (OpenAI, Anthropic, Gemini, Grok, Mistral, Qwen)
 - **📈 Observability**: Prometheus metrics, structured logging, and distributed tracing
