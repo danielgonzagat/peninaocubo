@@ -3,13 +3,15 @@ PENIN-Ω Mutators Module
 =======================
 
 Implements mutation strategies for model parameters, prompts, and configurations.
+Uses BLAKE2b for configuration hashing (v2.0).
 """
 
-import hashlib
 import json
 import random
 from dataclasses import dataclass
 from typing import Any
+
+from penin.ledger.hash_utils import hash_json
 
 
 @dataclass
@@ -87,9 +89,8 @@ class ParameterMutator:
         return variants
 
     def _hash_config(self, config: dict[str, Any]) -> str:
-        """Create deterministic hash of configuration"""
-        config_str = json.dumps(config, sort_keys=True)
-        return hashlib.sha256(config_str.encode()).hexdigest()
+        """Create deterministic hash of configuration using BLAKE2b"""
+        return hash_json(config)
 
 
 def generate_parameter_variants(

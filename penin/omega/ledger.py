@@ -7,11 +7,14 @@ Implementa:
 - Schema Pydantic v2 para RunRecord
 - File locks para concorrência
 - Pasta runs/<ts_id>/ com artifacts
-- Hash chain para integridade
+- BLAKE2b hash chain para integridade (v2.0)
 - Rollback atômico via champion pointer
+
+Hash Algorithm Evolution:
+- v1.0: SHA-256 (legacy)
+- v2.0: BLAKE2b-256 (current) - faster, more secure, modern
 """
 
-import hashlib
 import json
 import sqlite3
 import threading
@@ -21,6 +24,8 @@ from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+from penin.ledger.hash_utils import compute_hash, hash_json
 
 try:
     import portalocker
@@ -237,14 +242,13 @@ class WORMLedger:
             return row[0] if row else "genesis"
 
     def _compute_record_hash(self, record: RunRecord, prev_hash: str) -> str:
-        """Computa hash do record para chain"""
+        """Computa hash do record para chain usando BLAKE2b"""
         # Serializar record de forma determinística
         record_dict = record.model_dump()
         record_dict["prev_hash"] = prev_hash
 
-        # Hash SHA-256
-        record_json = json.dumps(record_dict, sort_keys=True, ensure_ascii=False)
-        return hashlib.sha256(record_json.encode()).hexdigest()
+        # Hash BLAKE2b
+        return hash_json(record_dict)
 
     def _create_run_directory(self, run_id: str) -> Path:
         """Cria diretório para artifacts do run"""
@@ -290,7 +294,7 @@ class WORMLedger:
                         "ts": time.time(),
                         "prev": self._tail_hash,
                     }
-                    record_hash = hashlib.sha256(json.dumps(simple_payload, sort_keys=True).encode()).hexdigest()
+                    record_hash = hash_json(simple_payload)
                     with sqlite3.connect(str(self.db_path)) as conn:
                         c = conn.cursor()
                         c.execute(
@@ -650,7 +654,7 @@ class SQLiteWORMLedger:
                 "ts": ts,
                 "prev": self._tail,
             }
-            record_hash = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+            record_hash = hash_json(payload)
             c = self._conn.cursor()
             c.execute(
                 "INSERT INTO events (etype, data, ts, prev, hash) VALUES (?, ?, ?, ?, ?)",
@@ -674,7 +678,7 @@ class SQLiteWORMLedger:
             if stored_prev != prev:
                 return False, f"Chain break at row {i}"
             payload = {"etype": etype, "data": json.loads(data), "ts": ts, "prev": stored_prev}
-            calc = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+            calc = hash_json(payload)
             if calc != stored_hash:
                 return False, f"Hash mismatch at row {i}"
             prev = stored_hash
