@@ -366,7 +366,6 @@ class PeninCLI:
 
         try:
             # Create a local node to perform the query
-            node = PeninNode("cli-node", SROmegaService())
 
             # For demonstration, we'll simulate a peer response
             # In a real implementation, this would query over the network
