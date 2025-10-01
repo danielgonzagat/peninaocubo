@@ -588,13 +588,92 @@ def compute_caos_plus_simple(
     """
     Wrapper simplificado quando já se tem C, A, O, S normalizados.
 
+    Esta função é um meio-termo entre `compute_caos_plus_exponential` (fórmula pura)
+    e `compute_caos_plus_complete` (pipeline completo). Use quando:
+    - Você já calculou os componentes C, A, O, S
+    - Não precisa de métricas estruturadas detalhadas
+    - Quer configuração avançada (clamps, normalização, fórmula alternativa)
+    - Não precisa de EMA ou tracking temporal
+
+    Funcionalidades
+    ---------------
+    - Aplica clamping automático nos inputs [0, 1]
+    - Suporta múltiplas fórmulas (exponential, phi_caos, hybrid)
+    - Aplica clamps no output (caos_min, caos_max)
+    - Normalização opcional para [0, 1]
+    - Configuração via CAOSConfig
+
     Args:
-        C, A, O, S: Componentes [0, 1]
-        kappa: Ganho base
-        config: Configuração opcional (se None, usa defaults)
+        C (float): Consistência [0, 1]
+            Valores fora do range são automaticamente clampados
+        A (float): Autoevolução [0, 1]
+            Valores fora do range são automaticamente clampados
+        O (float): Incognoscível [0, 1]
+            Valores fora do range são automaticamente clampados
+        S (float): Silêncio [0, 1]
+            Valores fora do range são automaticamente clampados
+        kappa (float): Ganho base (padrão: 20.0)
+            Usado apenas se config=None
+        config (CAOSConfig | None): Configuração opcional
+            Se None, cria config padrão com kappa fornecido
+            Se fornecido, usa todos parâmetros do config
 
     Returns:
-        CAOS⁺ (scaled e clamped conforme config)
+        float: CAOS⁺ processado conforme configuração
+            - Range padrão: [1.0, 10.0]
+            - Se normalize_output=True: [0.0, 1.0]
+            - Sempre aplicado clamping conforme config
+
+    Examples:
+        >>> # Uso básico com defaults
+        >>> compute_caos_plus_simple(0.8, 0.5, 0.3, 0.7, kappa=20.0)
+        1.5863...
+
+        >>> # Com configuração customizada
+        >>> config = CAOSConfig(
+        ...     kappa=25.0,
+        ...     caos_min=1.0,
+        ...     caos_max=5.0,  # Limitar amplificação
+        ...     normalize_output=True  # Normalizar para [0, 1]
+        ... )
+        >>> compute_caos_plus_simple(0.8, 0.5, 0.3, 0.7, config=config)
+        0.1465...  # Valor normalizado
+
+        >>> # Usando fórmula alternativa phi_caos
+        >>> config_phi = CAOSConfig(
+        ...     formula=CAOSFormula.PHI_CAOS,
+        ...     kappa=2.0,
+        ...     gamma=0.7
+        ... )
+        >>> compute_caos_plus_simple(0.8, 0.5, 0.3, 0.7, config=config_phi)
+        0.0805...  # Resultado da fórmula com saturação
+
+        >>> # Clamping automático de inputs
+        >>> compute_caos_plus_simple(1.5, -0.2, 0.5, 0.8)  # Valores inválidos
+        1.0000  # Clampados para (1.0, 0.0, 0.5, 0.8) → resultado 1.0
+
+    Quando Usar
+    -----------
+    Use `compute_caos_plus_simple` quando:
+    ✅ Já tem C, A, O, S calculados
+    ✅ Quer configuração avançada (clamps, normalização)
+    ✅ Não precisa de métricas estruturadas
+    ✅ Não precisa de EMA ou tracking
+
+    Use `compute_caos_plus_exponential` quando:
+    ✅ Quer fórmula pura sem configuração
+    ✅ Máxima simplicidade
+
+    Use `compute_caos_plus_complete` quando:
+    ✅ Tem métricas estruturadas (ConsistencyMetrics, etc)
+    ✅ Precisa de EMA e tracking temporal
+    ✅ Precisa de auditoria completa (details dict)
+
+    Ver Também
+    ----------
+    - compute_caos_plus_exponential: Fórmula matemática pura
+    - compute_caos_plus_complete: Pipeline completo com métricas e EMA
+    - CAOSConfig: Detalhes de configuração disponível
     """
     if config is None:
         config = CAOSConfig(kappa=kappa)
