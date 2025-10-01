@@ -1,24 +1,31 @@
-fastapi>=0.110,<1.0
-uvicorn>=0.23,<1.0
-requests>=2.31
-rich>=13.0
+# PENIN-Ω Core Dependencies
+# Install with: pip install -r requirements.txt
+# For full installation with all features: pip install -e ".[full]"
 
-# Optional research plugins (install if desired):
-# nextpy
-# naslib
-# mammoth-cl
-# symbolicai
-
-# Core
+# Core Framework
+fastapi>=0.110.0,<1.0
+uvicorn>=0.23.0,<1.0
+pydantic>=2.0.0
 pydantic-settings>=2.4.0
-psutil>=5.9.0
 
-# Observability / logging
+# System & Performance
+psutil>=5.9.0
+tenacity>=8.2.0
+orjson>=3.9.0
+
+# HTTP & Networking
+requests>=2.31.0
+httpx>=0.24.0
+
+# CLI & User Interface
+rich>=13.0.0
+
+# Observability & Logging
 prometheus-client>=0.16.0
 structlog>=23.1.0
 python-json-logger>=2.0.7
 
-# Providers / LLMs
+# LLM Providers
 openai>=1.40.0
 anthropic>=0.40.0
 mistralai>=1.2.4
@@ -27,21 +34,32 @@ xai-sdk>=0.2.1
 huggingface_hub>=0.24.0
 kaggle>=1.6.14
 
-# Modelagem / Vector / Utils
-numpy>=1.24.0
-faiss-cpu>=1.8.0
-sentence-transformers>=2.7.0
+# Data Science & ML
+numpy>=1.24.0,<2.0
 pandas>=2.2.0
+sentence-transformers>=2.7.0
 tiktoken>=0.7.0
-pyyaml>=6.0.1
+
+# Vector Search
+faiss-cpu>=1.8.0
+
+# Caching & Storage
 redis>=4.5.0
-httpx>=0.24.0
 cachetools>=5.3.0
 
-# Dev / Test
-pytest>=7.3.0
-pytest-asyncio>=0.21.0
-pytest-cov>=4.1.0
-black>=23.0.0
-mypy>=1.3.0
-ruff>=0.6.0
+# Configuration & Utils
+pyyaml>=6.0.1
+
+# Development Dependencies (optional, install with pip install -e ".[dev]")
+# pytest>=7.3.0
+# pytest-asyncio>=0.21.0
+# pytest-cov>=4.1.0
+# ruff>=0.6.0
+# black>=23.0.0
+# mypy>=1.3.0
+# pre-commit>=3.3.0
+
+# Documentation (optional, install with pip install -e ".[docs]")
+# mkdocs>=1.5.0
+# mkdocs-material>=9.0.0
+# mkdocstrings[python]>=0.24.0

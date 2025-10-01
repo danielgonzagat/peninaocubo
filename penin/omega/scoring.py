@@ -3,6 +3,13 @@ from typing import List, Dict
 import math
 
 
+def quick_harmonic(values: List[float], weights: List[float] = None, eps: float = 1e-9) -> float:
+    """Quick harmonic mean calculation with optional weights."""
+    if weights is None:
+        weights = [1.0] * len(values)
+    return harmonic_mean_weighted(values, weights, eps)
+
+
 def harmonic_mean_weighted(values: List[float], weights: List[float], eps: float = 1e-9) -> float:
     wsum = sum(weights) or eps
     den = 0.0
@@ -16,6 +23,22 @@ def harmonic_mean_weighted(values: List[float], weights: List[float], eps: float
 class GateVerdict:
     verdict: str
     score: float
+
+
+def quick_score_gate(
+    x1: float,
+    x2: float,
+    cost: float = 0.0,
+    x4: float = 0.0,
+    w1: float = 0.4,
+    w2: float = 0.3,
+    wcost: float = 0.2,
+    w4: float = 0.1,
+    tau: float = 0.8,
+    canary_margin: float = 0.05,
+) -> GateVerdict:
+    """Quick gate scoring with default weights."""
+    return score_gate(x1, x2, cost, x4, w1, w2, wcost, w4, tau, canary_margin)
 
 
 def score_gate(
