@@ -47,7 +47,12 @@ from penin.equations.oci_closure import OCIConfig, organizational_closure_index
 from penin.equations.omega_sea_total import OmegaSEAConfig, omega_sea_coherence
 from penin.equations.penin_equation import PeninState, penin_update
 from penin.equations.sigma_guard_gate import SigmaGuardConfig, sigma_guard_check
-from penin.equations.sr_omega_infinity import SRConfig, compute_sr_omega_infinity
+# SR-Ω∞ moved to penin/math/sr_omega_infinity.py for better organization
+from penin.math.sr_omega_infinity import SRScore, compute_sr_score
+
+# Backward compatibility aliases
+SRConfig = SRScore  # Type alias for compatibility
+compute_sr_omega_infinity = compute_sr_score  # Function alias
 
 __all__ = [
     # Equation 1: Penin Equation
