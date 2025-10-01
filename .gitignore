@@ -142,3 +142,7 @@ penin_data/
 *.penin
 # Benchmark results (regeneratable)
 benchmarks/*.json
+
+# PENIN-Ω state files
+.penin_omega/
+state.json
