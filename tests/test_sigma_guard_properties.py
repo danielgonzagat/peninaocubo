@@ -68,7 +68,7 @@ def passing_gate_metrics(draw) -> GateMetrics:
         sr_score=draw(valid_floats(0.81, 1.0)),  # >= 0.80
         omega_g=draw(valid_floats(0.86, 1.0)),  # >= 0.85
         delta_linf=draw(valid_floats(0.011, 0.2)),  # >= 0.01
-        caos_plus=draw(valid_floats(0.0, 50.0)),  # Not validated in current implementation
+        caos_plus=draw(valid_floats(0.0, 50.0)),  # Not validated in current implementation; does not affect test results
         cost_increase=draw(valid_floats(0.0, 0.09)),  # <= 0.10
         kappa=draw(valid_floats(21.0, 50.0)),  # >= 20.0
         consent=True,
