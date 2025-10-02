@@ -120,9 +120,11 @@ def run_smart(params: dict) -> None:
         "--gen", str(params["gen"]),
         "--novelty-min", str(params["novelty_min"]),
     ]
-    print("→ run_smart:", " ".join(cmd))
     try:
-        subprocess.run(cmd, check=False, timeout=int(os.environ.get("FUSE_SUBPROC_TIMEOUT","180")))
+        timeout_val = int(os.environ.get("FUSE_SUBPROC_TIMEOUT", "180"))
+        # Clamp timeout to reasonable bounds (30 seconds to 30 minutes)
+        timeout_val = max(30, min(1800, timeout_val))
+        subprocess.run(cmd, check=False, timeout=timeout_val)
     except subprocess.TimeoutExpired:
         print("⏱ run_smart: timeout do subprocesso — seguindo para o próximo.")
 
