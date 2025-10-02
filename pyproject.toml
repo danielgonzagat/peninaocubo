@@ -134,6 +134,12 @@ swarmrl = [
     # Add when implementing
 ]
 
+# Kubernetes Operator
+operator = [
+    "kopf>=1.37.0",
+    "kubernetes>=30.0.0",
+]
+
 # All SOTA integrations combined
 sota-p1 = [
     "peninaocubo[nextpy,metacog,spikingjelly]",
