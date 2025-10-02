@@ -126,7 +126,7 @@ def run_smart(params: dict) -> None:
         timeout_val = max(30, min(1800, timeout_val))
         subprocess.run(cmd, check=False, timeout=timeout_val)
     except subprocess.TimeoutExpired:
-        print("⏱ run_smart: timeout do subprocesso — seguindo para o próximo.")
+        print("⏱ run_smart: subprocess timeout — continuing to next.")
 
 def autotune_once(base: dict) -> dict:
     # tenta Optuna; senão faz três vizinhos do ponto atual
