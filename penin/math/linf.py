@@ -101,19 +101,25 @@ def compute_linf_meta(
         cost: Normalized cost
         config: L∞ configuration
         ethics_ok: ΣEA/LO-14 gate status
-        contractividade_ok: IR→IC gate status (ρ < 1)
+        contratividade_ok: IR→IC gate status (ρ < 1)
     
     Returns:
         L∞ score ∈ [0, 1], or 0.0 if gates fail
     """
+    import logging
+    
     if config is None:
         config = LInfConfig()
     
+    logger = logging.getLogger(__name__)
+    
     # Fail-closed gates
     if config.require_ethics and not ethics_ok:
+        logger.warning("L∞ computation blocked: Ethics gate failed (ΣEA/LO-14)")
         return 0.0
     
-    if config.require_contractividade and not contractividade_ok:
+    if config.require_contractividade and not contratividade_ok:
+        logger.warning("L∞ computation blocked: Contractividade gate failed (ρ ≥ 1)")
         return 0.0
     
     # Compute base harmonic mean
@@ -129,4 +135,8 @@ def compute_linf_meta(
     # Apply cost penalization
     penalty = math.exp(-config.lambda_c * max(0.0, cost))
     
+    result = base * penalty
+    logger.debug(f"L∞ computed: base={base:.4f}, penalty={penalty:.4f}, result={result:.4f}")
+    
+    return result
     return base * penalty
