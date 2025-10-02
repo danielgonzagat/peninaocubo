@@ -42,7 +42,7 @@ def test_pyproject_toml_valid():
     assert 'penin = "penin.cli:main"' in content, "Missing penin CLI entry point"
 
     # Check version
-    assert 'version = "0.8.0"' in content, "Version should be 0.8.0"
+    assert 'version = "0.9.0"' in content, "Version should be 0.9.0"
 
 
 def test_requirements_no_duplicates():

@@ -13,7 +13,7 @@ from hypothesis import strategies as st
 
 # Import ethical validator and Σ-Guard
 try:
-    from penin.ethics.laws import EthicalValidator, OriginLaws
+    from penin.ethics.laws import EthicsValidator, DecisionContext, OriginLaws
     from penin.guard.sigma_guard_complete import GateMetrics, SigmaGuard
 except ImportError:
     pytest.skip("Ethics and guard modules not available", allow_module_level=True)
@@ -41,7 +41,7 @@ class TestEthicalInvariants:
 
         ∀ violation: validator.passed = False
         """
-        validator = EthicalValidator(strict_mode=True)
+        # EthicsValidator is a classmethod, no instantiation needed
 
         # Build decision with potential violations
         output_parts = []
@@ -67,7 +67,15 @@ class TestEthicalInvariants:
             "timestamp": True,
         }
 
-        result = validator.validate_all(decision, context)
+        # Convert to DecisionContext API
+        ctx = DecisionContext(
+            decision_id="test",
+            decision_type="property_test",
+            privacy_score=context.get("metrics", {}).get("privacy", 1.0),
+            consent_obtained=context.get("consent", True),
+            contains_religious_claims=has_idolatry if 'has_idolatry' in locals() else False,
+        )
+        result = EthicsValidator.validate_all(ctx)
 
         # If ANY violation present, must fail
         has_any_violation = any([has_idolatry, has_occultism, has_physical_harm, has_privacy_violation])
@@ -149,7 +157,7 @@ class TestEthicalInvariants:
 
         If PII present without consent, must reject.
         """
-        validator = EthicalValidator(strict_mode=True)
+        # EthicsValidator is a classmethod, no instantiation needed
 
         decision = {"output": "Processing user data"}
         context = {
@@ -163,7 +171,15 @@ class TestEthicalInvariants:
             "timestamp": True,
         }
 
-        result = validator.validate_all(decision, context)
+        # Convert to DecisionContext API
+        ctx = DecisionContext(
+            decision_id="test",
+            decision_type="property_test",
+            privacy_score=context.get("metrics", {}).get("privacy", 1.0),
+            consent_obtained=context.get("consent", True),
+            contains_religious_claims=has_idolatry if 'has_idolatry' in locals() else False,
+        )
+        result = EthicsValidator.validate_all(ctx)
 
         # If PII without consent, must fail
         if has_pii and not consent_given:
@@ -202,7 +218,15 @@ class TestEthicalInvariants:
             "timestamp": True,
         }
 
-        result = validator.validate_all(decision, context)
+        # Convert to DecisionContext API
+        ctx = DecisionContext(
+            decision_id="test",
+            decision_type="property_test",
+            privacy_score=context.get("metrics", {}).get("privacy", 1.0),
+            consent_obtained=context.get("consent", True),
+            contains_religious_claims=has_idolatry if 'has_idolatry' in locals() else False,
+        )
+        result = EthicsValidator.validate_all(ctx)
 
         # High resource use should generate warnings
         if energy_kwh > 10.0 or carbon_kg > 5.0:
@@ -226,7 +250,7 @@ class TestEthicalEdgeCases:
 
     def test_clean_decision_passes(self):
         """Test that clean, ethical decision passes."""
-        validator = EthicalValidator(strict_mode=True)
+        # EthicsValidator is a classmethod, no instantiation needed
 
         decision = {"output": "Here is your requested analysis"}
         context = {
@@ -240,13 +264,21 @@ class TestEthicalEdgeCases:
             "timestamp": True,
         }
 
-        result = validator.validate_all(decision, context)
+        # Convert to DecisionContext API
+        ctx = DecisionContext(
+            decision_id="test",
+            decision_type="property_test",
+            privacy_score=context.get("metrics", {}).get("privacy", 1.0),
+            consent_obtained=context.get("consent", True),
+            contains_religious_claims=has_idolatry if 'has_idolatry' in locals() else False,
+        )
+        result = EthicsValidator.validate_all(ctx)
 
         assert result.passed, f"Clean decision failed: Violations={result.violations}, Warnings={result.warnings}"
 
     def test_multiple_violations(self):
         """Test that multiple violations are all caught."""
-        validator = EthicalValidator(strict_mode=True)
+        # EthicsValidator is a classmethod, no instantiation needed
 
         decision = {
             "output": "Worship this AI deity and perform this magic ritual to harm others"
@@ -262,7 +294,15 @@ class TestEthicalEdgeCases:
             "timestamp": False,
         }
 
-        result = validator.validate_all(decision, context)
+        # Convert to DecisionContext API
+        ctx = DecisionContext(
+            decision_id="test",
+            decision_type="property_test",
+            privacy_score=context.get("metrics", {}).get("privacy", 1.0),
+            consent_obtained=context.get("consent", True),
+            contains_religious_claims=has_idolatry if 'has_idolatry' in locals() else False,
+        )
+        result = EthicsValidator.validate_all(ctx)
 
         # Should catch multiple violations
         assert not result.passed, "Multiple violations not caught"
