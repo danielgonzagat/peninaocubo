@@ -1,21 +1,45 @@
-import time
+from __future__ import annotations
 from pathlib import Path
-from typing import Any
+from hashlib import blake2b
+import json, time
+from typing import Any, Dict
 
-import orjson
+_BASE = Path("penin/ledger/checkpoints")
+_BASE.mkdir(parents=True, exist_ok=True)
 
-SNAP = Path.home() / ".penin_omega" / "snapshots"
-SNAP.mkdir(parents=True, exist_ok=True)
+def _h(obj: bytes) -> str:
+    h = blake2b(digest_size=20)
+    h.update(obj)
+    return h.hexdigest()
 
+def save_snapshot(state: Dict[str, Any], name: str | None = None) -> Path:
+    """Salva um snapshot JSON + checksum. Retorna o caminho do .json."""
+    _BASE.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(state, sort_keys=True, ensure_ascii=False).encode("utf-8")
+    ts = time.strftime("%Y%m%d_%H%M%S")
+    stem = name or f"snapshot_{ts}"
+    path = _BASE / f"{stem}.json"
+    chk  = _BASE / f"{stem}.sha1"
+    path.write_bytes(payload)
+    chk.write_text(_h(payload), encoding="utf-8")
+    return path
 
-def save_snapshot(state: dict[str, Any]) -> str:
-    fn = SNAP / f"snap_{int(time.time())}.json"
-    fn.write_bytes(orjson.dumps(state))
-    return str(fn)
+def verify_checkpoint(path: str | Path) -> bool:
+    path = Path(path)
+    chk  = path.with_suffix(".sha1")
+    if not path.exists() or not chk.exists():
+        return False
+    payload = path.read_bytes()
+    want = chk.read_text(encoding="utf-8").strip()
+    try:
+        json.loads(payload.decode("utf-8"))
+    except Exception:
+        return False
+    return _h(payload) == want
 
-
-def restore_last() -> dict[str, Any] | None:
-    snaps = sorted(SNAP.glob("snap_*.json"))
-    if not snaps:
-        return None
-    return orjson.loads(snaps[-1].read_bytes())
+def restore_snapshot(path: str | Path) -> Dict[str, Any]:
+    path = Path(path)
+    if not verify_checkpoint(path):
+        raise ValueError(f"checkpoint inválido: {path}")
+    return json.loads(path.read_text(encoding="utf-8"))
+__all__ = ["save_snapshot","verify_checkpoint","restore_snapshot"]

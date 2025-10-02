@@ -79,7 +79,6 @@ Para guia detalhado com exemplos práticos, best practices e FAQ, consulte:
 docs/caos_guide.md
 """
 
-from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
@@ -1360,7 +1359,6 @@ if __name__ == "__main__":
 
 
 # --- auto-injetado: compute_A_autoevolution (contrativo e estável) ---
-from __future__ import annotations
 import numpy as _np
 
 def compute_A_autoevolution(phi, lam: float = 1.0):
@@ -1384,3 +1382,28 @@ def compute_A_autoevolution(phi, lam: float = 1.0):
     I = _np.eye(n)
     A = I - float(lam) * (L / scale)
     return A
+
+def compute_C_consistency(A, eps: float = 1e-12):
+    """Consistência ∈ [0,1] baseada na simetria de A.
+    1.0 => perfeitamente simétrico; 0.0 => altamente assimétrico.
+    """
+    import numpy as np
+    M = np.asarray(A, dtype=float)
+    if M.ndim == 1:
+        M = M[:, None]
+    if M.size == 0:
+        return 1.0
+    num = np.linalg.norm(M - M.T, ord='fro')
+    den = np.linalg.norm(M, ord='fro') + eps
+    score = 1.0 - float(num / (den*2**0.5))
+    return max(0.0, min(1.0, score))
+
+
+def compute_O_unknowable(A, eps: float = 1e-12):
+    """Mede o *desconhecível* ∈ [0,1] como complemento da consistência.
+    0.0 => totalmente conhecido/consistente; 1.0 => altamente desconhecido.
+    """
+    try:
+        return 1.0 - compute_C_consistency(A, eps=eps)
+    except Exception:
+        return 1.0
