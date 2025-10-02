@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-we-drawing",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/we-drawing",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/we-drawing",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8130903364672837,
+    "delta_linf": 0.003240948503686063,
+    "sr": 0.8652129644989314,
+    "G": 0.8657403884502831,
+    "ece": 0.011350271869876074,
+    "rho_bias": 1.0137861519825937,
+    "fp": 0.023017635240542605
+  },
+  "gate_pass": true,
+  "timestamp": 1759399634.394948,
+  "_slug": "github.com-danielgonzagat-we-drawing"
+}
