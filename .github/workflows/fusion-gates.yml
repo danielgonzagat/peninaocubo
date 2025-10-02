@@ -1,0 +1,39 @@
+name: Fusion gates
+on: [pull_request]
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.11" }
+      - name: Run smart sample and enforce PASS ratio
+        run: |
+          set -eux
+          python -m venv .venv
+          . .venv/bin/activate
+          pip -q install -U pip pyyaml orjson
+          export FUSE_REAL=1 FUSE_POLICY=staging FUSE_SUBPROC_TIMEOUT=120
+          export START_TS=$(date +%s)
+
+          # roda um lote curto e rápido
+          python scripts/run_smart.py --top 20 --mode auto --seed 2025 --jitter 0.0005 --pop 8 --gen 1 --novelty-min 0.0001
+
+          # calcula PASS apenas nos WORMs criados neste job
+          python -c "
+          import os,glob,json,time,sys
+          start=float(os.environ.get('START_TS','0'))
+          files=[f for f in glob.glob('penin/ledger/fusion/*.json') if os.path.getmtime(f)>=start-1]
+          ok=sum(1 for f in files if (lambda j: j.get('gate_pass') is True)(json.load(open(f))))
+          tot=len(files)
+          ratio=(ok/tot) if tot else 0.0
+          print(f'NEW PASS {ok}/{tot} = {ratio:.2%}')
+          sys.exit(0 if ratio>=0.98 else 1)
+          "
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fusion-ledger
+          path: |
+            penin/ledger/fusion/*.json
