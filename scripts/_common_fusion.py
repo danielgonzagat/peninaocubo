@@ -80,6 +80,8 @@ def vectorize(m: dict) -> List[float]:
     ]
     return vec
 
+def _dot(a: List[float], b: List[float]) -> float:
+    return sum(x * y for x, y in zip(a, b))
 def _norm(a: List[float]) -> float:
     return math.sqrt(_dot(a,a))
 def cosine(a: List[float], b: List[float]) -> float:
