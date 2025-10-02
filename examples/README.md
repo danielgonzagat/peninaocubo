@@ -2,6 +2,37 @@
 
 This directory contains complete, runnable examples demonstrating key features of the PENIN-Ω system.
 
+## Phase 4: The Forge of Hephaestus - CMA-ES Optimization
+
+### `phase4_cma_es_demo.py`
+
+Complete demonstration of CMA-ES (Covariance Matrix Adaptation Evolution Strategy) local optimization for NumericVectorArtifacts.
+
+**Run it:**
+```bash
+python examples/phase4_cma_es_demo.py
+```
+
+**What it demonstrates:**
+1. Initialize orchestrator with random artifact population
+2. Identify best artifact in knowledge base
+3. Run CMA-ES optimization starting from best artifact
+4. Analyze optimization metadata and convergence
+5. Integrate optimized artifact back into knowledge base
+6. Compare results to theoretical global optimum
+
+**Key concepts:**
+- State-of-the-art local optimization (CMA-ES)
+- Population-based evolutionary strategy
+- Automatic best-point selection from knowledge base
+- Rich optimization metadata tracking
+- Benchmark function optimization (Ackley function)
+
+**Expected results:**
+- Dramatic improvement: ~100% reduction in score
+- Convergence to near-global optimum (< 0.0001 error)
+- Demonstrates cure for "Primitive Local Intelligence"
+
 ## Cryptographic Attestation System
 
 ### `attestation_integration.py`
@@ -44,7 +75,8 @@ Most examples use direct module loading to avoid dependency issues. They require
 
 Some examples may require:
 - `cryptography` library (for Ed25519 signatures, recommended)
-- If not available, falls back to HMAC-based signatures
+- `cma` library (for CMA-ES optimization, Phase 4 demo)
+- If cryptography not available, falls back to HMAC-based signatures
 
 ## Learn More
 

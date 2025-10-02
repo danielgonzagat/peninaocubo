@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-ai-for-beginners",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/AI-For-Beginners",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/AI-For-Beginners",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8127558448771042,
+    "delta_linf": 0.0032407719798176805,
+    "sr": 0.8652871180351771,
+    "G": 0.8660689083284425,
+    "ece": 0.011351845604036464,
+    "rho_bias": 1.0133796140100912,
+    "fp": 0.023027768406054694
+  },
+  "gate_pass": false,
+  "timestamp": 1759399970.656998,
+  "_slug": "github.com-danielgonzagat-ai-for-beginners"
+}

@@ -4,14 +4,18 @@ PENIN-Ω Core Orchestrator
 
 Main orchestrator for the auto-evolution system with state persistence.
 Implements Phase 2: Persistence and Resilience.
+Implements Phase 4: The Forge of Hephaestus (CMA-ES local optimization).
 """
 
 from __future__ import annotations
 
 import json
 from collections import deque
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+import numpy as np
 
 from penin.core.artifacts import NumericVectorArtifact
 from penin.core.serialization import StateEncoder, state_decoder
@@ -146,3 +150,94 @@ class OmegaMetaOrchestrator:
                 else 0.0
             ),
         }
+
+    def _initiate_local_training(
+        self,
+        evaluate_artifact: Callable[[NumericVectorArtifact], float],
+        max_generations: int = 50,
+        sigma0: float = 0.5,
+        popsize: int | None = None,
+    ) -> NumericVectorArtifact:
+        """
+        Initiate local training using CMA-ES optimization.
+
+        This implements Phase 4: The Forge of Hephaestus - a sophisticated local
+        optimization algorithm to cure "Primitive Local Intelligence".
+
+        Args:
+            evaluate_artifact: Function that evaluates a NumericVectorArtifact and
+                             returns a score (lower is better for CMA-ES)
+            max_generations: Maximum number of CMA-ES generations (default: 50)
+            sigma0: Initial standard deviation for CMA-ES (default: 0.5)
+            popsize: Population size (default: None, auto-determined by CMA-ES)
+
+        Returns:
+            NumericVectorArtifact: Optimized artifact found by CMA-ES
+
+        Raises:
+            ValueError: If knowledge_base is empty or contains no valid artifacts
+        """
+        import cma
+
+        # Step 1: Select starting point from knowledge base
+        if not self.knowledge_base:
+            raise ValueError("Knowledge base is empty. Cannot initiate local training.")
+
+        # Find best artifact (lowest score)
+        best_key = None
+        best_score = float("inf")
+
+        for key, artifact in self.knowledge_base.items():
+            score = evaluate_artifact(artifact)
+            if score < best_score:
+                best_score = score
+                best_key = key
+
+        if best_key is None:
+            raise ValueError("No valid artifacts found in knowledge base.")
+
+        best_artifact = self.knowledge_base[best_key]
+        x0 = np.array(best_artifact.vector, dtype=float)
+
+        # Step 2: Configure the optimizer
+        opts = {"maxiter": max_generations, "verbose": -9}  # -9 = silent
+        if popsize is not None:
+            opts["popsize"] = popsize
+
+        es = cma.CMAEvolutionStrategy(x0, sigma0, opts)
+
+        # Step 3: Run the optimization loop
+        generation = 0
+        while not es.stop() and generation < max_generations:
+            # Ask for new population of candidate solutions
+            solutions = es.ask()
+
+            # Evaluate each candidate
+            fitness_scores = []
+            for solution in solutions:
+                candidate_artifact = NumericVectorArtifact(
+                    vector=solution.tolist(),
+                    metadata={"generation": generation, "method": "cma-es"},
+                )
+                score = evaluate_artifact(candidate_artifact)
+                fitness_scores.append(score)
+
+            # Tell optimizer the results
+            es.tell(solutions, fitness_scores)
+            generation += 1
+
+        # Step 4: Harvest the result
+        best_solution = es.result.xbest
+
+        # Step 5: Return the innovation
+        optimized_artifact = NumericVectorArtifact(
+            vector=best_solution.tolist(),
+            metadata={
+                "method": "cma-es",
+                "generations": generation,
+                "final_sigma": es.sigma,
+                "starting_point": best_key,
+            },
+        )
+
+        return optimized_artifact

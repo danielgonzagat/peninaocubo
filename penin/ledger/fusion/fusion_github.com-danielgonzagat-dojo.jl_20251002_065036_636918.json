@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-dojo.jl",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/Dojo.jl",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/Dojo.jl",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.813031252328796,
+    "delta_linf": 0.003240384819412551,
+    "sr": 0.8650944983098706,
+    "G": 0.8662472880655747,
+    "ece": 0.011346901410237368,
+    "rho_bias": 1.0138255112399739,
+    "fp": 0.023020214433414263
+  },
+  "gate_pass": true,
+  "timestamp": 1759398636.917696,
+  "_slug": "github.com-danielgonzagat-dojo.jl"
+}
