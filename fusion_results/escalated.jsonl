@@ -1103,3 +1103,5 @@
 {"worm": "penin/ledger/fusion/fusion_github.com-danielgonzagat-deepfacelab_20251001_183740_660665.json", "src": "https://github.com/danielgonzagat/deepfacelab", "policy": "", "status": "err-2", "ts": "2025-10-02T10:16:02.347397+00:00"}
 {"worm": "penin/ledger/fusion/fusion_github.com-danielgonzagat-langflow_20251001_183747_667421.json", "src": "https://github.com/danielgonzagat/langflow", "policy": "", "status": "err-2", "ts": "2025-10-02T10:16:11.506333+00:00"}
 {"worm": "penin/ledger/fusion/fusion_github.com-danielgonzagat-mygym_20251001_183753_673963.json", "src": "https://github.com/danielgonzagat/mygym", "policy": "", "status": "err-2", "ts": "2025-10-02T10:16:23.622574+00:00"}
+{"worm": "penin/ledger/fusion/fusion_github.com-danielgonzagat-penin-monorepo_20251001_183800_680388.json", "src": "https://github.com/danielgonzagat/penin-monorepo", "policy": "", "status": "err-2", "ts": "2025-10-02T10:16:37.466611+00:00"}
+{"worm": "penin/ledger/fusion/fusion_github.com-danielgonzagat-streamlit_20251001_183806_686517.json", "src": "https://github.com/danielgonzagat/streamlit", "policy": "", "status": "err-2", "ts": "2025-10-02T10:16:48.181288+00:00"}
