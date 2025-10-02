@@ -30,7 +30,9 @@ class MistralProvider(BaseProvider):
         if system:
             msgs.append({"role": "system", "content": system})
         msgs += messages
-        resp = await asyncio.to_thread(self.client.chat.complete, model=self.model, messages=msgs)
+        resp = await asyncio.to_thread(
+            self.client.chat.complete, model=self.model, messages=msgs
+        )
         content = resp.choices[0].message.content
         usage = getattr(resp, "usage", None)
         tokens_in = usage_value(usage, "prompt_tokens")

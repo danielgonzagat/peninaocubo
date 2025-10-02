@@ -154,8 +154,47 @@ def test_p0_4_router_cost_budget():
     """Test P0-4: Router with cost-aware scoring and budget"""
     print("\n=== P0-4: Router Cost & Budget ===")
 
-    # Note: Router internal tracking implementation may vary
-    pytest.skip("Router budget tracking test needs update for current implementation")
+    from penin.router_pkg.budget_tracker import BudgetTracker
+    from penin.router_pkg.cost_optimizer import CostOptimizer, OptimizationStrategy
+    
+    # Test budget tracking
+    tracker = BudgetTracker(daily_limit_usd=10.0)
+    
+    # Record some requests
+    tracker.record_request("openai", cost_usd=3.0, tokens_used=1000)
+    tracker.record_request("anthropic", cost_usd=2.0, tokens_used=800)
+    
+    assert tracker.used_usd == 5.0, f"Used should be 5.0, got {tracker.used_usd}"
+    assert tracker.remaining_usd == 5.0, f"Remaining should be 5.0, got {tracker.remaining_usd}"
+    print(f"✓ Budget tracking: ${tracker.used_usd} used, ${tracker.remaining_usd} remaining")
+    
+    # Test soft limit
+    tracker.record_request("gemini", cost_usd=5.0, tokens_used=2000)  # Total: 10.0 (100%)
+    assert tracker.is_hard_limit_exceeded() is True, "Hard limit should be exceeded"
+    print("✓ Hard limit detection works")
+    
+    # Test cost optimizer
+    optimizer = CostOptimizer(strategy=OptimizationStrategy.CHEAPEST)
+    providers = ["openai", "anthropic", "gemini"]
+    costs = {"openai": 0.03, "anthropic": 0.015, "gemini": 0.01}
+    
+    # Select with budget constraint
+    selected = optimizer.select_provider(
+        providers=providers,
+        provider_costs=costs,
+        estimated_tokens=1000,
+        budget_remaining=0.02  # Only gemini is affordable
+    )
+    
+    assert selected == "gemini", f"Should select gemini (cheapest within budget), got {selected}"
+    print(f"✓ Cost-aware selection: {selected} (within budget)")
+    
+    # Test without budget constraint
+    selected_cheap = optimizer.select_provider(providers, costs, estimated_tokens=1000)
+    assert selected_cheap == "gemini", f"Should select gemini (cheapest overall), got {selected_cheap}"
+    print(f"✓ Cheapest selection: {selected_cheap}")
+    
+    return True
 
     from typing import Any
 

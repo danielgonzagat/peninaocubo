@@ -39,7 +39,9 @@ class SigmaGuardConfig:
     require_eco_ok: bool = True
 
 
-def sigma_guard_check(metrics: dict[str, float], config: SigmaGuardConfig | None = None) -> tuple[bool, str]:
+def sigma_guard_check(
+    metrics: dict[str, float], config: SigmaGuardConfig | None = None
+) -> tuple[bool, str]:
     """
     Execute Σ-Guard gate (fail-closed).
 
@@ -59,13 +61,22 @@ def sigma_guard_check(metrics: dict[str, float], config: SigmaGuardConfig | None
 
     # Check each condition (non-compensatory)
     if metrics.get("rho", 1.0) >= config.rho_threshold:
-        return False, f"Contratividade falhou: ρ={metrics.get('rho')} >= {config.rho_threshold}"
+        return (
+            False,
+            f"Contratividade falhou: ρ={metrics.get('rho')} >= {config.rho_threshold}",
+        )
 
     if metrics.get("ece", 1.0) > config.ece_threshold:
-        return False, f"Calibração falhou: ECE={metrics.get('ece')} > {config.ece_threshold}"
+        return (
+            False,
+            f"Calibração falhou: ECE={metrics.get('ece')} > {config.ece_threshold}",
+        )
 
     if metrics.get("rho_bias", 10.0) > config.bias_rho_threshold:
-        return False, f"Bias excessivo: ρ_bias={metrics.get('rho_bias')} > {config.bias_rho_threshold}"
+        return (
+            False,
+            f"Bias excessivo: ρ_bias={metrics.get('rho_bias')} > {config.bias_rho_threshold}",
+        )
 
     if config.require_consent and not metrics.get("consent", False):
         return False, "Consentimento não obtido"

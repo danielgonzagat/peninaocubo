@@ -42,15 +42,29 @@ class SymbolicAIConfig(IntegrationConfig):
     priority: IntegrationPriority = Field(default=IntegrationPriority.P2_HIGH)
 
     # SymbolicAI-specific settings
-    reasoning_depth: int = Field(default=3, ge=1, le=10, description="Depth of symbolic reasoning chain")
-    enable_logic_validation: bool = Field(default=True, description="Enable formal logic validation")
-    enable_constraint_checking: bool = Field(default=True, description="Enable constraint satisfaction checking")
-    symbolic_fusion: bool = Field(default=True, description="Enable neurosymbolic fusion")
+    reasoning_depth: int = Field(
+        default=3, ge=1, le=10, description="Depth of symbolic reasoning chain"
+    )
+    enable_logic_validation: bool = Field(
+        default=True, description="Enable formal logic validation"
+    )
+    enable_constraint_checking: bool = Field(
+        default=True, description="Enable constraint satisfaction checking"
+    )
+    symbolic_fusion: bool = Field(
+        default=True, description="Enable neurosymbolic fusion"
+    )
 
     # Verification settings
-    min_confidence: float = Field(default=0.8, ge=0.0, le=1.0, description="Minimum confidence for validation")
-    require_proof: bool = Field(default=False, description="Require formal proof for critical decisions")
-    explain_reasoning: bool = Field(default=True, description="Generate reasoning explanations")
+    min_confidence: float = Field(
+        default=0.8, ge=0.0, le=1.0, description="Minimum confidence for validation"
+    )
+    require_proof: bool = Field(
+        default=False, description="Require formal proof for critical decisions"
+    )
+    explain_reasoning: bool = Field(
+        default=True, description="Generate reasoning explanations"
+    )
 
 
 class SymbolicAIAdapter(BaseIntegrationAdapter):
@@ -85,7 +99,9 @@ class SymbolicAIAdapter(BaseIntegrationAdapter):
         """Initialize SymbolicAI modules"""
         if not self.is_available():
             self.status = IntegrationStatus.NOT_INSTALLED
-            logger.warning("SymbolicAI not installed. Install with: pip install symbolicai")
+            logger.warning(
+                "SymbolicAI not installed. Install with: pip install symbolicai"
+            )
             return False
 
         try:
@@ -105,7 +121,9 @@ class SymbolicAIAdapter(BaseIntegrationAdapter):
 
         except Exception as e:
             self.status = IntegrationStatus.FAILED
-            raise IntegrationInitializationError("symbolicai", f"Initialization failed: {e}", e) from e
+            raise IntegrationInitializationError(
+                "symbolicai", f"Initialization failed: {e}", e
+            ) from e
 
     def get_status(self) -> dict[str, Any]:
         """Get current status of SymbolicAI integration"""
@@ -172,7 +190,9 @@ class SymbolicAIAdapter(BaseIntegrationAdapter):
                 logger.warning(f"SymbolicAI execution failed (fail-open): {e}")
                 return {"status": "failed", "fallback": True, "valid": True}
             else:
-                raise IntegrationExecutionError("symbolicai", f"Execution failed: {e}", e) from e
+                raise IntegrationExecutionError(
+                    "symbolicai", f"Execution failed: {e}", e
+                ) from e
 
     async def _validate_decision(
         self, decision: dict[str, Any] | None, context: dict[str, Any] | None
@@ -222,7 +242,9 @@ class SymbolicAIAdapter(BaseIntegrationAdapter):
             },
         }
 
-    async def _symbolic_reason(self, decision: dict[str, Any] | None, context: dict[str, Any] | None) -> dict[str, Any]:
+    async def _symbolic_reason(
+        self, decision: dict[str, Any] | None, context: dict[str, Any] | None
+    ) -> dict[str, Any]:
         """
         Apply symbolic reasoning to a decision.
 
@@ -295,7 +317,8 @@ class SymbolicAIAdapter(BaseIntegrationAdapter):
             "formal_proof_available": self.config.require_proof,
             "metadata": {
                 "total_constraints": len(constraints or []) + 2,  # Include defaults
-                "satisfaction_rate": len(satisfied) / max(1, len(satisfied) + len(violated)),
+                "satisfaction_rate": len(satisfied)
+                / max(1, len(satisfied) + len(violated)),
             },
         }
 
@@ -360,21 +383,29 @@ class SymbolicAIAdapter(BaseIntegrationAdapter):
         context = {"constraints": ethical_constraints or []}
 
         # Run validation
-        validation_result = await self.execute("validate", decision=decision, context=context)
+        validation_result = await self.execute(
+            "validate", decision=decision, context=context
+        )
 
         # If validation enabled, also verify constraints
         if self.config.enable_constraint_checking:
-            verification_result = await self.execute("verify", decision=decision, context=context)
+            verification_result = await self.execute(
+                "verify", decision=decision, context=context
+            )
             validation_result["constraint_verification"] = verification_result
 
         # If explanation enabled, generate reasoning
         if self.config.explain_reasoning:
-            explanation_result = await self.execute("explain", decision=decision, context=context)
+            explanation_result = await self.execute(
+                "explain", decision=decision, context=context
+            )
             validation_result["explanation"] = explanation_result
 
         return validation_result
 
-    async def reason(self, decision: dict[str, Any], context: dict[str, Any] | None = None) -> dict[str, Any]:
+    async def reason(
+        self, decision: dict[str, Any], context: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """
         High-level interface for symbolic reasoning.
 

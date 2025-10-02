@@ -99,12 +99,22 @@ class AutoTuner:
         gate_failures = metrics.get("gate_failures", 0.0)
 
         # Weighted sum (tunable)
-        meta_loss = 0.4 * linf_variance + 0.3 * convergence_time + 0.2 * caos_variance + 0.1 * gate_failures
+        meta_loss = (
+            0.4 * linf_variance
+            + 0.3 * convergence_time
+            + 0.2 * caos_variance
+            + 0.1 * gate_failures
+        )
 
         self.meta_loss_history.append(meta_loss)
         return meta_loss
 
-    def estimate_gradient(self, hyperparam_name: str, loss_fn: Callable[[float], float], delta: float = 1e-4) -> float:
+    def estimate_gradient(
+        self,
+        hyperparam_name: str,
+        loss_fn: Callable[[float], float],
+        delta: float = 1e-4,
+    ) -> float:
         """
         Estimate gradient via finite differences.
 
@@ -158,7 +168,9 @@ class AutoTuner:
         state.grad_sum_squares += gradient**2
 
         # Adaptive learning rate (AdaGrad)
-        eta_t = self.config.eta_base / (1.0 + state.grad_sum_squares + self.config.epsilon)
+        eta_t = self.config.eta_base / (
+            1.0 + state.grad_sum_squares + self.config.epsilon
+        )
 
         # Gradient descent step
         new_value = state.current_value - eta_t * gradient
@@ -190,12 +202,16 @@ class AutoTuner:
                 }
                 for name, state in self.hyperparams.items()
             },
-            "meta_loss_trend": self.meta_loss_history[-10:] if self.meta_loss_history else [],
+            "meta_loss_trend": (
+                self.meta_loss_history[-10:] if self.meta_loss_history else []
+            ),
         }
 
 
 def auto_tune_hyperparams(
-    current_hyperparams: dict[str, float], metrics: dict[str, float], config: AutoTuningConfig | None = None
+    current_hyperparams: dict[str, float],
+    metrics: dict[str, float],
+    config: AutoTuningConfig | None = None,
 ) -> dict[str, float]:
     """
     One-shot auto-tuning function (stateless wrapper).

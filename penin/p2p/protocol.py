@@ -138,9 +138,16 @@ class PeninProtocol:
         """Register message handler"""
         self.message_handlers[msg_type] = handler
 
-    def create_message(self, msg_type: MessageType, payload: dict[str, Any]) -> PeninMessage:
+    def create_message(
+        self, msg_type: MessageType, payload: dict[str, Any]
+    ) -> PeninMessage:
         """Create a new protocol message"""
-        return PeninMessage(msg_type=msg_type, sender_id=self.node_id, timestamp=time.time(), payload=payload)
+        return PeninMessage(
+            msg_type=msg_type,
+            sender_id=self.node_id,
+            timestamp=time.time(),
+            payload=payload,
+        )
 
     async def handle_message(self, message: PeninMessage) -> PeninMessage | None:
         """Handle incoming message"""
@@ -152,7 +159,10 @@ class PeninProtocol:
     # --- Message Creators ---
 
     def create_peer_announce(
-        self, multiaddrs: list[str], specializations: list[str], metrics: dict[str, float]
+        self,
+        multiaddrs: list[str],
+        specializations: list[str],
+        metrics: dict[str, float],
     ) -> PeninMessage:
         """Create peer announcement message"""
         return self.create_message(
@@ -169,7 +179,9 @@ class PeninProtocol:
         """Create knowledge offer message"""
         return self.create_message(MessageType.KNOWLEDGE_OFFER, asdict(asset))
 
-    def create_knowledge_request(self, asset_id: str, offer_terms: dict[str, Any]) -> PeninMessage:
+    def create_knowledge_request(
+        self, asset_id: str, offer_terms: dict[str, Any]
+    ) -> PeninMessage:
         """Create knowledge request message"""
         return self.create_message(
             MessageType.KNOWLEDGE_REQUEST,
@@ -201,20 +213,28 @@ class PeninProtocol:
 
     def create_heartbeat(self, status: str = "healthy") -> PeninMessage:
         """Create heartbeat message"""
-        return self.create_message(MessageType.HEARTBEAT, {"status": status, "node_id": self.node_id})
+        return self.create_message(
+            MessageType.HEARTBEAT, {"status": status, "node_id": self.node_id}
+        )
 
-    def create_error(self, error_msg: str, context: dict[str, Any] | None = None) -> PeninMessage:
+    def create_error(
+        self, error_msg: str, context: dict[str, Any] | None = None
+    ) -> PeninMessage:
         """Create error message"""
         return self.create_message(
-            MessageType.ERROR, {"error": error_msg, "context": context or {}, "timestamp": time.time()}
+            MessageType.ERROR,
+            {"error": error_msg, "context": context or {}, "timestamp": time.time()},
         )
 
     def create_status_query(self, target_peer_id: str | None = None) -> PeninMessage:
         """Create status query message"""
         return self.create_message(
-            MessageType.STATUS_QUERY, {"requester_id": self.node_id, "target_peer_id": target_peer_id}
+            MessageType.STATUS_QUERY,
+            {"requester_id": self.node_id, "target_peer_id": target_peer_id},
         )
 
     def create_status_response(self, mental_state: dict[str, Any]) -> PeninMessage:
         """Create status response message with mental state"""
-        return self.create_message(MessageType.STATUS_RESPONSE, {"mental_state": mental_state})
+        return self.create_message(
+            MessageType.STATUS_RESPONSE, {"mental_state": mental_state}
+        )

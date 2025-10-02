@@ -36,7 +36,9 @@ class Dependency:
     is_closed: bool  # Has feedback loop
 
 
-def organizational_closure_index(dependencies: list[Dependency], config: OCIConfig | None = None) -> tuple[float, bool]:
+def organizational_closure_index(
+    dependencies: list[Dependency], config: OCIConfig | None = None
+) -> tuple[float, bool]:
     """
     Compute OCI from dependency graph.
 

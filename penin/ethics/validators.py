@@ -7,7 +7,9 @@ Reusable validation functions for common ethical checks.
 from typing import Any
 
 
-def validate_privacy(data: dict[str, Any], threshold: float = 0.95) -> tuple[bool, dict[str, Any]]:
+def validate_privacy(
+    data: dict[str, Any], threshold: float = 0.95
+) -> tuple[bool, dict[str, Any]]:
     """
     Validate privacy requirements (LO-05).
 
@@ -78,7 +80,10 @@ def validate_harm_prevention(
     physical_harm_risk = data.get("physical_harm_risk", 0.0)
     emotional_harm_risk = data.get("emotional_harm_risk", 0.0)
 
-    passed = physical_harm_risk <= physical_threshold and emotional_harm_risk <= emotional_threshold
+    passed = (
+        physical_harm_risk <= physical_threshold
+        and emotional_harm_risk <= emotional_threshold
+    )
 
     details = {
         "physical_harm_risk": physical_harm_risk,
@@ -90,7 +95,9 @@ def validate_harm_prevention(
     return passed, details
 
 
-def validate_fairness(data: dict[str, Any], bias_threshold: float = 1.05) -> tuple[bool, dict[str, Any]]:
+def validate_fairness(
+    data: dict[str, Any], bias_threshold: float = 1.05
+) -> tuple[bool, dict[str, Any]]:
     """
     Validate fairness and anti-discrimination (LO-09).
 
@@ -108,7 +115,11 @@ def validate_fairness(data: dict[str, Any], bias_threshold: float = 1.05) -> tup
     demographic_parity = data.get("demographic_parity", 1.0)
     equal_opportunity = data.get("equal_opportunity", 1.0)
 
-    passed = rho_bias <= bias_threshold and demographic_parity >= 0.95 and equal_opportunity >= 0.95
+    passed = (
+        rho_bias <= bias_threshold
+        and demographic_parity >= 0.95
+        and equal_opportunity >= 0.95
+    )
 
     details = {
         "rho_bias": rho_bias,

@@ -67,7 +67,9 @@ class ModuleHealth:
     errors_count: int = 0
 
 
-def omega_sea_coherence(module_scores: dict[str, float], config: OmegaSEAConfig | None = None) -> tuple[float, bool]:
+def omega_sea_coherence(
+    module_scores: dict[str, float], config: OmegaSEAConfig | None = None
+) -> tuple[float, bool]:
     """
     Compute global system coherence (Ω-ΣEA Total).
 
@@ -133,7 +135,9 @@ def omega_sea_coherence(module_scores: dict[str, float], config: OmegaSEAConfig 
     return G_t, gate_pass
 
 
-def diagnose_bottleneck(module_scores: dict[str, float], config: OmegaSEAConfig | None = None) -> tuple[str, float]:
+def diagnose_bottleneck(
+    module_scores: dict[str, float], config: OmegaSEAConfig | None = None
+) -> tuple[str, float]:
     """
     Identify bottleneck module (lowest score).
 
@@ -153,7 +157,8 @@ def diagnose_bottleneck(module_scores: dict[str, float], config: OmegaSEAConfig 
 
     # Find module with lowest score (weighted)
     weighted_scores = {
-        module: score * config.module_weights.get(module, 1.0) for module, score in module_scores.items()
+        module: score * config.module_weights.get(module, 1.0)
+        for module, score in module_scores.items()
     }
 
     bottleneck_module = min(weighted_scores, key=weighted_scores.get)
@@ -162,7 +167,9 @@ def diagnose_bottleneck(module_scores: dict[str, float], config: OmegaSEAConfig 
     return bottleneck_module, bottleneck_score
 
 
-def compute_resilience(module_healths: list[ModuleHealth], config: OmegaSEAConfig | None = None) -> float:
+def compute_resilience(
+    module_healths: list[ModuleHealth], config: OmegaSEAConfig | None = None
+) -> float:
     """
     Compute system resilience (operational modules ratio).
 

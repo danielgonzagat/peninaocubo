@@ -92,7 +92,9 @@ def usage_value(usage: Any, key: str) -> int:
         return 0
 
 
-def estimate_cost(provider: str, model: str, prompt_tokens: int, completion_tokens: int) -> float:
+def estimate_cost(
+    provider: str, model: str, prompt_tokens: int, completion_tokens: int
+) -> float:
     """Estimate USD cost from token counts using provider pricing."""
 
     pricing = get_pricing(provider, model)
@@ -103,7 +105,9 @@ def estimate_cost(provider: str, model: str, prompt_tokens: int, completion_toke
     return max(total, 0.0)
 
 
-def calculate_cost(provider: str, model: str, prompt_tokens: int, completion_tokens: int) -> float:
+def calculate_cost(
+    provider: str, model: str, prompt_tokens: int, completion_tokens: int
+) -> float:
     """Alias for estimate_cost for backwards compatibility."""
     return estimate_cost(provider, model, prompt_tokens, completion_tokens)
 

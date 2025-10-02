@@ -31,7 +31,9 @@ class SRClient:
         except Exception:
             return False
 
-    def eval(self, ece: float, rho: float, risk: float, dlinf_dc: float) -> dict[str, Any]:
+    def eval(
+        self, ece: float, rho: float, risk: float, dlinf_dc: float
+    ) -> dict[str, Any]:
         r = requests.post(
             f"{self.base}/sr/eval",
             json={"ece": ece, "rho": rho, "risk": risk, "dlinf_dc": dlinf_dc},

@@ -32,16 +32,24 @@ class PeninNode:
         self.protocol = PeninProtocol(node_id)
         self.sr_service = sr_service or SROmegaService()
         self.peers: dict[str, dict[str, Any]] = {}
-        self.status_responses: dict[str, dict[str, Any]] = {}  # Store responses by peer_id
+        self.status_responses: dict[str, dict[str, Any]] = (
+            {}
+        )  # Store responses by peer_id
 
         # Register message handlers
         self._register_handlers()
 
     def _register_handlers(self) -> None:
         """Register protocol message handlers"""
-        self.protocol.register_handler(MessageType.STATUS_QUERY, self._handle_status_query)
-        self.protocol.register_handler(MessageType.STATUS_REQUEST, self._handle_status_query)  # Same handler
-        self.protocol.register_handler(MessageType.STATUS_RESPONSE, self._handle_status_response)
+        self.protocol.register_handler(
+            MessageType.STATUS_QUERY, self._handle_status_query
+        )
+        self.protocol.register_handler(
+            MessageType.STATUS_REQUEST, self._handle_status_query
+        )  # Same handler
+        self.protocol.register_handler(
+            MessageType.STATUS_RESPONSE, self._handle_status_response
+        )
         self.protocol.register_handler(MessageType.HEARTBEAT, self._handle_heartbeat)
 
     async def _handle_status_query(self, message: PeninMessage) -> PeninMessage:
@@ -88,7 +96,9 @@ class PeninNode:
         """
         return self.protocol.create_heartbeat(status="healthy")
 
-    async def query_peer_status(self, peer_id: str, timeout: float = 5.0) -> dict[str, Any] | None:
+    async def query_peer_status(
+        self, peer_id: str, timeout: float = 5.0
+    ) -> dict[str, Any] | None:
         """
         Query the mental state of a peer node
 

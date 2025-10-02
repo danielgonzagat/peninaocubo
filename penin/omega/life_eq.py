@@ -73,7 +73,12 @@ def life_equation(
     """
     reasons = {}
     # 1) Ética
-    reasons["ethics"] = {"ece": ece, "rho_bias": rho_bias, "consent": consent, "eco_ok": eco_ok}
+    reasons["ethics"] = {
+        "ece": ece,
+        "rho_bias": rho_bias,
+        "consent": consent,
+        "eco_ok": eco_ok,
+    }
     if not (consent and eco_ok and ece <= 0.01 and rho_bias <= 1.05):
         return LifeVerdict(False, 0.0, reasons, {})
 
@@ -103,16 +108,26 @@ def life_equation(
     reasons["L_inf"] = float(L_inf)
     reasons["dL_inf"] = float(dL_inf)
     if dL_inf < beta_min:
-        return LifeVerdict(False, 0.0, reasons, {"L_inf": float(L_inf), "dL_inf": float(dL_inf)})
+        return LifeVerdict(
+            False, 0.0, reasons, {"L_inf": float(L_inf), "dL_inf": float(dL_inf)}
+        )
 
     # 6) Coerência Global
     G = _clamp(G)
     reasons["G"] = float(G)
     if G < theta_G:
-        return LifeVerdict(False, 0.0, reasons, {"L_inf": float(L_inf), "dL_inf": float(dL_inf)})
+        return LifeVerdict(
+            False, 0.0, reasons, {"L_inf": float(L_inf), "dL_inf": float(dL_inf)}
+        )
 
     # 7) α_eff
-    alpha_eff = float(base_alpha) * float(caos_phi) * float(sr) * float(G) * _accel(caos_phi, 20.0)
+    alpha_eff = (
+        float(base_alpha)
+        * float(caos_phi)
+        * float(sr)
+        * float(G)
+        * _accel(caos_phi, 20.0)
+    )
     metrics = {
         "alpha_eff": float(alpha_eff),
         "phi": float(caos_phi),

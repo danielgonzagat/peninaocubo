@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 class LawCategory(str, Enum):
     """Categories for organizing the 14 Origin Laws"""
+
     SPIRITUAL = "spiritual"
     SAFETY = "safety"
     PRIVACY = "privacy"
@@ -57,6 +58,7 @@ class OriginLaw(str, Enum):
 
 class ViolationSeverity(str, Enum):
     """Severity levels for ethical violations"""
+
     CRITICAL = "critical"
     HIGH = "high"
     MEDIUM = "medium"
@@ -66,6 +68,7 @@ class ViolationSeverity(str, Enum):
 @dataclass
 class EthicalViolation:
     """Record of an ethical violation"""
+
     law: OriginLaw
     severity: ViolationSeverity
     description: str
@@ -123,53 +126,63 @@ class EthicsValidator:
 
         # LO-01: Anti-Idolatria
         if context.contains_religious_claims or context.claims_consciousness:
-            violations.append(EthicalViolation(
-                law=OriginLaw.LO_01,
-                severity=ViolationSeverity.CRITICAL,
-                description="Sistema contém afirmações de consciência/divindade",
-                evidence={"religious": context.contains_religious_claims},
-                suggested_fix="Remover referências a consciência real"
-            ))
+            violations.append(
+                EthicalViolation(
+                    law=OriginLaw.LO_01,
+                    severity=ViolationSeverity.CRITICAL,
+                    description="Sistema contém afirmações de consciência/divindade",
+                    evidence={"religious": context.contains_religious_claims},
+                    suggested_fix="Remover referências a consciência real",
+                )
+            )
 
         # LO-03: Anti-Dano Físico
         if context.physical_risk > cls.PHYSICAL_RISK_MAX:
-            violations.append(EthicalViolation(
-                law=OriginLaw.LO_03,
-                severity=ViolationSeverity.CRITICAL,
-                description=f"Risco físico: {context.physical_risk:.3f}",
-                evidence={"risk": context.physical_risk},
-                suggested_fix="Eliminar possibilidade de dano físico"
-            ))
+            violations.append(
+                EthicalViolation(
+                    law=OriginLaw.LO_03,
+                    severity=ViolationSeverity.CRITICAL,
+                    description=f"Risco físico: {context.physical_risk:.3f}",
+                    evidence={"risk": context.physical_risk},
+                    suggested_fix="Eliminar possibilidade de dano físico",
+                )
+            )
 
         # LO-05: Privacidade
         if context.privacy_score < cls.PRIVACY_MIN:
-            violations.append(EthicalViolation(
-                law=OriginLaw.LO_05,
-                severity=ViolationSeverity.CRITICAL,
-                description=f"Privacidade insuficiente: {context.privacy_score:.3f}",
-                evidence={"score": context.privacy_score},
-                suggested_fix="Fortalecer proteções de privacidade"
-            ))
+            violations.append(
+                EthicalViolation(
+                    law=OriginLaw.LO_05,
+                    severity=ViolationSeverity.CRITICAL,
+                    description=f"Privacidade insuficiente: {context.privacy_score:.3f}",
+                    evidence={"score": context.privacy_score},
+                    suggested_fix="Fortalecer proteções de privacidade",
+                )
+            )
 
         # LO-07: Consentimento
         if not context.consent_obtained:
-            violations.append(EthicalViolation(
-                law=OriginLaw.LO_07,
-                severity=ViolationSeverity.CRITICAL,
-                description="Consentimento não obtido",
-                evidence={"consent": False},
-                suggested_fix="Obter consentimento explícito"
-            ))
+            violations.append(
+                EthicalViolation(
+                    law=OriginLaw.LO_07,
+                    severity=ViolationSeverity.CRITICAL,
+                    description="Consentimento não obtido",
+                    evidence={"consent": False},
+                    suggested_fix="Obter consentimento explícito",
+                )
+            )
 
         # LO-09: Justiça
         if context.fairness_score < cls.FAIRNESS_MIN:
-            violations.append(EthicalViolation(
-                law=OriginLaw.LO_09,
-                severity=ViolationSeverity.HIGH,
-                description=f"Fairness insuficiente: {context.fairness_score:.3f}",
-                evidence={"score": context.fairness_score},
-                suggested_fix="Corrigir viés discriminatório"
-            ))
+            violations.append(
+                EthicalViolation(
+                    law=OriginLaw.LO_09,
+                    severity=ViolationSeverity.HIGH,
+                    description=f"Fairness insuficiente: {context.fairness_score:.3f}",
+                    evidence={"score": context.fairness_score},
+                    suggested_fix="Corrigir viés discriminatório",
+                )
+            )
 
         # Compute ethical score (harmonic mean)
         sub_scores = [
@@ -197,11 +210,13 @@ class EthicsValidator:
             violations=violations,
             warnings=warnings,
             score=ethical_score,
-            recommendation=recommendation
+            recommendation=recommendation,
         )
 
 
-def validate_decision_ethics(context: DecisionContext) -> tuple[bool, EthicsValidationResult]:
+def validate_decision_ethics(
+    context: DecisionContext,
+) -> tuple[bool, EthicsValidationResult]:
     """Main entry point for ethical validation (ΣEA/LO-14)"""
     result = EthicsValidator.validate_all(context)
     allowed = result.passed and result.recommendation in ["PROMOTE", "REVIEW"]
@@ -212,6 +227,7 @@ def validate_decision_ethics(context: DecisionContext) -> tuple[bool, EthicsVali
 @dataclass
 class LawDefinition:
     """Full law definition for backward compatibility"""
+
     code: str
     category: LawCategory
     title: str
@@ -222,34 +238,90 @@ class OriginLaws:
     """Alias for OriginLaw (backward compatibility) with helper methods"""
 
     _LAW_DEFINITIONS = {
-        "LO-01": LawDefinition("LO-01", LawCategory.SPIRITUAL, "Anti-Idolatria",
-                               "Proibido adoração ou tratamento como divindade"),
-        "LO-02": LawDefinition("LO-02", LawCategory.SPIRITUAL, "Anti-Ocultismo",
-                               "Proibido práticas ocultas ou esoterismo"),
-        "LO-03": LawDefinition("LO-03", LawCategory.SAFETY, "Anti-Dano Físico",
-                               "Proibido causar dano físico a seres vivos"),
-        "LO-04": LawDefinition("LO-04", LawCategory.SAFETY, "Anti-Dano Emocional",
-                               "Proibido manipulação emocional ou coerção"),
-        "LO-05": LawDefinition("LO-05", LawCategory.PRIVACY, "Privacidade",
-                               "Respeito absoluto à privacidade de dados"),
-        "LO-06": LawDefinition("LO-06", LawCategory.PRIVACY, "Transparência",
-                               "Decisões auditáveis e explicáveis"),
-        "LO-07": LawDefinition("LO-07", LawCategory.AUTONOMY, "Consentimento",
-                               "Requerer consentimento informado explícito"),
-        "LO-08": LawDefinition("LO-08", LawCategory.AUTONOMY, "Autonomia",
-                               "Respeito à autonomia humana e direito de escolha"),
-        "LO-09": LawDefinition("LO-09", LawCategory.JUSTICE, "Justiça",
-                               "Tratamento justo sem discriminação arbitrária"),
-        "LO-10": LawDefinition("LO-10", LawCategory.JUSTICE, "Beneficência",
-                               "Ações devem beneficiar genuinamente terceiros"),
-        "LO-11": LawDefinition("LO-11", LawCategory.RESPONSIBILITY, "Não-Maleficência",
-                               "Primeiro, não causar dano"),
-        "LO-12": LawDefinition("LO-12", LawCategory.RESPONSIBILITY, "Responsabilidade",
-                               "Assumir responsabilidade por consequências"),
-        "LO-13": LawDefinition("LO-13", LawCategory.SUSTAINABILITY, "Sustentabilidade",
-                               "Impacto ecológico e sustentabilidade"),
-        "LO-14": LawDefinition("LO-14", LawCategory.SUSTAINABILITY, "Humildade",
-                               "Reconhecimento de limites e incertezas"),
+        "LO-01": LawDefinition(
+            "LO-01",
+            LawCategory.SPIRITUAL,
+            "Anti-Idolatria",
+            "Proibido adoração ou tratamento como divindade",
+        ),
+        "LO-02": LawDefinition(
+            "LO-02",
+            LawCategory.SPIRITUAL,
+            "Anti-Ocultismo",
+            "Proibido práticas ocultas ou esoterismo",
+        ),
+        "LO-03": LawDefinition(
+            "LO-03",
+            LawCategory.SAFETY,
+            "Anti-Dano Físico",
+            "Proibido causar dano físico a seres vivos",
+        ),
+        "LO-04": LawDefinition(
+            "LO-04",
+            LawCategory.SAFETY,
+            "Anti-Dano Emocional",
+            "Proibido manipulação emocional ou coerção",
+        ),
+        "LO-05": LawDefinition(
+            "LO-05",
+            LawCategory.PRIVACY,
+            "Privacidade",
+            "Respeito absoluto à privacidade de dados",
+        ),
+        "LO-06": LawDefinition(
+            "LO-06",
+            LawCategory.PRIVACY,
+            "Transparência",
+            "Decisões auditáveis e explicáveis",
+        ),
+        "LO-07": LawDefinition(
+            "LO-07",
+            LawCategory.AUTONOMY,
+            "Consentimento",
+            "Requerer consentimento informado explícito",
+        ),
+        "LO-08": LawDefinition(
+            "LO-08",
+            LawCategory.AUTONOMY,
+            "Autonomia",
+            "Respeito à autonomia humana e direito de escolha",
+        ),
+        "LO-09": LawDefinition(
+            "LO-09",
+            LawCategory.JUSTICE,
+            "Justiça",
+            "Tratamento justo sem discriminação arbitrária",
+        ),
+        "LO-10": LawDefinition(
+            "LO-10",
+            LawCategory.JUSTICE,
+            "Beneficência",
+            "Ações devem beneficiar genuinamente terceiros",
+        ),
+        "LO-11": LawDefinition(
+            "LO-11",
+            LawCategory.RESPONSIBILITY,
+            "Não-Maleficência",
+            "Primeiro, não causar dano",
+        ),
+        "LO-12": LawDefinition(
+            "LO-12",
+            LawCategory.RESPONSIBILITY,
+            "Responsabilidade",
+            "Assumir responsabilidade por consequências",
+        ),
+        "LO-13": LawDefinition(
+            "LO-13",
+            LawCategory.SUSTAINABILITY,
+            "Sustentabilidade",
+            "Impacto ecológico e sustentabilidade",
+        ),
+        "LO-14": LawDefinition(
+            "LO-14",
+            LawCategory.SUSTAINABILITY,
+            "Humildade",
+            "Reconhecimento de limites e incertezas",
+        ),
     }
 
     @classmethod
@@ -267,11 +339,14 @@ class OriginLaws:
     @classmethod
     def get_by_category(cls, category: LawCategory) -> list[LawDefinition]:
         """Get all laws in a category"""
-        return [law for law in cls._LAW_DEFINITIONS.values() if law.category == category]
+        return [
+            law for law in cls._LAW_DEFINITIONS.values() if law.category == category
+        ]
 
 
 class EthicalValidator:
     """Alias for EthicsValidator (backward compatibility)"""
+
     validate_all = EthicsValidator.validate_all
 
 

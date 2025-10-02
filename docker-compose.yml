@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # Prometheus - Metrics Collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: penin-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - penin-network
+    restart: unless-stopped
+
+  # Grafana - Dashboards
+  grafana:
+    image: grafana/grafana:latest
+    container_name: penin-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./deploy/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./deploy/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - penin-network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  # Loki - Log Aggregation
+  loki:
+    image: grafana/loki:latest
+    container_name: penin-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./deploy/loki.yml:/etc/loki/local-config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - penin-network
+    restart: unless-stopped
+
+networks:
+  penin-network:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  loki-data:

@@ -8,7 +8,9 @@ LOG = Path.home() / ".penin_omega" / "knowledge" / "api_io.jsonl"
 LOG.parent.mkdir(parents=True, exist_ok=True)
 
 
-def record_call(provider: str, endpoint: str, req: dict[str, Any], resp: dict[str, Any]) -> None:
+def record_call(
+    provider: str, endpoint: str, req: dict[str, Any], resp: dict[str, Any]
+) -> None:
     item = {"t": time.time(), "p": provider, "e": endpoint, "req": req, "resp": resp}
     with LOG.open("ab") as f:
         f.write(orjson.dumps(item) + b"\n")
@@ -31,7 +33,11 @@ def suggest_replay(prompt: str) -> dict[str, Any]:
                 if diff < best_len:
                     best_len = diff
                     best = it
-    return best.get("resp", {"note": "no-similar-found"}) if best else {"note": "no-similar-found"}
+    return (
+        best.get("resp", {"note": "no-similar-found"})
+        if best
+        else {"note": "no-similar-found"}
+    )
 
 
 def get_provider_stats(provider: str | None = None) -> dict[str, Any]:
@@ -87,11 +93,13 @@ def get_provider_stats(provider: str | None = None) -> dict[str, Any]:
 
                     # Keep last 10 calls
                     if len(stats["recent_calls"]) < 10:
-                        stats["recent_calls"].append({
-                            "provider": p,
-                            "endpoint": endpoint,
-                            "timestamp": it.get("t"),
-                        })
+                        stats["recent_calls"].append(
+                            {
+                                "provider": p,
+                                "endpoint": endpoint,
+                                "timestamp": it.get("t"),
+                            }
+                        )
 
                 except orjson.JSONDecodeError:
                     # Skip malformed JSON lines

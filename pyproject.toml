@@ -1,227 +1,54 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "peninaocubo"
+name = "penin"
 version = "0.9.0"
-description = "PENIN-Ω auto-evolution system with Master Equation, CAOS+, SR-Ω∞, SOTA integrations, and ethical AI orchestration for true IA³"
+description = "PENIN-Ω: IA³ Auto-Evolutiva com Ética Embutida"
 readme = "README.md"
+license = {text = "Apache-2.0"}
+authors = [{name = "Daniel Penin"}]
 requires-python = ">=3.11"
-license = { text = "Apache-2.0" }
-authors = [{ name = "Daniel Penin" }]
-keywords = [
-    "auto-evolution",
-    "WORM",
-    "ethics",
-    "CAOS+",
-    "SR-Ω∞",
-    "master-equation",
-    "fail-closed",
-    "observability",
-    "LLM",
-    "orchestration"
-]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: Apache Software License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-]
 
 dependencies = [
-    "pydantic>=2.0.0",
-    "pydantic-settings>=2.4.0",
-    "psutil>=5.9.0",
-    "tenacity>=8.2.0",
-    "orjson>=3.9.0",
-    "fastapi>=0.110.0,<1.0",
-    "uvicorn>=0.23.0,<1.0",
-    "requests>=2.31.0",
-    "httpx>=0.24.0",
-    "rich>=13.0.0",
+    "pydantic>=2.0",
+    "numpy>=1.24",
+    "fastapi>=0.100",
+    "uvicorn>=0.23",
+    "httpx>=0.24",
+    "orjson>=3.9",
+    "prometheus-client>=0.17",
+    "typer>=0.9.0",
+    "python-dotenv>=1.0.0",
 ]
 
-[project.optional-dependencies]
-full = [
-    # Observability
-    "prometheus-client>=0.16.0",
-    "structlog>=23.1.0",
-    "python-json-logger>=2.0.7",
-    # LLM Providers
-    "openai>=1.40.0",
-    "anthropic>=0.40.0",
-    "mistralai>=1.2.4",
-    "google-genai>=0.3.0",
-    "xai-sdk>=0.2.1",
-    "huggingface_hub>=0.24.0",
-    # Data & ML
-    "numpy>=1.24.0,<2.0",
-    "pandas>=2.2.0",
-    "faiss-cpu>=1.8.0",
-    "sentence-transformers>=2.7.0",
-    "tiktoken>=0.7.0",
-    "cma>=3.2.0",
-    # Storage & Caching
-    "redis>=4.5.0",
-    "cachetools>=5.3.0",
-    # Utils
-    "pyyaml>=6.0.1",
-    "kaggle>=1.6.14",
-]
 
 dev = [
-    "pytest>=7.3.0",
-    "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.1.0",
-    "hypothesis>=6.0.0",
-    "ruff>=0.6.0",
-    "black>=23.0.0",
-    "flake8>=6.0.0",
-    "mypy>=1.3.0",
-    "pre-commit>=3.3.0",
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "pytest-asyncio>=0.21",
+    "hypothesis>=6.80",
+    "ruff>=0.1.0",
+    "black>=23.0",
+    "mypy>=1.5",
+    "pre-commit>=3.3",
 ]
 
-docs = [
-    "mkdocs>=1.5.0",
-    "mkdocs-material>=9.0.0",
-    "mkdocstrings[python]>=0.24.0",
+full = [
+    "torch>=2.0",
+    "transformers>=4.30",
+    "sentence-transformers>=2.2",
+    "rank-bm25>=0.2",
 ]
-
-# SOTA Integration Extras (Priority 1-3)
-nextpy = [
-    "nextpy>=0.4.0",  # Autonomous Modifying System (P1)
-]
-
-metacog = [
-    # Metacognitive-Prompting dependencies (P1)
-    # Add specific requirements when implementing
-]
-
-spikingjelly = [
-    "spikingjelly>=0.0.0.0.14",  # Neuromorphic computing (P1)
-    "torch>=2.0.0",
-]
-
-goneat = [
-    # goNEAT dependencies (P2)
-    # Add when implementing
-]
-
-mammoth = [
-    "mammoth-continual>=0.1.0",  # Continual learning (P2)
-]
-
-symbolicai = [
-    "symbolicai>=0.3.0",  # Neurosymbolic integration (P2)
-]
-
-midwiving = [
-    # midwiving-ai dependencies (P3)
-    # Add when implementing
-]
-
-opencog = [
-    # OpenCog AtomSpace dependencies (P3)
-    # Add when implementing
-]
-
-swarmrl = [
-    # SwarmRL dependencies (P3)
-    # Add when implementing
-]
-
-# Kubernetes Operator
-operator = [
-    "kopf>=1.37.0",
-    "kubernetes>=30.0.0",
-]
-
-# All SOTA integrations combined
-sota-p1 = [
-    "peninaocubo[nextpy,metacog,spikingjelly]",
-]
-
-sota-p2 = [
-    "peninaocubo[goneat,mammoth,symbolicai]",
-]
-
-sota-p3 = [
-    "peninaocubo[midwiving,opencog,swarmrl]",
-]
-
-sota-full = [
-    "peninaocubo[sota-p1,sota-p2,sota-p3]",
-]
-
-[project.urls]
-Homepage = "https://github.com/danielgonzagat/peninaocubo"
-Documentation = "https://github.com/danielgonzagat/peninaocubo/tree/main/docs"
-Repository = "https://github.com/danielgonzagat/peninaocubo"
-Issues = "https://github.com/danielgonzagat/peninaocubo/issues"
-Changelog = "https://github.com/danielgonzagat/peninaocubo/blob/main/CHANGELOG.md"
 
 [project.scripts]
 penin = "penin.cli:main"
 
-[tool.setuptools]
-package-dir = {"penin" = "penin"}
-
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["penin", "penin.*"]
-namespaces = false
-
-[tool.black]
-line-length = 88
-target-version = ["py311", "py312"]
-include = '\.pyi?$'
-extend-exclude = '''
-/(
-    \.git
-  | \.venv
-  | build
-  | dist
-  | docs/archive
-)/
-'''
-
-[tool.ruff]
-line-length = 88
-target-version = "py311"
-extend-exclude = ["docs/archive", ".venv", "build", "dist"]
-
-[tool.ruff.lint]
-select = [
-    "E",   # pycodestyle errors
-    "F",   # pyflakes
-    "W",   # pycodestyle warnings
-    "I",   # isort
-    "UP",  # pyupgrade
-    "B",   # flake8-bugbear
-    "PL",  # pylint
-    "C90", # mccabe complexity
-]
-ignore = [
-    "PLR0912", # too-many-branches
-    "PLR0913", # too-many-arguments
-    "PLR0915", # too-many-statements
-    "PLR2004", # magic-value-comparison
-    "E402",    # module-import-not-at-top-of-file
-    "PLC0415", # import-outside-toplevel
-]
-
-[tool.ruff.lint.per-file-ignores]
-"test_*.py" = ["E402", "PLC0415", "PLR2004", "RUF001", "RUF002"]
-"examples/*.py" = ["E402", "T201"]
-
-[tool.ruff.lint.isort]
-known-first-party = ["penin"]
+include = ["penin*"]
+exclude = ["tests*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -229,18 +56,34 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = [
-    "-v",
+    "-ra",
     "--strict-markers",
-    "--tb=short",
-    "--cov=penin",
-    "--cov-report=term-missing",
-    "--cov-report=html",
+    "--strict-config",
+    "--showlocals",
 ]
-asyncio_mode = "auto"
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "integration: marks tests as integration tests",
-    "unit: marks tests as unit tests",
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+[tool.coverage.run]
+source = ["penin"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/.*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstract",
 ]
 
 [tool.mypy]
@@ -253,36 +96,25 @@ check_untyped_defs = true
 no_implicit_optional = true
 warn_redundant_casts = true
 warn_unused_ignores = true
-warn_no_return = true
-strict_optional = true
-strict_equality = true
 
-[[tool.mypy.overrides]]
-module = [
-    "redis.*",
-    "faiss.*",
-    "kaggle.*",
-    "structlog.*",
-    "prometheus_client.*",
-]
-ignore_missing_imports = true
+[tool.black]
+line-length = 100
+target-version = ["py311", "py312", "py313"]
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+  | \.mypy_cache
+  | \.pytest_cache
+  | \.ruff_cache
+  | \.venv
+  | build
+  | dist
+)/
+'''
 
-[tool.coverage.run]
-source = ["penin"]
-omit = [
-    "*/tests/*",
-    "*/test_*.py",
-    "*/__pycache__/*",
-    "*/site-packages/*",
-]
-
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if __name__ == .__main__.:",
-    "if TYPE_CHECKING:",
-    "@abstractmethod",
-]
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+include_trailing_comma = true

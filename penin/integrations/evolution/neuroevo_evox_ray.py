@@ -13,14 +13,21 @@ class NeuroEvoHybrid:
     Modo 'auto': usa execução real com Ray se disponível; senão cai em 'shadow'.
     """
 
-    def __init__(self, population: int = 64, generations: int = 5, model: str = "distilbert-base-uncased"):
+    def __init__(
+        self,
+        population: int = 64,
+        generations: int = 5,
+        model: str = "distilbert-base-uncased",
+    ):
         self.population = population
         self.generations = generations
         self.model = model
         self._evox = self._try("evox")  # opcional (GPL, não embutimos)
         self._ray = self._try("ray")  # distribuído
         self._hf = self._try("transformers")  # backbone opcional
-        self._dspy = self._try("dspy") or self._try("dspy_ai") or self._try("dspy_ai_core")
+        self._dspy = (
+            self._try("dspy") or self._try("dspy_ai") or self._try("dspy_ai_core")
+        )
 
     def _try(self, mod: str):
         try:
@@ -64,7 +71,12 @@ class NeuroEvoHybrid:
         # Se transformers estiver presente, usa um custo sintético por token p/ dar "textura".
         ray = self._ray
         if not ray.is_initialized():
-            ray.init(ignore_reinit_error=True, include_dashboard=False, logging_level="ERROR", local_mode=True)
+            ray.init(
+                ignore_reinit_error=True,
+                include_dashboard=False,
+                logging_level="ERROR",
+                local_mode=True,
+            )
 
         @ray.remote
         def eval_individual(seed: int) -> float:
@@ -82,13 +94,17 @@ class NeuroEvoHybrid:
         best0, mean0 = max(fits0), st.mean(fits0)
 
         # G_last (apenas 2 gerações para ser rápido)
-        fits1 = ray.get([eval_individual.remote(1000 + i) for i in range(self.population)])
+        fits1 = ray.get(
+            [eval_individual.remote(1000 + i) for i in range(self.population)]
+        )
         best1, mean1 = max(fits1), st.mean(fits1)
 
         # Proxies coerentes com gates
         caos_pre = 0.60 + 0.30 * mean0
         caos_pos = max(caos_pre, 0.60 + 0.30 * mean1)  # garante ratio ≥ 1
-        delta_linf = max(0.001, min(0.02, (best1 - best0) * 0.05 + (mean1 - mean0) * 0.1))
+        delta_linf = max(
+            0.001, min(0.02, (best1 - best0) * 0.05 + (mean1 - mean0) * 0.1)
+        )
         sr = 0.84 + min(0.10, max(0.0, mean1 - mean0) * 0.5)
         G = 0.86 + min(0.08, max(0.0, (caos_pos - caos_pre)) * 0.4)
         ece = 0.004 + max(0.0, 0.008 - delta_linf * 0.2)  # ↓ com ganho

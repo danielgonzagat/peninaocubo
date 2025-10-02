@@ -59,14 +59,24 @@ class GrokProvider(BaseProvider):
         text = getattr(resp, "content", "")
         usage = getattr(resp, "usage", None)
 
-        tokens_in = float(get_first_available(usage, "input_tokens", "prompt_tokens") or 0)
-        tokens_out = float(get_first_available(usage, "output_tokens", "completion_tokens") or 0)
+        tokens_in = float(
+            get_first_available(usage, "input_tokens", "prompt_tokens") or 0
+        )
+        tokens_out = float(
+            get_first_available(usage, "output_tokens", "completion_tokens") or 0
+        )
 
-        cost_usd = float(estimate_cost(self.name, self.model, tokens_in, tokens_out) or 0.0)
+        cost_usd = float(
+            estimate_cost(self.name, self.model, tokens_in, tokens_out) or 0.0
+        )
         if cost_usd <= 0 and (tokens_in or tokens_out):
             try:
                 pr = get_pricing("openai", "gpt-4o")  # prompt/completion > 0
-                cost_usd = max(1e-9, (tokens_in / 1000.0) * pr.prompt + (tokens_out / 1000.0) * pr.completion)
+                cost_usd = max(
+                    1e-9,
+                    (tokens_in / 1000.0) * pr.prompt
+                    + (tokens_out / 1000.0) * pr.completion,
+                )
             except Exception:
                 cost_usd = max(1e-9, (tokens_in + tokens_out) / 1_000_000.0)
 

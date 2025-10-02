@@ -58,7 +58,9 @@ class LeagueOrchestrator:
         self.challenger: ModelCandidate | None = None
         self.deployment_history: list[dict[str, Any]] = []
 
-    def register_champion(self, model_config: dict[str, Any], candidate_id: str = "champion_v1") -> ModelCandidate:
+    def register_champion(
+        self, model_config: dict[str, Any], candidate_id: str = "champion_v1"
+    ) -> ModelCandidate:
         """Register the current champion model"""
         champion = ModelCandidate(
             candidate_id=candidate_id,
@@ -73,7 +75,9 @@ class LeagueOrchestrator:
         self._log_deployment_event("champion_registered", champion)
         return champion
 
-    def deploy_challenger(self, model_config: dict[str, Any], candidate_id: str = None) -> ModelCandidate:
+    def deploy_challenger(
+        self, model_config: dict[str, Any], candidate_id: str = None
+    ) -> ModelCandidate:
         """Deploy a new challenger in shadow mode"""
         if candidate_id is None:
             candidate_id = f"challenger_{int(time.time())}"
@@ -93,7 +97,10 @@ class LeagueOrchestrator:
 
     async def run_shadow_phase(self) -> bool:
         """Run shadow deployment phase"""
-        if not self.challenger or self.challenger.deployment_stage != DeploymentStage.SHADOW:
+        if (
+            not self.challenger
+            or self.challenger.deployment_stage != DeploymentStage.SHADOW
+        ):
             return False
 
         print(f"🔍 Starting shadow phase for {self.challenger.candidate_id}")
@@ -118,7 +125,10 @@ class LeagueOrchestrator:
 
     async def run_canary_phase(self) -> bool:
         """Run canary deployment phase"""
-        if not self.challenger or self.challenger.deployment_stage != DeploymentStage.SHADOW:
+        if (
+            not self.challenger
+            or self.challenger.deployment_stage != DeploymentStage.SHADOW
+        ):
             return False
 
         # Promote to canary
@@ -149,11 +159,14 @@ class LeagueOrchestrator:
 
     def promote_challenger(self) -> bool:
         """Promote challenger to champion"""
-        if not self.challenger or self.challenger.deployment_stage != DeploymentStage.CANARY:
+        if (
+            not self.challenger
+            or self.challenger.deployment_stage != DeploymentStage.CANARY
+        ):
             return False
 
         # Validate attestation chain if present
-        if hasattr(self.challenger, 'attestation_chain'):
+        if hasattr(self.challenger, "attestation_chain"):
             chain_valid, error_msg = self._validate_attestation_chain()
             if not chain_valid:
                 print(f"❌ Attestation chain validation failed: {error_msg}")
@@ -184,7 +197,7 @@ class LeagueOrchestrator:
         try:
             from penin.omega.attestation import AttestationChain, ServiceType
 
-            if not hasattr(self.challenger, 'attestation_chain'):
+            if not hasattr(self.challenger, "attestation_chain"):
                 return True, "No attestation chain present (skipped)"
 
             chain = self.challenger.attestation_chain
@@ -219,7 +232,9 @@ class LeagueOrchestrator:
             self.challenger.traffic_fraction = 0.0
 
             print(f"🔄 Rolled back {self.challenger.candidate_id}: {reason}")
-            self._log_deployment_event("challenger_rolled_back", self.challenger, {"reason": reason})
+            self._log_deployment_event(
+                "challenger_rolled_back", self.challenger, {"reason": reason}
+            )
 
             self.challenger = None
 
@@ -251,7 +266,9 @@ class LeagueOrchestrator:
 
     def _evaluate_shadow_metrics(self, metrics: dict[str, Any]) -> bool:
         """Evaluate if shadow metrics are acceptable"""
-        error_rate = metrics.get("shadow_errors", 0) / max(1, metrics.get("shadow_requests", 1))
+        error_rate = metrics.get("shadow_errors", 0) / max(
+            1, metrics.get("shadow_requests", 1)
+        )
 
         # Shadow passes if error rate is acceptable
         return error_rate <= self.config.error_rate_threshold
@@ -282,7 +299,9 @@ class LeagueOrchestrator:
         cost_improvement = (champion_cost - challenger_cost) / champion_cost
 
         # Combined improvement score
-        improvement_score = accuracy_delta + (latency_improvement * 0.3) + (cost_improvement * 0.2)
+        improvement_score = (
+            accuracy_delta + (latency_improvement * 0.3) + (cost_improvement * 0.2)
+        )
 
         # Check error rate
         error_rate = canary_metrics.get("canary_error_rate", 0)
@@ -321,7 +340,9 @@ class LeagueOrchestrator:
             self.deployment_history.append(archive_entry)
             print(f"📦 Archived champion {self.champion.candidate_id}")
 
-    def _log_deployment_event(self, event_type: str, candidate: ModelCandidate, extra_data: dict = None):
+    def _log_deployment_event(
+        self, event_type: str, candidate: ModelCandidate, extra_data: dict = None
+    ):
         """Log deployment events"""
         event = {
             "timestamp": time.time(),
@@ -342,9 +363,15 @@ class LeagueOrchestrator:
         return {
             "champion": (
                 {
-                    "candidate_id": self.champion.candidate_id if self.champion else None,
-                    "stage": self.champion.deployment_stage.value if self.champion else None,
-                    "traffic_fraction": self.champion.traffic_fraction if self.champion else 0,
+                    "candidate_id": (
+                        self.champion.candidate_id if self.champion else None
+                    ),
+                    "stage": (
+                        self.champion.deployment_stage.value if self.champion else None
+                    ),
+                    "traffic_fraction": (
+                        self.champion.traffic_fraction if self.champion else 0
+                    ),
                     "metrics": self.champion.metrics if self.champion else {},
                 }
                 if self.champion
@@ -352,9 +379,17 @@ class LeagueOrchestrator:
             ),
             "challenger": (
                 {
-                    "candidate_id": self.challenger.candidate_id if self.challenger else None,
-                    "stage": self.challenger.deployment_stage.value if self.challenger else None,
-                    "traffic_fraction": self.challenger.traffic_fraction if self.challenger else 0,
+                    "candidate_id": (
+                        self.challenger.candidate_id if self.challenger else None
+                    ),
+                    "stage": (
+                        self.challenger.deployment_stage.value
+                        if self.challenger
+                        else None
+                    ),
+                    "traffic_fraction": (
+                        self.challenger.traffic_fraction if self.challenger else 0
+                    ),
                     "metrics": self.challenger.metrics if self.challenger else {},
                 }
                 if self.challenger
@@ -364,7 +399,9 @@ class LeagueOrchestrator:
         }
 
 
-async def run_full_deployment_cycle(orchestrator: LeagueOrchestrator, challenger_config: dict[str, Any]) -> bool:
+async def run_full_deployment_cycle(
+    orchestrator: LeagueOrchestrator, challenger_config: dict[str, Any]
+) -> bool:
     """Run complete deployment cycle: shadow -> canary -> promote"""
 
     # Deploy challenger

@@ -75,17 +75,19 @@ def main() -> int:
     try:
         # Add some knowledge
         orchestrator.add_knowledge(
-            "embedding_1",
-            NumericVectorArtifact(vector=[0.1, 0.2, 0.3])
+            "embedding_1", NumericVectorArtifact(vector=[0.1, 0.2, 0.3])
         )
         orchestrator.add_knowledge(
-            "embedding_2",
-            NumericVectorArtifact(vector=[0.4, 0.5, 0.6])
+            "embedding_2", NumericVectorArtifact(vector=[0.4, 0.5, 0.6])
         )
 
         # Add some tasks
-        orchestrator.add_task({"task_id": 1, "type": "evolution", "status": "completed"})
-        orchestrator.add_task({"task_id": 2, "type": "evaluation", "status": "completed"})
+        orchestrator.add_task(
+            {"task_id": 1, "type": "evolution", "status": "completed"}
+        )
+        orchestrator.add_task(
+            {"task_id": 2, "type": "evaluation", "status": "completed"}
+        )
 
         # Add some scores
         orchestrator.add_score(0.85)

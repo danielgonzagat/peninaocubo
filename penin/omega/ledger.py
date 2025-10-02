@@ -83,7 +83,9 @@ class DecisionInfo(BaseModel):
     beta_min_met: bool = Field(description="Se ΔL∞ ≥ β_min")
 
     # Cryptographic attestation chain (optional)
-    attestation_chain: dict[str, Any] | None = Field(None, description="Attestation chain proof")
+    attestation_chain: dict[str, Any] | None = Field(
+        None, description="Attestation chain proof"
+    )
 
 
 class RunRecord(BaseModel):
@@ -134,7 +136,12 @@ class WORMLedger:
     - Artifacts em diretórios separados
     """
 
-    def __init__(self, db_path: Path | None = None, runs_dir: Path | None = None, enable_wal: bool = True):
+    def __init__(
+        self,
+        db_path: Path | None = None,
+        runs_dir: Path | None = None,
+        enable_wal: bool = True,
+    ):
         """
         Args:
             db_path: Caminho do banco SQLite
@@ -216,11 +223,19 @@ class WORMLedger:
             )
 
             # Índices
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_run_id ON run_records(run_id)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON run_records(timestamp)")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_run_id ON run_records(run_id)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_timestamp ON run_records(timestamp)"
+            )
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_cycle ON run_records(cycle)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_provider ON run_records(provider_id)")
-            cursor.execute("CREATE INDEX IF NOT EXISTS idx_decision ON run_records(decision_json)")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_provider ON run_records(provider_id)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_decision ON run_records(decision_json)"
+            )
 
             # Tabela de champion pointer (para rollback atômico)
             cursor.execute(
@@ -240,7 +255,9 @@ class WORMLedger:
         """Obtém último hash da chain"""
         with sqlite3.connect(str(self.db_path)) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT record_hash FROM run_records ORDER BY id DESC LIMIT 1")
+            cursor.execute(
+                "SELECT record_hash FROM run_records ORDER BY id DESC LIMIT 1"
+            )
             row = cursor.fetchone()
             return row[0] if row else "genesis"
 
@@ -276,7 +293,9 @@ class WORMLedger:
             # Lock é liberado automaticamente quando arquivo fecha
             pass
 
-    def append_record(self, record: RunRecord | str, artifacts: dict[str, Any] | None = None) -> str:
+    def append_record(
+        self, record: RunRecord | str, artifacts: dict[str, Any] | None = None
+    ) -> str:
         """
         Adiciona record ao ledger (append-only)
 
@@ -425,7 +444,11 @@ class WORMLedger:
                 return None
 
     def list_records(
-        self, limit: int = 100, offset: int = 0, provider_id: str | None = None, verdict: str | None = None
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        provider_id: str | None = None,
+        verdict: str | None = None,
     ) -> list[RunRecord]:
         """Lista records com filtros"""
         with sqlite3.connect(str(self.db_path)) as conn:
@@ -487,7 +510,9 @@ class WORMLedger:
                     cursor = conn.cursor()
 
                     # Verificar se run existe
-                    cursor.execute("SELECT 1 FROM run_records WHERE run_id = ?", (run_id,))
+                    cursor.execute(
+                        "SELECT 1 FROM run_records WHERE run_id = ?", (run_id,)
+                    )
                     if not cursor.fetchone():
                         return False
 
@@ -661,7 +686,13 @@ class SQLiteWORMLedger:
             c = self._conn.cursor()
             c.execute(
                 "INSERT INTO events (etype, data, ts, prev, hash) VALUES (?, ?, ?, ?, ?)",
-                (event.event_type, json.dumps(event.data, ensure_ascii=False), ts, self._tail, record_hash),
+                (
+                    event.event_type,
+                    json.dumps(event.data, ensure_ascii=False),
+                    ts,
+                    self._tail,
+                    record_hash,
+                ),
             )
             self._conn.commit()
             self._tail = record_hash
@@ -669,18 +700,37 @@ class SQLiteWORMLedger:
 
     def query(self, limit: int = 100) -> list[dict[str, Any]]:
         c = self._conn.cursor()
-        c.execute("SELECT etype, data, ts, prev, hash FROM events ORDER BY id DESC LIMIT ?", (limit,))
+        c.execute(
+            "SELECT etype, data, ts, prev, hash FROM events ORDER BY id DESC LIMIT ?",
+            (limit,),
+        )
         rows = c.fetchall()
-        return [{"etype": r[0], "data": json.loads(r[1]), "ts": r[2], "prev": r[3], "hash": r[4]} for r in rows]
+        return [
+            {
+                "etype": r[0],
+                "data": json.loads(r[1]),
+                "ts": r[2],
+                "prev": r[3],
+                "hash": r[4],
+            }
+            for r in rows
+        ]
 
     def verify_chain(self) -> tuple[bool, str | None]:
         c = self._conn.cursor()
         c.execute("SELECT etype, data, ts, prev, hash FROM events ORDER BY id")
         prev = "genesis"
-        for i, (etype, data, ts, stored_prev, stored_hash) in enumerate(c.fetchall(), 1):
+        for i, (etype, data, ts, stored_prev, stored_hash) in enumerate(
+            c.fetchall(), 1
+        ):
             if stored_prev != prev:
                 return False, f"Chain break at row {i}"
-            payload = {"etype": etype, "data": json.loads(data), "ts": ts, "prev": stored_prev}
+            payload = {
+                "etype": etype,
+                "data": json.loads(data),
+                "ts": ts,
+                "prev": stored_prev,
+            }
             calc = hash_json(payload)
             if calc != stored_hash:
                 return False, f"Hash mismatch at row {i}"
@@ -723,9 +773,15 @@ def create_run_record(
         provider_id=provider_id,
         candidate_cfg_hash="default",
         metrics=RunMetrics(**metrics),
-        gates=GuardResults(sigma_guard_ok=True, ir_ic_ok=True, sr_gate_ok=True, caos_gate_ok=True),
+        gates=GuardResults(
+            sigma_guard_ok=True, ir_ic_ok=True, sr_gate_ok=True, caos_gate_ok=True
+        ),
         decision=DecisionInfo(
-            verdict=decision_verdict, reason="default", delta_linf=0.0, delta_score=0.0, beta_min_met=False
+            verdict=decision_verdict,
+            reason="default",
+            delta_linf=0.0,
+            delta_score=0.0,
+            beta_min_met=False,
         ),
     )
 
@@ -738,6 +794,8 @@ def quick_ledger_append(
     artifacts: dict[str, Any] | None = None,
 ) -> str:
     """Append rápido ao ledger"""
-    record = create_run_record(provider_id=provider_id, metrics=metrics, decision_verdict=verdict)
+    record = create_run_record(
+        provider_id=provider_id, metrics=metrics, decision_verdict=verdict
+    )
 
     return ledger.append_record(record, artifacts)

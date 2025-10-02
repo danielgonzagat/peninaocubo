@@ -94,13 +94,17 @@ class EvolutionRunner:
         # Initialize components
         self.mutator = ParameterMutator(MutationConfig(seed=self.config.seed))
         self.evaluator = TaskBattery(
-            TaskBatteryConfig(seed=self.config.seed, max_tasks_per_metric=self.config.max_tasks_per_metric)
+            TaskBatteryConfig(
+                seed=self.config.seed,
+                max_tasks_per_metric=self.config.max_tasks_per_metric,
+            )
         )
         self.ethics_calculator = EthicsCalculator()
         self.ethics_gate = EthicsGate()
         self.league = LeagueOrchestrator(
             LeagueConfig(
-                shadow_duration_s=self.config.shadow_duration_s, canary_duration_s=self.config.canary_duration_s
+                shadow_duration_s=self.config.shadow_duration_s,
+                canary_duration_s=self.config.canary_duration_s,
             )
         )
 
@@ -130,7 +134,12 @@ class EvolutionRunner:
 
         # Default base config if none provided
         if base_config is None:
-            base_config = {"temperature": 0.7, "top_p": 0.9, "max_tokens": 500, "model": "gpt-4"}
+            base_config = {
+                "temperature": 0.7,
+                "top_p": 0.9,
+                "max_tokens": 500,
+                "model": "gpt-4",
+            }
 
         try:
             # Step 1: Generate challengers
@@ -145,7 +154,9 @@ class EvolutionRunner:
 
             # Step 3: Apply gates and scoring
             print("🛡️  Step 3: Applying gates and scoring...")
-            scoring_results, gate_results = await self._score_and_gate_challengers(challengers, evaluation_results)
+            scoring_results, gate_results = await self._score_and_gate_challengers(
+                challengers, evaluation_results
+            )
 
             # Step 4: Select best challenger
             print("🏆 Step 4: Selecting best challenger...")
@@ -165,7 +176,9 @@ class EvolutionRunner:
             # Step 6: Update tuner
             if self.tuner:
                 print("🎯 Step 6: Updating tuner...")
-                cycle_metrics = self._extract_cycle_metrics(evaluation_results, scoring_results)
+                cycle_metrics = self._extract_cycle_metrics(
+                    evaluation_results, scoring_results
+                )
                 updated_params = self.tuner.update_from_cycle_result(cycle_metrics)
                 print(f"   Updated {len(updated_params)} parameters")
 
@@ -186,7 +199,9 @@ class EvolutionRunner:
                 best_challenger=best_challenger,
                 total_duration_s=total_duration,
                 cost_usd=cost_usd,
-                evidence_hash=self._compute_evidence_hash(cycle_id, challengers, evaluation_results),
+                evidence_hash=self._compute_evidence_hash(
+                    cycle_id, challengers, evaluation_results
+                ),
             )
 
             # Record in WORM ledger
@@ -220,9 +235,13 @@ class EvolutionRunner:
             self._record_cycle_result(result)
             raise
 
-    async def _generate_challengers(self, base_config: dict[str, Any]) -> list[dict[str, Any]]:
+    async def _generate_challengers(
+        self, base_config: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         """Generate challenger configurations"""
-        mutation_results = self.mutator.mutate_parameters(base_config, self.config.n_challengers)
+        mutation_results = self.mutator.mutate_parameters(
+            base_config, self.config.n_challengers
+        )
 
         challengers = []
         for i, result in enumerate(mutation_results):
@@ -237,7 +256,9 @@ class EvolutionRunner:
 
         return challengers
 
-    async def _evaluate_challengers(self, challengers: list[dict[str, Any]]) -> dict[str, Any]:
+    async def _evaluate_challengers(
+        self, challengers: list[dict[str, Any]]
+    ) -> dict[str, Any]:
         """Evaluate all challengers using the task battery"""
         evaluation_results = {}
 
@@ -266,7 +287,12 @@ class EvolutionRunner:
             except Exception as e:
                 print(f"   ⚠️  Evaluation failed for {challenger_id}: {e}")
                 evaluation_results[challenger_id] = {
-                    "aggregate_scores": {"U": {"mean": 0}, "S": {"mean": 0}, "C": {"mean": 0}, "L": {"mean": 0}},
+                    "aggregate_scores": {
+                        "U": {"mean": 0},
+                        "S": {"mean": 0},
+                        "C": {"mean": 0},
+                        "L": {"mean": 0},
+                    },
                     "overall_score": 0.0,
                     "error": str(e),
                 }
@@ -295,13 +321,17 @@ class EvolutionRunner:
                 linf_score = quick_harmonic([u_score, s_score, c_score, l_score])
 
                 # Calculate CAOS+ phi
-                caos_phi = quick_caos_phi(c_score, 0.8, 0.9, s_score)  # Mock A, O values
+                caos_phi = quick_caos_phi(
+                    c_score, 0.8, 0.9, s_score
+                )  # Mock A, O values
 
                 # Calculate SR score
                 sr_score = quick_sr_harmonic(0.9, True, 0.8, 0.85)  # Mock values
 
                 # Apply score gate
-                gate_passed, gate_details = quick_score_gate(u_score, s_score, c_score, l_score)
+                gate_passed, gate_details = quick_score_gate(
+                    u_score, s_score, c_score, l_score
+                )
 
                 # Ethics check (simplified)
                 ethics_passed = True  # Would do real ethics check here
@@ -326,7 +356,9 @@ class EvolutionRunner:
                     "score_gate_details": gate_details,
                     "ethics_passed": ethics_passed,
                     "sigma_guard_passed": sigma_guard_passed,
-                    "all_gates_passed": gate_passed and ethics_passed and sigma_guard_passed,
+                    "all_gates_passed": gate_passed
+                    and ethics_passed
+                    and sigma_guard_passed,
                 }
             else:
                 # Failed evaluation
@@ -349,7 +381,10 @@ class EvolutionRunner:
         return scoring_results, gate_results
 
     def _select_best_challenger(
-        self, challengers: list[dict[str, Any]], scoring_results: dict[str, Any], gate_results: dict[str, Any]
+        self,
+        challengers: list[dict[str, Any]],
+        scoring_results: dict[str, Any],
+        gate_results: dict[str, Any],
     ) -> tuple[dict[str, Any] | None, str, str]:
         """Select the best challenger based on scores and gates"""
 
@@ -398,7 +433,9 @@ class EvolutionRunner:
             return {}
 
         # Get metrics from best performer
-        best_eval = max(evaluation_results.values(), key=lambda x: x.get("overall_score", 0))
+        best_eval = max(
+            evaluation_results.values(), key=lambda x: x.get("overall_score", 0)
+        )
 
         return {
             "linf_score": best_eval.get("overall_score", 0),
@@ -412,7 +449,9 @@ class EvolutionRunner:
             "ethics_passed": True,
         }
 
-    def _estimate_cycle_cost(self, challengers: list[dict[str, Any]], evaluation_results: dict[str, Any]) -> float:
+    def _estimate_cycle_cost(
+        self, challengers: list[dict[str, Any]], evaluation_results: dict[str, Any]
+    ) -> float:
         """Estimate total cost of the cycle"""
         # Simple estimation based on number of challengers and evaluations
         base_cost_per_challenger = 0.01  # $0.01 per challenger
@@ -421,13 +460,19 @@ class EvolutionRunner:
         return base_cost_per_challenger * len(challengers) + evaluation_cost
 
     def _compute_evidence_hash(
-        self, cycle_id: str, challengers: list[dict[str, Any]], evaluation_results: dict[str, Any]
+        self,
+        cycle_id: str,
+        challengers: list[dict[str, Any]],
+        evaluation_results: dict[str, Any],
     ) -> str:
         """Compute evidence hash for the cycle"""
         evidence_data = {
             "cycle_id": cycle_id,
             "challenger_hashes": [c.get("config_hash", "") for c in challengers],
-            "evaluation_summary": {cid: result.get("overall_score", 0) for cid, result in evaluation_results.items()},
+            "evaluation_summary": {
+                cid: result.get("overall_score", 0)
+                for cid, result in evaluation_results.items()
+            },
         }
 
         import hashlib
@@ -445,7 +490,11 @@ class EvolutionRunner:
                 "decision": result.decision,
                 "decision_reason": result.decision_reason,
                 "n_challengers": len(result.challengers),
-                "best_challenger_id": result.best_challenger["challenger_id"] if result.best_challenger else None,
+                "best_challenger_id": (
+                    result.best_challenger["challenger_id"]
+                    if result.best_challenger
+                    else None
+                ),
                 "duration_s": result.total_duration_s,
                 "cost_usd": result.cost_usd,
                 "evidence_hash": result.evidence_hash,
@@ -459,7 +508,9 @@ class EvolutionRunner:
 
 
 # Utility functions
-async def run_evolution_cycles(n_cycles: int = 5, config: EvolutionConfig = None) -> list[CycleResult]:
+async def run_evolution_cycles(
+    n_cycles: int = 5, config: EvolutionConfig = None
+) -> list[CycleResult]:
     """Run multiple evolution cycles"""
     runner = EvolutionRunner(config)
     results = []
@@ -480,7 +531,9 @@ async def run_evolution_cycles(n_cycles: int = 5, config: EvolutionConfig = None
 if __name__ == "__main__":
 
     async def demo():
-        config = EvolutionConfig(n_challengers=3, budget_minutes=5, dry_run=True, max_tasks_per_metric=2)
+        config = EvolutionConfig(
+            n_challengers=3, budget_minutes=5, dry_run=True, max_tasks_per_metric=2
+        )
 
         results = await run_evolution_cycles(2, config)
 

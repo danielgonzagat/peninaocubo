@@ -137,7 +137,9 @@ class Chunk:
     def __post_init__(self):
         """Compute chunk hash on initialization."""
         if not self.chunk_hash:
-            self.chunk_hash = hashlib.sha256(f"{self.doc_id}:{self.content}".encode()).hexdigest()
+            self.chunk_hash = hashlib.sha256(
+                f"{self.doc_id}:{self.content}".encode()
+            ).hexdigest()
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -165,7 +167,10 @@ class RetrievalResult:
     def __post_init__(self):
         """Generate citation on initialization."""
         if not self.citation:
-            self.citation = f"[{self.chunk.doc_id}:{self.chunk.chunk_id} " f"hash:{self.chunk.chunk_hash[:8]}...]"
+            self.citation = (
+                f"[{self.chunk.doc_id}:{self.chunk.chunk_id} "
+                f"hash:{self.chunk.chunk_hash[:8]}...]"
+            )
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
@@ -272,7 +277,9 @@ class BM25:
             idf = self.idf[token]
 
             numerator = tf * (self.k1 + 1)
-            denominator = tf + self.k1 * (1 - self.b + self.b * (doc_length / self.avg_doc_length))
+            denominator = tf + self.k1 * (
+                1 - self.b + self.b * (doc_length / self.avg_doc_length)
+            )
 
             score += idf * (numerator / denominator)
 
@@ -314,7 +321,10 @@ class EmbeddingRetriever:
     def __init__(self, model_name: str = DEFAULT_EMBEDDING_MODEL):
         """Initialize embedding model."""
         if not SENTENCE_TRANSFORMERS_AVAILABLE:
-            raise ImportError("sentence-transformers not available. " "Install with: pip install sentence-transformers")
+            raise ImportError(
+                "sentence-transformers not available. "
+                "Install with: pip install sentence-transformers"
+            )
 
         if not NUMPY_AVAILABLE:
             raise ImportError("numpy not available. " "Install with: pip install numpy")
@@ -334,7 +344,9 @@ class EmbeddingRetriever:
         contents = [content for _, content in documents]
 
         # Encode all documents
-        self.embeddings = self.model.encode(contents, convert_to_numpy=True, show_progress_bar=False)
+        self.embeddings = self.model.encode(
+            contents, convert_to_numpy=True, show_progress_bar=False
+        )
 
     @staticmethod
     def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
@@ -356,7 +368,9 @@ class EmbeddingRetriever:
             return []
 
         # Encode query
-        query_embedding = self.model.encode([query], convert_to_numpy=True, show_progress_bar=False)[0]
+        query_embedding = self.model.encode(
+            [query], convert_to_numpy=True, show_progress_bar=False
+        )[0]
 
         # Compute similarities
         scores = []
@@ -565,7 +579,9 @@ class Deduplicator:
 
         # Encode all chunks
         contents = [chunk.content for chunk in chunks]
-        embeddings = model.encode(contents, convert_to_numpy=True, show_progress_bar=False)
+        embeddings = model.encode(
+            contents, convert_to_numpy=True, show_progress_bar=False
+        )
 
         # Greedy deduplication
         keep_mask = [True] * len(chunks)
@@ -578,7 +594,9 @@ class Deduplicator:
                 if not keep_mask[j]:
                     continue
 
-                similarity = EmbeddingRetriever.cosine_similarity(embeddings[i], embeddings[j])
+                similarity = EmbeddingRetriever.cosine_similarity(
+                    embeddings[i], embeddings[j]
+                )
 
                 if similarity >= self.similarity_threshold:
                     keep_mask[j] = False
@@ -817,7 +835,9 @@ class SelfRAG:
             combined_scores[chunk_id] = combined_scores.get(chunk_id, 0.0) + rrf_score
 
         # Sort by combined score
-        ranked = sorted(combined_scores.items(), key=lambda x: x[1], reverse=True)[:top_k]
+        ranked = sorted(combined_scores.items(), key=lambda x: x[1], reverse=True)[
+            :top_k
+        ]
 
         # Create results
         results = []

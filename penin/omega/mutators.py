@@ -47,7 +47,9 @@ class ParameterMutator:
         self.config = config or MutationConfig()
         self.rng = random.Random(self.config.seed)
 
-    def mutate_parameters(self, base_config: dict[str, Any], n_variants: int = None) -> list[MutationResult]:
+    def mutate_parameters(
+        self, base_config: dict[str, Any], n_variants: int = None
+    ) -> list[MutationResult]:
         """Generate parameter variants from base configuration"""
         n_variants = n_variants or self.config.max_variants
         variants = []
@@ -60,7 +62,9 @@ class ParameterMutator:
 
             # Mutate temperature
             if "temperature" in base_config:
-                mutated["temperature"] = variant_rng.uniform(*self.config.temperature_range)
+                mutated["temperature"] = variant_rng.uniform(
+                    *self.config.temperature_range
+                )
 
             # Mutate top_p
             if "top_p" in base_config:
@@ -68,7 +72,9 @@ class ParameterMutator:
 
             # Mutate max_tokens
             if "max_tokens" in base_config:
-                mutated["max_tokens"] = variant_rng.choice(self.config.max_tokens_options)
+                mutated["max_tokens"] = variant_rng.choice(
+                    self.config.max_tokens_options
+                )
 
             # Create result
             variant_id = f"param_variant_{i:03d}"

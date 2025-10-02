@@ -233,9 +233,7 @@ class AutoEvolutionPipeline:
         self.current_champion = champion_state
 
         # Step 1: Generate Challengers (Ω-META)
-        challengers = await self._generate_challengers(
-            champion_state, num_challengers
-        )
+        challengers = await self._generate_challengers(champion_state, num_challengers)
 
         # Step 2: Evaluate each challenger
         evaluations: list[ChallengerEvaluation] = []
@@ -265,9 +263,15 @@ class AutoEvolutionPipeline:
             promoted_challenger=promoted_challenger,
             total_duration_sec=time.time() - start_time,
             total_challengers=len(evaluations),
-            promoted=sum(1 for e in evaluations if e.decision == PipelineDecision.PROMOTED),
-            rejected=sum(1 for e in evaluations if e.decision == PipelineDecision.REJECTED),
-            rolled_back=sum(1 for e in evaluations if e.decision == PipelineDecision.ROLLED_BACK),
+            promoted=sum(
+                1 for e in evaluations if e.decision == PipelineDecision.PROMOTED
+            ),
+            rejected=sum(
+                1 for e in evaluations if e.decision == PipelineDecision.REJECTED
+            ),
+            rolled_back=sum(
+                1 for e in evaluations if e.decision == PipelineDecision.ROLLED_BACK
+            ),
         )
 
         self.pipeline_history.append(result)
@@ -312,6 +316,7 @@ class AutoEvolutionPipeline:
 
         # Challenger metrics (slightly better)
         import random
+
         random.seed(hash(challenger_id) % (2**32))
 
         challenger_linf = champion_linf + random.uniform(-0.05, 0.15)
@@ -428,15 +433,24 @@ class AutoEvolutionPipeline:
 
         # Gate 2: ΔL∞
         if delta_linf < self.config.beta_min:
-            return PipelineDecision.REJECTED, f"ΔL∞ ({delta_linf:.4f}) < β_min ({self.config.beta_min})"
+            return (
+                PipelineDecision.REJECTED,
+                f"ΔL∞ ({delta_linf:.4f}) < β_min ({self.config.beta_min})",
+            )
 
         # Gate 3: SR-Ω∞
         if sr_score < self.config.sr_min:
-            return PipelineDecision.REJECTED, f"SR-Ω∞ ({sr_score:.4f}) < threshold ({self.config.sr_min})"
+            return (
+                PipelineDecision.REJECTED,
+                f"SR-Ω∞ ({sr_score:.4f}) < threshold ({self.config.sr_min})",
+            )
 
         # Gate 4: Omega-G
         if omega_g < self.config.omega_g_min:
-            return PipelineDecision.REJECTED, f"Omega-G ({omega_g:.4f}) < threshold ({self.config.omega_g_min})"
+            return (
+                PipelineDecision.REJECTED,
+                f"Omega-G ({omega_g:.4f}) < threshold ({self.config.omega_g_min})",
+            )
 
         # All gates passed
         return PipelineDecision.PROMOTED, "All gates passed: ready for promotion"

@@ -112,7 +112,9 @@ class SigmaGuardVerdict:
                 ],
                 "timestamp": self.timestamp,
             }
-            self.hash_proof = hashlib.sha256(json.dumps(proof_data, sort_keys=True).encode()).hexdigest()
+            self.hash_proof = hashlib.sha256(
+                json.dumps(proof_data, sort_keys=True).encode()
+            ).hexdigest()
 
     def create_attestation(self, candidate_id: str) -> Any:
         """Create cryptographic attestation for this verdict"""
@@ -122,7 +124,9 @@ class SigmaGuardVerdict:
             gates_data = [
                 {
                     "name": g.gate_name,
-                    "status": g.status.value if hasattr(g.status, 'value') else str(g.status),
+                    "status": (
+                        g.status.value if hasattr(g.status, "value") else str(g.status)
+                    ),
                     "value": g.value,
                     "threshold": g.threshold,
                     "passed": g.passed,
@@ -135,7 +139,7 @@ class SigmaGuardVerdict:
                 verdict=verdict_str,
                 candidate_id=candidate_id,
                 gates=gates_data,
-                aggregate_score=self.aggregate_score
+                aggregate_score=self.aggregate_score,
             )
             self.attestation = attestation
             return attestation
@@ -374,7 +378,11 @@ class SigmaGuard:
             ethical_result = self.ethical_validator.validate_all(decision, context)
             passed = ethical_result.passed
 
-            violation_str = ", ".join(ethical_result.violations[:3]) if ethical_result.violations else "none"
+            violation_str = (
+                ", ".join(ethical_result.violations[:3])
+                if ethical_result.violations
+                else "none"
+            )
             gates.append(
                 GateResult(
                     gate_name="ethical_laws",
@@ -391,7 +399,9 @@ class SigmaGuard:
         passed_values = [g.value for g in gates if g.passed and g.value > 0]
         if passed_values:
             epsilon = 1e-6
-            aggregate_score = len(passed_values) / sum(1.0 / max(epsilon, v) for v in passed_values)
+            aggregate_score = len(passed_values) / sum(
+                1.0 / max(epsilon, v) for v in passed_values
+            )
         else:
             aggregate_score = 0.0
 
@@ -587,7 +597,9 @@ class SigmaGuard:
         if all_passed:
             values = [g.value / g.threshold for g in gates if g.threshold > 0]
             eps = 1e-6
-            aggregate = len(values) / sum(1.0 / max(eps, v) for v in values) if values else 0.0
+            aggregate = (
+                len(values) / sum(1.0 / max(eps, v) for v in values) if values else 0.0
+            )
         else:
             aggregate = 0.0
 
@@ -599,13 +611,21 @@ class SigmaGuard:
         else:
             # Find worst gate
             failed_gates = [g for g in gates if not g.passed]
-            worst = min(failed_gates, key=lambda g: g.value / g.threshold if g.threshold > 0 else 0.0)
+            worst = min(
+                failed_gates,
+                key=lambda g: g.value / g.threshold if g.threshold > 0 else 0.0,
+            )
             verdict = GateStatus.FAIL
             action = "rollback"
             reason = f"FAIL on {worst.gate_name}: {worst.reason} → ROLLBACK"
 
         return SigmaGuardVerdict(
-            verdict=verdict, passed=all_passed, gates=gates, aggregate_score=aggregate, reason=reason, action=action
+            verdict=verdict,
+            passed=all_passed,
+            gates=gates,
+            aggregate_score=aggregate,
+            reason=reason,
+            action=action,
         )
 
 

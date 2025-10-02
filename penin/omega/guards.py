@@ -49,7 +49,9 @@ class GuardViolation:
 
 
 # Standalone functions for compatibility with tests
-def sigma_guard(metrics: dict[str, Any], policy: "SigmaGuardPolicy" = None) -> "GuardResult":
+def sigma_guard(
+    metrics: dict[str, Any], policy: "SigmaGuardPolicy" = None
+) -> "GuardResult":
     """Standalone sigma guard function"""
     if policy is None:
         policy = SigmaGuardPolicy()
@@ -59,7 +61,9 @@ def sigma_guard(metrics: dict[str, Any], policy: "SigmaGuardPolicy" = None) -> "
     return result
 
 
-def ir_to_ic_contractive(risk_history: list[float], rho_threshold: float = 1.0) -> "GuardResult":
+def ir_to_ic_contractive(
+    risk_history: list[float], rho_threshold: float = 1.0
+) -> "GuardResult":
     """Standalone IR→IC contractivity check"""
     guard = IRICGuard(rho_threshold)
     result, violations, details = guard.check(risk_history)
@@ -67,7 +71,9 @@ def ir_to_ic_contractive(risk_history: list[float], rho_threshold: float = 1.0) 
 
 
 def combined_guard_check(
-    metrics: dict[str, Any], risk_history: list[float], policy: "SigmaGuardPolicy" = None
+    metrics: dict[str, Any],
+    risk_history: list[float],
+    policy: "SigmaGuardPolicy" = None,
 ) -> tuple[bool, dict[str, Any]]:
     """Combined guard check"""
     if policy is None:
@@ -78,7 +84,11 @@ def combined_guard_check(
 
     all_passed = sigma_result.passed and iric_result.passed
 
-    results = {"sigma_guard": sigma_result, "ir_ic_guard": iric_result, "all_passed": all_passed}
+    results = {
+        "sigma_guard": sigma_result,
+        "ir_ic_guard": iric_result,
+        "all_passed": all_passed,
+    }
 
     return all_passed, results
 
@@ -107,7 +117,9 @@ class IRICGuard:
     def __init__(self, rho_threshold: float = 1.0):
         self.rho_threshold = rho_threshold
 
-    def check(self, risk_history: list[float]) -> tuple[GuardResult, list[GuardViolation], dict[str, Any]]:
+    def check(
+        self, risk_history: list[float]
+    ) -> tuple[GuardResult, list[GuardViolation], dict[str, Any]]:
         """Check if risk is contractive (IR→IC)"""
         violations = []
 
@@ -124,7 +136,10 @@ class IRICGuard:
             )
 
             result = GuardResult(
-                passed=False, violations=violations, details={"error": "insufficient_data"}, timestamp=str(time.time())
+                passed=False,
+                violations=violations,
+                details={"error": "insufficient_data"},
+                timestamp=str(time.time()),
             )
 
             return result, violations, {"error": "insufficient_data"}
@@ -149,7 +164,10 @@ class IRICGuard:
             )
 
             result = GuardResult(
-                passed=False, violations=violations, details={"error": "no_valid_ratios"}, timestamp=str(time.time())
+                passed=False,
+                violations=violations,
+                details={"error": "no_valid_ratios"},
+                timestamp=str(time.time()),
             )
 
             return result, violations, {"error": "no_valid_ratios"}
@@ -174,7 +192,11 @@ class IRICGuard:
         result = GuardResult(
             passed=passed,
             violations=violations,
-            details={"avg_ratio": avg_ratio, "is_contractive": is_contractive, "ratios": ratios},
+            details={
+                "avg_ratio": avg_ratio,
+                "is_contractive": is_contractive,
+                "ratios": ratios,
+            },
             timestamp=str(time.time()),
         )
 
@@ -235,13 +257,18 @@ class SigmaGuard:
             policy = SigmaGuardPolicy()
 
         self.ece_max = ece_max if ece_max is not None else policy.ece_threshold
-        self.rho_bias_max = rho_bias_max if rho_bias_max is not None else policy.rho_bias_threshold
+        self.rho_bias_max = (
+            rho_bias_max if rho_bias_max is not None else policy.rho_bias_threshold
+        )
         self.require_consent = require_consent if require_consent is not None else True
         self.require_eco = require_eco if require_eco is not None else True
         self.ethics_calc = EthicsCalculator()
 
     def check(
-        self, state_dict: dict[str, Any], dataset_id: str | None = None, seed: int | None = None
+        self,
+        state_dict: dict[str, Any],
+        dataset_id: str | None = None,
+        seed: int | None = None,
     ) -> tuple[GuardResult, list[GuardViolation], dict[str, Any]]:
         """
         Executa verificação Σ-Guard
@@ -372,7 +399,12 @@ class SigmaGuard:
                 timestamp=str(time.time()),
             )
 
-            evidence = {"guard": "SIGMA_GUARD", "timestamp": time.time(), "error": str(e), "result": "ERROR"}
+            evidence = {
+                "guard": "SIGMA_GUARD",
+                "timestamp": time.time(),
+                "error": str(e),
+                "result": "ERROR",
+            }
 
         return result, violations, evidence
 
@@ -410,7 +442,12 @@ class IRtoICGuard:
     Verifica se ρ < 1 (sistema contrativo/convergente)
     """
 
-    def __init__(self, rho_max: float = 0.95, min_history_length: int = 2, contraction_factor: float = 0.98):
+    def __init__(
+        self,
+        rho_max: float = 0.95,
+        min_history_length: int = 2,
+        contraction_factor: float = 0.98,
+    ):
         """
         Args:
             rho_max: Threshold máximo para ρ
@@ -421,7 +458,9 @@ class IRtoICGuard:
         self.min_history = min_history_length
         self.contraction_factor = contraction_factor
 
-    def check_contractive(self, risk_series: list[float]) -> tuple[GuardResult, list[GuardViolation], dict[str, Any]]:
+    def check_contractive(
+        self, risk_series: list[float]
+    ) -> tuple[GuardResult, list[GuardViolation], dict[str, Any]]:
         """
         Verifica contratividade da série de risco
 
@@ -516,11 +555,17 @@ class IRtoICGuard:
             # Resultado
             if meets_threshold and is_contractive:
                 result = GuardResult(
-                    passed=True, violations=[], details={"status": "passed"}, timestamp=str(time.time())
+                    passed=True,
+                    violations=[],
+                    details={"status": "passed"},
+                    timestamp=str(time.time()),
                 )
             else:
                 result = GuardResult(
-                    passed=False, violations=violations, details={"status": "failed"}, timestamp=str(time.time())
+                    passed=False,
+                    violations=violations,
+                    details={"status": "failed"},
+                    timestamp=str(time.time()),
                 )
 
             analysis = {
@@ -533,7 +578,10 @@ class IRtoICGuard:
                 "series_length": len(risk_series),
                 "n_ratios": len(ratios),
                 "ratios": ratios[-5:],  # Últimos 5 para debug
-                "config": {"rho_max": self.rho_max, "contraction_factor": self.contraction_factor},
+                "config": {
+                    "rho_max": self.rho_max,
+                    "contraction_factor": self.contraction_factor,
+                },
             }
 
         except Exception as e:
@@ -573,7 +621,11 @@ class IRtoICGuard:
 
     def get_config(self) -> dict[str, Any]:
         """Retorna configuração atual"""
-        return {"rho_max": self.rho_max, "min_history": self.min_history, "contraction_factor": self.contraction_factor}
+        return {
+            "rho_max": self.rho_max,
+            "min_history": self.min_history,
+            "contraction_factor": self.contraction_factor,
+        }
 
 
 class GuardOrchestrator:
@@ -583,7 +635,11 @@ class GuardOrchestrator:
     Executa Σ-Guard e IR→IC em sequência, fail-closed
     """
 
-    def __init__(self, sigma_guard: SigmaGuard | None = None, iric_guard: IRtoICGuard | None = None):
+    def __init__(
+        self,
+        sigma_guard: SigmaGuard | None = None,
+        iric_guard: IRtoICGuard | None = None,
+    ):
         """
         Args:
             sigma_guard: Instância do Σ-Guard (default: padrão)
@@ -612,10 +668,16 @@ class GuardOrchestrator:
             (all_passed, all_violations, combined_evidence)
         """
         all_violations = []
-        evidence = {"timestamp": time.time(), "guards_executed": [], "overall_result": None}
+        evidence = {
+            "timestamp": time.time(),
+            "guards_executed": [],
+            "overall_result": None,
+        }
 
         # 1. Σ-Guard
-        sigma_result, sigma_violations, sigma_evidence = self.sigma_guard.check(state_dict, dataset_id, seed)
+        sigma_result, sigma_violations, sigma_evidence = self.sigma_guard.check(
+            state_dict, dataset_id, seed
+        )
 
         all_violations.extend(sigma_violations)
         evidence["sigma_guard"] = sigma_evidence
@@ -626,7 +688,9 @@ class GuardOrchestrator:
             # Usar histórico do state_dict ou valor atual
             risk_series = state_dict.get("risk_history", [state_dict.get("rho", 0.5)])
 
-        iric_result, iric_violations, iric_evidence = self.iric_guard.check_contractive(risk_series)
+        iric_result, iric_violations, iric_evidence = self.iric_guard.check_contractive(
+            risk_series
+        )
 
         all_violations.extend(iric_violations)
         evidence["iric_guard"] = iric_evidence
@@ -665,7 +729,9 @@ def quick_sigma_guard_check(
     return passed, messages
 
 
-def quick_iric_check(risk_series: list[float], rho_max: float = 0.95) -> tuple[bool, float]:
+def quick_iric_check(
+    risk_series: list[float], rho_max: float = 0.95
+) -> tuple[bool, float]:
     """Verificação rápida do IR→IC"""
     guard = IRtoICGuard(rho_max=rho_max)
     result, violations, analysis = guard.check_contractive(risk_series)
@@ -676,7 +742,9 @@ def quick_iric_check(risk_series: list[float], rho_max: float = 0.95) -> tuple[b
     return passed, max_ratio
 
 
-def full_guard_check(state_dict: dict[str, Any], risk_series: list[float] | None = None) -> dict[str, Any]:
+def full_guard_check(
+    state_dict: dict[str, Any], risk_series: list[float] | None = None
+) -> dict[str, Any]:
     """
     Verificação completa de todos os guards
 
@@ -684,7 +752,9 @@ def full_guard_check(state_dict: dict[str, Any], risk_series: list[float] | None
         Dict com resultado detalhado
     """
     orchestrator = GuardOrchestrator()
-    passed, violations, evidence = orchestrator.check_all_guards(state_dict, risk_series)
+    passed, violations, evidence = orchestrator.check_all_guards(
+        state_dict, risk_series
+    )
 
     return {
         "passed": passed,

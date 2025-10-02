@@ -63,7 +63,9 @@ class MammothInput(BaseModel):
 async def plugin_mammoth(p: MammothInput):
     try:
         out = continual_step_mammoth(p.dataset)
-        LEDGER.append(WORMEvent("plugin_mammoth", "meta", {"dataset": p.dataset, **out}))
+        LEDGER.append(
+            WORMEvent("plugin_mammoth", "meta", {"dataset": p.dataset, **out})
+        )
         return out
     except ImportError as e:
         raise HTTPException(400, str(e))
@@ -78,7 +80,9 @@ class SymbolicInput(BaseModel):
 async def plugin_symbolicai(p: SymbolicInput):
     try:
         out = verify_with_symbolicai(p.contract, p.specimen)
-        LEDGER.append(WORMEvent("plugin_symbolicai", "meta", {"contract": p.contract, **out}))
+        LEDGER.append(
+            WORMEvent("plugin_symbolicai", "meta", {"contract": p.contract, **out})
+        )
         return out
     except ImportError as e:
         raise HTTPException(400, str(e))
@@ -115,7 +119,9 @@ class GuardMetrics(BaseModel):
 
 
 @app.post("/meta/promote/{pid}")
-async def promote(pid: str, dlinf: float, caos_plus: float, sr: float, guard: GuardMetrics):
+async def promote(
+    pid: str, dlinf: float, caos_plus: float, sr: float, guard: GuardMetrics
+):
     gate_ok = (dlinf >= 0.01) and (caos_plus >= 1.0) and (sr >= 0.80)
     g = GUARD.eval(guard.dict())
     allow = bool(g.get("allow", False))
@@ -143,7 +149,12 @@ class PipelineInput(BaseModel):
     plugin: str
     payload: dict[str, Any] = {}
     caos_components: dict[str, float] = {"C": 0.6, "A": 0.6, "O": 1.0, "S": 1.0}
-    sr_probe: dict[str, float] = {"ece": 0.006, "rho": 0.95, "risk": 0.2, "dlinf_dc": 1.0}
+    sr_probe: dict[str, float] = {
+        "ece": 0.006,
+        "rho": 0.95,
+        "risk": 0.2,
+        "dlinf_dc": 1.0,
+    }
     guard_metrics: GuardMetrics
 
 
@@ -161,7 +172,9 @@ async def propose_canary_promote(x: PipelineInput):
             out = continual_step_mammoth(x.payload.get("dataset", "cifar10"))
             eg, cost = 0.012, 0.6
         elif x.plugin == "symbolicai":
-            out = verify_with_symbolicai(x.payload.get("contract", ""), x.payload.get("specimen", ""))
+            out = verify_with_symbolicai(
+                x.payload.get("contract", ""), x.payload.get("specimen", "")
+            )
             eg, cost = (0.01 if out.get("passed") else 0.0), 0.3
         else:
             raise HTTPException(400, f"Plugin desconhecido: {x.plugin}")

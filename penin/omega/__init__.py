@@ -29,10 +29,12 @@ def quick_caos_phi(*args, **kwargs):
     """Quick wrapper for phi_caos (compatibility)"""
     return phi_caos(*args, **kwargs)
 
+
 def validate_caos_stability(*args, **kwargs):
     """Stability validation (compatibility stub)"""
     # Implement basic stability check
     return True
+
 
 # Ethics and safety
 from .ethics_metrics import EthicsCalculator, EthicsGate, EthicsMetrics

@@ -55,7 +55,9 @@ class SRConfig:
         if not (0.0 <= self.w_intro <= 1.0):
             raise ValueError(f"w_intro must be in [0,1], got {self.w_intro}")
         if abs(self.w_calib + self.w_intro - 1.0) > 1e-6:
-            raise ValueError(f"Weights must sum to 1.0, got {self.w_calib + self.w_intro}")
+            raise ValueError(
+                f"Weights must sum to 1.0, got {self.w_calib + self.w_intro}"
+            )
         if not (0.0 < self.alpha_0 <= 1.0):
             raise ValueError(f"alpha_0 must be in (0,1], got {self.alpha_0}")
         if not (0.0 < self.gamma <= 1.0):
@@ -63,7 +65,9 @@ class SRConfig:
         if self.epsilon <= 0:
             raise ValueError(f"epsilon must be positive, got {self.epsilon}")
         if not (0.0 <= self.sr_min_threshold <= 1.0):
-            raise ValueError(f"sr_min_threshold must be in [0,1], got {self.sr_min_threshold}")
+            raise ValueError(
+                f"sr_min_threshold must be in [0,1], got {self.sr_min_threshold}"
+            )
 
 
 @dataclass

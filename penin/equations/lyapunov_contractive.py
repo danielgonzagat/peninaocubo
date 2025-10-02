@@ -29,7 +29,9 @@ class LyapunovConfig:
 
 
 def lyapunov_check(
-    I_current: dict[str, float], I_next: dict[str, float], config: LyapunovConfig | None = None
+    I_current: dict[str, float],
+    I_next: dict[str, float],
+    config: LyapunovConfig | None = None,
 ) -> tuple[bool, float]:
     """
     Check Lyapunov contractivity: V(I_next) < V(I_current).
@@ -49,4 +51,9 @@ def lyapunov_check(
     return is_contractive, delta_V
 
 
-__all__ = ["LyapunovConfig", "lyapunov_check", "compute_lyapunov_quadratic", "life_gate_lyapunov"]
+__all__ = [
+    "LyapunovConfig",
+    "lyapunov_check",
+    "compute_lyapunov_quadratic",
+    "life_gate_lyapunov",
+]

@@ -81,8 +81,18 @@ class VidaPlusRunner:
             "base_alpha": 1e-3,
             "fractal_depth": 2,
             "fractal_branching": 3,
-            "thresholds": {"beta_min": 0.01, "theta_caos": 0.25, "tau_sr": 0.80, "theta_G": 0.85, "spi_max": 0.05},
-            "evolution": {"survival_rate": 0.5, "min_fitness": 0.3, "exploration_mode": False},
+            "thresholds": {
+                "beta_min": 0.01,
+                "theta_caos": 0.25,
+                "tau_sr": 0.80,
+                "theta_G": 0.85,
+                "spi_max": 0.05,
+            },
+            "evolution": {
+                "survival_rate": 0.5,
+                "min_fitness": 0.3,
+                "exploration_mode": False,
+            },
         }
 
     def _init_knowledge_base(self):
@@ -113,7 +123,9 @@ class VidaPlusRunner:
 
         # 1. Checkpoint current state
         if self.current_state:
-            self.checkpoint_id = save_snapshot(self.current_state, reason=f"pre_evolution_gen_{self.generation}")
+            self.checkpoint_id = save_snapshot(
+                self.current_state, reason=f"pre_evolution_gen_{self.generation}"
+            )
 
         # 2. Collect swarm state
         self._update_swarm()
@@ -160,15 +172,23 @@ class VidaPlusRunner:
 
         if self.config["evolution"]["exploration_mode"]:
             # Use KRATOS for exploration
-            exploration = compute_exploration_metrics(C, A, O, S, exploration_factor=2.0)
-            phi = exploration["phi_kratos"] if exploration["safe"] else exploration["phi_base"]
+            exploration = compute_exploration_metrics(
+                C, A, O, S, exploration_factor=2.0
+            )
+            phi = (
+                exploration["phi_kratos"]
+                if exploration["safe"]
+                else exploration["phi_base"]
+            )
         else:
             phi = phi_caos(C, A, O, S)
 
         sr = sr_omega(
             awareness=metrics.get("awareness", 0.8),
             ethics_ok=True,
-            autocorr=metrics.get("autocorrection", 0.8),  # Note: parameter name is autocorr not autocorrection
+            autocorr=metrics.get(
+                "autocorrection", 0.8
+            ),  # Note: parameter name is autocorr not autocorrection
             metacognition=metrics.get("metacognition", 0.8),
         )
 
@@ -191,7 +211,10 @@ class VidaPlusRunner:
                 metrics.get("metacognition", 0.8),
             ),
             linf_weights={"accuracy": 2.0, "efficiency": 1.0},
-            linf_metrics={"accuracy": metrics.get("accuracy", 0.8), "efficiency": metrics.get("efficiency", 0.7)},
+            linf_metrics={
+                "accuracy": metrics.get("accuracy", 0.8),
+                "efficiency": metrics.get("efficiency", 0.7),
+            },
             cost=metrics.get("cost", 0.01),
             ethical_ok_flag=True,
             G=G,
@@ -217,7 +240,9 @@ class VidaPlusRunner:
             timestamp=time.time(),
         )
 
-        variant.fitness_score = darwinian_score(variant.life_ok, variant.caos_phi, variant.sr, variant.G, variant.L_inf)
+        variant.fitness_score = darwinian_score(
+            variant.life_ok, variant.caos_phi, variant.sr, variant.G, variant.L_inf
+        )
 
         self.variants.append(variant)
 
@@ -231,7 +256,10 @@ class VidaPlusRunner:
         print(f"  ✓ Survivors: {len(survivors)}/{len(self.variants)}")
 
         # 11. Update fractal tree
-        propagate_update(self.fractal_tree, {"alpha": life_result.alpha_eff, "generation": self.generation})
+        propagate_update(
+            self.fractal_tree,
+            {"alpha": life_result.alpha_eff, "generation": self.generation},
+        )
 
         # 12. Record to neural chain
         block_hash = add_block(
@@ -320,7 +348,9 @@ class VidaPlusRunner:
     def _get_risk_series(self) -> dict[str, float]:
         """Get risk time series"""
         # Simulated decreasing risk over generations
-        return {f"r{i}": max(0.1, 0.9 - i * 0.05 - self.generation * 0.01) for i in range(3)}
+        return {
+            f"r{i}": max(0.1, 0.9 - i * 0.05 - self.generation * 0.01) for i in range(3)
+        }
 
     def _get_action_history(self) -> list[str]:
         """Get recent action history"""
@@ -380,7 +410,9 @@ class VidaPlusRunner:
         # Compute summary
         successful = sum(1 for r in results if r.get("life_ok", False))
         avg_alpha = sum(r.get("alpha_eff", 0) for r in results) / max(1, len(results))
-        avg_fitness = sum(r.get("phi", 0) * r.get("sr", 0) * r.get("G", 0) for r in results) / max(1, len(results))
+        avg_fitness = sum(
+            r.get("phi", 0) * r.get("sr", 0) * r.get("G", 0) for r in results
+        ) / max(1, len(results))
 
         summary = {
             "cycles_requested": cycles,
@@ -398,7 +430,9 @@ class VidaPlusRunner:
         print("📊 CANARY SUMMARY")
         print(f"{'=' * 50}")
         print(f"  Cycles: {summary['cycles_completed']}/{cycles}")
-        print(f"  Success rate: {summary['successful_cycles']}/{summary['cycles_completed']}")
+        print(
+            f"  Success rate: {summary['successful_cycles']}/{summary['cycles_completed']}"
+        )
         print(f"  Avg α_eff: {summary['average_alpha_eff']:.6f}")
         print(f"  Avg fitness: {summary['average_fitness']:.3f}")
         print(f"  Chain valid: {summary['chain_valid']}")

@@ -44,19 +44,37 @@ class SpikingJellyConfig(IntegrationConfig):
     priority: IntegrationPriority = Field(default=IntegrationPriority.P1_CRITICAL)
 
     # SpikingJelly-specific settings
-    backend: str = Field(default="cupy", description="Backend: 'torch', 'cupy' (for CUDA acceleration)")
-    neuron_type: str = Field(default="IF", description="Neuron model: 'IF', 'LIF', 'PLIF'")
-    surrogate_function: str = Field(default="ATan", description="Surrogate gradient: 'ATan', 'Sigmoid', 'Rectangle'")
-    time_steps: int = Field(default=4, ge=1, le=32, description="Number of time steps for SNN simulation")
+    backend: str = Field(
+        default="cupy", description="Backend: 'torch', 'cupy' (for CUDA acceleration)"
+    )
+    neuron_type: str = Field(
+        default="IF", description="Neuron model: 'IF', 'LIF', 'PLIF'"
+    )
+    surrogate_function: str = Field(
+        default="ATan", description="Surrogate gradient: 'ATan', 'Sigmoid', 'Rectangle'"
+    )
+    time_steps: int = Field(
+        default=4, ge=1, le=32, description="Number of time steps for SNN simulation"
+    )
 
     # Optimization
-    enable_cuda_enhanced: bool = Field(default=True, description="Use CUDA-enhanced neurons (11× speedup)")
-    enable_sparse_computation: bool = Field(default=True, description="Enable sparse spiking computation")
-    target_sparsity: float = Field(default=0.69, ge=0.0, le=1.0, description="Target spike sparsity")
+    enable_cuda_enhanced: bool = Field(
+        default=True, description="Use CUDA-enhanced neurons (11× speedup)"
+    )
+    enable_sparse_computation: bool = Field(
+        default=True, description="Enable sparse spiking computation"
+    )
+    target_sparsity: float = Field(
+        default=0.69, ge=0.0, le=1.0, description="Target spike sparsity"
+    )
 
     # Energy efficiency
-    track_energy: bool = Field(default=True, description="Track energy consumption metrics")
-    energy_budget: float = Field(default=1.0, ge=0.0, description="Relative energy budget (1.0 = baseline)")
+    track_energy: bool = Field(
+        default=True, description="Track energy consumption metrics"
+    )
+    energy_budget: float = Field(
+        default=1.0, ge=0.0, description="Relative energy budget (1.0 = baseline)"
+    )
 
 
 class SpikingNetworkAdapter(BaseIntegrationAdapter):
@@ -92,7 +110,9 @@ class SpikingNetworkAdapter(BaseIntegrationAdapter):
         """Initialize SpikingJelly modules"""
         if not self.is_available():
             self.status = IntegrationStatus.NOT_INSTALLED
-            logger.warning("SpikingJelly not installed. Install with: pip install spikingjelly torch")
+            logger.warning(
+                "SpikingJelly not installed. Install with: pip install spikingjelly torch"
+            )
             return False
 
         try:
@@ -114,7 +134,9 @@ class SpikingNetworkAdapter(BaseIntegrationAdapter):
 
                     logger.info("CUDA-enhanced neurons enabled (11× speedup)")
                 except ImportError:
-                    logger.warning("CuPy not available, falling back to PyTorch backend")
+                    logger.warning(
+                        "CuPy not available, falling back to PyTorch backend"
+                    )
                     self.config.backend = "torch"
 
             self.status = IntegrationStatus.INITIALIZED
@@ -127,7 +149,9 @@ class SpikingNetworkAdapter(BaseIntegrationAdapter):
 
         except Exception as e:
             self.status = IntegrationStatus.FAILED
-            raise IntegrationInitializationError("spikingjelly", f"Initialization failed: {e}", e) from e
+            raise IntegrationInitializationError(
+                "spikingjelly", f"Initialization failed: {e}", e
+            ) from e
 
     def get_status(self) -> dict[str, Any]:
         """Get current status of SpikingJelly integration"""
@@ -144,7 +168,9 @@ class SpikingNetworkAdapter(BaseIntegrationAdapter):
             "metrics": self.get_metrics(),
         }
 
-    async def execute(self, operation: str, model: Any | None = None, data: Any | None = None) -> dict[str, Any]:
+    async def execute(
+        self, operation: str, model: Any | None = None, data: Any | None = None
+    ) -> dict[str, Any]:
         """
         Execute SpikingJelly operation.
 
@@ -190,7 +216,9 @@ class SpikingNetworkAdapter(BaseIntegrationAdapter):
                 logger.warning(f"SpikingJelly execution failed (fail-open): {e}")
                 return {"status": "failed", "fallback": True}
             else:
-                raise IntegrationExecutionError("spikingjelly", f"Execution failed: {e}", e) from e
+                raise IntegrationExecutionError(
+                    "spikingjelly", f"Execution failed: {e}", e
+                ) from e
 
     async def _convert_to_snn(self, ann_model: Any) -> dict[str, Any]:
         """
@@ -198,7 +226,9 @@ class SpikingNetworkAdapter(BaseIntegrationAdapter):
 
         Placeholder implementation - will integrate actual SpikingJelly conversion.
         """
-        logger.info(f"Converting ANN to SNN: neuron_type={self.config.neuron_type}, T={self.config.time_steps}")
+        logger.info(
+            f"Converting ANN to SNN: neuron_type={self.config.neuron_type}, T={self.config.time_steps}"
+        )
 
         # TODO: Implement actual conversion using spikingjelly.activation_based.model_converter
         # Example (hypothetical):
@@ -249,7 +279,10 @@ class SpikingNetworkAdapter(BaseIntegrationAdapter):
             "speedup_vs_ann": 11.0 if self.config.enable_cuda_enhanced else 1.0,
             "avg_sparsity": self.config.target_sparsity,
             "energy_consumption": 0.1,  # Relative to ANN baseline
-            "metadata": {"backend": self.config.backend, "time_steps": self.config.time_steps},
+            "metadata": {
+                "backend": self.config.backend,
+                "time_steps": self.config.time_steps,
+            },
         }
 
     async def _infer_snn(self, snn_model: Any, input_data: Any) -> dict[str, Any]:
@@ -273,10 +306,15 @@ class SpikingNetworkAdapter(BaseIntegrationAdapter):
             "latency_ms": 5.2,  # 100× faster than dense computation
             "sparsity_achieved": 0.72,  # 72% of spikes were zero
             "energy_ratio": 0.01,  # 1% of ANN energy
-            "metadata": {"backend": self.config.backend, "time_steps": self.config.time_steps},
+            "metadata": {
+                "backend": self.config.backend,
+                "time_steps": self.config.time_steps,
+            },
         }
 
-    async def _analyze_sparsity(self, snn_model: Any, input_data: Any) -> dict[str, Any]:
+    async def _analyze_sparsity(
+        self, snn_model: Any, input_data: Any
+    ) -> dict[str, Any]:
         """
         Analyze spike sparsity and energy efficiency.
 

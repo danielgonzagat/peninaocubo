@@ -170,7 +170,9 @@ def estimate_gradient_fast(
     for i in range(n):
         orig = state_perturbed[i]
         state_perturbed[i] = orig + finite_diff_epsilon
-        gradient[i] = (loss_fn(state_perturbed, evidence, policies) - loss_current) * inv_eps
+        gradient[i] = (
+            loss_fn(state_perturbed, evidence, policies) - loss_current
+        ) * inv_eps
         state_perturbed[i] = orig
 
     # Negate for descent direction (vectorized)
@@ -224,7 +226,7 @@ def project_to_safe_set(
             max_norm = clip_norm or H_constraints.get("max_norm")
             norm = np.linalg.norm(projected)
             if norm > max_norm:
-                projected *= (max_norm / norm)
+                projected *= max_norm / norm
 
     # S: Ethical constraints (placeholder)
     # In production, call OPA/Rego service

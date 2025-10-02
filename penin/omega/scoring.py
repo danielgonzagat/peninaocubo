@@ -2,14 +2,18 @@ import math
 from dataclasses import dataclass
 
 
-def quick_harmonic(values: list[float], weights: list[float] = None, eps: float = 1e-9) -> float:
+def quick_harmonic(
+    values: list[float], weights: list[float] = None, eps: float = 1e-9
+) -> float:
     """Quick harmonic mean calculation with optional weights."""
     if weights is None:
         weights = [1.0] * len(values)
     return harmonic_mean_weighted(values, weights, eps)
 
 
-def harmonic_mean_weighted(values: list[float], weights: list[float], eps: float = 1e-9) -> float:
+def harmonic_mean_weighted(
+    values: list[float], weights: list[float], eps: float = 1e-9
+) -> float:
     wsum = sum(weights) or eps
     den = 0.0
     for v, w in zip(values, weights, strict=False):
@@ -73,7 +77,12 @@ def normalize_series(values: list[float]) -> list[float]:
 
 
 def linf_harmonic(
-    metrics, weights, cost_factor=None, lambda_c: float = 0.0, ethical_ok: bool = True, **kwargs
+    metrics,
+    weights,
+    cost_factor=None,
+    lambda_c: float = 0.0,
+    ethical_ok: bool = True,
+    **kwargs,
 ) -> float:
     """Compatibility linf: accepts list or dict inputs and cost_factor alias."""
     if isinstance(metrics, dict):

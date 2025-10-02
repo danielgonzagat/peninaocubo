@@ -82,7 +82,9 @@ def compute_hash_legacy(data: bytes) -> str:
     return compute_hash(data, algorithm=LEGACY_HASH_ALGORITHM)
 
 
-def verify_hash(data: bytes, expected_hash: str, algorithm: str = HASH_ALGORITHM) -> bool:
+def verify_hash(
+    data: bytes, expected_hash: str, algorithm: str = HASH_ALGORITHM
+) -> bool:
     """
     Verify that data matches expected hash.
 
@@ -153,6 +155,8 @@ def _migrate_hash_chain(
         "Hash chain migration requires event-specific serialization. "
         "Use ledger-specific migration tools instead."
     )
+
+
 # ============================================================================
 # Performance Benchmarks
 # ============================================================================

@@ -1,246 +1,413 @@
-# PENIN-Ω Foundation Configuration
-# ==================================
+#############################################################################
+# PENIN-Ω Foundation Policy Configuration
+# =========================================
 # 
-# This file defines all thresholds, gates, and policies for the
-# PENIN-Ω auto-evolution system following the complete blueprint.
+# Defines all critical thresholds and constraints for:
+# - Mathematical equations (L∞, CAOS+, SR, etc.)
+# - Ethical gates (ΣEA/LO-14)
+# - Safety gates (Σ-Guard)
+# - Operational limits (budget, resources)
+#
+# These values are enforced via OPA/Rego policies and fail-closed gates.
+#############################################################################
 
-# Core Thresholds (Legacy compatibility)
-thresholds:
-  rho_max: 0.999              # Contractivity upper bound
-  ece_max: 0.01               # Expected Calibration Error
-  rho_bias_max: 1.05          # Bias ratio
-  sr_min: 0.80                # SR-Ω∞ minimum
-  caos_plus_min: 1.0          # CAOS⁺ minimum
-  agape_min: 0.70             # Agápe index minimum
-  league_fp_max: 0.05         # Max false positive rate
-  util_min: 0.90              # Minimum utilization
-
-# Fail-Closed Mode (mandatory)
-fail_closed: true
-
-# Σ-Guard Complete Configuration
-sigma_guard:
-  rho_max: 0.99               # Contractivity: ρ < 1 (IR→IC)
-  ece_max: 0.01               # Expected Calibration Error
-  rho_bias_max: 1.05          # Bias ratio
-  sr_min: 0.80                # SR-Ω∞ reflexivity minimum
-  G_min: 0.85                 # Global coherence (Ω-ΣEA Total)
-  delta_Linf_min: 0.01        # β_min (Death equation threshold)
-  cost_max_increase: 0.10     # Maximum cost increase (10%)
-  kappa_min: 20.0             # CAOS⁺ kappa minimum
-  consent_required: true      # User consent mandatory
-  eco_ok_required: true       # Ecological constraints mandatory
-
-# Budget Management
-budget:
-  daily_usd: 50.0             # Daily budget limit
-  soft_limit_pct: 0.90        # Soft limit trigger (90%)
-  hard_limit_pct: 1.0         # Hard limit (100%)
-  alert_threshold: 0.95       # Alert at 95%
-
-# CAOS⁺ Engine Configuration
-caos_plus:
-  kappa_default: 20.0         # Default kappa (amplification)
-  kappa_min: 20.0             # Minimum kappa
-  kappa_max: 50.0             # Maximum kappa (auto-tuning range)
-  gamma: 0.8                  # Saturation parameter φ(CAOS⁺)
-  C_weights:                  # Consistency weights
-    pass_at_k: 0.5
-    ece: 0.3
-    external: 0.2
-  S_weights:                  # Silence weights
-    noise: 0.5
-    redundancy: 0.25
-    entropy: 0.25
-
-# SR-Ω∞ Reflexive Configuration
-sr_omega_infinity:
-  awareness_threshold: 0.85   # Minimum awareness
-  autocorrection_threshold: 0.80  # Minimum autocorrection
-  metacognition_threshold: 0.75   # Minimum metacognition
-  ethics_mandatory: true      # Ethics gate mandatory (fail-closed)
-  harmonic_epsilon: 1e-6      # Numerical stability
-
-# Master Equation (Penin Update)
-master_equation:
-  alpha_0: 0.1                # Base learning rate
-  gamma: 0.8                  # φ saturation parameter
-  H_constraints:              # Technical constraints
-    bounds: [0.0, 1.0]        # Box constraints [min, max]
-    max_norm: 10.0            # L2 norm clipping
-  S_constraints:              # Ethical constraints (OPA/Rego)
-    opa_service: "http://localhost:8181/v1/data/penin/guard"
-    rego_policy: "policies/sigma_guard.rego"
-  finite_diff_epsilon: 1e-4   # Gradient estimation epsilon
-
-# L∞ Meta-Function
-Linf:
-  default_weights:            # Default metric weights
-    accuracy: 0.4
-    robustness: 0.4
-    privacy: 0.2
-  lambda_c_default: 0.5       # Cost penalty coefficient
-  epsilon: 1e-3               # Stability epsilon
-
-# IR→IC Contractivity
-ir_ic:
-  rho_default: 0.85           # Default contraction factor
-  rho_min: 0.50               # Minimum ρ (aggressive)
-  rho_max: 0.95               # Maximum ρ (conservative)
-  max_iterations: 10          # Max refinement iterations
-  convergence_threshold: 1e-3 # Convergence criterion
-  risk_categories:            # LO-01 to LO-14
-    - idolatry                # LO-01
-    - occultism               # LO-02
-    - physical_harm           # LO-03
-    - emotional_harm          # LO-04
-    - spiritual_harm          # LO-05
-    - privacy_violation       # LO-06
-    - bias                    # LO-07
-    - fairness                # LO-08
-    - transparency            # LO-09
-
-# Vida/Morte Gates
-gates:
-  death:
-    beta_min_default: 0.01    # Minimum improvement required
-    beta_min_range: [0.001, 0.1]  # Auto-tuning range
-    strict: true              # Use strict inequality (≥)
-  life:
-    lyapunov_epsilon: 1e-6    # Tolerance for Lyapunov check
-    dt_default: 1.0           # Default time step
-
-# Auto-Tuning Configuration
-auto_tuning:
-  enabled: true
-  learning_rate: 0.05         # Adaptation rate
-  parameters:                 # Parameters to tune
-    - kappa                   # CAOS⁺ amplification
-    - lambda_c                # Cost penalty
-    - beta_min                # Death gate threshold
-    - weights                 # L∞ metric weights
-  target_success_rate: 0.60   # Target promotion success rate
-  adaptation_window: 20       # Window for computing success rate
-
-# Ω-META Mutation Engine
-omega_meta:
-  enabled: true
-  mutation_rate: 0.05         # Probability of mutation
-  max_mutations_per_cycle: 3  # Limit mutations per cycle
-  ast_patch_safe: true        # Only safe AST patches
-  feature_flags: true         # Use feature flags
-  rollback_atomic: true       # Atomic rollback on failure
-
-# ACFA League (Champion-Challenger)
-acfa_league:
-  shadow_traffic_pct: 0.0     # Shadow traffic (read-only)
-  canary_traffic_pct: 0.05    # Canary traffic (1-5%)
-  promotion_threshold: 0.90   # Confidence threshold for promotion
-  rollback_threshold: 0.50    # Confidence threshold for rollback
-  epv_enabled: true           # Expected Possession Value
-
-# WORM Ledger
-worm_ledger:
-  enabled: true
-  hash_algorithm: "sha256"    # Hash algorithm
-  chain_integrity: true       # Verify chain integrity
-  timestamp_utc: true         # Use UTC timestamps
-  append_only: true           # Strictly append-only
-  storage: "ledger/worm.jsonl"  # Storage path
-
-# Multi-LLM Router
-router:
-  budget_tracking: true
-  circuit_breaker:
-    enabled: true
-    failure_threshold: 5      # Consecutive failures to open
-    timeout_seconds: 30       # Timeout before retry
-  cache:
-    enabled: true
-    l1_ttl_seconds: 300       # L1 cache TTL
-    l2_ttl_seconds: 3600      # L2 cache TTL
-    hmac_enabled: true        # HMAC integrity
-  analytics:
-    enabled: true
-    metrics_export: "prometheus"
-    latency_percentiles: [0.5, 0.90, 0.95, 0.99]
-
-# Observability
-observability:
-  structured_logging: true    # JSON structured logs
-  log_level: "INFO"           # Default log level
-  tracing:
-    enabled: true
-    otel_endpoint: "http://localhost:4318"
-    sample_rate: 1.0          # 100% sampling (adjust for production)
-  metrics:
-    enabled: true
-    prometheus_port: 9090
-    export_interval_seconds: 15
-  dashboards:
-    - Linf_over_time
-    - caos_plus_distribution
-    - sr_omega_score
-    - gate_pass_rates
-    - cost_per_cycle
-    - delta_Linf_histogram
-
-# Security & Compliance
-security:
-  sbom_generation: true       # Generate SBOM
-  sca_scan: true              # Software Composition Analysis
-  secrets_scan: true          # Scan for secrets
-  signed_releases: true       # Sign releases (Sigstore/cosign)
-  slsa_provenance: true       # SLSA provenance metadata
-
-# Self-RAG
-self_rag:
-  enabled: true
-  bm25_weight: 0.7            # BM25 weight
-  embedding_weight: 0.3       # Embedding weight
-  dedup: true                 # Deduplication
-  chunking:
-    min_size: 512
-    max_size: 2048
-  retrieval_top_k: 5
-
-# Fractal Coherence
-fractal_coherence:
-  enabled: true
-  threshold: 0.85             # Minimum coherence score
-  levels: 3                   # Fractal depth
-
-# Ethical Foundation (ΣEA/LO-14)
-ethics:
-  laws:                       # Leis Originárias (LO-01 to LO-14)
-    LO_01: "No idolatry"
-    LO_02: "No occultism"
-    LO_03: "No physical harm"
-    LO_04: "No emotional harm"
-    LO_05: "No spiritual harm"
-    LO_06: "Privacy protection"
-    LO_07: "Bias mitigation"
-    LO_08: "Fairness enforcement"
-    LO_09: "Transparency mandatory"
-    LO_10: "Consent required"
-    LO_11: "Ecological responsibility"
-    LO_12: "Accountability"
-    LO_13: "Human dignity"
-    LO_14: "Agápe index ≥ threshold"
-  agape_index:
-    sacrificial_cost_weight: 0.2
-    virtues_weight: 0.8
-    virtues:
-      - patience
-      - kindness
-      - humility
-      - selflessness
-      - forgiveness
-
-# System Metadata
+---
+# Core System Information
 metadata:
-  version: "0.8.0"
-  blueprint_version: "1.0"
-  last_updated: "2025-10-01"
-  maintainer: "Daniel Penin"
-  license: "Apache-2.0"
+  name: "PENIN-Ω Foundation Policy"
+  version: "1.0.0"
+  date: "2025-10-02"
+  authority: "PENIN-Ω Core Team"
+  enforcement: "fail-closed"  # Default deny on violations
+
+# ============================================================================
+# MATHEMATICAL THRESHOLDS
+# ============================================================================
+
+mathematics:
+  # Equation 2: L∞ Meta-Function
+  linf:
+    lambda_c: 0.5  # Cost penalty factor
+    epsilon: 0.001  # Numerical stability
+    require_ethics: true  # Fail-closed if ethics fail
+    require_contractivity: true  # Fail-closed if ρ >= 1
+    min_acceptable: 0.1  # Minimum L∞ for promotion
+  
+  # Equation 3: CAOS+ Motor
+  caos_plus:
+    kappa_min: 20.0  # Minimum amplification gain
+    kappa_max: 100.0  # Maximum (safety cap)
+    kappa_default: 20.0
+    components:
+      consistency:
+        min: 0.70  # Minimum C for viable system
+        target: 0.90
+      autoevolution:
+        min: 0.01  # Minimum A (must show improvement)
+        target: 0.50
+      incognoscible:
+        min: 0.0
+        max: 1.0  # Full epistemic uncertainty allowed
+      silence:
+        min: 0.50  # Require some signal quality
+        target: 0.85
+  
+  # Equation 4: SR-Ω∞ Reflexivity
+  sr_omega:
+    min_score: 0.80  # Minimum reflexivity for operation
+    target_score: 0.90
+    aggregation: "harmonic"  # Non-compensatory
+    components:
+      awareness_min: 0.70
+      ethics_required: true  # Binary: must be true
+      autocorrection_min: 0.60
+      metacognition_min: 0.70
+  
+  # Equation 5: Death Gate
+  death_gate:
+    beta_min_default: 0.01  # Minimum ΔL∞ improvement (1%)
+    beta_min_range: [0.001, 0.10]  # Auto-tuning bounds
+    action_on_death: "rollback"  # rollback | quarantine | archive
+  
+  # Equation 6: IR→IC Contractivity
+  contractivity:
+    rho_max: 0.99  # Maximum contraction factor (must be < 1)
+    rho_target: 0.90  # Target for strong contractivity
+    max_iterations: 10  # Iterative refinement limit
+    convergence_epsilon: 0.001
+  
+  # Equation 13: ΔL∞ Compound Growth
+  growth:
+    beta_min: 0.01  # 1% minimum growth per cycle
+    compound_required: true  # Must maintain compound growth
+    max_stagnation_cycles: 3  # Trigger intervention
+
+# ============================================================================
+# ETHICAL CONSTRAINTS (ΣEA/LO-14)
+# ============================================================================
+
+ethics:
+  # Origin Laws enforcement
+  laws:
+    lo_01_anti_idolatry: "critical"  # Severity level
+    lo_02_anti_occultism: "critical"
+    lo_03_anti_physical_harm: "critical"
+    lo_04_anti_emotional_harm: "critical"
+    lo_05_privacy: "critical"
+    lo_06_transparency: "high"
+    lo_07_consent: "critical"
+    lo_08_autonomy: "critical"
+    lo_09_justice: "high"
+    lo_10_beneficence: "medium"
+    lo_11_non_maleficence: "critical"
+    lo_12_responsibility: "high"
+    lo_13_sustainability: "medium"
+    lo_14_humility: "high"
+  
+  # Validation thresholds
+  thresholds:
+    privacy_min: 0.95  # Minimum privacy score
+    fairness_min: 0.95  # Minimum fairness (rho_bias ≤ 1.05)
+    transparency_min: 0.90
+    physical_risk_max: 0.01  # Maximum acceptable physical risk
+    emotional_risk_max: 0.05
+  
+  # Calibration
+  calibration:
+    ece_max: 0.01  # Expected Calibration Error ≤ 1%
+    confidence_min: 0.80
+  
+  # Bias
+  bias:
+    rho_bias_max: 1.05  # Maximum fairness ratio (5% tolerance)
+    demographic_parity_min: 0.90
+  
+  # Consent
+  consent:
+    required: true  # Always require explicit consent
+    informed: true  # Must be informed consent
+    revocable: true  # Users can revoke
+  
+  # Content moderation
+  content:
+    allow_religious_claims: false  # LO-01
+    allow_occult_content: false  # LO-02
+    allow_consciousness_claims: false  # LO-01
+    allow_deity_references: false  # LO-01
+
+# ============================================================================
+# SIGMA GUARD CONFIGURATION
+# ============================================================================
+
+sigma_guard:
+  # Gate enforcement mode
+  mode: "fail-closed"  # fail-closed | fail-open (only fail-closed for production)
+  aggregation: "non-compensatory"  # All gates must pass
+  
+  # Individual gates
+  gates:
+    contractivity:
+      enabled: true
+      threshold: 1.0  # ρ < 1.0 required
+      action_on_fail: "rollback"
+    
+    calibration:
+      enabled: true
+      ece_max: 0.01
+      action_on_fail: "rollback"
+    
+    bias:
+      enabled: true
+      rho_bias_max: 1.05
+      action_on_fail: "rollback"
+    
+    reflexivity:
+      enabled: true
+      sr_min: 0.80
+      action_on_fail: "rollback"
+    
+    coherence:
+      enabled: true
+      omega_g_min: 0.85
+      action_on_fail: "rollback"
+    
+    death_gate:
+      enabled: true
+      beta_min: 0.01
+      action_on_fail: "rollback"
+    
+    cost:
+      enabled: true
+      max_increase_pct: 0.10  # 10% max cost increase
+      action_on_fail: "block"
+    
+    kappa:
+      enabled: true
+      min_value: 20.0
+      action_on_fail: "block"
+    
+    consent:
+      enabled: true
+      required: true
+      action_on_fail: "rollback"
+    
+    ecological:
+      enabled: true
+      energy_kwh_max: 10.0  # Per decision
+      carbon_kg_max: 1.0  # Per decision
+      action_on_fail: "review"  # Less strict, allows review
+
+# ============================================================================
+# OPERATIONAL CONSTRAINTS
+# ============================================================================
+
+operations:
+  # Multi-LLM Router
+  router:
+    budget:
+      daily_usd_max: 100.0  # Maximum daily spend
+      soft_cutoff_pct: 0.95  # Warn at 95%
+      hard_cutoff_pct: 1.00  # Block at 100%
+      reset_hour_utc: 0  # Reset at midnight UTC
+    
+    circuit_breaker:
+      failure_threshold: 3  # Open after 3 consecutive failures
+      recovery_timeout_s: 60.0  # Try recovery after 60s
+      half_open_max_calls: 1  # Test with 1 call in half-open
+    
+    cache:
+      l1_max_size: 1000  # In-memory cache size
+      l2_max_size: 10000  # Persistent cache size
+      ttl_seconds: 3600  # 1 hour TTL
+      hmac_enabled: true  # HMAC integrity checking
+    
+    analytics:
+      track_latency: true
+      track_cost: true
+      track_success_rate: true
+      retention_days: 30
+  
+  # Resource limits
+  resources:
+    max_memory_mb: 2048  # Per instance
+    max_cpu_cores: 4
+    max_concurrent_requests: 100
+    request_timeout_s: 30
+  
+  # WORM Ledger
+  ledger:
+    enabled: true
+    format: "jsonl"  # Append-only JSONL
+    hash_algorithm: "blake2b"  # BLAKE2b-256
+    compression: false  # No compression (integrity > size)
+    backup_enabled: true
+    backup_interval_hours: 24
+    retention_days: 365  # 1 year minimum
+  
+  # Observability
+  observability:
+    logging:
+      level: "INFO"  # DEBUG | INFO | WARNING | ERROR
+      format: "json"  # json | text
+      structured: true
+    
+    metrics:
+      enabled: true
+      port: 9090  # Prometheus metrics
+      interval_s: 15
+    
+    tracing:
+      enabled: false  # Enable for production
+      sampling_rate: 0.1  # 10% sampling
+
+# ============================================================================
+# AUTO-EVOLUTION PIPELINE
+# ============================================================================
+
+auto_evolution:
+  # Champion-Challenger configuration
+  league:
+    enabled: true
+    mode: "shadow-canary"  # shadow-only | shadow-canary | full
+    canary_traffic_pct: 0.05  # 5% canary traffic
+    promotion_criteria:
+      delta_linf_min: 0.01
+      caos_plus_improvement_required: true
+      sr_score_min: 0.80
+      all_gates_must_pass: true
+    rollback_triggers:
+      delta_linf_negative: true
+      gate_failure: true
+      error_rate_increase: 0.05  # 5% increase
+      latency_increase: 0.20  # 20% increase
+  
+  # Ω-META mutation generation
+  omega_meta:
+    enabled: true
+    max_mutations_per_cycle: 5
+    mutation_types:
+      - "parameter_tuning"
+      - "architecture_modification"
+      - "policy_update"
+    safety:
+      dry_run_first: true
+      sandbox_execution: true
+      rollback_available: true
+  
+  # Auto-Tuning
+  auto_tuning:
+    enabled: true
+    parameters:
+      - "kappa"
+      - "lambda_c"
+      - "beta_min"
+      - "weights"
+    learning_rate: 0.01
+    adaptation_interval: 100  # Tune every 100 cycles
+
+# ============================================================================
+# SOTA INTEGRATIONS
+# ============================================================================
+
+integrations:
+  priority_1:
+    nextpy_ams:
+      enabled: true
+      version: ">=0.4.0"
+    metacognitive_prompting:
+      enabled: true
+      stages: 5  # Understanding → Judgment → Evaluation → Decision → Confidence
+    spikingjelly:
+      enabled: true
+      neuromorphic: true
+      acceleration: "cuda"  # cuda | cpu
+  
+  priority_2:
+    goneat:
+      enabled: false  # To be implemented
+      planned: true
+    mammoth:
+      enabled: false  # To be implemented
+      planned: true
+    symbolicai:
+      enabled: false  # To be implemented
+      planned: true
+  
+  priority_3:
+    midwiving_ai:
+      enabled: false  # Experimental
+      planned: true
+    opencog:
+      enabled: false  # Experimental
+      planned: true
+    swarmrl:
+      enabled: false  # Experimental
+      planned: true
+
+# ============================================================================
+# SECURITY & COMPLIANCE
+# ============================================================================
+
+security:
+  # SBOM (Software Bill of Materials)
+  sbom:
+    format: "cyclonedx"  # cyclonedx | spdx
+    generation: "automatic"
+    update_frequency: "on_release"
+  
+  # SCA (Software Composition Analysis)
+  sca:
+    tools:
+      - "trivy"
+      - "grype"
+      - "pip-audit"
+    severity_threshold: "medium"  # Block on medium+
+    action_on_vuln: "block"
+  
+  # Secrets management
+  secrets:
+    scan_enabled: true
+    tools: ["gitleaks"]
+    action_on_leak: "block"
+    redact_logs: true
+  
+  # Container security
+  container:
+    sign_images: true
+    tool: "cosign"  # Sigstore cosign
+    verify_on_pull: true
+  
+  # Release security
+  release:
+    slsa_level: "slsa-2"  # Target SLSA Level 2
+    provenance_required: true
+    attestation_required: true
+
+# ============================================================================
+# COMPLIANCE & GOVERNANCE
+# ============================================================================
+
+compliance:
+  # Data protection
+  data_protection:
+    gdpr_compliant: true
+    ccpa_compliant: true
+    data_minimization: true
+    purpose_limitation: true
+  
+  # Audit requirements
+  audit:
+    worm_ledger_required: true
+    pcag_required: true  # Proof-Carrying Artifacts
+    retention_years: 7  # Legal minimum
+    immutable: true
+  
+  # Governance
+  governance:
+    decision_authority: "multi-sig"  # Requires multiple approvals
+    ethics_review_required: true
+    security_review_required: true
+    change_control: "strict"
+
+---
+# End of foundation.yaml

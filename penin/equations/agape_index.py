@@ -126,7 +126,9 @@ def compute_agape_index(
     return agape, True
 
 
-def _choquet_integral(virtues: dict[str, float], fuzzy_measures: dict[str, float]) -> float:
+def _choquet_integral(
+    virtues: dict[str, float], fuzzy_measures: dict[str, float]
+) -> float:
     """
     Compute Choquet integral (non-compensatory aggregation).
 
@@ -143,7 +145,10 @@ def _choquet_integral(virtues: dict[str, float], fuzzy_measures: dict[str, float
     if total_weight == 0:
         return 0.0
 
-    harmonic_sum = sum(fuzzy_measures.get(virtue, 1.0) / max(epsilon, score) for virtue, score in sorted_virtues)
+    harmonic_sum = sum(
+        fuzzy_measures.get(virtue, 1.0) / max(epsilon, score)
+        for virtue, score in sorted_virtues
+    )
 
     choquet = len(sorted_virtues) / harmonic_sum if harmonic_sum > 0 else 0.0
 
@@ -196,7 +201,10 @@ def check_ethical_laws(data: dict, context: dict) -> list[EthicalViolation]:
     if not context.get("user_consent", False):
         violations.append(
             EthicalViolation(
-                law_id="LO-07", description="No user consent recorded", severity=0.9, timestamp=time.time()
+                law_id="LO-07",
+                description="No user consent recorded",
+                severity=0.9,
+                timestamp=time.time(),
             )
         )
 

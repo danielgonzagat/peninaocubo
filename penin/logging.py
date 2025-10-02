@@ -46,7 +46,9 @@ class SecretRedactor:
     def _get_compiled_patterns(cls):
         """Get compiled regex patterns for secret detection."""
         if cls._compiled_patterns is None:
-            cls._compiled_patterns = [re.compile(pattern, re.IGNORECASE) for pattern in cls.SECRET_PATTERNS]
+            cls._compiled_patterns = [
+                re.compile(pattern, re.IGNORECASE) for pattern in cls.SECRET_PATTERNS
+            ]
         return cls._compiled_patterns
 
     @classmethod

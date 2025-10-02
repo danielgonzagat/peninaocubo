@@ -73,12 +73,22 @@ class IntegrationConfig(BaseModel):
     """Base configuration for all SOTA integrations"""
 
     enabled: bool = Field(default=True, description="Enable this integration")
-    priority: IntegrationPriority = Field(default=IntegrationPriority.P4_LOW, description="Priority level")
-    max_retries: int = Field(default=3, ge=0, le=10, description="Max retry attempts on failure")
+    priority: IntegrationPriority = Field(
+        default=IntegrationPriority.P4_LOW, description="Priority level"
+    )
+    max_retries: int = Field(
+        default=3, ge=0, le=10, description="Max retry attempts on failure"
+    )
     timeout_seconds: float = Field(default=30.0, gt=0, description="Operation timeout")
-    fail_open: bool = Field(default=False, description="Fail-open (True) or fail-closed (False)")
-    audit_trail: bool = Field(default=True, description="Log all operations to WORM ledger")
-    dry_run: bool = Field(default=False, description="Dry-run mode (no actual execution)")
+    fail_open: bool = Field(
+        default=False, description="Fail-open (True) or fail-closed (False)"
+    )
+    audit_trail: bool = Field(
+        default=True, description="Log all operations to WORM ledger"
+    )
+    dry_run: bool = Field(
+        default=False, description="Dry-run mode (no actual execution)"
+    )
 
     class Config:
         """Pydantic config"""
@@ -152,7 +162,9 @@ class BaseIntegrationAdapter(ABC):
         """
         pass
 
-    def record_invocation(self, success: bool, latency_ms: float, cost_usd: float = 0.0):
+    def record_invocation(
+        self, success: bool, latency_ms: float, cost_usd: float = 0.0
+    ):
         """Record metrics for an invocation"""
         self.metrics.invocations += 1
         if success:
@@ -179,7 +191,9 @@ class BaseIntegrationAdapter(ABC):
 class IntegrationError(Exception):
     """Base exception for integration errors"""
 
-    def __init__(self, adapter_name: str, message: str, original_error: Exception | None = None):
+    def __init__(
+        self, adapter_name: str, message: str, original_error: Exception | None = None
+    ):
         self.adapter_name = adapter_name
         self.message = message
         self.original_error = original_error
