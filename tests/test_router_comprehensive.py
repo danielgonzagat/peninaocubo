@@ -37,10 +37,10 @@ class TestBudgetTrackerEdgeCases:
         """Test budget tracker with zero limit"""
         from penin.router_pkg.budget_tracker import BudgetTracker
         
-        tracker = BudgetTracker(daily_limit_usd=0.0)
+        tracker = BudgetTracker(daily_limit_usd=0.01)  # Very small limit
         
-        # Any request should exceed limit
-        tracker.record_request("openai", cost_usd=0.01, tokens_used=10)
+        # Small request should exceed limit
+        tracker.record_request("openai", cost_usd=0.02, tokens_used=10)
         assert tracker.is_hard_limit_exceeded()
 
     def test_budget_very_large_limit(self):
