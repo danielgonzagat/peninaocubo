@@ -1091,3 +1091,5 @@
 {"worm": "penin/ledger/fusion/fusion_github.com-danielgonzagat-we-drawing_20251001_183138_298018.json", "src": "https://github.com/danielgonzagat/we-drawing", "policy": "", "status": "ok", "ts": "2025-10-02T10:02:41.339691+00:00"}
 {"worm": "penin/ledger/fusion/fusion_github.com-danielgonzagat-zenml_20251001_183144_304270.json", "src": "https://github.com/danielgonzagat/zenml", "policy": "", "status": "ok", "ts": "2025-10-02T10:03:02.112240+00:00"}
 {"worm": "penin/ledger/fusion/fusion_github.com-danielgonzagat-dojo.jl_20251001_183150_310768.json", "src": "https://github.com/danielgonzagat/dojo.jl", "policy": "", "status": "ok", "ts": "2025-10-02T10:03:20.632254+00:00"}
+{"worm": "penin/ledger/fusion/fusion_github.com-danielgonzagat-autopoietic-nets_20251001_183641_601860.json", "src": "https://github.com/danielgonzagat/autopoietic-nets", "policy": "", "status": "err-2", "ts": "2025-10-02T10:14:18.769272+00:00"}
+{"worm": "penin/ledger/fusion/fusion_github.com-danielgonzagat-ncflow_20251001_183648_608387.json", "src": "https://github.com/danielgonzagat/ncflow", "policy": "", "status": "err-2", "ts": "2025-10-02T10:14:29.628176+00:00"}
