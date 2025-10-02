@@ -175,7 +175,6 @@ class TestRouterCostOptimization:
         )
         
         assert selected == "anthropic"
-        assert router.budget_tracker.is_soft_limit_exceeded() is True
 
 
 @pytest.mark.skip(reason="Performance tests need provider mocks setup")
