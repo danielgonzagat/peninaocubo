@@ -76,9 +76,9 @@ class TestBudgetTracker:
         assert tracker.requests_count == 1
 
         usage = tracker.get_usage()
-        assert usage["spend_today_usd"] == 0.05
-        assert usage["tokens_consumed"] == 1500
-        assert usage["requests_count"] == 1
+        assert usage["spend_today"] == 0.05
+        assert usage["tokens"] == 1500
+        assert usage["requests"] == 1
 
     def test_track_multiple_providers(self):
         """Test tracking from multiple providers"""
@@ -94,15 +94,15 @@ class TestBudgetTracker:
 
         # Check provider stats
         openai_stats = tracker.get_provider_stats("openai")
-        assert openai_stats["requests_total"] == 2
-        assert openai_stats["requests_success"] == 1
-        assert openai_stats["requests_failed"] == 1
-        assert openai_stats["success_rate"] == 0.5
-        assert openai_stats["cost_total_usd"] == 0.05
+        assert openai_stats.requests_total == 2
+        assert openai_stats.requests_success == 1
+        assert openai_stats.requests_failed == 1
+        assert openai_stats.success_rate() == 0.5
+        assert openai_stats.cost_total_usd == 0.05
 
         anthropic_stats = tracker.get_provider_stats("anthropic")
-        assert anthropic_stats["requests_total"] == 1
-        assert anthropic_stats["success_rate"] == 1.0
+        assert anthropic_stats.requests_total == 1
+        assert anthropic_stats.success_rate() == 1.0
 
     def test_get_usage_percent(self):
         """Test usage percentage calculation"""

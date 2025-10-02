@@ -289,6 +289,25 @@ class BudgetTracker:
             ProviderStats for that provider
         """
         return self.provider_stats[provider]
+    
+    def get_usage_percent(self) -> float:
+        """Get current usage as percentage [0, 100+]"""
+        self._check_and_reset_if_new_day()
+        return (self.spend_today_usd / self.daily_limit_usd) * 100.0
+    
+    def get_remaining_budget(self) -> float:
+        """Get remaining budget in USD"""
+        self._check_and_reset_if_new_day()
+        return self.daily_limit_usd - self.spend_today_usd
+    
+    def __repr__(self) -> str:
+        """String representation"""
+        return (
+            f"BudgetTracker(daily_limit=${self.daily_limit_usd:.2f}, "
+            f"used=${self.spend_today_usd:.2f}, "
+            f"remaining=${self.remaining_usd:.2f}, "
+            f"usage={self.usage_pct*100:.1f}%)"
+        )
 
     def reset(self) -> None:
         """Reset all counters (manual or automatic at midnight UTC)"""
@@ -395,20 +414,31 @@ class BudgetTracker:
 
     def export_metrics(self) -> dict[str, Any]:
         """
-        Export metrics for Prometheus/monitoring
+        Export metrics for Prometheus/monitoring in expected format.
 
         Returns:
-            Dict with all metrics
+            Dict with Prometheus-style metric names
         """
-        usage = self.get_usage()
-        breakdown = self.get_provider_breakdown()
-
-        return {
-            "budget": usage,
-            "providers": breakdown,
-            "timestamp": time.time(),
-            "day_utc": self.current_day_utc,
+        self._check_and_reset_if_new_day()
+        
+        metrics = {
+            # Budget metrics
+            "penin_budget_daily_usd": self.daily_limit_usd,
+            "penin_daily_spend_usd": self.spend_today_usd,
+            "penin_daily_remaining_usd": self.remaining_usd,
+            "penin_budget_usage_percent": self.usage_pct * 100.0,
+            "penin_tokens_consumed_total": float(self.tokens_consumed),
+            "penin_requests_total": float(self.requests_count),
         }
+        
+        # Provider-specific metrics
+        for provider, stats in self.provider_stats.items():
+            metrics[f'penin_provider_requests_total{{provider="{provider}"}}'] = float(stats.requests_total)
+            metrics[f'penin_provider_cost_usd{{provider="{provider}"}}'] = stats.cost_total_usd
+            metrics[f'penin_provider_tokens{{provider="{provider}"}}'] = float(stats.tokens_total)
+            metrics[f'penin_provider_success_rate{{provider="{provider}"}}'] = stats.success_rate()
+        
+        return metrics
 
 
 __all__ = ["BudgetTracker", "ProviderStats", "RequestRecord"]
