@@ -9,7 +9,6 @@ import json
 import sys
 
 from penin.omega.sr import SROmegaService
-from penin.p2p.node import PeninNode
 
 
 def format_mental_state(mental_state: dict) -> str:

@@ -19,7 +19,6 @@ Uses Ed25519 signatures for:
 
 import hashlib
 import json
-import time
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
@@ -27,8 +26,8 @@ from typing import Any
 
 # Use cryptography library for Ed25519 (part of Python standard library in 3.13+, otherwise use cryptography)
 try:
-    from cryptography.hazmat.primitives.asymmetric import ed25519
     from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ed25519
     HAS_CRYPTOGRAPHY = True
 except ImportError:
     # Fallback: use hashlib-based HMAC for signing (not true public-key crypto, but acceptable for MVP)
@@ -46,25 +45,25 @@ class ServiceType(str, Enum):
 @dataclass
 class SignatureKeyPair:
     """Ed25519 key pair for signing"""
-    
+
     service_type: ServiceType
     private_key_bytes: bytes
     public_key_bytes: bytes
     created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
-    
+
     @classmethod
     def generate(cls, service_type: ServiceType) -> "SignatureKeyPair":
         """Generate a new Ed25519 key pair"""
         if HAS_CRYPTOGRAPHY:
             private_key = ed25519.Ed25519PrivateKey.generate()
             public_key = private_key.public_key()
-            
+
             private_bytes = private_key.private_bytes(
                 encoding=serialization.Encoding.Raw,
                 format=serialization.PrivateFormat.Raw,
                 encryption_algorithm=serialization.NoEncryption()
             )
-            
+
             public_bytes = public_key.public_bytes(
                 encoding=serialization.Encoding.Raw,
                 format=serialization.PublicFormat.Raw
@@ -74,13 +73,13 @@ class SignatureKeyPair:
             import os
             private_bytes = os.urandom(32)
             public_bytes = hashlib.sha256(private_bytes).digest()
-        
+
         return cls(
             service_type=service_type,
             private_key_bytes=private_bytes,
             public_key_bytes=public_bytes
         )
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary (WARNING: includes private key)"""
         return {
@@ -90,7 +89,7 @@ class SignatureKeyPair:
             # NOTE: private_key is intentionally NOT included in serialization
             # Store it securely in environment variables or secrets manager
         }
-    
+
     def public_key_hex(self) -> str:
         """Get public key as hex string"""
         return self.public_key_bytes.hex()
@@ -99,18 +98,18 @@ class SignatureKeyPair:
 @dataclass
 class Attestation:
     """Cryptographic attestation from a validation service"""
-    
+
     service_type: ServiceType
     verdict: str  # "pass", "fail", "promote", "rollback", etc.
     subject_id: str  # ID of the model/candidate being validated
     metrics: dict[str, Any]  # Metrics that led to this verdict
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
-    
+
     # Cryptographic proof
     signature: str = ""  # Hex-encoded signature
     public_key: str = ""  # Hex-encoded public key
     content_hash: str = ""  # SHA-256 hash of canonical content
-    
+
     def compute_content_hash(self) -> str:
         """Compute deterministic hash of attestation content"""
         # Canonical representation for signing
@@ -121,19 +120,19 @@ class Attestation:
             "metrics": self.metrics,
             "timestamp": self.timestamp,
         }
-        
+
         # Sort keys for determinism
         content_json = json.dumps(content, sort_keys=True, ensure_ascii=False)
         return hashlib.sha256(content_json.encode()).hexdigest()
-    
+
     def sign(self, key_pair: SignatureKeyPair) -> None:
         """Sign the attestation with a private key"""
         if key_pair.service_type != self.service_type:
             raise ValueError(f"Key pair service type {key_pair.service_type} does not match {self.service_type}")
-        
+
         # Compute content hash
         self.content_hash = self.compute_content_hash()
-        
+
         # Sign the hash
         if HAS_CRYPTOGRAPHY:
             private_key = ed25519.Ed25519PrivateKey.from_private_bytes(key_pair.private_key_bytes)
@@ -145,26 +144,26 @@ class Attestation:
                 self.content_hash.encode(),
                 hashlib.sha256
             ).digest()
-        
+
         self.signature = signature_bytes.hex()
         self.public_key = key_pair.public_key_hex()
-    
+
     def verify(self) -> bool:
         """Verify the signature on this attestation"""
         if not self.signature or not self.public_key:
             return False
-        
+
         try:
             # Recompute content hash
             expected_hash = self.compute_content_hash()
-            
+
             if expected_hash != self.content_hash:
                 return False
-            
+
             # Verify signature
             signature_bytes = bytes.fromhex(self.signature)
             public_key_bytes = bytes.fromhex(self.public_key)
-            
+
             if HAS_CRYPTOGRAPHY:
                 public_key = ed25519.Ed25519PublicKey.from_public_bytes(public_key_bytes)
                 try:
@@ -176,11 +175,11 @@ class Attestation:
                 # Fallback: HMAC verification (requires private key, so we check hash only)
                 # In production, use proper Ed25519
                 return len(signature_bytes) == 32  # Basic sanity check
-                
+
         except Exception as e:
             print(f"Verification error: {e}")
             return False
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary"""
         return {
@@ -193,7 +192,7 @@ class Attestation:
             "public_key": self.public_key,
             "content_hash": self.content_hash,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Attestation":
         """Deserialize from dictionary"""
@@ -212,64 +211,64 @@ class Attestation:
 @dataclass
 class AttestationChain:
     """A chain of attestations for a promotion decision"""
-    
+
     candidate_id: str
     attestations: list[Attestation] = field(default_factory=list)
     final_decision: str = "pending"  # "promote", "reject", "rollback"
     chain_hash: str = ""
     created_at: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
-    
+
     def add_attestation(self, attestation: Attestation) -> None:
         """Add an attestation to the chain"""
         if not attestation.verify():
             raise ValueError(f"Cannot add unverified attestation from {attestation.service_type}")
-        
+
         self.attestations.append(attestation)
         self._update_chain_hash()
-    
+
     def _update_chain_hash(self) -> None:
         """Update the Merkle-like chain hash"""
         # Chain hash = H(H(att1) || H(att2) || ... || H(attN))
         attestation_hashes = [att.content_hash for att in self.attestations]
         combined = "".join(attestation_hashes)
         self.chain_hash = hashlib.sha256(combined.encode()).hexdigest()
-    
+
     def verify_chain(self) -> tuple[bool, str]:
         """Verify the entire attestation chain"""
         if not self.attestations:
             return False, "No attestations in chain"
-        
+
         # Verify each attestation
         for att in self.attestations:
             if not att.verify():
                 return False, f"Attestation from {att.service_type} failed verification"
-        
+
         # Verify chain hash
         self._update_chain_hash()
         # Note: In production, store original chain_hash and compare
-        
+
         return True, "All attestations verified"
-    
+
     def get_attestation(self, service_type: ServiceType) -> Attestation | None:
         """Get attestation from a specific service"""
         for att in self.attestations:
             if att.service_type == service_type:
                 return att
         return None
-    
+
     def has_all_required(self) -> bool:
         """Check if all required attestations are present"""
         required = {ServiceType.SR_OMEGA, ServiceType.SIGMA_GUARD}
         present = {att.service_type for att in self.attestations}
         return required.issubset(present)
-    
+
     def all_passed(self) -> bool:
         """Check if all attestations passed"""
         for att in self.attestations:
             if att.verdict not in ["pass", "promote", "approved"]:
                 return False
         return self.has_all_required()
-    
+
     def to_dict(self) -> dict[str, Any]:
         """Serialize to dictionary"""
         return {
@@ -279,7 +278,7 @@ class AttestationChain:
             "chain_hash": self.chain_hash,
             "created_at": self.created_at,
         }
-    
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "AttestationChain":
         """Deserialize from dictionary"""
@@ -289,31 +288,31 @@ class AttestationChain:
             chain_hash=data.get("chain_hash", ""),
             created_at=data.get("created_at", datetime.now(UTC).isoformat()),
         )
-        
+
         for att_data in data.get("attestations", []):
             chain.attestations.append(Attestation.from_dict(att_data))
-        
+
         return chain
 
 
 class AttestationManager:
     """Manages attestation keys and signing operations"""
-    
+
     def __init__(self):
         self.key_pairs: dict[ServiceType, SignatureKeyPair] = {}
         self._load_or_generate_keys()
-    
+
     def _load_or_generate_keys(self) -> None:
         """Load keys from environment or generate new ones"""
         # In production, load from secure storage (env vars, secrets manager, etc.)
         # For now, generate ephemeral keys per session
         for service_type in ServiceType:
             self.key_pairs[service_type] = SignatureKeyPair.generate(service_type)
-    
+
     def get_public_key(self, service_type: ServiceType) -> str:
         """Get public key for a service"""
         return self.key_pairs[service_type].public_key_hex()
-    
+
     def create_attestation(
         self,
         service_type: ServiceType,
@@ -328,16 +327,16 @@ class AttestationManager:
             subject_id=subject_id,
             metrics=metrics
         )
-        
+
         key_pair = self.key_pairs[service_type]
         attestation.sign(key_pair)
-        
+
         return attestation
-    
+
     def verify_attestation(self, attestation: Attestation) -> bool:
         """Verify an attestation signature"""
         return attestation.verify()
-    
+
     def export_public_keys(self) -> dict[str, str]:
         """Export all public keys"""
         return {

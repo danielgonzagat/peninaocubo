@@ -75,7 +75,7 @@ def demo_p2p_status_query():
         # Node 2 queries Node 1
         print("Node-002 querying node-001...")
         query = node2.protocol.create_status_query("node-001")
-        print(f"✓ Created status query message")
+        print("✓ Created status query message")
         print()
 
         # Simulate message passing

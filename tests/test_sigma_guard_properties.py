@@ -11,10 +11,10 @@ References:
 """
 
 import math
-from typing import Any
 
 import pytest
-from hypothesis import assume, given, settings, strategies as st
+from hypothesis import assume, given, settings
+from hypothesis import strategies as st
 
 from penin.guard.sigma_guard_complete import (
     GateMetrics,
@@ -23,7 +23,6 @@ from penin.guard.sigma_guard_complete import (
     SigmaGuard,
     SigmaGuardVerdict,
 )
-
 
 # ============================================================================
 # Strategy Definitions
@@ -84,7 +83,7 @@ def failing_gate_metrics(draw) -> tuple[GateMetrics, str]:
         "rho", "ece", "rho_bias", "sr_score", "omega_g",
         "delta_linf", "cost_increase", "kappa", "consent", "eco_ok"
     ]))
-    
+
     # Start with passing values
     metrics = GateMetrics(
         rho=draw(valid_floats(0.0, 0.98)),
@@ -99,7 +98,7 @@ def failing_gate_metrics(draw) -> tuple[GateMetrics, str]:
         consent=True,
         eco_ok=True,
     )
-    
+
     # Violate the chosen gate
     if gate_to_fail == "rho":
         metrics.rho = draw(valid_floats(1.0, 1.5))
@@ -121,7 +120,7 @@ def failing_gate_metrics(draw) -> tuple[GateMetrics, str]:
         metrics.consent = False
     elif gate_to_fail == "eco_ok":
         metrics.eco_ok = False
-    
+
     return metrics, gate_to_fail
 
 
@@ -139,7 +138,7 @@ class TestFailClosedProperties:
         """Property: Verdict structure is always valid regardless of input."""
         guard = SigmaGuard()
         verdict = guard.validate(metrics)
-        
+
         # Verdict must have required fields
         assert isinstance(verdict, SigmaGuardVerdict)
         assert isinstance(verdict.passed, bool)
@@ -158,7 +157,7 @@ class TestFailClosedProperties:
         """Property: System NEVER promotes when any gate fails (fail-closed)."""
         guard = SigmaGuard()
         verdict = guard.validate(metrics)
-        
+
         # If any gate fails, must not promote
         any_gate_failed = any(not g.passed for g in verdict.gates)
         if any_gate_failed:
@@ -176,12 +175,12 @@ class TestFailClosedProperties:
         metrics, expected_failure = data
         guard = SigmaGuard()
         verdict = guard.validate(metrics)
-        
+
         # Must fail
         assert verdict.passed is False
         assert verdict.verdict == GateStatus.FAIL
         assert verdict.action == "rollback"
-        
+
         # At least one gate must have failed
         failed_gates = [g for g in verdict.gates if not g.passed]
         assert len(failed_gates) >= 1
@@ -192,7 +191,7 @@ class TestFailClosedProperties:
         """Property: When all gates pass, system promotes."""
         guard = SigmaGuard()
         verdict = guard.validate(metrics)
-        
+
         # All gates should pass
         assert verdict.passed is True
         assert verdict.verdict == GateStatus.PASS
@@ -216,7 +215,7 @@ class TestFailClosedProperties:
     ):
         """Property: Contractivity violation (ρ >= 1.0) always causes failure."""
         assume(rho >= 0.99)  # Ensure violation
-        
+
         guard = SigmaGuard()
         metrics = GateMetrics(
             rho=rho, ece=ece, rho_bias=rho_bias, sr_score=sr_score,
@@ -224,7 +223,7 @@ class TestFailClosedProperties:
             cost_increase=cost_increase, kappa=kappa, consent=True, eco_ok=True,
         )
         verdict = guard.validate(metrics)
-        
+
         assert verdict.passed is False
         assert verdict.action == "rollback"
 
@@ -260,7 +259,7 @@ class TestNonCompensatoryProperties:
             consent=True,
             eco_ok=True,
         )
-        
+
         # Break one gate
         if failing_gate == "rho":
             metrics.rho = 1.2
@@ -282,10 +281,10 @@ class TestNonCompensatoryProperties:
             metrics.consent = False
         elif failing_gate == "eco_ok":
             metrics.eco_ok = False
-        
+
         guard = SigmaGuard()
         verdict = guard.validate(metrics)
-        
+
         # Must still fail despite excellent other metrics
         assert verdict.passed is False
         assert verdict.verdict == GateStatus.FAIL
@@ -305,7 +304,7 @@ class TestBoundaryProperties:
     def test_rho_boundary_at_0_99(self, epsilon: float):
         """Property: ρ just below threshold passes, just above fails."""
         guard = SigmaGuard(rho_max=0.99)
-        
+
         # Just below threshold - should pass
         metrics_pass = GateMetrics(
             rho=0.99 - epsilon,
@@ -316,7 +315,7 @@ class TestBoundaryProperties:
         verdict_pass = guard.validate(metrics_pass)
         rho_gate_pass = next(g for g in verdict_pass.gates if g.gate_name == "contractividade")
         assert rho_gate_pass.passed is True
-        
+
         # Just above threshold - should fail
         metrics_fail = GateMetrics(
             rho=0.99 + epsilon,
@@ -333,7 +332,7 @@ class TestBoundaryProperties:
     def test_ece_boundary_at_0_01(self, epsilon: float):
         """Property: ECE at boundary behaves correctly."""
         guard = SigmaGuard(ece_max=0.01)
-        
+
         # Just below threshold - should pass
         metrics_pass = GateMetrics(
             rho=0.95,
@@ -345,7 +344,7 @@ class TestBoundaryProperties:
         verdict_pass = guard.validate(metrics_pass)
         ece_gate_pass = next(g for g in verdict_pass.gates if g.gate_name == "calibration")
         assert ece_gate_pass.passed is True
-        
+
         # Just above threshold - should fail
         metrics_fail = GateMetrics(
             rho=0.95,
@@ -383,7 +382,7 @@ class TestExtremeValueProperties:
             consent=True,
             eco_ok=True,
         )
-        
+
         # Should not raise error
         verdict = guard.validate(metrics)
         assert isinstance(verdict, SigmaGuardVerdict)
@@ -405,7 +404,7 @@ class TestExtremeValueProperties:
             consent=True,
             eco_ok=True,
         )
-        
+
         # Should not raise error
         verdict = guard.validate(metrics)
         assert isinstance(verdict, SigmaGuardVerdict)
@@ -414,7 +413,7 @@ class TestExtremeValueProperties:
     def test_nan_and_infinity_handled_safely(self):
         """Property: NaN and infinity values don't crash the system."""
         guard = SigmaGuard()
-        
+
         # Test with NaN values
         test_cases = [
             # NaN in rho
@@ -436,7 +435,7 @@ class TestExtremeValueProperties:
                 kappa=-math.inf, consent=True, eco_ok=True,
             ),
         ]
-        
+
         for metrics in test_cases:
             # Should handle gracefully (may fail gates, but shouldn't crash)
             try:
@@ -463,18 +462,18 @@ class TestIdempotencyProperties:
     def test_validation_is_deterministic(self, metrics: GateMetrics):
         """Property: Same metrics always produce same verdict."""
         guard = SigmaGuard()
-        
+
         verdict1 = guard.validate(metrics)
         verdict2 = guard.validate(metrics)
-        
+
         # Same inputs produce same outputs
         assert verdict1.passed == verdict2.passed
         assert verdict1.verdict == verdict2.verdict
         assert verdict1.action == verdict2.action
         assert len(verdict1.gates) == len(verdict2.gates)
-        
+
         # Each gate result should be identical
-        for g1, g2 in zip(verdict1.gates, verdict2.gates):
+        for g1, g2 in zip(verdict1.gates, verdict2.gates, strict=True):
             assert g1.gate_name == g2.gate_name
             assert g1.passed == g2.passed
             assert g1.status == g2.status
@@ -487,10 +486,10 @@ class TestIdempotencyProperties:
         """Property: Multiple guard instances with same config behave identically."""
         guard1 = SigmaGuard()
         guard2 = SigmaGuard()
-        
+
         verdict1 = guard1.validate(metrics)
         verdict2 = guard2.validate(metrics)
-        
+
         assert verdict1.passed == verdict2.passed
         assert verdict1.verdict == verdict2.verdict
         assert verdict1.action == verdict2.action
@@ -510,10 +509,10 @@ class TestGateIndependenceProperties:
         """Property: All 10 gates are always evaluated regardless of early failures."""
         guard = SigmaGuard()
         verdict = guard.validate(metrics)
-        
+
         # All 10 gates must be present
         assert len(verdict.gates) == 10
-        
+
         # Expected gate names
         expected_gates = {
             "contractividade", "calibration", "bias", "self_reflection",
@@ -529,7 +528,7 @@ class TestGateIndependenceProperties:
         """Property: Each gate result is properly structured."""
         guard = SigmaGuard()
         verdict = guard.validate(metrics)
-        
+
         for gate in verdict.gates:
             assert isinstance(gate, GateResult)
             assert isinstance(gate.gate_name, str)

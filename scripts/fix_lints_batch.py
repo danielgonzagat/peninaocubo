@@ -21,7 +21,7 @@ def fix_b904_exception_chain(content: str) -> str:
     fixed_lines = []
     in_except = False
 
-    for i, line in enumerate(lines):
+    for _i, line in enumerate(lines):
         if "except " in line and " as " in line:
             in_except = True
             # Extract variable name
@@ -32,7 +32,7 @@ def fix_b904_exception_chain(content: str) -> str:
             # Add 'from' chain
             if except_var in line or "err" in line or "exc" in line:
                 # Use the exception variable
-                indent = len(line) - len(line.lstrip())
+                len(line) - len(line.lstrip())
                 fixed_lines.append(line.rstrip() + f" from {except_var}")
             else:
                 # No reference to exception, use 'from None'

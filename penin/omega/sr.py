@@ -441,33 +441,33 @@ class SROmegaEngine:
         }
 
         return passed, gate_details
-    
+
     def create_attestation(self, components: SRComponents, candidate_id: str, tau: float = 0.8) -> Any:
         """
         Create cryptographic attestation for SR evaluation
-        
+
         Args:
             components: SR components
             candidate_id: ID of the candidate being evaluated
             tau: Threshold for passing
-            
+
         Returns:
             Attestation object or None if unavailable
         """
         try:
             from penin.omega.attestation import create_sr_attestation
-            
+
             sr_score, details = self.compute_sr(components)
             passed = sr_score >= tau
             verdict = "pass" if passed else "fail"
-            
+
             attestation = create_sr_attestation(
                 verdict=verdict,
                 candidate_id=candidate_id,
                 sr_score=sr_score,
                 components=components.to_dict()
             )
-            
+
             return attestation
         except ImportError:
             return None
@@ -900,7 +900,7 @@ class Outcome:
 class SROmegaService:
     """
     SR-Omega Service - Tracks mental state and provides introspection capabilities
-    
+
     This service maintains state about:
     - Pending recommendations that haven't been reported back on
     - Recent outcomes (success/failure) of recommendations
@@ -910,7 +910,7 @@ class SROmegaService:
     def __init__(self, max_pending: int = 100, max_outcomes: int = 50):
         """
         Initialize SR-Omega service
-        
+
         Args:
             max_pending: Maximum number of pending recommendations to track
             max_outcomes: Maximum number of recent outcomes to track
@@ -927,7 +927,7 @@ class SROmegaService:
     ) -> None:
         """
         Add a new recommendation to pending list
-        
+
         Args:
             recommendation_id: Unique identifier for the recommendation
             task: Task name or description
@@ -952,7 +952,7 @@ class SROmegaService:
     ) -> None:
         """
         Report the outcome of a recommendation
-        
+
         Args:
             recommendation_id: ID of the recommendation
             success: Whether the recommendation was successful
@@ -1003,7 +1003,7 @@ class SROmegaService:
     def get_mental_state(self) -> dict[str, Any]:
         """
         Get the current mental state of the SR-Omega service
-        
+
         Returns:
             Dictionary containing:
             - pending_recommendations: List of pending recommendations

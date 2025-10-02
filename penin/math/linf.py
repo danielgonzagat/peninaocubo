@@ -19,16 +19,15 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Any
 
 
 @dataclass
 class LInfConfig:
     """Configuration for L∞ computation."""
-    
+
     lambda_c: float = 0.5  # Cost penalization factor
     epsilon: float = 1e-3  # Numerical stability
-    
+
     # Ethics gates (fail-closed)
     require_ethics: bool = True
     require_contractividade: bool = True
@@ -41,15 +40,15 @@ def harmonic_noncomp(
 ) -> float:
     """
     Compute non-compensatory harmonic mean.
-    
+
     Formula:
         H = Σw_j / Σ(w_j / max(ε, m_j))
-    
+
     Args:
         metrics: Normalized metrics ∈ [0, 1]
         weights: Importance weights (non-negative)
         eps: Stability threshold
-    
+
     Returns:
         Harmonic mean ∈ [0, 1]
     """
@@ -70,13 +69,13 @@ def linf_score(
 ) -> float:
     """
     Compute L∞ score with cost penalization.
-    
+
     Args:
         metrics: Normalized metrics ∈ [0, 1]
         weights: Importance weights
         cost: Normalized cost ∈ [0, ∞)
         lambda_c: Cost penalty factor
-    
+
     Returns:
         L∞ score ∈ [0, 1]
     """
@@ -94,7 +93,7 @@ def compute_linf_meta(
 ) -> float:
     """
     Compute full L∞ meta-function with fail-closed gates.
-    
+
     Args:
         metrics: Normalized metrics ∈ [0, 1]
         weights: Importance weights (sum to 1.0 preferred)
@@ -102,26 +101,26 @@ def compute_linf_meta(
         config: L∞ configuration
         ethics_ok: ΣEA/LO-14 gate status
         contratividade_ok: IR→IC gate status (ρ < 1)
-    
+
     Returns:
         L∞ score ∈ [0, 1], or 0.0 if gates fail
     """
     import logging
-    
+
     if config is None:
         config = LInfConfig()
-    
+
     logger = logging.getLogger(__name__)
-    
+
     # Fail-closed gates
     if config.require_ethics and not ethics_ok:
         logger.warning("L∞ computation blocked: Ethics gate failed (ΣEA/LO-14)")
         return 0.0
-    
+
     if config.require_contractividade and not contratividade_ok:
         logger.warning("L∞ computation blocked: Contractividade gate failed (ρ ≥ 1)")
         return 0.0
-    
+
     # Compute base harmonic mean
     num = 0.0
     den = 0.0
@@ -129,14 +128,16 @@ def compute_linf_meta(
         w = weights.get(k, 1.0)
         den += w / max(config.epsilon, v)
         num += w
-    
+
     base = num / max(config.epsilon, den)
-    
+
     # Apply cost penalization
     penalty = math.exp(-config.lambda_c * max(0.0, cost))
-    
+
     result = base * penalty
     logger.debug(f"L∞ computed: base={base:.4f}, penalty={penalty:.4f}, result={result:.4f}")
-    
+    result = base * penalty
+    logger.debug(f"L∞ computed: base={base:.4f}, penalty={penalty:.4f}, result={result:.4f}")
+
     return result
     return base * penalty

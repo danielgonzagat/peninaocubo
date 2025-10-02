@@ -151,7 +151,7 @@ class LeagueOrchestrator:
         """Promote challenger to champion"""
         if not self.challenger or self.challenger.deployment_stage != DeploymentStage.CANARY:
             return False
-        
+
         # Validate attestation chain if present
         if hasattr(self.challenger, 'attestation_chain'):
             chain_valid, error_msg = self._validate_attestation_chain()
@@ -178,34 +178,34 @@ class LeagueOrchestrator:
         self._log_deployment_event("challenger_promoted", self.champion)
 
         return True
-    
+
     def _validate_attestation_chain(self) -> tuple[bool, str]:
         """Validate the attestation chain for the challenger"""
         try:
             from penin.omega.attestation import AttestationChain, ServiceType
-            
+
             if not hasattr(self.challenger, 'attestation_chain'):
                 return True, "No attestation chain present (skipped)"
-            
+
             chain = self.challenger.attestation_chain
             if not isinstance(chain, AttestationChain):
                 return False, "Invalid attestation chain type"
-            
+
             # Verify the chain
             is_valid, msg = chain.verify_chain()
             if not is_valid:
                 return False, msg
-            
+
             # Check that all required attestations are present
             if not chain.has_all_required():
                 return False, "Missing required attestations (SR-Ω∞ or Σ-Guard)"
-            
+
             # Check that all attestations passed
             if not chain.all_passed():
                 return False, "One or more attestations did not pass"
-            
+
             return True, "All attestations verified"
-            
+
         except ImportError:
             # If attestation module is not available, skip validation
             return True, "Attestation module not available (skipped)"

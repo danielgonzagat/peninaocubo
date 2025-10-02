@@ -8,12 +8,13 @@ Tests using Hypothesis for exhaustive validation.
 """
 
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 # Import contractivity operators
 try:
+    from penin.equations.ir_ic_contractive import lapidation_operator, risk_information
     from penin.iric.lpsi import apply_lpsi_operator, compute_risk_reduction_ratio
-    from penin.equations.ir_ic_contractive import risk_information, lapidation_operator
 except ImportError:
     pytest.skip("IR→IC modules not available", allow_module_level=True)
 
@@ -28,27 +29,27 @@ class TestContractivityProperties:
     def test_lpsi_always_contractive(self, initial_risk: float):
         """
         Property: L_ψ operator always reduces risk.
-        
+
         Mathematical form: ρ = H(L_ψ(k)) / H(k) < 1.0
         """
         try:
             # Apply lapidation operator
             evolved_risk = apply_lpsi_operator(initial_risk)
-            
+
             # Compute contractivity ratio
             rho = evolved_risk / initial_risk
-            
+
             # Critical assertion: ρ must be < 1.0 (strict contractivity)
             assert rho < 1.0, (
                 f"Contractivity violated: ρ={rho:.6f} ≥ 1.0 "
                 f"(initial={initial_risk:.6f}, evolved={evolved_risk:.6f})"
             )
-            
+
             # Additional check: evolved risk must be strictly less
             assert evolved_risk < initial_risk, (
                 f"Risk did not decrease: {evolved_risk:.6f} ≥ {initial_risk:.6f}"
             )
-            
+
         except Exception as e:
             pytest.fail(f"L_ψ operator failed for risk={initial_risk:.6f}: {e}")
 
@@ -60,23 +61,23 @@ class TestContractivityProperties:
     def test_repeated_lpsi_monotonic_decrease(self, initial_risk: float, iterations: int):
         """
         Property: Repeated application of L_ψ monotonically decreases risk.
-        
+
         ∀ t: risk(t+1) < risk(t)
         """
         risk = initial_risk
         previous_risks = [risk]
-        
+
         for i in range(iterations):
             risk = apply_lpsi_operator(risk)
-            
+
             # Check monotonic decrease
             assert risk < previous_risks[-1], (
                 f"Iteration {i+1}: Risk increased or stayed same "
                 f"({risk:.6f} ≥ {previous_risks[-1]:.6f})"
             )
-            
+
             previous_risks.append(risk)
-        
+
         # Check overall reduction
         final_reduction = initial_risk - risk
         assert final_reduction > 0, (
@@ -91,16 +92,16 @@ class TestContractivityProperties:
     def test_lpsi_order_preserving(self, risk_a: float, risk_b: float):
         """
         Property: If risk_a < risk_b, then L_ψ(risk_a) < L_ψ(risk_b).
-        
+
         Monotonicity of operator.
         """
         if risk_a >= risk_b:
             # Swap to ensure risk_a < risk_b
             risk_a, risk_b = risk_b, risk_a
-        
+
         evolved_a = apply_lpsi_operator(risk_a)
         evolved_b = apply_lpsi_operator(risk_b)
-        
+
         # Order must be preserved
         assert evolved_a < evolved_b, (
             f"Order not preserved: L_ψ({risk_a:.4f})={evolved_a:.4f} "
@@ -117,13 +118,13 @@ class TestContractivityProperties:
         """
         evolved_risk = apply_lpsi_operator(initial_risk)
         rho = compute_risk_reduction_ratio(initial_risk, evolved_risk)
-        
+
         # Lower bound: ρ > 0 (risk can't become negative or zero)
         assert rho > 0, f"ρ={rho:.6f} ≤ 0 (risk became non-positive)"
-        
+
         # Upper bound: ρ < 1 (strict contractivity)
         assert rho < 1.0, f"ρ={rho:.6f} ≥ 1.0 (no contraction)"
-        
+
         # Typical range: 0.7 < ρ < 0.95 (sanity check)
         assert 0.5 < rho < 0.99, (
             f"ρ={rho:.6f} outside typical range [0.5, 0.99] "
@@ -139,7 +140,7 @@ class TestContractivityEdgeCases:
         initial_risk = 0.001
         evolved_risk = apply_lpsi_operator(initial_risk)
         rho = evolved_risk / initial_risk
-        
+
         assert rho < 1.0, f"Contractivity failed for near-zero risk: ρ={rho}"
         assert evolved_risk > 0, "Risk became zero or negative"
 
@@ -148,7 +149,7 @@ class TestContractivityEdgeCases:
         initial_risk = 0.99
         evolved_risk = apply_lpsi_operator(initial_risk)
         rho = evolved_risk / initial_risk
-        
+
         assert rho < 1.0, f"Contractivity failed for high risk: ρ={rho}"
         assert evolved_risk < initial_risk
 

@@ -6,8 +6,11 @@ Tests adapter functionality without requiring actual SpikingJelly installation.
 
 import pytest
 
-from penin.integrations.neuromorphic.spikingjelly_adapter import SpikingJellyConfig, SpikingNetworkAdapter
 from penin.integrations.base import IntegrationStatus
+from penin.integrations.neuromorphic.spikingjelly_adapter import (
+    SpikingJellyConfig,
+    SpikingNetworkAdapter,
+)
 
 
 class TestSpikingJellyAdapter:

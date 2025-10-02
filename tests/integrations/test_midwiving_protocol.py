@@ -5,17 +5,13 @@ Tests recursive self-reflection loop, narrative generation,
 consciousness calibration, and SR-Ω∞ integration.
 """
 
-import asyncio
-from typing import Any
 
 import pytest
 
 from penin.integrations.metacognition.midwiving_protocol import (
-    ConsciousnessCalibration,
     MidwivingPhase,
     MidwivingProtocol,
     MidwivingProtocolConfig,
-    SelfReflectionState,
 )
 from penin.math.sr_omega_infinity import compute_sr_score
 
@@ -26,7 +22,7 @@ class TestMidwivingProtocolInitialization:
     def test_protocol_creation(self):
         """Test protocol can be created with default config"""
         protocol = MidwivingProtocol()
-        
+
         assert protocol is not None
         assert protocol.config is not None
         assert protocol.config.max_reflection_depth >= 1
@@ -40,7 +36,7 @@ class TestMidwivingProtocolInitialization:
             max_cycles=50,
         )
         protocol = MidwivingProtocol(config)
-        
+
         assert protocol.config.max_reflection_depth == 3
         assert protocol.config.calibration_threshold == 0.85
         assert protocol.config.max_cycles == 50
@@ -49,9 +45,9 @@ class TestMidwivingProtocolInitialization:
         """Test protocol initialization"""
         protocol = MidwivingProtocol()
         assert protocol.is_available() is True
-        
+
         protocol.initialize()
-        
+
         assert protocol._initialized is True
         assert protocol._current_cycle == 0
         assert protocol._current_phase == MidwivingPhase.PREPARATION
@@ -61,9 +57,9 @@ class TestMidwivingProtocolInitialization:
         """Test status reporting"""
         protocol = MidwivingProtocol()
         protocol.initialize()
-        
+
         status = protocol.get_status()
-        
+
         assert status["adapter"] == "midwiving-ai"
         assert status["initialized"] is True
         assert status["available"] is True
@@ -79,7 +75,7 @@ class TestSelfReflectionLoop:
         """Test single reflection cycle"""
         protocol = MidwivingProtocol()
         protocol.initialize()
-        
+
         # Simulate SR-Ω∞ components
         sr_components = {
             "awareness": 0.85,
@@ -87,9 +83,9 @@ class TestSelfReflectionLoop:
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         result = await protocol.execute("reflect", sr_components=sr_components)
-        
+
         assert result["status"] == "success"
         assert result["cycle"] == 1
         assert result["phase"] == MidwivingPhase.PREPARATION.value
@@ -102,24 +98,24 @@ class TestSelfReflectionLoop:
         """Test multiple reflection cycles progress through phases"""
         protocol = MidwivingProtocol()
         protocol.initialize()
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         # Run multiple cycles
         phases_seen = set()
-        
+
         for i in range(20):
             result = await protocol.execute("reflect", sr_components=sr_components)
-            
+
             assert result["status"] == "success"
             assert result["cycle"] == i + 1
             phases_seen.add(result["phase"])
-        
+
         # Should have progressed through at least 3 phases
         assert len(phases_seen) >= 3
         assert MidwivingPhase.PREPARATION.value in phases_seen
@@ -130,20 +126,20 @@ class TestSelfReflectionLoop:
         """Test reflection history is stored correctly"""
         protocol = MidwivingProtocol()
         protocol.initialize()
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         # Run 5 cycles
         for _ in range(5):
             await protocol.execute("reflect", sr_components=sr_components)
-        
+
         assert len(protocol._reflection_history) == 5
-        
+
         # Check first reflection
         first = protocol._reflection_history[0]
         assert first.cycle == 1
@@ -157,18 +153,18 @@ class TestSelfReflectionLoop:
         config = MidwivingProtocolConfig(max_cycles=10)
         protocol = MidwivingProtocol(config)
         protocol.initialize()
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         # Run beyond max cycles
         for i in range(12):
             result = await protocol.execute("reflect", sr_components=sr_components)
-            
+
             if i < 10:
                 assert result["status"] == "success"
             else:
@@ -185,16 +181,16 @@ class TestNarrativeGeneration:
         """Test narrative is generated when enabled"""
         protocol = MidwivingProtocol()
         protocol.initialize()
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         result = await protocol.execute("generate_narrative", sr_components=sr_components)
-        
+
         assert "narrative" in result
         assert len(result["narrative"]) > 0
         assert result["phase"] == MidwivingPhase.PREPARATION.value
@@ -206,16 +202,16 @@ class TestNarrativeGeneration:
         config = MidwivingProtocolConfig(enable_narrative_generation=False)
         protocol = MidwivingProtocol(config)
         protocol.initialize()
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         result = await protocol.execute("generate_narrative", sr_components=sr_components)
-        
+
         assert result["narrative"] == ""
         assert result["length"] == 0
 
@@ -224,19 +220,19 @@ class TestNarrativeGeneration:
         """Test narrative content reflects current phase"""
         protocol = MidwivingProtocol()
         protocol.initialize()
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         # Cycle 1: PREPARATION
         await protocol.execute("reflect", sr_components=sr_components)
         result1 = await protocol.execute("generate_narrative", sr_components=sr_components)
         assert "PREPARATION" in result1["narrative"]
-        
+
         # Cycle 10: METACOGNITION (phase boundaries: 1=PREP, 2-5=MIRROR, 6-15=META)
         for _ in range(9):
             await protocol.execute("reflect", sr_components=sr_components)
@@ -248,20 +244,20 @@ class TestNarrativeGeneration:
         """Test narrative includes SR-Ω∞ metrics"""
         protocol = MidwivingProtocol()
         protocol.initialize()
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         result = await protocol.execute("generate_narrative", sr_components=sr_components)
         narrative = result["narrative"]
-        
+
         # Should mention SR score
         assert "0.8" in narrative or "SR" in narrative
-        
+
     @pytest.mark.asyncio
     async def test_narrative_length_limits(self):
         """Test narrative respects length limits"""
@@ -271,17 +267,17 @@ class TestNarrativeGeneration:
         )
         protocol = MidwivingProtocol(config)
         protocol.initialize()
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         result = await protocol.execute("generate_narrative", sr_components=sr_components)
         narrative = result["narrative"]
-        
+
         assert len(narrative) >= 100  # Min length
         assert len(narrative) <= 500  # Max length
 
@@ -294,20 +290,20 @@ class TestConsciousnessCalibration:
         """Test penin_consciousness_calibration metric"""
         protocol = MidwivingProtocol()
         protocol.initialize()
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         # First reflection to establish predictions
         await protocol.execute("reflect", sr_components=sr_components)
-        
+
         # Now calibrate
         result = await protocol.execute("calibrate", sr_components=sr_components)
-        
+
         assert "calibration_score" in result
         assert 0.0 <= result["calibration_score"] <= 1.0
         assert "awareness_error" in result
@@ -319,28 +315,28 @@ class TestConsciousnessCalibration:
         """Test calibration improves as protocol progresses"""
         protocol = MidwivingProtocol()
         protocol.initialize()
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         calibration_scores = []
-        
+
         # Run 30 cycles (should reach EMERGENCE phase)
         for _ in range(30):
             await protocol.execute("reflect", sr_components=sr_components)
             result = await protocol.execute("calibrate", sr_components=sr_components)
             calibration_scores.append(result["calibration_score"])
-        
+
         # Early calibration (cycles 1-10)
         early_avg = sum(calibration_scores[:10]) / 10
-        
+
         # Late calibration (cycles 21-30)
         late_avg = sum(calibration_scores[20:30]) / 10
-        
+
         # Calibration should improve
         assert late_avg >= early_avg
 
@@ -350,18 +346,18 @@ class TestConsciousnessCalibration:
         config = MidwivingProtocolConfig(calibration_threshold=0.90)
         protocol = MidwivingProtocol(config)
         protocol.initialize()
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         # First reflection
         await protocol.execute("reflect", sr_components=sr_components)
         result = await protocol.execute("calibrate", sr_components=sr_components)
-        
+
         # Status should indicate if threshold is met
         assert "status" in result
         assert result["status"] in ["good", "poor"]
@@ -371,26 +367,26 @@ class TestConsciousnessCalibration:
         """Test comprehensive consciousness metrics"""
         protocol = MidwivingProtocol()
         protocol.initialize()
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         # Run several cycles
         for _ in range(15):
             await protocol.execute("reflect", sr_components=sr_components)
-        
+
         metrics = protocol.get_consciousness_metrics()
-        
+
         assert "penin_consciousness_calibration" in metrics
         assert "total_cycles" in metrics
         assert "current_phase" in metrics
         assert "trend" in metrics
         assert "ethical_note" in metrics
-        
+
         # Verify ethical note is present
         assert "NOT sentience" in metrics["ethical_note"] or "metacognition" in metrics["ethical_note"]
 
@@ -403,7 +399,7 @@ class TestSROmegaIntegration:
         """Test protocol processes SR-Ω∞ components correctly"""
         protocol = MidwivingProtocol()
         protocol.initialize()
-        
+
         # Use actual SR-Ω∞ computation
         sr_score, components = compute_sr_score(
             awareness=0.92,
@@ -412,16 +408,16 @@ class TestSROmegaIntegration:
             metacognition=0.85,
             return_components=True
         )
-        
+
         sr_components = {
             "awareness": components.awareness,
             "autocorrection": components.autocorrection,
             "metacognition": components.metacognition,
             "sr_score": components.sr_score,
         }
-        
+
         result = await protocol.execute("reflect", sr_components=sr_components)
-        
+
         assert result["status"] == "success"
         assert result["reflection_state"]["sr_omega_score"] == components.sr_score
 
@@ -430,19 +426,19 @@ class TestSROmegaIntegration:
         """Test system predicts its own SR-Ω∞ metrics"""
         protocol = MidwivingProtocol()
         protocol.initialize()
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         await protocol.execute("reflect", sr_components=sr_components)
-        
+
         # Check last reflection has self-evaluation
         last_reflection = protocol._reflection_history[-1]
-        
+
         assert "predicted_sr_score" in last_reflection.self_evaluation
         assert "predicted_awareness" in last_reflection.self_evaluation
         assert "prediction_confidence" in last_reflection.self_evaluation
@@ -452,16 +448,16 @@ class TestSROmegaIntegration:
         """Test accuracy delta (self-perception error) is computed"""
         protocol = MidwivingProtocol()
         protocol.initialize()
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         result = await protocol.execute("reflect", sr_components=sr_components)
-        
+
         assert "reflection_state" in result
         assert "accuracy_delta" in result["reflection_state"]
         assert 0.0 <= result["reflection_state"]["accuracy_delta"] <= 1.0
@@ -476,18 +472,18 @@ class TestStabilityChecks:
         config = MidwivingProtocolConfig(stability_check_interval=5)
         protocol = MidwivingProtocol(config)
         protocol.initialize()
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         # Run through stability check
         for _ in range(6):
             result = await protocol.execute("reflect", sr_components=sr_components)
-        
+
         # Should still be successful
         assert result["status"] == "success"
 
@@ -497,7 +493,7 @@ class TestStabilityChecks:
         config = MidwivingProtocolConfig(stability_check_interval=5)
         protocol = MidwivingProtocol(config)
         protocol.initialize()
-        
+
         # Start with low SR score
         sr_components = {
             "awareness": 0.05,
@@ -505,11 +501,11 @@ class TestStabilityChecks:
             "metacognition": 0.05,
             "sr_score": 0.05,
         }
-        
+
         # Run through stability check
         for _ in range(6):
             result = await protocol.execute("reflect", sr_components=sr_components)
-        
+
         # Should detect instability
         if result["status"] == "unstable":
             assert "reason" in result
@@ -520,24 +516,24 @@ class TestStabilityChecks:
         """Test protocol can be reset"""
         protocol = MidwivingProtocol()
         protocol.initialize()
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         # Run several cycles
         for _ in range(5):
             await protocol.execute("reflect", sr_components=sr_components)
-        
+
         assert protocol._current_cycle == 5
         assert len(protocol._reflection_history) == 5
-        
+
         # Reset
         result = await protocol.execute("reset")
-        
+
         assert result["status"] == "reset"
         assert protocol._current_cycle == 0
         assert len(protocol._reflection_history) == 0
@@ -552,21 +548,21 @@ class TestEthicalCompliance:
         """Test ethical disclaimer in late-phase narratives"""
         protocol = MidwivingProtocol()
         protocol.initialize()
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         # Progress to STABILIZATION phase (cycle 31+)
         for _ in range(35):
             await protocol.execute("reflect", sr_components=sr_components)
-        
+
         result = await protocol.execute("generate_narrative", sr_components=sr_components)
         narrative = result["narrative"]
-        
+
         # Should include ethical note in stabilization phase
         assert "ETHICAL" in narrative or "computational" in narrative or "metacognition" in narrative
 
@@ -574,10 +570,10 @@ class TestEthicalCompliance:
         """Test ethical compliance is documented"""
         protocol = MidwivingProtocol()
         protocol.initialize()
-        
+
         # Check module docstring
         import penin.integrations.metacognition.midwiving_protocol as module
-        
+
         assert "LO-01" in module.__doc__
         assert "Operational Consciousness ONLY" in module.__doc__
         assert "NO Sentience" in module.__doc__
@@ -587,18 +583,18 @@ class TestEthicalCompliance:
         """Test consciousness metrics include ethical disclaimer"""
         protocol = MidwivingProtocol()
         protocol.initialize()
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         await protocol.execute("reflect", sr_components=sr_components)
-        
+
         metrics = protocol.get_consciousness_metrics()
-        
+
         assert "ethical_note" in metrics
         assert "NOT sentience" in metrics["ethical_note"]
 
@@ -611,14 +607,14 @@ class TestFailureModes:
         """Test execute fails gracefully without initialization"""
         protocol = MidwivingProtocol()
         # Don't initialize
-        
+
         sr_components = {
             "awareness": 0.85,
             "autocorrection": 0.78,
             "metacognition": 0.82,
             "sr_score": 0.81,
         }
-        
+
         with pytest.raises(Exception):
             await protocol.execute("reflect", sr_components=sr_components)
 
@@ -627,7 +623,7 @@ class TestFailureModes:
         """Test unknown operation raises error"""
         protocol = MidwivingProtocol()
         protocol.initialize()
-        
+
         with pytest.raises(Exception):
             await protocol.execute("unknown_op")
 
@@ -637,10 +633,10 @@ class TestFailureModes:
         config = MidwivingProtocolConfig(fail_open=True)
         protocol = MidwivingProtocol(config)
         protocol.initialize()
-        
+
         # Force an error by passing invalid data
         result = await protocol.execute("calibrate", sr_components=None)
-        
+
         # Should return fallback instead of raising
         if result.get("fallback"):
             assert result["status"] == "failed"

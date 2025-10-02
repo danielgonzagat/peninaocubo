@@ -113,12 +113,12 @@ class SigmaGuardVerdict:
                 "timestamp": self.timestamp,
             }
             self.hash_proof = hashlib.sha256(json.dumps(proof_data, sort_keys=True).encode()).hexdigest()
-    
+
     def create_attestation(self, candidate_id: str) -> Any:
         """Create cryptographic attestation for this verdict"""
         try:
             from penin.omega.attestation import create_sigma_guard_attestation
-            
+
             gates_data = [
                 {
                     "name": g.gate_name,
@@ -129,7 +129,7 @@ class SigmaGuardVerdict:
                 }
                 for g in self.gates
             ]
-            
+
             verdict_str = "pass" if self.passed else "fail"
             attestation = create_sigma_guard_attestation(
                 verdict=verdict_str,

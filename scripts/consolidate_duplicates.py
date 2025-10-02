@@ -18,10 +18,8 @@ Safety:
 - Test suite must pass after changes
 """
 
-import ast
 import re
 from pathlib import Path
-from typing import Dict, List, Set
 
 # Project root
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -32,7 +30,7 @@ DUPLICATES_TO_REMOVE = {
     "penin/equations/caos_plus.py": "penin/core/caos.py",
     "penin/math/caos_plus_complete.py": "penin/core/caos.py",
     # Note: penin/engine/caos_plus.py is a deprecation wrapper, keep for compatibility
-    
+
     # L∞ duplicates (keep only penin/math/linf.py)
     "penin/equations/linf_meta.py": "penin/math/linf.py",
 }
@@ -41,22 +39,20 @@ DUPLICATES_TO_REMOVE = {
 IMPORT_MAPPINGS = {
     # CAOS+
     "from penin.core.caos import": "from penin.core.caos import",
-    "from penin.core.caos import": "from penin.core.caos import",
     "import penin.core.caos": "import penin.core.caos",
-    "import penin.core.caos": "import penin.core.caos",
-    
+
     # L∞
     "from penin.math.linf import": "from penin.math.linf import",
     "import penin.math.linf": "import penin.math.linf",
 }
 
 # Function/class renames if needed
-SYMBOL_RENAMES: Dict[str, str] = {
+SYMBOL_RENAMES: dict[str, str] = {
     # Example: "old_function_name": "new_function_name"
 }
 
 
-def find_python_files(exclude_patterns: List[str] = None) -> List[Path]:
+def find_python_files(exclude_patterns: list[str] = None) -> list[Path]:
     """Find all Python files in project."""
     if exclude_patterns is None:
         exclude_patterns = [
@@ -64,23 +60,23 @@ def find_python_files(exclude_patterns: List[str] = None) -> List[Path]:
             "*/build/*", "*/dist/*", "*/__pycache__/*",
             "*/docs/archive/*"
         ]
-    
+
     python_files = []
     for py_file in PROJECT_ROOT.rglob("*.py"):
         # Check if file matches any exclude pattern
         if any(py_file.match(pattern) for pattern in exclude_patterns):
             continue
         python_files.append(py_file)
-    
+
     return python_files
 
 
-def find_imports_in_file(file_path: Path) -> Set[str]:
+def find_imports_in_file(file_path: Path) -> set[str]:
     """Extract all import statements from a Python file."""
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
-        
+
         # Use regex to find imports (simple approach)
         import_pattern = re.compile(r'^(from .+ import .+|import .+)$', re.MULTILINE)
         imports = set(import_pattern.findall(content))
@@ -93,18 +89,17 @@ def find_imports_in_file(file_path: Path) -> Set[str]:
 def update_imports_in_file(file_path: Path, dry_run: bool = True) -> int:
     """Update imports in a file according to IMPORT_MAPPINGS."""
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             content = f.read()
-        
-        original_content = content
+
         changes = 0
-        
+
         # Apply import mappings
         for old_import, new_import in IMPORT_MAPPINGS.items():
             if old_import in content:
                 content = content.replace(old_import, new_import)
                 changes += 1
-        
+
         # Apply symbol renames
         for old_symbol, new_symbol in SYMBOL_RENAMES.items():
             # Be careful: only rename function calls, not inside strings
@@ -113,7 +108,7 @@ def update_imports_in_file(file_path: Path, dry_run: bool = True) -> int:
             if re.search(pattern, content):
                 content = re.sub(pattern, new_symbol, content)
                 changes += 1
-        
+
         if changes > 0:
             if dry_run:
                 print(f"✏️  Would update {file_path} ({changes} changes)")
@@ -121,9 +116,9 @@ def update_imports_in_file(file_path: Path, dry_run: bool = True) -> int:
                 with open(file_path, "w", encoding="utf-8") as f:
                     f.write(content)
                 print(f"✅ Updated {file_path} ({changes} changes)")
-        
+
         return changes
-    
+
     except Exception as e:
         print(f"⚠️  Error processing {file_path}: {e}")
         return 0
@@ -155,7 +150,7 @@ try:
 except ImportError:
     pass
 '''
-    
+
     if dry_run:
         print(f"📝 Would deprecate {file_path}")
         print(f"   → Canonical: {canonical_path}")
@@ -177,7 +172,7 @@ def remove_file(file_path: Path, dry_run: bool = True):
 def consolidate_duplicates(dry_run: bool = True, mode: str = "deprecate"):
     """
     Main consolidation function.
-    
+
     Args:
         dry_run: If True, only print what would be done
         mode: "deprecate" (add deprecation notice) or "remove" (delete file)
@@ -188,13 +183,13 @@ def consolidate_duplicates(dry_run: bool = True, mode: str = "deprecate"):
     print(f"Mode: {'DRY RUN' if dry_run else 'LIVE'}")
     print(f"Action: {mode.upper()}")
     print()
-    
+
     # Step 1: Find all Python files
     print("📁 Finding Python files...")
     python_files = find_python_files()
     print(f"   Found {len(python_files)} Python files")
     print()
-    
+
     # Step 2: Update imports in all files
     print("🔄 Updating imports...")
     total_changes = 0
@@ -203,7 +198,7 @@ def consolidate_duplicates(dry_run: bool = True, mode: str = "deprecate"):
         total_changes += changes
     print(f"   Total import updates: {total_changes}")
     print()
-    
+
     # Step 3: Handle duplicate files
     print(f"🗂️  Handling duplicate files ({mode})...")
     for old_path_str, canonical_path in DUPLICATES_TO_REMOVE.items():
@@ -216,14 +211,14 @@ def consolidate_duplicates(dry_run: bool = True, mode: str = "deprecate"):
         else:
             print(f"⚠️  File not found: {old_path}")
     print()
-    
+
     # Summary
     print("=" * 70)
     print("Summary")
     print("=" * 70)
     print(f"Import updates: {total_changes}")
     print(f"Duplicate files handled: {len(DUPLICATES_TO_REMOVE)}")
-    
+
     if dry_run:
         print()
         print("ℹ️  This was a DRY RUN. No changes were made.")
@@ -237,7 +232,7 @@ def consolidate_duplicates(dry_run: bool = True, mode: str = "deprecate"):
 
 if __name__ == "__main__":
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Consolidate duplicate code implementations")
     parser.add_argument(
         "--live",
@@ -250,7 +245,7 @@ if __name__ == "__main__":
         default="deprecate",
         help="How to handle duplicates: deprecate (add notice) or remove (delete)"
     )
-    
+
     args = parser.parse_args()
-    
+
     consolidate_duplicates(dry_run=not args.live, mode=args.mode)

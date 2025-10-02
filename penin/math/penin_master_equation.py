@@ -74,7 +74,7 @@ def estimate_gradient(
     Note:
         For large systems, use proper autodiff (PyTorch/JAX).
         This is a simple estimator for small-scale systems.
-        
+
     Optimization:
         Uses vectorized computation and pre-allocated arrays to reduce overhead.
         Forward differences are faster but less accurate than central differences.
@@ -135,21 +135,21 @@ def estimate_gradient_fast(
 ) -> np.ndarray:
     """
     Fast gradient estimation using optimized forward differences.
-    
+
     This is an optimized version that pre-computes the loss and reuses
     the perturbed state array efficiently. It minimizes Python overhead
     by using NumPy operations where possible.
-    
+
     Args:
         state: Current state I_n
         evidence: Environment/data E_n
         policies: Policy parameters P_n
         loss_fn: Loss function to minimize
         finite_diff_epsilon: Step size for finite differences
-    
+
     Returns:
         Gradient estimate G (same shape as state)
-        
+
     Performance:
         - Pre-allocates arrays to avoid repeated memory allocation
         - Uses scalar multiplication instead of division where possible
@@ -204,7 +204,7 @@ def project_to_safe_set(
         >>> projected = project_to_safe_set(state, H_constraints={'bounds': (0.0, 1.0)})
         >>> print(projected)
         [1.0 0.0 1.0]
-        
+
     Optimization:
         Avoids unnecessary copies when no constraints are applied.
     """
@@ -292,7 +292,7 @@ def penin_update(
         >>> I_next = penin_update(I_n, G, alpha_n=0.065)
         >>> print(I_next)
         [0.5065 0.29675 0.70975]
-        
+
     Optimization:
         Uses in-place operations when possible to reduce memory allocations.
     """

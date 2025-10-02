@@ -81,7 +81,7 @@ class DecisionInfo(BaseModel):
     delta_linf: float = Field(description="ΔL∞ vs champion")
     delta_score: float = Field(description="ΔScore vs champion")
     beta_min_met: bool = Field(description="Se ΔL∞ ≥ β_min")
-    
+
     # Cryptographic attestation chain (optional)
     attestation_chain: dict[str, Any] | None = Field(None, description="Attestation chain proof")
 

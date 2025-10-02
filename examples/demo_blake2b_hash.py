@@ -34,29 +34,29 @@ def print_section(title: str):
 def demo_hash_algorithm():
     """Demonstrate the new hash algorithm."""
     print_section("Hash Algorithm: BLAKE2b-256")
-    
-    print(f"\n📊 Current Configuration:")
+
+    print("\n📊 Current Configuration:")
     print(f"   Algorithm: {HASH_ALGORITHM}")
     print(f"   Ledger Version: {LEDGER_VERSION}")
-    print(f"   Security Level: 256 bits")
-    
+    print("   Security Level: 256 bits")
+
     # Show hash examples
-    print(f"\n🔑 Hash Examples:")
+    print("\n🔑 Hash Examples:")
     test_data = b"PENIN-Omega WORM Ledger"
-    
+
     blake2b_hash = compute_hash(test_data, algorithm="blake2b")
     sha256_hash = compute_hash(test_data, algorithm="sha256")
-    
+
     print(f"   Data: {test_data.decode()}")
     print(f"   BLAKE2b: {blake2b_hash}")
     print(f"   SHA-256: {sha256_hash}")
-    print(f"   Both:    64 characters (256-bit)")
+    print("   Both:    64 characters (256-bit)")
 
 
 def demo_performance():
     """Demonstrate performance improvements."""
     print_section("Performance Benchmark")
-    
+
     # Create realistic test data
     test_data = hash_json({
         "event_type": "evaluate",
@@ -68,16 +68,16 @@ def demo_performance():
             "decision": {"verdict": "promote", "reason": "metrics improved"}
         }
     }).encode()
-    
+
     print(f"\n⏱️  Benchmarking with {len(test_data)} bytes of data...")
-    print(f"   Running 10,000 iterations for each algorithm...")
-    
+    print("   Running 10,000 iterations for each algorithm...")
+
     results = benchmark_hash_algorithms(test_data, iterations=10000)
-    
+
     # Sort by speed
     sorted_results = sorted(results.items(), key=lambda x: x[1])
-    
-    print(f"\n📈 Results:")
+
+    print("\n📈 Results:")
     for i, (algo, time_taken) in enumerate(sorted_results, 1):
         speedup = sorted_results[-1][1] / time_taken
         print(f"   {i}. {algo:12s}: {time_taken:.6f}s  ({speedup:.2f}x faster than slowest)")
@@ -86,17 +86,17 @@ def demo_performance():
 def demo_worm_ledger():
     """Demonstrate WORM ledger with BLAKE2b."""
     print_section("WORM Ledger Operations")
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
         ledger_path = Path(tmpdir) / "demo_ledger.jsonl"
-        
+
         print(f"\n📝 Creating ledger at: {ledger_path}")
         ledger = create_worm_ledger(ledger_path)
-        
+
         # Append events
-        print(f"\n✏️  Appending events...")
+        print("\n✏️  Appending events...")
         start_time = time.time()
-        
+
         events = []
         for i in range(10):
             event = ledger.append(
@@ -110,33 +110,33 @@ def demo_worm_ledger():
                 }
             )
             events.append(event)
-        
+
         elapsed = time.time() - start_time
         print(f"   ✓ Appended {len(events)} events in {elapsed:.4f}s")
         print(f"   ✓ Average: {elapsed/len(events):.6f}s per event")
-        
+
         # Show hash chain
-        print(f"\n🔗 Hash Chain Sample:")
+        print("\n🔗 Hash Chain Sample:")
         for i, event in enumerate(events[:3]):
             print(f"   Event {i}: {event.event_hash[:16]}... -> {event.previous_hash[:16] if event.previous_hash else 'genesis'}...")
-        print(f"   ...")
-        
+        print("   ...")
+
         # Verify chain
-        print(f"\n🔍 Verifying hash chain...")
+        print("\n🔍 Verifying hash chain...")
         is_valid, error = ledger.verify_chain()
         if is_valid:
-            print(f"   ✅ Chain verified successfully!")
+            print("   ✅ Chain verified successfully!")
         else:
             print(f"   ❌ Chain verification failed: {error}")
-        
+
         # Compute Merkle root
-        print(f"\n🌳 Computing Merkle root...")
+        print("\n🌳 Computing Merkle root...")
         merkle_root = ledger.compute_merkle_root()
         print(f"   Root: {merkle_root}")
-        
+
         # Show statistics
         stats = ledger.get_statistics()
-        print(f"\n📊 Ledger Statistics:")
+        print("\n📊 Ledger Statistics:")
         print(f"   Total events: {stats['total_events']}")
         print(f"   Last sequence: {stats['last_sequence']}")
         print(f"   Last hash: {stats['last_hash'][:16]}...")
@@ -148,13 +148,13 @@ def demo_worm_ledger():
 def demo_proof_carrying_artifact():
     """Demonstrate Proof-Carrying Artifacts."""
     print_section("Proof-Carrying Artifacts (PCAg)")
-    
+
     with tempfile.TemporaryDirectory() as tmpdir:
         ledger_path = Path(tmpdir) / "pcag_ledger.jsonl"
         ledger = create_worm_ledger(ledger_path)
-        
-        print(f"\n🎯 Creating PCAg for decision tracking...")
-        
+
+        print("\n🎯 Creating PCAg for decision tracking...")
+
         # Create PCAg
         pcag = create_pcag(
             decision_id="promote-001",
@@ -178,18 +178,18 @@ def demo_proof_carrying_artifact():
                 "version": "v1.0"
             }
         )
-        
+
         print(f"   ✓ PCAg created: {pcag.decision_type}:{pcag.decision_id}")
         print(f"   ✓ Hash: {pcag.artifact_hash[:32]}...")
         print(f"   ✓ Timestamp: {pcag.timestamp}")
-        
+
         # Verify PCAg
-        print(f"\n🔍 Verifying PCAg hash...")
+        print("\n🔍 Verifying PCAg hash...")
         is_valid = pcag.verify_hash()
         print(f"   {'✅' if is_valid else '❌'} Hash verification: {'PASSED' if is_valid else 'FAILED'}")
-        
+
         # Append to ledger
-        print(f"\n📝 Appending PCAg to ledger...")
+        print("\n📝 Appending PCAg to ledger...")
         event = ledger.append_pcag(pcag)
         print(f"   ✓ Appended as event: {event.event_id}")
         print(f"   ✓ Event hash: {event.event_hash[:32]}...")
@@ -198,24 +198,24 @@ def demo_proof_carrying_artifact():
 def demo_keyed_hashing():
     """Demonstrate keyed hashing for authentication."""
     print_section("Keyed Hashing (Authentication)")
-    
-    print(f"\n🔐 BLAKE2b supports native keyed hashing (like HMAC)...")
-    
+
+    print("\n🔐 BLAKE2b supports native keyed hashing (like HMAC)...")
+
     data = b"Sensitive ledger data"
     secret_key = b"my_secret_key_12345"
-    
+
     # Create authenticated hash
     auth_hash = keyed_hash(data, secret_key, algorithm="blake2b")
-    
+
     print(f"   Data: {data.decode()}")
     print(f"   Key:  {secret_key.decode()}")
     print(f"   Auth Hash: {auth_hash}")
-    
+
     # Try different key
     wrong_key = b"wrong_key"
     wrong_hash = keyed_hash(data, wrong_key, algorithm="blake2b")
-    
-    print(f"\n🔑 Testing with different keys:")
+
+    print("\n🔑 Testing with different keys:")
     print(f"   Correct key: {auth_hash[:32]}...")
     print(f"   Wrong key:   {wrong_hash[:32]}...")
     print(f"   Match: {'❌ NO' if auth_hash != wrong_hash else '✅ YES'}")
@@ -224,8 +224,8 @@ def demo_keyed_hashing():
 def demo_comparison():
     """Demonstrate comparison with legacy SHA-256."""
     print_section("BLAKE2b vs SHA-256 Comparison")
-    
-    print(f"\n📊 Feature Comparison:")
+
+    print("\n📊 Feature Comparison:")
     print(f"   {'Feature':<25} {'BLAKE2b':<15} {'SHA-256':<15}")
     print(f"   {'-' * 55}")
     print(f"   {'Hash Length':<25} {'64 chars':<15} {'64 chars':<15}")
@@ -235,18 +235,18 @@ def demo_comparison():
     print(f"   {'Keyed Hashing':<25} {'✅ Native':<15} {'⚠️  HMAC':<15}")
     print(f"   {'Hardware Accel':<25} {'✅ Modern':<15} {'✅ Legacy':<15}")
     print(f"   {'Quantum Resistant':<25} {'✅ Better':<15} {'✅ Good':<15}")
-    
-    print(f"\n✅ Why BLAKE2b?")
-    print(f"   • More modern cryptographic design")
-    print(f"   • Better performance in optimized implementations")
-    print(f"   • Native keyed hashing support")
-    print(f"   • Growing adoption in blockchain/distributed systems")
-    print(f"   • Same security level as SHA-256")
-    
-    print(f"\n🔄 Backward Compatibility:")
-    print(f"   • Legacy ledgers continue using SHA-256")
-    print(f"   • New ledgers automatically use BLAKE2b")
-    print(f"   • No breaking changes to API")
+
+    print("\n✅ Why BLAKE2b?")
+    print("   • More modern cryptographic design")
+    print("   • Better performance in optimized implementations")
+    print("   • Native keyed hashing support")
+    print("   • Growing adoption in blockchain/distributed systems")
+    print("   • Same security level as SHA-256")
+
+    print("\n🔄 Backward Compatibility:")
+    print("   • Legacy ledgers continue using SHA-256")
+    print("   • New ledgers automatically use BLAKE2b")
+    print("   • No breaking changes to API")
 
 
 def main():
@@ -255,14 +255,14 @@ def main():
     print("  PENIN-Ω WORM Ledger: BLAKE2b Hash Algorithm Demo")
     print("=" * 70)
     print("\n  Demonstrating improved hash algorithm for immutable audit trail")
-    
+
     demo_hash_algorithm()
     demo_performance()
     demo_worm_ledger()
     demo_proof_carrying_artifact()
     demo_keyed_hashing()
     demo_comparison()
-    
+
     print("\n" + "=" * 70)
     print("  ✅ Demo Complete!")
     print("=" * 70)

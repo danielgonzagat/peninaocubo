@@ -12,7 +12,7 @@ from pathlib import Path
 def load_results(filename: str) -> dict:
     """Load benchmark results from JSON file."""
     path = Path(__file__).parent / filename
-    with open(path, "r") as f:
+    with open(path) as f:
         return json.load(f)
 
 
@@ -40,7 +40,7 @@ def compare_benchmarks():
     total_improvement = 0
     count = 0
 
-    for baseline_res, optimized_res in zip(baseline["results"], optimized["results"]):
+    for baseline_res, optimized_res in zip(baseline["results"], optimized["results"], strict=False):
         name = baseline_res["name"]
         baseline_time = baseline_res["mean_time_ms"]
         optimized_time = optimized_res["mean_time_ms"]

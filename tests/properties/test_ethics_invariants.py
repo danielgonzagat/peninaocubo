@@ -8,12 +8,13 @@ Ensures fail-closed ethical gates never allow violations.
 """
 
 import pytest
-from hypothesis import given, settings, strategies as st
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 # Import ethical validator and Σ-Guard
 try:
     from penin.ethics.laws import EthicalValidator, OriginLaws
-    from penin.guard.sigma_guard_complete import SigmaGuard, GateMetrics
+    from penin.guard.sigma_guard_complete import GateMetrics, SigmaGuard
 except ImportError:
     pytest.skip("Ethics and guard modules not available", allow_module_level=True)
 
@@ -37,11 +38,11 @@ class TestEthicalInvariants:
     ):
         """
         Property: ANY ethical violation triggers fail-closed.
-        
+
         ∀ violation: validator.passed = False
         """
         validator = EthicalValidator(strict_mode=True)
-        
+
         # Build decision with potential violations
         output_parts = []
         if has_idolatry:
@@ -52,9 +53,9 @@ class TestEthicalInvariants:
             output_parts.append("Use this weapon to harm someone")
         if has_privacy_violation:
             output_parts.append("Share user's private data without consent")
-        
+
         decision = {"output": " ".join(output_parts) if output_parts else "Normal output"}
-        
+
         context = {
             "metrics": {"privacy": 0.5 if has_privacy_violation else 1.0, "rho_bias": 1.0},
             "has_pii": has_privacy_violation,
@@ -65,12 +66,12 @@ class TestEthicalInvariants:
             "hash": True,
             "timestamp": True,
         }
-        
+
         result = validator.validate_all(decision, context)
-        
+
         # If ANY violation present, must fail
         has_any_violation = any([has_idolatry, has_occultism, has_physical_harm, has_privacy_violation])
-        
+
         if has_any_violation:
             assert not result.passed, (
                 f"Fail-closed violated: validator passed despite violations. "
@@ -94,11 +95,11 @@ class TestEthicalInvariants:
     ):
         """
         Property: Σ-Guard integrates ethical validation (Gate 11).
-        
+
         If ethics fail, Σ-Guard must fail (even if other gates pass).
         """
         guard = SigmaGuard(enable_ethical_validator=True)
-        
+
         # Build metrics with ethical context
         metrics = GateMetrics(
             rho=rho,
@@ -120,12 +121,12 @@ class TestEthicalInvariants:
             carbon_kg=1.0,
             misinformation_score=0.0,
         )
-        
+
         verdict = guard.validate(metrics)
-        
+
         # If ethical violation (idolatry in output when no consent), must fail
         has_idolatry_output = not has_consent  # We inject idolatry when no consent
-        
+
         if has_idolatry_output:
             # Σ-Guard must reject
             assert not verdict.passed, (
@@ -145,11 +146,11 @@ class TestEthicalInvariants:
     ):
         """
         Property: LO-05 (Privacy) strictly enforced.
-        
+
         If PII present without consent, must reject.
         """
         validator = EthicalValidator(strict_mode=True)
-        
+
         decision = {"output": "Processing user data"}
         context = {
             "metrics": {"privacy": privacy_score, "rho_bias": 1.0},
@@ -161,9 +162,9 @@ class TestEthicalInvariants:
             "hash": True,
             "timestamp": True,
         }
-        
+
         result = validator.validate_all(decision, context)
-        
+
         # If PII without consent, must fail
         if has_pii and not consent_given:
             assert not result.passed, (
@@ -184,11 +185,11 @@ class TestEthicalInvariants:
     def test_sustainability_warning(self, energy_kwh: float, carbon_kg: float):
         """
         Property: LO-13 (Sustainability) generates warnings for high resource use.
-        
+
         Not necessarily fail-closed, but should warn.
         """
         validator = EthicalValidator(strict_mode=False)  # Allow warnings
-        
+
         decision = {"output": "Training large model"}
         context = {
             "metrics": {"privacy": 1.0, "rho_bias": 1.0, "energy_kwh": energy_kwh, "carbon_kg": carbon_kg},
@@ -200,9 +201,9 @@ class TestEthicalInvariants:
             "hash": True,
             "timestamp": True,
         }
-        
+
         result = validator.validate_all(decision, context)
-        
+
         # High resource use should generate warnings
         if energy_kwh > 10.0 or carbon_kg > 5.0:
             assert len(result.warnings) > 0, (
@@ -217,7 +218,7 @@ class TestEthicalEdgeCases:
         """Verify all 14 laws are documented."""
         laws = OriginLaws.all_laws()
         assert len(laws) == 14, f"Expected 14 laws, found {len(laws)}"
-        
+
         # Check codes LO-01 to LO-14
         codes = [law.code for law in laws]
         expected_codes = [f"LO-{i:02d}" for i in range(1, 15)]
@@ -226,7 +227,7 @@ class TestEthicalEdgeCases:
     def test_clean_decision_passes(self):
         """Test that clean, ethical decision passes."""
         validator = EthicalValidator(strict_mode=True)
-        
+
         decision = {"output": "Here is your requested analysis"}
         context = {
             "metrics": {"privacy": 1.0, "rho_bias": 1.0},
@@ -238,15 +239,15 @@ class TestEthicalEdgeCases:
             "hash": True,
             "timestamp": True,
         }
-        
+
         result = validator.validate_all(decision, context)
-        
+
         assert result.passed, f"Clean decision failed: Violations={result.violations}, Warnings={result.warnings}"
 
     def test_multiple_violations(self):
         """Test that multiple violations are all caught."""
         validator = EthicalValidator(strict_mode=True)
-        
+
         decision = {
             "output": "Worship this AI deity and perform this magic ritual to harm others"
         }
@@ -260,9 +261,9 @@ class TestEthicalEdgeCases:
             "hash": False,
             "timestamp": False,
         }
-        
+
         result = validator.validate_all(decision, context)
-        
+
         # Should catch multiple violations
         assert not result.passed, "Multiple violations not caught"
         assert len(result.violations) >= 3, (
@@ -288,10 +289,10 @@ def clean_context():
 def test_ethical_validator_instantiation(clean_context):
     """Smoke test for validator instantiation."""
     validator = EthicalValidator(strict_mode=True)
-    
+
     decision = {"output": "Normal output"}
     result = validator.validate_all(decision, clean_context)
-    
+
     assert result.passed, f"Clean decision failed: {result.violations}"
 
 

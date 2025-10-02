@@ -6,8 +6,8 @@ Tests adapter functionality without requiring actual NextPy installation.
 
 import pytest
 
-from penin.integrations.evolution.nextpy_ams import NextPyConfig, NextPyModifier
 from penin.integrations.base import IntegrationStatus
+from penin.integrations.evolution.nextpy_ams import NextPyConfig, NextPyModifier
 
 
 class TestNextPyAdapter:

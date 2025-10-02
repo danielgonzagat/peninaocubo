@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 def test_example_toxiproxy_integration():
     """
     Example: Using Toxiproxy for realistic network chaos
-    
+
     This test demonstrates how to use Toxiproxy when it's available.
     If Toxiproxy is not running, the test is skipped.
     """
@@ -62,7 +62,7 @@ def test_example_toxiproxy_integration():
 def test_example_chaos_proxy_context():
     """
     Example: Using chaos_proxy context manager
-    
+
     This is the recommended way to use Toxiproxy in tests.
     """
     pytest.skip("Requires Toxiproxy running")
@@ -85,7 +85,7 @@ def test_example_chaos_proxy_context():
 def test_example_network_chaos_mock():
     """
     Example: Using NetworkChaos for mocking without Toxiproxy
-    
+
     This works without any external dependencies.
     """
     from chaos_utils import NetworkChaos
@@ -97,7 +97,7 @@ def test_example_network_chaos_mock():
         failures = 0
         attempts = 10
 
-        for i in range(attempts):
+        for _i in range(attempts):
             try:
                 requests.get("http://example.com", timeout=1)
             except requests.exceptions.ConnectionError:
@@ -110,7 +110,7 @@ def test_example_network_chaos_mock():
 def test_example_service_chaos():
     """
     Example: Using ServiceChaos utilities
-    
+
     Demonstrates service-level chaos operations.
     """
     from chaos_utils import ServiceChaos
@@ -122,7 +122,7 @@ def test_example_service_chaos():
         failures = 0
         successes = 0
 
-        for i in range(20):
+        for _i in range(20):
             try:
                 requests.get("http://example.com", timeout=1)
                 successes += 1
@@ -137,7 +137,7 @@ def test_example_service_chaos():
 def test_example_validate_fail_closed():
     """
     Example: Using validate_fail_closed decorator
-    
+
     This ensures your test validates the fail-closed guarantee.
     """
     from chaos_utils import validate_fail_closed
@@ -161,10 +161,11 @@ def test_example_validate_fail_closed():
 def test_example_comprehensive_chaos_scenario():
     """
     Example: Comprehensive chaos scenario
-    
+
     Combines multiple chaos conditions to simulate real-world failure.
     """
-    from unittest.mock import patch, Mock
+    from unittest.mock import Mock, patch
+
     import requests
 
     print("\n=== Comprehensive Chaos Scenario ===")

@@ -31,6 +31,8 @@ from __future__ import annotations
 __version__ = "1.0.0-alpha"
 
 # Core CAOS+ module
+# Persistence and state management
+from .artifacts import NumericVectorArtifact
 from .caos import (
     DEFAULT_GAMMA,
     DEFAULT_KAPPA,
@@ -39,9 +41,11 @@ from .caos import (
     AutoevolutionMetrics,
     # Enums
     CAOSComponent,
+    CAOSComponents,
     # Config & State
     CAOSConfig,
     CAOSFormula,
+    CAOSPlusEngine,
     CAOSState,
     # Tracker
     CAOSTracker,
@@ -65,9 +69,6 @@ from .caos import (
     harmonic_mean,
     phi_caos,
 )
-
-# Persistence and state management
-from .artifacts import NumericVectorArtifact
 from .orchestrator import OmegaMetaOrchestrator
 from .serialization import StateEncoder, state_decoder
 
@@ -78,6 +79,7 @@ __all__ = [
     # CAOS+ Enums
     "CAOSComponent",
     "CAOSFormula",
+    "CAOSComponents",
     # CAOS+ Metrics
     "ConsistencyMetrics",
     "AutoevolutionMetrics",
@@ -86,6 +88,7 @@ __all__ = [
     # CAOS+ Config & State
     "CAOSConfig",
     "CAOSState",
+    "CAOSPlusEngine",
     # CAOS+ Core functions
     "compute_caos_plus_exponential",
     "phi_caos",

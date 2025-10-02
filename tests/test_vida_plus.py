@@ -23,7 +23,11 @@ from penin.omega.market import InternalMarket, Need, Offer
 from penin.omega.neural_chain import add_block, get_latest_hash, verify_chain
 from penin.omega.self_rag import ingest_text, query, self_cycle
 from penin.omega.swarm import compute_swarm_coherence, heartbeat, sample_global_state
-from penin.omega.zero_consciousness import assert_zero_consciousness, detect_self_reference, spi_proxy
+from penin.omega.zero_consciousness import (
+    assert_zero_consciousness,
+    detect_self_reference,
+    spi_proxy,
+)
 
 
 class TestLifeEquation:

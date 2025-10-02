@@ -9,14 +9,12 @@ from pathlib import Path
 
 import pytest
 
-from penin.ledger.hash_utils import HASH_ALGORITHM, compute_hash, verify_hash
+from penin.ledger.hash_utils import HASH_ALGORITHM, compute_hash
 from penin.ledger.worm_ledger import (
     LEDGER_VERSION,
-    ProofCarryingArtifact,
     WORMEvent,
     WORMLedger,
     create_pcag,
-    create_worm_ledger,
 )
 
 
@@ -252,7 +250,7 @@ class TestWORMLedgerBLAKE2b:
         # Create same event twice
         payload = {"data": "deterministic test", "value": 42}
 
-        event1 = WORMEvent.create(
+        WORMEvent.create(
             event_type="test",
             event_id="evt-001",
             payload=payload,
@@ -264,7 +262,7 @@ class TestWORMLedgerBLAKE2b:
 
         time.sleep(0.01)
 
-        event2 = WORMEvent.create(
+        WORMEvent.create(
             event_type="test",
             event_id="evt-001",
             payload=payload,
@@ -301,7 +299,6 @@ class TestHashAlgorithmComparison:
 
     def test_hash_length_consistency(self):
         """Test that BLAKE2b produces same length hashes as SHA-256."""
-        from penin.ledger.hash_utils import compute_hash
 
         test_data = b"test data for comparison"
 
@@ -314,7 +311,6 @@ class TestHashAlgorithmComparison:
 
     def test_different_algorithms_produce_different_hashes(self):
         """Test that BLAKE2b and SHA-256 produce different hashes."""
-        from penin.ledger.hash_utils import compute_hash
 
         test_data = b"test data"
 
