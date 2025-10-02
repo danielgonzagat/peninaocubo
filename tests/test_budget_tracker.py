@@ -5,7 +5,7 @@ Tests for BudgetTracker
 
 import pytest
 
-from penin.router.budget_tracker import BudgetTracker, ProviderStats
+from penin.router_pkg.budget_tracker import BudgetTracker, ProviderStats
 
 
 class TestBudgetTracker:

@@ -28,7 +28,7 @@ from penin.math.sr_omega_infinity import SRComponents, compute_sr_score
 from penin.meta.omega_meta_complete import MutationType, create_omega_meta
 from penin.providers.base import BaseProvider, LLMResponse
 from penin.rag.self_rag_complete import Document, create_self_rag
-from penin.router_complete import MultiLLMRouterComplete, RouterMode
+from penin.router import MultiLLMRouterComplete, RouterMode
 
 # ============================================================================
 # Mock Provider for Demo
