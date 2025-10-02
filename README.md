@@ -119,7 +119,7 @@ Phase 3: Summary & Analysis
 
 ```python
 from penin.engine.master_equation import MasterState, step_master
-from penin.engine.caos_plus import compute_caos_plus
+from penin.core.caos import compute_caos_plus_exponential
 from penin.math.linf import linf_score
 from penin.integrations.metacognition import MetacognitiveReasoner
 
@@ -135,7 +135,7 @@ cost = 0.1
 
 # Evolution step
 linf = linf_score(metrics, weights, cost)  # Non-compensatory aggregation
-caos_plus = compute_caos_plus(C=0.8, A=0.5, O=0.7, S=0.9, kappa=20.0)  # Amplification
+caos_plus = compute_caos_plus_exponential(C=0.8, A=0.5, O=0.7, S=0.9, kappa=20.0)  # Amplification
 alpha = 0.1 * caos_plus  # Dynamic step size
 
 state = step_master(state, delta_linf=linf, alpha_omega=alpha)  # Master Equation
@@ -150,6 +150,11 @@ decision = await reasoner.reason(
 print(f"Decision: {decision['decision']}")
 print(f"Confidence: {decision['confidence_calibrated']:.3f}")
 ```
+
+**📖 Learn More:**
+- [Complete CAOS⁺ Guide](docs/caos_guide.md) - Detailed guide on the CAOS⁺ evolutionary engine
+- [Equations Reference](docs/equations.md) - All 15 mathematical equations
+- [System Guide](docs/COMPLETE_SYSTEM_GUIDE.md) - End-to-end pipeline
 
 ### Running Services
 

@@ -45,6 +45,38 @@ Auditabilidade:
 - Todos cálculos registrados em WORM ledger
 - PCAg gerados para cada computação crítica
 - Determinismo garantido via seed
+
+Quick Start:
+------------
+>>> # Uso simples com componentes já calculados
+>>> from penin.core.caos import compute_caos_plus_exponential
+>>> caos = compute_caos_plus_exponential(c=0.88, a=0.40, o=0.35, s=0.82, kappa=20.0)
+>>> print(f"CAOS⁺: {caos:.2f}")  # ~1.86
+
+>>> # Uso completo com métricas e EMA
+>>> from penin.core.caos import (
+...     ConsistencyMetrics, AutoevolutionMetrics,
+...     IncognoscibleMetrics, SilenceMetrics,
+...     CAOSConfig, CAOSState, compute_caos_plus_complete
+... )
+>>> 
+>>> consistency = ConsistencyMetrics(pass_at_k=0.92, ece=0.008)
+>>> autoevol = AutoevolutionMetrics(delta_linf=0.06, cost_normalized=0.15)
+>>> incog = IncognoscibleMetrics(epistemic_uncertainty=0.35)
+>>> silence = SilenceMetrics(noise_ratio=0.08)
+>>> 
+>>> config = CAOSConfig(kappa=25.0, ema_half_life=5)
+>>> state = CAOSState()
+>>> 
+>>> caos, details = compute_caos_plus_complete(
+...     consistency, autoevol, incog, silence, config, state
+... )
+>>> print(f"CAOS⁺: {caos:.4f}, Stability: {details['state_stability']:.3f}")
+
+Documentação Completa:
+---------------------
+Para guia detalhado com exemplos práticos, best practices e FAQ, consulte:
+docs/caos_guide.md
 """
 
 from __future__ import annotations
@@ -404,194 +436,6 @@ def compute_caos_plus_exponential(
     """
     Fórmula CAOS⁺ exponencial pura: (1 + κ·C·A)^(O·S)
 
-    Esta é a fórmula matemática canônica original do motor evolutivo PENIN-Ω.
-    É monotônica em todas as dimensões (C, A, O, S) e κ amplifica a base.
-
-    Racional Matemático
-    -------------------
-    A fórmula CAOS⁺ foi projetada para modular a taxa de aprendizado (α) no motor
-    evolutivo, equilibrando exploração e exploração através de quatro dimensões:
-
-    1. **Base (1 + κ·C·A)**: Representa o potencial de amplificação
-       - C·A mede a "qualidade" da evolução (consistência × autoevolução)
-       - κ controla a intensidade da amplificação (padrão: 20.0)
-       - Base sempre ≥ 1, garantindo que CAOS⁺ nunca reduz o passo
-
-    2. **Expoente (O·S)**: Controla a agressividade da exploração
-       - O (Incognoscível) aumenta quando há mais incerteza → mais exploração
-       - S (Silêncio) aumenta com melhor qualidade de sinal → mais confiança
-       - O·S alto → expoente alto → amplificação exponencial mais agressiva
-
-    Propriedades Matemáticas
-    ------------------------
-    - **Identidade**: CAOS⁺(0,0,0,0) = 1^0 = 1 (sem amplificação)
-    - **Máximo teórico**: CAOS⁺(1,1,1,1) = (1 + κ)^1 = 1 + κ
-    - **Monotonicidade**: ∂CAOS⁺/∂x ≥ 0 para x ∈ {C, A, O, S, κ}
-    - **Estabilidade**: Base sempre ≥ 1 previne valores negativos ou zero
-    - **Escala**: Com κ=20, range típico é [1.0, 3.5] para valores práticos
-
-    Args:
-        c (float): Consistência [0, 1]. Mede confiabilidade das predições através de:
-            - pass@k: taxa de autoconsistência em k amostras
-            - (1-ECE): calibração das probabilidades (Expected Calibration Error)
-            - v_ext: score de verificação externa (oracles, testes formais)
-        a (float): Autoevolução [0, 1]. Mede eficiência do aprendizado:
-            - Razão: ΔL∞⁺ / (Cost_norm + ε)
-            - ΔL∞⁺: ganho de performance (apenas valores positivos)
-            - Cost_norm: custo normalizado (tempo, tokens, energia)
-        o (float): Incognoscível [0, 1]. Mede incerteza e necessidade de exploração:
-            - epistemic_uncertainty: entropia, mutual information
-            - ood_score: distância de distribuição de treino
-            - ensemble_disagreement: variância entre predições do ensemble
-        s (float): Silêncio [0, 1]. Mede qualidade do sinal (inverso de ruído):
-            - (1-noise_ratio): anti-ruído
-            - (1-redundancy_ratio): anti-redundância
-            - (1-entropy_normalized): anti-entropia
-        kappa (float): Ganho base ≥ 1 (padrão: 20.0). Controla intensidade da amplificação.
-            - Valores típicos: 10-100
-            - Maior κ → amplificação mais agressiva
-            - Pode ser auto-tunado via Equação 10 (bandit meta-optimization)
-
-    Returns:
-        float: CAOS⁺ ≥ 1.0 (fator de amplificação, sem teto superior)
-            - 1.0 = sem amplificação (componentes próximos de zero)
-            - 1.5-2.5 = amplificação moderada (cenário típico)
-            - > 3.0 = amplificação alta (alta consistência + incerteza)
-
-    Examples:
-        >>> # Exemplo 1: Estado inicial (sem evolução)
-        >>> compute_caos_plus_exponential(c=0.0, a=0.0, o=0.0, s=0.0, kappa=20.0)
-        1.0
-
-        >>> # Exemplo 2: Alta consistência e autoevolução, baixa incerteza
-        >>> compute_caos_plus_exponential(c=0.9, a=0.5, o=0.2, s=0.8, kappa=20.0)
-        1.4454...  # Amplificação moderada (expoente baixo O·S=0.16)
-
-        >>> # Exemplo 3: Alta incerteza → exploração mais agressiva
-        >>> compute_caos_plus_exponential(c=0.8, a=0.4, o=0.8, s=0.9, kappa=20.0)
-        4.2252...  # Amplificação ALTA devido a O·S = 0.72
-
-        >>> # Exemplo 4: Efeito de κ na amplificação
-        >>> compute_caos_plus_exponential(c=0.7, a=0.3, o=0.5, s=0.5, kappa=10.0)
-        1.3269...
-        >>> compute_caos_plus_exponential(c=0.7, a=0.3, o=0.5, s=0.5, kappa=50.0)
-        1.8415...  # Maior κ → maior amplificação
-
-    Uso no Pipeline PENIN-Ω
-    -----------------------
-    1. **Modulação de α**: α_eff = α_0 · φ(CAOS⁺) na Equação de Penin
-    2. **Seleção de Challengers**: Maior CAOS⁺ → maior prioridade na Liga ACFA
-    3. **Adaptação de β_min**: Threshold dinâmico da Death Equation
-
-    Ver Também
-    ----------
-    - compute_caos_plus_complete: Versão completa com métricas estruturadas e EMA
-    - compute_caos_plus_simple: Wrapper com configuração e clamping
-    - phi_caos: Variante com saturação via tanh (compatibilidade histórica)
-    - CAOSConfig: Configuração com clamps e normalização
-    """
-    # Clamp inputs
-    c = clamp01(c)
-    a = clamp01(a)
-    o = clamp01(o)
-    s = clamp01(s)
-    kappa = max(1.0, kappa)
-
-    # Base: 1 + κ·C·A
-    base = 1.0 + kappa * c * a
-
-    # Expoente: O·S
-    exponent = o * s
-
-    # CAOS⁺
-    caos_plus = base**exponent
-
-    return caos_plus
-
-
-def phi_caos(
-    c: float,
-    a: float,
-    o: float,
-    s: float,
-    kappa: float = 2.0,
-    kappa_max: float = 10.0,
-    gamma: float = DEFAULT_GAMMA,
-) -> float:
-    """
-    Fórmula CAOS⁺ com saturação: tanh(γ · log(CAOS⁺_exponencial))
-
-    Variante histórica com output limitado a [0, 1) via tanh. Esta função aplica
-    uma transformação não-linear sobre o CAOS⁺ exponencial para manter o resultado
-    em um intervalo normalizado, útil para composições com outras métricas.
-
-    Racional Matemático
-    -------------------
-    A função phi_caos foi desenvolvida para cenários onde é necessário:
-    1. **Normalização**: Manter output em [0, 1) para integração com outras métricas
-    2. **Saturação suave**: Evitar explosão numérica em casos extremos
-    3. **Compatibilidade**: Manter consistência com código legado em penin/omega/
-
-    Pipeline de transformação:
-    1. Calcula base: (1 + κ·C·A)
-    2. Aplica expoente: base^(O·S)  
-    3. Transforma para log-space: log(base^(O·S)) = (O·S)·log(base)
-    4. Aplica saturação: tanh(γ · log_caos)
-
-    A função tanh garante:
-    - tanh(0) = 0 (identidade)
-    - tanh(∞) → 1 (saturação superior)
-    - tanh(-∞) → -1 (não aplicável, base sempre ≥ 1)
-
-    Args:
-        c (float): Consistência [0, 1]
-        a (float): Autoevolução [0, 1]
-        o (float): Incognoscível [0, 1]
-        s (float): Silêncio [0, 1]
-        kappa (float): Ganho [1, kappa_max] (padrão: 2.0, menor que versão exponencial)
-        kappa_max (float): Limite superior de kappa (padrão: 10.0)
-        gamma (float): Parâmetro de saturação [0.1, 2.0] (padrão: 0.7)
-            - gamma baixo → saturação mais suave (curva mais lenta)
-            - gamma alto → saturação mais rápida (curva mais íngreme)
-
-    Returns:
-        float: φ_CAOS em [0, 1) aproximadamente
-            - 0.0 = nenhuma amplificação
-            - 0.5 = amplificação moderada  
-            - ~0.9 = amplificação alta (próximo da saturação)
-            - < 1.0 sempre (devido à tanh)
-
-    Examples:
-        >>> # Exemplo 1: Valores baixos → phi próximo de zero
-        >>> phi_caos(c=0.1, a=0.1, o=0.1, s=0.1, kappa=2.0, gamma=0.7)
-        0.0001...
-
-        >>> # Exemplo 2: Valores moderados
-        >>> phi_caos(c=0.7, a=0.5, o=0.6, s=0.8, kappa=2.0, gamma=0.7)
-        0.1764...
-
-        >>> # Exemplo 3: Valores altos → saturação próxima de 1
-        >>> phi_caos(c=0.9, a=0.9, o=0.9, s=0.9, kappa=10.0, gamma=0.7)
-        0.8489...
-
-        >>> # Exemplo 4: Efeito do parâmetro gamma
-        >>> phi_caos(c=0.8, a=0.6, o=0.7, s=0.7, kappa=5.0, gamma=0.3)  # suave
-        0.1780...
-        >>> phi_caos(c=0.8, a=0.6, o=0.7, s=0.7, kappa=5.0, gamma=1.5)  # íngreme
-        0.7160...
-
-    Nota:
-        Esta fórmula é mantida para compatibilidade com código histórico
-        em penin/omega/caos.py, mas a fórmula exponencial (compute_caos_plus_exponential)
-        é preferida para uso no pipeline principal devido a:
-        - Melhor interpretabilidade (amplificação direta)
-        - Menos parâmetros (não precisa de gamma)
-        - Range não limitado (útil para modulação de α)
-
-    Ver Também
-    ----------
-    - compute_caos_plus_exponential: Fórmula preferida para pipeline principal
-    - compute_caos_plus: Wrapper de compatibilidade que usa esta função
     """
     # Clamp inputs
     c = clamp01(c)
@@ -753,177 +597,7 @@ def compute_caos_plus_complete(
     state: CAOSState | None = None,
 ) -> tuple[float, dict[str, Any]]:
     """
-    Computação CAOS⁺ completa com métricas detalhadas, EMA e auditoria.
 
-    Esta é a função de mais alto nível para cálculo de CAOS⁺, integrando todas as
-    funcionalidades: computação de componentes, suavização temporal, configuração
-    avançada e auditabilidade completa.
-
-    Pipeline de Computação
-    ----------------------
-    1. **Agregação de Métricas**: Calcula C, A, O, S a partir de métricas raw
-       - C: Média ponderada de pass@k, (1-ECE), verificação externa
-       - A: Razão ganho/custo normalizada em [0, 1]
-       - O: Média ponderada de incertezas (epistêmica, OOD, ensemble)
-       - S: Média ponderada de qualidade de sinal (anti-ruído/redundância/entropia)
-
-    2. **Atualização de Estado**: Armazena valores current (raw)
-
-    3. **Suavização EMA**: Aplica Exponential Moving Average para estabilidade temporal
-       - EMA_t = α · valor_t + (1-α) · EMA_{t-1}
-       - α calculado via half-life (padrão: 5 amostras)
-       - Reduz oscilações e melhora convergência
-
-    4. **Clamping de Parâmetros**: Aplica limites em kappa (padrão: [10, 100])
-
-    5. **Computação CAOS⁺**: Usa valores suavizados
-       - Fórmula exponencial: (1 + κ·C·A)^(O·S)
-       - Ou phi_caos com saturação, conforme config.formula
-
-    6. **Pós-processamento**:
-       - Clamp do resultado (padrão: [1, 10])
-       - Log-space opcional (para comparações)
-       - Normalização para [0, 1] opcional
-
-    7. **Atualização de Histórico**: Armazena valor em FIFO buffer
-
-    8. **Retorno**: Valor final + detalhes completos para auditoria (WORM ledger)
-
-    Args:
-        consistency_metrics (ConsistencyMetrics): Métricas de Consistência
-            - pass_at_k: Taxa de sucesso em k tentativas [0, 1]
-            - ece: Expected Calibration Error [0, 1] (menor é melhor)
-            - external_verification: Score de verificação externa [0, 1]
-            - Pesos: weight_pass, weight_ece, weight_external
-            
-        autoevolution_metrics (AutoevolutionMetrics): Métricas de Autoevolução
-            - delta_linf: Ganho de L∞ (performance)
-            - cost_normalized: Custo normalizado [0, ∞)
-            - max_a: Clamp máximo antes de normalizar (padrão: 10.0)
-            
-        incognoscible_metrics (IncognoscibleMetrics): Métricas de Incognoscível
-            - epistemic_uncertainty: Incerteza epistêmica [0, 1]
-            - ood_score: Score out-of-distribution [0, 1]
-            - ensemble_disagreement: Variância do ensemble [0, 1]
-            - Pesos: weight_epistemic, weight_ood, weight_ensemble
-            
-        silence_metrics (SilenceMetrics): Métricas de Silêncio
-            - noise_ratio: Proporção de ruído [0, 1]
-            - redundancy_ratio: Proporção de redundância [0, 1]
-            - entropy_normalized: Entropia normalizada [0, 1]
-            - Pesos: weight_noise, weight_redundancy, weight_entropy (2:1:1)
-            
-        config (CAOSConfig | None): Configuração do motor CAOS⁺. Se None, usa defaults:
-            - formula: CAOSFormula.EXPONENTIAL
-            - kappa: 20.0 (range: [10, 100])
-            - gamma: 0.7 (para phi_caos)
-            - ema_half_life: 5 amostras
-            - caos_min/max: [1.0, 10.0]
-            - normalize_output: False
-            
-        state (CAOSState | None): Estado com histórico EMA. Se None, cria novo:
-            - Valores raw: c_current, a_current, o_current, s_current
-            - Valores suavizados: c_smoothed, a_smoothed, o_smoothed, s_smoothed
-            - Histórico: últimas N amostras (padrão: 100)
-            - update_count: Contador de atualizações
-
-    Returns:
-        tuple[float, dict[str, Any]]: (caos_plus_final, details)
-        
-        caos_plus_final (float): Valor CAOS⁺ final processado
-            - Range típico: [1.0, 10.0] (ou [0, 1] se normalize_output=True)
-            
-        details (dict): Dicionário completo com métricas intermediárias:
-            - 'components_raw': Dict[str, float] - C, A, O, S calculados
-            - 'metrics_input': Dict - Todas métricas de entrada para auditoria
-            - 'components_smoothed': Dict[str, float] - C, A, O, S suavizados via EMA
-            - 'ema_alpha': float - Fator de suavização calculado
-            - 'ema_half_life': int - Half-life configurado
-            - 'kappa': float - κ clamped usado no cálculo
-            - 'formula': str - Fórmula utilizada ('exponential' ou 'phi_caos')
-            - 'caos_plus_raw': float - Valor antes de clamping
-            - 'caos_plus_clamped': float - Valor após clamping [caos_min, caos_max]
-            - 'caos_plus_log': float - Valor em log-space (se use_log_space=True)
-            - 'caos_plus_normalized': float - Valor normalizado (se normalize_output=True)
-            - 'caos_plus_final': float - Valor final retornado
-            - 'state_update_count': int - Número de atualizações realizadas
-            - 'state_stability': float - Estabilidade temporal (inverse CV)
-
-    Examples:
-        >>> # Exemplo 1: Uso básico com valores padrão
-        >>> from penin.core.caos import (
-        ...     compute_caos_plus_complete,
-        ...     ConsistencyMetrics,
-        ...     AutoevolutionMetrics,
-        ...     IncognoscibleMetrics,
-        ...     SilenceMetrics,
-        ...     CAOSConfig,
-        ...     CAOSState
-        ... )
-        >>> 
-        >>> consistency = ConsistencyMetrics(pass_at_k=0.92, ece=0.008)
-        >>> autoevolution = AutoevolutionMetrics(delta_linf=0.06, cost_normalized=0.15)
-        >>> incognoscible = IncognoscibleMetrics(epistemic_uncertainty=0.35)
-        >>> silence = SilenceMetrics(noise_ratio=0.08)
-        >>> 
-        >>> caos_plus, details = compute_caos_plus_complete(
-        ...     consistency, autoevolution, incognoscible, silence
-        ... )
-        >>> print(f"CAOS⁺: {caos_plus:.3f}")  # doctest: +SKIP
-        CAOS⁺: 1.199
-        >>> print(f"C: {details['components_raw']['C']:.3f}")  # doctest: +SKIP
-        C: 0.930
-
-        >>> # Exemplo 2: Uso com suavização EMA para séries temporais
-        >>> config = CAOSConfig(kappa=25.0, ema_half_life=5)
-        >>> state = CAOSState()
-        >>> 
-        >>> # Primeira iteração
-        >>> caos1, _ = compute_caos_plus_complete(
-        ...     consistency, autoevolution, incognoscible, silence, config, state
-        ... )
-        >>> 
-        >>> # Segunda iteração (com EMA do estado anterior)
-        >>> consistency2 = ConsistencyMetrics(pass_at_k=0.95, ece=0.006)
-        >>> caos2, details2 = compute_caos_plus_complete(
-        ...     consistency2, autoevolution, incognoscible, silence, config, state
-        ... )
-        >>> # caos2 será suavizado com caos1 via EMA
-
-        >>> # Exemplo 3: Configuração para output normalizado [0, 1]
-        >>> config_norm = CAOSConfig(kappa=20.0, normalize_output=True)
-        >>> caos_norm, details_norm = compute_caos_plus_complete(
-        ...     consistency, autoevolution, incognoscible, silence, config_norm
-        ... )
-        >>> assert 0.0 <= caos_norm <= 1.0  # Garantido em [0, 1]
-
-        >>> # Exemplo 4: Auditoria completa - inspecionar details
-        >>> print("Componentes raw:", details['components_raw'])  # doctest: +SKIP
-        >>> print("Componentes suavizados:", details['components_smoothed'])  # doctest: +SKIP
-        >>> print("Estabilidade:", details['state_stability'])  # doctest: +SKIP
-
-    Notas de Implementação
-    ----------------------
-    - **Thread-safety**: Não é thread-safe. Use locks se acessar state compartilhado
-    - **Persistência**: state pode ser serializado/deserializado para checkpointing
-    - **Determinismo**: Com seed fixo em config, resultados são reproduzíveis
-    - **Performance**: O(1) em tempo, O(N) em espaço (N = max_history_length)
-
-    Casos de Uso
-    -----------
-    1. **Pipeline principal**: Calcular CAOS⁺ para modulação de α na Eq. Penin
-    2. **Análise temporal**: Usar state para tracking de estabilidade ao longo do tempo
-    3. **Auditoria**: Usar details para registrar no WORM ledger
-    4. **Debug**: Inspecionar components_raw vs components_smoothed para diagnóstico
-    5. **Meta-optimization**: Usar histórico para ajustar κ via Eq. 10
-
-    Ver Também
-    ----------
-    - compute_caos_plus_exponential: Fórmula matemática core
-    - compute_caos_plus_simple: Versão simplificada sem métricas estruturadas
-    - CAOSConfig: Detalhes de todos parâmetros de configuração
-    - CAOSState: Estrutura de estado para tracking temporal
-    - CAOSTracker: Classe helper para monitoramento contínuo
     """
     if config is None:
         config = CAOSConfig()

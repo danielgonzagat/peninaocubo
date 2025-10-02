@@ -17,11 +17,6 @@ Welcome to the PENIN-Ω documentation! This index provides quick access to all d
 
 ## 📖 Core Documentation
 
-### Architecture & Design
-- **[Architecture Guide](architecture.md)** — System architecture (1100+ lines)
-- **[Equations Guide](equations.md)** — Mathematical foundations (15 equations)
-- **[Complete System Guide](COMPLETE_SYSTEM_GUIDE.md)** — Comprehensive system overview
-
 ### Guides & Tutorials
 - **[Setup Guide](SETUP.md)** — Installation and configuration
 - **[Equations Complete Guide](guides/PENIN_OMEGA_COMPLETE_EQUATIONS_GUIDE.md)** — Detailed equations tutorial
