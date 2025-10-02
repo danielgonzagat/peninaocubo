@@ -56,10 +56,10 @@ registry.register(MetacognitivePrompting())
 for cycle in evolution_loop():
     # Neuromorphic forward pass (100× faster)
     output = registry.get('spiking_jelly').forward(input_data)
-    
+
     # Metacognitive reflection
     reflection = registry.get('metacognition').reflect(output)
-    
+
     # Update with SR-Ω∞
     sr_score = compute_sr_omega(reflection)
 ```
@@ -87,12 +87,12 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Type
+from typing import Any, Optional
 
 
 class IntegrationStatus(Enum):
     """Integration maturity status"""
-    
+
     READY = "ready"  # 🟢 Production-ready
     BETA = "beta"  # 🟡 Functional but needs testing
     ALPHA = "alpha"  # 🟠 Experimental
@@ -102,7 +102,7 @@ class IntegrationStatus(Enum):
 
 class IntegrationCategory(Enum):
     """Integration category"""
-    
+
     NEUROMORPHIC = "neuromorphic"
     EVOLUTION = "evolution"
     METALEARNING = "metalearning"
@@ -118,27 +118,27 @@ class IntegrationCategory(Enum):
 @dataclass
 class IntegrationMetadata:
     """Metadata for an integration"""
-    
+
     name: str
     category: IntegrationCategory
     status: IntegrationStatus
     description: str
-    
+
     # References
-    github_url: Optional[str] = None
-    paper_url: Optional[str] = None
+    github_url: str | None = None
+    paper_url: str | None = None
     stars: int = 0
-    
+
     # Requirements
-    dependencies: List[str] = field(default_factory=list)
-    optional_dependencies: List[str] = field(default_factory=list)
+    dependencies: list[str] = field(default_factory=list)
+    optional_dependencies: list[str] = field(default_factory=list)
     requires_gpu: bool = False
     min_memory_gb: float = 4.0
-    
+
     # Performance
-    expected_speedup: Optional[float] = None  # Multiplicative factor
-    expected_quality_improvement: Optional[float] = None  # ΔL∞
-    
+    expected_speedup: float | None = None  # Multiplicative factor
+    expected_quality_improvement: float | None = None  # ΔL∞
+
     # Ethical compliance
     ethical_review_required: bool = True
     worm_logging: bool = True
@@ -147,33 +147,33 @@ class IntegrationMetadata:
 
 class BaseIntegration(ABC):
     """Base class for all SOTA integrations"""
-    
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+
+    def __init__(self, config: dict[str, Any] | None = None):
         self.config = config or {}
         self.metadata = self.get_metadata()
         self.initialized = False
-        self.ledger_events: List[Dict[str, Any]] = []
-    
+        self.ledger_events: list[dict[str, Any]] = []
+
     @abstractmethod
     def get_metadata(self) -> IntegrationMetadata:
         """Return integration metadata"""
         pass
-    
+
     @abstractmethod
     def initialize(self) -> bool:
         """Initialize the integration. Returns True if successful."""
         pass
-    
+
     @abstractmethod
     def is_available(self) -> bool:
         """Check if integration dependencies are available"""
         pass
-    
-    def log_event(self, event: Dict[str, Any]) -> None:
+
+    def log_event(self, event: dict[str, Any]) -> None:
         """Log event for WORM ledger"""
         self.ledger_events.append(event)
-    
-    def get_cost_estimate(self, operation: str, **kwargs) -> Dict[str, float]:
+
+    def get_cost_estimate(self, operation: str, **kwargs) -> dict[str, float]:
         """Estimate cost (compute, memory, tokens, USD) for operation"""
         return {
             "compute_ops": 0.0,
@@ -181,44 +181,38 @@ class BaseIntegration(ABC):
             "tokens": 0,
             "usd": 0.0,
         }
-    
-    def validate_ethical_compliance(self) -> tuple[bool, Dict[str, Any]]:
+
+    def validate_ethical_compliance(self) -> tuple[bool, dict[str, Any]]:
         """Validate ethical compliance"""
         return True, {"compliant": True, "checks": []}
 
 
 class IntegrationRegistry:
     """Central registry for all integrations"""
-    
+
     def __init__(self):
-        self.integrations: Dict[str, BaseIntegration] = {}
-        self.metadata_cache: Dict[str, IntegrationMetadata] = {}
-    
+        self.integrations: dict[str, BaseIntegration] = {}
+        self.metadata_cache: dict[str, IntegrationMetadata] = {}
+
     def register(self, integration: BaseIntegration) -> None:
         """Register an integration"""
         name = integration.metadata.name
         self.integrations[name] = integration
         self.metadata_cache[name] = integration.metadata
-    
-    def get(self, name: str) -> Optional[BaseIntegration]:
+
+    def get(self, name: str) -> BaseIntegration | None:
         """Get integration by name"""
         return self.integrations.get(name)
-    
-    def list_available(self) -> List[str]:
+
+    def list_available(self) -> list[str]:
         """List all available integrations"""
-        return [
-            name for name, integration in self.integrations.items()
-            if integration.is_available()
-        ]
-    
-    def list_by_category(self, category: IntegrationCategory) -> List[str]:
+        return [name for name, integration in self.integrations.items() if integration.is_available()]
+
+    def list_by_category(self, category: IntegrationCategory) -> list[str]:
         """List integrations by category"""
-        return [
-            name for name, meta in self.metadata_cache.items()
-            if meta.category == category
-        ]
-    
-    def get_status_summary(self) -> Dict[str, Any]:
+        return [name for name, meta in self.metadata_cache.items() if meta.category == category]
+
+    def get_status_summary(self) -> dict[str, Any]:
         """Get summary of all integration statuses"""
         summary = {
             "total": len(self.integrations),
@@ -226,16 +220,16 @@ class IntegrationRegistry:
             "by_category": {},
             "available": len(self.list_available()),
         }
-        
+
         for meta in self.metadata_cache.values():
             # By status
             status_key = meta.status.value
             summary["by_status"][status_key] = summary["by_status"].get(status_key, 0) + 1
-            
+
             # By category
             cat_key = meta.category.value
             summary["by_category"][cat_key] = summary["by_category"].get(cat_key, 0) + 1
-        
+
         return summary
 
 

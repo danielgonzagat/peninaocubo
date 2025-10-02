@@ -1,10 +1,8 @@
 import asyncio
+import os
+import tempfile
 import threading
 import time
-import tempfile
-import os
-from unittest.mock import Mock, patch
-import pytest
 
 
 def test_worm_concurrent_access():
@@ -13,14 +11,15 @@ def test_worm_concurrent_access():
 
     sys.path.insert(0, "/workspace/peninaocubo")
 
-    from penin.omega.ledger import (
-        WORMLedger,
-        RunRecord,
-        RunMetrics,
-        GuardResults,
-        DecisionInfo,
-    )
     import uuid
+
+    from penin.omega.ledger import (
+        DecisionInfo,
+        GuardResults,
+        RunMetrics,
+        RunRecord,
+        WORMLedger,
+    )
 
     # Create temporary database
     db_path = tempfile.mktemp() + ".db"
@@ -85,7 +84,7 @@ def test_router_budget_concurrency():
 
     sys.path.insert(0, "/workspace/peninaocubo")
 
-    from penin.router import MultiLLMRouter
+    from penin.router import MultiLLMRouterComplete as MultiLLMRouter
 
     class MockProvider:
         async def chat(self, *args, **kwargs):
@@ -176,7 +175,7 @@ def test_network_failure_handling():
 
     sys.path.insert(0, "/workspace/peninaocubo")
 
-    from penin.router import MultiLLMRouter
+    from penin.router import MultiLLMRouterComplete as MultiLLMRouter
 
     class FailingProvider:
         def __init__(self, fail_rate=0.5):

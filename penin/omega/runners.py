@@ -7,23 +7,23 @@ mutators, evaluators, guards, scoring, and deployment decisions.
 """
 
 import asyncio
-import time
 import json
-from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import dataclass, asdict
-from pathlib import Path
+import time
+from dataclasses import dataclass
+from typing import Any
+
+from .acfa import LeagueConfig, LeagueOrchestrator, run_full_deployment_cycle
+from .caos import quick_caos_phi
+from .ethics_metrics import EthicsCalculator, EthicsGate
+from .evaluators import TaskBattery, TaskBatteryConfig
+from .guards import quick_sigma_guard_check_simple
+from .ledger import WORMLedger
 
 # Import other omega modules
-from .mutators import ParameterMutator, MutationConfig
-from .evaluators import TaskBattery, TaskBatteryConfig, quick_evaluate_model
-from .ethics_metrics import EthicsCalculator, EthicsGate
+from .mutators import MutationConfig, ParameterMutator
 from .scoring import quick_harmonic, quick_score_gate
-from .caos import quick_caos_phi
 from .sr import quick_sr_harmonic
-from .guards import quick_sigma_guard_check_simple
-from .acfa import LeagueOrchestrator, LeagueConfig, run_full_deployment_cycle
-from .tuner import PeninOmegaTuner, create_penin_tuner
-from .ledger import WORMLedger
+from .tuner import create_penin_tuner
 
 
 @dataclass
@@ -59,23 +59,23 @@ class CycleResult:
     config: EvolutionConfig
 
     # Generated variants
-    challengers: List[Dict[str, Any]]
+    challengers: list[dict[str, Any]]
 
     # Evaluation results
-    evaluation_results: Dict[str, Any]
+    evaluation_results: dict[str, Any]
 
     # Scoring results
-    scoring_results: Dict[str, Any]
+    scoring_results: dict[str, Any]
 
     # Gate results
-    gate_results: Dict[str, Any]
+    gate_results: dict[str, Any]
 
     # Final decision
     decision: str  # 'promote', 'canary', 'reject'
     decision_reason: str
 
     # Best challenger
-    best_challenger: Optional[Dict[str, Any]]
+    best_challenger: dict[str, Any] | None
 
     # Performance metrics
     total_duration_s: float
@@ -112,7 +112,7 @@ class EvolutionRunner:
 
         print(f"🚀 Evolution runner initialized (seed={self.config.seed})")
 
-    async def evolve_one_cycle(self, base_config: Dict[str, Any] = None) -> CycleResult:
+    async def evolve_one_cycle(self, base_config: dict[str, Any] = None) -> CycleResult:
         """
         Execute one complete evolution cycle
 
@@ -220,7 +220,7 @@ class EvolutionRunner:
             self._record_cycle_result(result)
             raise
 
-    async def _generate_challengers(self, base_config: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _generate_challengers(self, base_config: dict[str, Any]) -> list[dict[str, Any]]:
         """Generate challenger configurations"""
         mutation_results = self.mutator.mutate_parameters(base_config, self.config.n_challengers)
 
@@ -237,7 +237,7 @@ class EvolutionRunner:
 
         return challengers
 
-    async def _evaluate_challengers(self, challengers: List[Dict[str, Any]]) -> Dict[str, Any]:
+    async def _evaluate_challengers(self, challengers: list[dict[str, Any]]) -> dict[str, Any]:
         """Evaluate all challengers using the task battery"""
         evaluation_results = {}
 
@@ -274,8 +274,8 @@ class EvolutionRunner:
         return evaluation_results
 
     async def _score_and_gate_challengers(
-        self, challengers: List[Dict[str, Any]], evaluation_results: Dict[str, Any]
-    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        self, challengers: list[dict[str, Any]], evaluation_results: dict[str, Any]
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         """Apply scoring and gates to challengers"""
         scoring_results = {}
         gate_results = {}
@@ -349,8 +349,8 @@ class EvolutionRunner:
         return scoring_results, gate_results
 
     def _select_best_challenger(
-        self, challengers: List[Dict[str, Any]], scoring_results: Dict[str, Any], gate_results: Dict[str, Any]
-    ) -> Tuple[Optional[Dict[str, Any]], str, str]:
+        self, challengers: list[dict[str, Any]], scoring_results: dict[str, Any], gate_results: dict[str, Any]
+    ) -> tuple[dict[str, Any] | None, str, str]:
         """Select the best challenger based on scores and gates"""
 
         # Filter challengers that passed all gates
@@ -381,7 +381,7 @@ class EvolutionRunner:
 
         return best_challenger, decision, reason
 
-    async def _deploy_challenger(self, challenger: Dict[str, Any]) -> bool:
+    async def _deploy_challenger(self, challenger: dict[str, Any]) -> bool:
         """Deploy challenger using league orchestrator"""
         try:
             success = await run_full_deployment_cycle(self.league, challenger["config"])
@@ -391,8 +391,8 @@ class EvolutionRunner:
             return False
 
     def _extract_cycle_metrics(
-        self, evaluation_results: Dict[str, Any], scoring_results: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        self, evaluation_results: dict[str, Any], scoring_results: dict[str, Any]
+    ) -> dict[str, Any]:
         """Extract metrics for tuner update"""
         if not evaluation_results or not scoring_results:
             return {}
@@ -412,7 +412,7 @@ class EvolutionRunner:
             "ethics_passed": True,
         }
 
-    def _estimate_cycle_cost(self, challengers: List[Dict[str, Any]], evaluation_results: Dict[str, Any]) -> float:
+    def _estimate_cycle_cost(self, challengers: list[dict[str, Any]], evaluation_results: dict[str, Any]) -> float:
         """Estimate total cost of the cycle"""
         # Simple estimation based on number of challengers and evaluations
         base_cost_per_challenger = 0.01  # $0.01 per challenger
@@ -421,7 +421,7 @@ class EvolutionRunner:
         return base_cost_per_challenger * len(challengers) + evaluation_cost
 
     def _compute_evidence_hash(
-        self, cycle_id: str, challengers: List[Dict[str, Any]], evaluation_results: Dict[str, Any]
+        self, cycle_id: str, challengers: list[dict[str, Any]], evaluation_results: dict[str, Any]
     ) -> str:
         """Compute evidence hash for the cycle"""
         evidence_data = {
@@ -452,14 +452,14 @@ class EvolutionRunner:
             }
 
             self.ledger.record(record_data)
-            print(f"   📝 Recorded cycle result in WORM ledger")
+            print("   📝 Recorded cycle result in WORM ledger")
 
         except Exception as e:
             print(f"   ⚠️  Failed to record in WORM ledger: {e}")
 
 
 # Utility functions
-async def run_evolution_cycles(n_cycles: int = 5, config: EvolutionConfig = None) -> List[CycleResult]:
+async def run_evolution_cycles(n_cycles: int = 5, config: EvolutionConfig = None) -> list[CycleResult]:
     """Run multiple evolution cycles"""
     runner = EvolutionRunner(config)
     results = []

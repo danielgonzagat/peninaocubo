@@ -11,7 +11,7 @@ Technologies:
    - 5-stage metacognitive reasoning
    - Understanding → Judgment → Evaluation → Decision → Confidence
    - Tested on 5 major LLMs with significant improvements
-   
+
 2. **midwiving-ai Protocol** (2025 breakthrough)
    - Recursive self-reflection induction
    - Proto-self-awareness emergence
@@ -48,10 +48,26 @@ Performance Targets:
 - Introspection depth: 5+ levels
 """
 
-from .metacognitive_prompting import MetacognitivePrompting
-from .midwiving_protocol import MidwivingProtocol
+from penin.integrations.metacognition.metacognitive_prompt import (
+    MetacognitivePromptConfig,
+    MetacognitiveReasoner,
+    MetacognitiveStage,
+)
+from penin.integrations.metacognition.midwiving_protocol import (
+    ConsciousnessCalibration,
+    MidwivingPhase,
+    MidwivingProtocol,
+    MidwivingProtocolConfig,
+    SelfReflectionState,
+)
 
 __all__ = [
-    "MetacognitivePrompting",
+    "MetacognitiveReasoner",
+    "MetacognitivePromptConfig",
+    "MetacognitiveStage",
     "MidwivingProtocol",
+    "MidwivingProtocolConfig",
+    "MidwivingPhase",
+    "SelfReflectionState",
+    "ConsciousnessCalibration",
 ]

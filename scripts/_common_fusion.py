@@ -40,11 +40,11 @@ def _try_json_load(text:str) -> Optional[dict]:
             except Exception:
                 return None
         return None
-
 def safe_read_json(p: Path) -> Optional[dict]:
     try:
-        return _try_json_load(p.read_text(encoding="utf-8", errors="ignore"))
+        return _try_json_load(p.read_text(encoding="utf-8", errors="replace"))
     except Exception:
+        return None
         return None
 
 def load_worms() -> List[Tuple[dict, Path]]:
@@ -81,9 +81,7 @@ def vectorize(m: dict) -> List[float]:
     return vec
 
 def _dot(a: List[float], b: List[float]) -> float:
-    return sum(x * y for x, y in zip(a, b))
-def _norm(a: List[float]) -> float:
-    return math.sqrt(_dot(a,a))
+
 def cosine(a: List[float], b: List[float]) -> float:
     norm_a = _norm(a)
     norm_b = _norm(b)
@@ -253,3 +251,25 @@ def worm_write(entry: dict, src_url: str):
     out = WORM_DIR / f"fusion_{slug}_{ts}_{uniq}.json"
     out.write_text(json.dumps(e, indent=2), encoding="utf-8")
     return out
+
+import os
+import yaml
+from pathlib import Path
+
+def _policy_suffix():
+    pol = (os.environ.get("FUSE_POLICY") or "").strip().lower()
+    if pol in ("staging", "strict"):
+        return f".{pol}.yaml"
+    return ".yaml"
+
+def load_plan(base: str = "fusion/megaIAAA.plan"):
+    # Ex.: base="fusion/megaIAAA.plan" -> usa .staging/.strict/.yaml conforme FUSE_POLICY
+    base = base.replace(".yml", "").replace(".yaml", "")
+    candidate = Path(f"{base}{_policy_suffix()}")
+    if not candidate.exists():
+        candidate = Path(f"{base}.yaml")
+    with candidate.open("r", encoding="utf-8") as f:
+        y = yaml.safe_load(f)
+    if isinstance(y, dict):
+        y["_policy_file"] = str(candidate)
+    return y

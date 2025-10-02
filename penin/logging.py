@@ -2,10 +2,10 @@
 Logging utilities with secret redaction for PENIN-Ω system.
 """
 
-import re
 import json
-from typing import Any, Dict, Union
+import re
 from functools import wraps
+from typing import Any
 
 
 class SecretRedactor:
@@ -62,7 +62,7 @@ class SecretRedactor:
         return value
 
     @classmethod
-    def redact_dict(cls, data: Dict[str, Any]) -> Dict[str, Any]:
+    def redact_dict(cls, data: dict[str, Any]) -> dict[str, Any]:
         """Recursively redact secrets from a dictionary."""
         if not isinstance(data, dict):
             return data
@@ -147,7 +147,7 @@ class SecureLogger:
     def __init__(self, logger):
         self.logger = logger
 
-    def _redact_message(self, message: Union[str, Dict[str, Any]]) -> Union[str, Dict[str, Any]]:
+    def _redact_message(self, message: str | dict[str, Any]) -> str | dict[str, Any]:
         """Redact secrets from log message."""
         if isinstance(message, dict):
             return SecretRedactor.redact(message)
@@ -162,22 +162,22 @@ class SecureLogger:
         else:
             return message
 
-    def info(self, message: Union[str, Dict[str, Any]], *args, **kwargs):
+    def info(self, message: str | dict[str, Any], *args, **kwargs):
         """Log info message with secret redaction."""
         redacted_message = self._redact_message(message)
         self.logger.info(redacted_message, *args, **kwargs)
 
-    def warning(self, message: Union[str, Dict[str, Any]], *args, **kwargs):
+    def warning(self, message: str | dict[str, Any], *args, **kwargs):
         """Log warning message with secret redaction."""
         redacted_message = self._redact_message(message)
         self.logger.warning(redacted_message, *args, **kwargs)
 
-    def error(self, message: Union[str, Dict[str, Any]], *args, **kwargs):
+    def error(self, message: str | dict[str, Any], *args, **kwargs):
         """Log error message with secret redaction."""
         redacted_message = self._redact_message(message)
         self.logger.error(redacted_message, *args, **kwargs)
 
-    def debug(self, message: Union[str, Dict[str, Any]], *args, **kwargs):
+    def debug(self, message: str | dict[str, Any], *args, **kwargs):
         """Log debug message with secret redaction."""
         redacted_message = self._redact_message(message)
         self.logger.debug(redacted_message, *args, **kwargs)

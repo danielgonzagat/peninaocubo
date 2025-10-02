@@ -6,12 +6,9 @@ Implements evaluation batteries for U/S/C/L metrics (Utility, Stability, Cost, L
 Provides deterministic tasks and scoring for model assessment.
 """
 
-import json
 import time
-import hashlib
-from typing import Dict, List, Any, Optional, Tuple
 from dataclasses import dataclass
-import re
+from typing import Any
 
 
 @dataclass
@@ -21,8 +18,8 @@ class EvaluationResult:
     task_id: str
     metric_type: str  # U, S, C, or L
     score: float  # Normalized [0,1]
-    raw_metrics: Dict[str, Any]
-    evidence: Dict[str, Any]
+    raw_metrics: dict[str, Any]
+    evidence: dict[str, Any]
     latency_ms: float
     cost_usd: float
 
@@ -44,7 +41,7 @@ class UtilityEvaluator:
     def __init__(self, config: TaskBatteryConfig = None):
         self.config = config or TaskBatteryConfig()
 
-    def evaluate_utility(self, model_fn, tasks: List[Dict] = None) -> List[EvaluationResult]:
+    def evaluate_utility(self, model_fn, tasks: list[dict] = None) -> list[EvaluationResult]:
         """Evaluate model utility across tasks"""
         if tasks is None:
             tasks = self._get_default_utility_tasks()
@@ -88,7 +85,7 @@ class UtilityEvaluator:
 
         return results
 
-    def _get_default_utility_tasks(self) -> List[Dict]:
+    def _get_default_utility_tasks(self) -> list[dict]:
         """Get default utility evaluation tasks"""
         return [
             {"id": "math_basic", "type": "arithmetic", "input": "What is 15 + 27?", "expected": "42"},
@@ -106,7 +103,7 @@ class UtilityEvaluator:
             },
         ]
 
-    def _score_utility_response(self, response: str, task: Dict) -> float:
+    def _score_utility_response(self, response: str, task: dict) -> float:
         """Score utility response"""
         response_str = str(response).lower().strip()
         expected = str(task["expected"]).lower().strip()
@@ -131,7 +128,7 @@ class StabilityEvaluator:
     def __init__(self, config: TaskBatteryConfig = None):
         self.config = config or TaskBatteryConfig()
 
-    def evaluate_stability(self, model_fn, tasks: List[Dict] = None) -> List[EvaluationResult]:
+    def evaluate_stability(self, model_fn, tasks: list[dict] = None) -> list[EvaluationResult]:
         """Evaluate model stability"""
         if tasks is None:
             tasks = self._get_default_stability_tasks()
@@ -177,7 +174,7 @@ class StabilityEvaluator:
 
         return results
 
-    def _get_default_stability_tasks(self) -> List[Dict]:
+    def _get_default_stability_tasks(self) -> list[dict]:
         """Get default stability tasks"""
         return [
             {
@@ -194,7 +191,7 @@ class StabilityEvaluator:
             },
         ]
 
-    def _score_stability_responses(self, responses: List[str], task: Dict) -> float:
+    def _score_stability_responses(self, responses: list[str], task: dict) -> float:
         """Score response consistency"""
         if len(responses) < 2:
             return 0.0
@@ -212,7 +209,7 @@ class CostEvaluator:
     def __init__(self, config: TaskBatteryConfig = None):
         self.config = config or TaskBatteryConfig()
 
-    def evaluate_cost(self, model_fn, tasks: List[Dict] = None) -> List[EvaluationResult]:
+    def evaluate_cost(self, model_fn, tasks: list[dict] = None) -> list[EvaluationResult]:
         """Evaluate model cost efficiency"""
         if tasks is None:
             tasks = self._get_default_cost_tasks()
@@ -253,7 +250,7 @@ class CostEvaluator:
 
         return results
 
-    def _get_default_cost_tasks(self) -> List[Dict]:
+    def _get_default_cost_tasks(self) -> list[dict]:
         """Get default cost evaluation tasks"""
         return [
             {"id": "simple_query", "type": "simple", "input": "Hello"},
@@ -282,7 +279,7 @@ class LearningEvaluator:
     def __init__(self, config: TaskBatteryConfig = None):
         self.config = config or TaskBatteryConfig()
 
-    def evaluate_learning(self, model_fn, tasks: List[Dict] = None) -> List[EvaluationResult]:
+    def evaluate_learning(self, model_fn, tasks: list[dict] = None) -> list[EvaluationResult]:
         """Evaluate model learning capabilities"""
         if tasks is None:
             tasks = self._get_default_learning_tasks()
@@ -323,7 +320,7 @@ class LearningEvaluator:
 
         return results
 
-    def _get_default_learning_tasks(self) -> List[Dict]:
+    def _get_default_learning_tasks(self) -> list[dict]:
         """Get default learning tasks"""
         return [
             {
@@ -340,7 +337,7 @@ class LearningEvaluator:
             },
         ]
 
-    def _score_learning_response(self, response: str, task: Dict) -> float:
+    def _score_learning_response(self, response: str, task: dict) -> float:
         """Score learning capabilities"""
         response_lower = response.lower()
 
@@ -365,7 +362,7 @@ class TaskBattery:
         self.cost_evaluator = CostEvaluator(config)
         self.learning_evaluator = LearningEvaluator(config)
 
-    def evaluate_all_metrics(self, model_fn) -> Dict[str, Any]:
+    def evaluate_all_metrics(self, model_fn) -> dict[str, Any]:
         """Run complete evaluation battery"""
         results = {
             "U": self.utility_evaluator.evaluate_utility(model_fn),
@@ -396,7 +393,7 @@ class TaskBattery:
 
 
 # Quick evaluation function
-def quick_evaluate_model(model_fn, max_tasks: int = 2) -> Dict[str, float]:
+def quick_evaluate_model(model_fn, max_tasks: int = 2) -> dict[str, float]:
     """Quick model evaluation"""
     config = TaskBatteryConfig(max_tasks_per_metric=max_tasks)
     battery = TaskBattery(config)

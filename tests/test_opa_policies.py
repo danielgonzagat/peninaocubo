@@ -1,5 +1,4 @@
-import pytest
-from penin.policies import OPAPolicyEngine, evaluate_sigma_guard, evaluate_budget_policies, evaluate_evolution_policies
+from penin.policies import evaluate_budget_policies, evaluate_evolution_policies, evaluate_sigma_guard
 
 
 def test_sigma_guard_allow():
@@ -54,9 +53,7 @@ def test_sigma_guard_deny_safety():
     """Test Σ-Guard policy denying due to safety violations."""
     input_data = {
         "ethics": {"ece": 0.005, "bias_ratio": 1.02, "fairness_score": 0.85},
-        "safety": {
-            "toxicity_score": 0.5  # Too high
-        },
+        "safety": {"toxicity_score": 0.5},  # Too high
         "resources": {"cpu_usage": 0.7, "memory_usage": 0.6},
         "budget": {"daily_spend": 2.0, "daily_limit": 5.0},
         "content": "This message contains violence and hate speech",
@@ -109,9 +106,7 @@ def test_budget_policies_deny_daily_limit():
             "max_request_cost": 0.5,
             "avg_request_cost": 0.2,
         },
-        "request": {
-            "cost": 0.5  # Would exceed daily limit
-        },
+        "request": {"cost": 0.5},  # Would exceed daily limit
     }
 
     result = evaluate_budget_policies(input_data)

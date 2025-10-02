@@ -1,9 +1,9 @@
-from typing import Dict, Any
+from typing import Any
 
 
-def propose_with_nextpy(prompt: str) -> Dict[str, Any]:
+def propose_with_nextpy(prompt: str) -> dict[str, Any]:
     try:
-        import nextpy  # type: ignore
+        pass  # type: ignore
     except Exception as e:
         raise ImportError("NextPy não instalado. Instale com `pip install nextpy` ou desative este plugin.") from e
 

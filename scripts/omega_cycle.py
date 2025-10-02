@@ -31,7 +31,7 @@ def ensure_inventory() -> None:
             owner=None
     owner = os.environ.get("GITHUB_USER") or owner
     if not owner:
-        print("⚠️  não consegui inferir GITHUB_USER; inventário não gerado")
+        print("⚠️  Could not infer GITHUB_USER; inventory not generated")
         return
     cmd = ["gh","repo","list", owner, "--limit","1200",
            "--json","name,nameWithOwner,url,sshUrl,visibility,isFork,isArchived,isEmpty,licenseInfo,updatedAt,primaryLanguage,diskUsage,stargazerCount"]
@@ -61,7 +61,7 @@ def ensure_inventory() -> None:
             "stars": r.get("stargazerCount") or 0,
         })
     inv.write_text(_json.dumps(outv, indent=2), encoding="utf-8")
-    print(f"✔ inventário criado: {inv} ({len(outv)} repos)")
+    print(f"✔ Inventory created: {inv} ({len(outv)} repos)")
 
 def load_state() -> dict:
     if STATE_F.exists():
@@ -91,18 +91,19 @@ def stats_from_files(files: List[str]) -> Tuple[float,float,int]:
     # retorna (mean_score, mean_nov_global, n)
     import json
     scores=[]; novs=[]
-    for name in files:
-        p = WORM_DIR/name
         try:
-            s = p.read_text(encoding="utf-8", errors="ignore")
-            # leitura leniente (arquivos WORM podem ter “lixo” após JSON)
+            s = p.read_text(encoding="utf-8", errors="replace")
+            # leitura leniente (arquivos WORM podem ter "lixo" após JSON)
             i=s.find("{"); k=s.rfind("}")
-            if i==-1 or k==-1 or k<=i: continue
+            if i==-1 or k==-1 or k<=i: 
+                print(f"Warning: Invalid JSON structure in {p.name}", file=sys.stderr)
+                continue
             j=json.loads(s[i:k+1])
             m=j.get("metrics") or {}
             scores.append(float(score(m)))
             novs.append(float(((j.get("novelty") or {}).get("vs_global")) or 0.0))
-        except Exception:
+        except Exception as e:
+            print(f"Warning: Failed to parse {p.name}: {e}", file=sys.stderr)
             continue
     n=len(scores)
     if n==0: return (0.0, 0.0, 0)
@@ -119,11 +120,13 @@ def run_smart(params: dict) -> None:
         "--gen", str(params["gen"]),
         "--novelty-min", str(params["novelty_min"]),
     ]
-    print("→ run_smart:", " ".join(cmd))
     try:
-        subprocess.run(cmd, check=False, timeout=int(os.environ.get("FUSE_SUBPROC_TIMEOUT","180")))
+        timeout_val = int(os.environ.get("FUSE_SUBPROC_TIMEOUT", "180"))
+        # Clamp timeout to reasonable bounds (30 seconds to 30 minutes)
+        timeout_val = max(30, min(1800, timeout_val))
+        subprocess.run(cmd, check=False, timeout=timeout_val)
     except subprocess.TimeoutExpired:
-        print("⏱ run_smart: timeout do subprocesso — seguindo para o próximo.")
+        print("⏱ run_smart: subprocess timeout — continuing to next.")
 
 def autotune_once(base: dict) -> dict:
     # tenta Optuna; senão faz três vizinhos do ponto atual
