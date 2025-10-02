@@ -6,3 +6,6 @@ package-lock.json merge=ours
 *.generated.* merge=ours
 dist/** merge=ours
 build/** merge=ours
+penin/ledger/fusion/*.json merge=ours
+fusion_results/*.csv         merge=ours
+docs/FUSION_*.md             merge=ours
