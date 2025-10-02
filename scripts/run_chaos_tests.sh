@@ -146,7 +146,7 @@ if [ "$MODE" = "docker" ]; then
     # Check service health
     echo -e "${BLUE}→ Checking service health...${NC}"
     
-    if docker-compose -f docker-compose.chaos.yml exec -T toxiproxy wget -q -O- http://localhost:8474/version &> /dev/null; then
+    if docker-compose -f docker-compose.chaos.yml exec -T toxiproxy curl -sf http://localhost:8474/version &> /dev/null; then
         echo -e "${GREEN}  ✓ Toxiproxy is healthy${NC}"
     else
         echo -e "${YELLOW}  ⚠ Toxiproxy might not be ready yet${NC}"
