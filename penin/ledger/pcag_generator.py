@@ -19,8 +19,6 @@ import time
 from dataclasses import dataclass, field, asdict
 from typing import Any
 
-import blake3
-
 
 @dataclass
 class ProofComponents:
@@ -268,7 +266,7 @@ class PCAgGenerator:
         json_bytes = json.dumps(data, sort_keys=True).encode('utf-8')
         
         # Compute BLAKE2b hash (fast + secure)
-        return blake3.blake3(json_bytes).hexdigest()
+        return self._compute_blake2b(json_bytes)
     
     def _compute_blake2b(self, data: bytes) -> str:
         """Compute BLAKE2b-256 hash"""
