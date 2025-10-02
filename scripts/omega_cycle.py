@@ -31,7 +31,7 @@ def ensure_inventory() -> None:
             owner=None
     owner = os.environ.get("GITHUB_USER") or owner
     if not owner:
-        print("⚠️  não consegui inferir GITHUB_USER; inventário não gerado")
+        print("⚠️  Could not infer GITHUB_USER; inventory not generated")
         return
     cmd = ["gh","repo","list", owner, "--limit","1200",
            "--json","name,nameWithOwner,url,sshUrl,visibility,isFork,isArchived,isEmpty,licenseInfo,updatedAt,primaryLanguage,diskUsage,stargazerCount"]
