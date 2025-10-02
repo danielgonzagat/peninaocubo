@@ -180,12 +180,17 @@ def main():
         reachable = True
     except Exception:
         pass
-
-    proof: Dict[str, Any] = {
-        "fusion": slug,
-        "plan":   {"source_url": src, "mode": args.mode},
-        "genes":  {"source_url": src, "reachable": reachable},
-        "adapter": {
+    # tentar checar reachability por git (não quebra se git não estiver disponível)
+    reachable = False
+    try:
+        # Validate URL format before passing to git
+        if not src.startswith(('https://', 'git://', 'ssh://')) or any(c in src for c in ['&', '|', ';', '`', '$']):
+            reachable = False
+        else:
+            subprocess.run(["git","ls-remote", src, "HEAD"], check=True, capture_output=True, timeout=30)
+            reachable = True
+    except Exception:
+        pass
             "engine": "Shadow" if args.mode=="shadow" or (args.mode=="auto" and os.environ.get("FUSE_REAL","0") in ("0","")) else "NeuroEvoHybrid",
             "population": int(args.pop or 16),
             "generations": int(args.gen or 1),
