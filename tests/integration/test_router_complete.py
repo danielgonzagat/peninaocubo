@@ -19,16 +19,16 @@ class TestRouterBudgetTracking:
 
     def test_budget_initialization(self):
         """Test budget tracker initialization"""
-        tracker = BudgetTracker(daily_limit_usd=100.0)
+        tracker = BudgetTracker(daily_budget_usd=100.0)
         
-        assert tracker.daily_limit_usd == 100.0
+        assert tracker.daily_budget_usd == 100.0
         assert tracker.used_usd == 0.0
         assert tracker.remaining_usd == 100.0
         assert tracker.usage_pct == 0.0
 
     def test_budget_tracking_single_request(self):
         """Test tracking single request cost"""
-        tracker = BudgetTracker(daily_limit_usd=100.0)
+        tracker = BudgetTracker(daily_budget_usd=100.0)
         
         # Record a request costing $0.50
         tracker.record_request("openai", cost_usd=0.50, tokens_used=1000)
@@ -39,7 +39,7 @@ class TestRouterBudgetTracking:
 
     def test_budget_enforcement_soft_limit(self):
         """Test soft limit warning (95%)"""
-        tracker = BudgetTracker(daily_budget_usd=100.0, soft_limit_pct=0.95)
+        tracker = BudgetTracker(daily_budget_usd=100.0, soft_limit_ratio=0.95)
         
         # Use 96% of budget
         tracker.record_request("openai", cost_usd=96.0, tokens_used=100000)
@@ -49,7 +49,7 @@ class TestRouterBudgetTracking:
 
     def test_budget_enforcement_hard_limit(self):
         """Test hard limit blocking (100%)"""
-        tracker = BudgetTracker(daily_limit_usd=100.0)
+        tracker = BudgetTracker(daily_budget_usd=100.0)
         
         # Use 100% of budget
         tracker.record_request("openai", cost_usd=100.0, tokens_used=100000)
@@ -59,7 +59,7 @@ class TestRouterBudgetTracking:
 
     def test_budget_provider_stats(self):
         """Test per-provider statistics"""
-        tracker = BudgetTracker(daily_limit_usd=100.0)
+        tracker = BudgetTracker(daily_budget_usd=100.0)
         
         # Record requests from different providers
         tracker.record_request("openai", cost_usd=10.0, tokens_used=5000)
@@ -67,9 +67,9 @@ class TestRouterBudgetTracking:
         tracker.record_request("openai", cost_usd=5.0, tokens_used=2500)
         
         stats = tracker.get_provider_stats("openai")
-        assert stats.total_requests == 2
-        assert stats.total_cost_usd == 15.0
-        assert stats.total_tokens == 7500
+        assert stats.requests_total == 2
+        assert stats.cost_total_usd == 15.0
+        assert stats.tokens_total == 7500
 
 
 class TestRouterCircuitBreakers:
@@ -79,8 +79,8 @@ class TestRouterCircuitBreakers:
     def router(self):
         """Create router with circuit breaker config"""
         return MultiLLMRouterComplete(
-            mode=RouterMode.COST_OPTIMIZED,
-            budget_daily_usd=100.0,
+            mode=RouterMode.PRODUCTION,
+            daily_budget_usd=100.0,
             circuit_breaker_enabled=True,
             circuit_breaker_threshold=3,
             circuit_breaker_timeout_s=60.0,
@@ -136,8 +136,8 @@ class TestRouterCostOptimization:
     def router(self):
         """Create cost-optimized router"""
         return MultiLLMRouterComplete(
-            mode=RouterMode.COST_OPTIMIZED,
-            budget_daily_usd=100.0,
+            mode=RouterMode.PRODUCTION,
+            daily_budget_usd=100.0,
         )
 
     def test_selects_cheapest_provider(self, router):
@@ -173,7 +173,7 @@ class TestRouterPerformance:
         """Test routing decision latency is minimal"""
         import time
         
-        router = MultiLLMRouterComplete(mode=RouterMode.COST_OPTIMIZED)
+        router = MultiLLMRouterComplete(mode=RouterMode.PRODUCTION)
         
         # Measure routing decision time
         start = time.perf_counter()
@@ -190,7 +190,7 @@ class TestRouterPerformance:
         """Test router handles concurrent requests safely"""
         import concurrent.futures
         
-        router = MultiLLMRouterComplete(mode=RouterMode.COST_OPTIMIZED)
+        router = MultiLLMRouterComplete(mode=RouterMode.PRODUCTION)
         
         def make_request(i):
             router.budget_tracker.record_request("openai", cost_usd=0.1, tokens_used=500)
@@ -212,7 +212,7 @@ class TestRouterCache:
     def router(self):
         """Create router with cache enabled"""
         return MultiLLMRouterComplete(
-            mode=RouterMode.COST_OPTIMIZED,
+            mode=RouterMode.PRODUCTION,
             cache_enabled=True,
             cache_ttl_seconds=3600,
         )
@@ -255,7 +255,7 @@ class TestRouterFallback:
     def router(self):
         """Create router with fallback enabled"""
         return MultiLLMRouterComplete(
-            mode=RouterMode.PERFORMANCE,
+            mode=RouterMode.PRODUCTION,
             fallback_enabled=True,
         )
 
@@ -280,7 +280,7 @@ class TestRouterAnalytics:
 
     def test_tracks_success_rate_per_provider(self):
         """Test success rate tracking"""
-        router = MultiLLMRouterComplete(mode=RouterMode.COST_OPTIMIZED)
+        router = MultiLLMRouterComplete(mode=RouterMode.PRODUCTION)
         
         # Record mix of successes and failures
         for _ in range(95):
@@ -294,7 +294,7 @@ class TestRouterAnalytics:
 
     def test_tracks_latency_percentiles(self):
         """Test latency percentile tracking"""
-        router = MultiLLMRouterComplete(mode=RouterMode.COST_OPTIMIZED)
+        router = MultiLLMRouterComplete(mode=RouterMode.PRODUCTION)
         
         # Record various latencies
         latencies_ms = [10, 20, 30, 40, 50, 100, 200, 500, 1000, 2000]
@@ -322,7 +322,7 @@ class TestRouterRealProviders:
         if not os.getenv("OPENAI_API_KEY"):
             pytest.skip("OPENAI_API_KEY not set")
         
-        router = MultiLLMRouterComplete(mode=RouterMode.COST_OPTIMIZED)
+        router = MultiLLMRouterComplete(mode=RouterMode.PRODUCTION)
         
         response = router.generate(
             "Say 'test' and nothing else",
@@ -340,7 +340,7 @@ class TestRouterRealProviders:
         if not os.getenv("ANTHROPIC_API_KEY"):
             pytest.skip("ANTHROPIC_API_KEY not set")
         
-        router = MultiLLMRouterComplete(mode=RouterMode.COST_OPTIMIZED)
+        router = MultiLLMRouterComplete(mode=RouterMode.PRODUCTION)
         
         response = router.generate(
             "Say 'test' and nothing else",
@@ -357,7 +357,7 @@ class TestRouterRealProviders:
         if not (os.getenv("OPENAI_API_KEY") and os.getenv("ANTHROPIC_API_KEY")):
             pytest.skip("API keys not set")
         
-        router = MultiLLMRouterComplete(mode=RouterMode.COST_OPTIMIZED)
+        router = MultiLLMRouterComplete(mode=RouterMode.PRODUCTION)
         
         prompt = "What is 2+2? Answer in one word."
         
