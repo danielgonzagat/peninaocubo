@@ -9,3 +9,5 @@ build/** merge=ours
 penin/ledger/fusion/*.json merge=ours
 fusion_results/*.csv         merge=ours
 docs/FUSION_*.md             merge=ours
+fusion_results/*.jsonl       merge=ours
+penin/ledger/fusion/*.json   merge=ours
