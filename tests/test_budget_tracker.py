@@ -2,12 +2,10 @@
 Tests for BudgetTracker
 """
 
-import time
-from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from penin.router.budget_tracker import BudgetTracker, ProviderStats, RequestRecord
+from penin.router.budget_tracker import BudgetTracker, ProviderStats
 
 
 class TestBudgetTracker:

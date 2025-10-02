@@ -26,7 +26,12 @@ def test_ethics_pipeline_integration():
     """Test complete ethics pipeline from calculation to attestation"""
     print("\n=== Integration: Ethics Pipeline ===")
 
-    from penin.omega.ethics_metrics import EthicsAttestation, EthicsCalculator, compute_ethics_attestation, sigma_guard
+    from penin.omega.ethics_metrics import (
+        EthicsAttestation,
+        EthicsCalculator,
+        compute_ethics_attestation,
+        sigma_guard,
+    )
 
     # Generate synthetic data
     n = 200

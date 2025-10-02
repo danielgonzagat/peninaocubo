@@ -25,8 +25,8 @@ def analyze_bottlenecks():
     print("-" * 70)
 
     # Parse profiling data
-    baseline_profile = baseline.get("profile", "")
-    optimized_profile = optimized.get("profile", "")
+    baseline.get("profile", "")
+    optimized.get("profile", "")
 
     print("\n1. Primary Bottleneck: Loss Function Evaluation")
     print("   - The loss_fn is called ~5050 times per 50 iterations")
@@ -50,7 +50,7 @@ def analyze_bottlenecks():
 
     print("\n4. Performance Improvements by State Size:")
     print("-" * 70)
-    for baseline_res, optimized_res in zip(baseline["results"], optimized["results"]):
+    for baseline_res, optimized_res in zip(baseline["results"], optimized["results"], strict=False):
         name = baseline_res["name"]
         dims = baseline_res["dimensions"]
         baseline_time = baseline_res["mean_time_ms"]

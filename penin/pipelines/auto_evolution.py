@@ -26,7 +26,6 @@ References:
 
 from __future__ import annotations
 
-import asyncio
 import time
 import uuid
 from collections import deque
@@ -36,9 +35,7 @@ from enum import Enum
 from typing import Any
 
 from penin.engine.caos_plus import compute_caos_plus
-from penin.engine.master_equation import MasterState, step_master
-from penin.math.linf import compute_linf_meta
-from penin.equations.omega_sea_total import omega_sea_coherence
+from penin.engine.master_equation import MasterState
 from penin.guard.sigma_guard_complete import (
     GateMetrics,
     GateStatus,
@@ -53,11 +50,8 @@ from penin.ledger.worm_ledger_complete import (
 )
 from penin.meta.omega_meta_complete import (
     Mutation,
-    MutationStatus,
     OmegaMeta,
 )
-from penin.sr.sr_service import SRScore, compute_sr_score
-
 
 # ============================================================================
 # Pipeline Configuration
@@ -116,29 +110,29 @@ class ChallengerEvaluation:
 
     challenger_id: str
     mutation: Mutation
-    
+
     # Metrics
     linf: float
     delta_linf: float
     caos_plus: float
     sr_score: float
     omega_g: float
-    
+
     # Gate results
     ece: float
     rho_bias: float
     rho: float
     cost_increase: float
-    
+
     # Decision
     decision: PipelineDecision
     reason: str
-    
+
     # Evidence
     samples_collected: int
     duration_sec: float
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
-    
+
     # Audit
     sigma_guard_verdict: SigmaGuardVerdict | None = None
     pcag: ProofCarryingArtifact | None = None
@@ -151,19 +145,19 @@ class PipelineResult:
     pipeline_id: str
     champion_id: str
     challengers: list[ChallengerEvaluation]
-    
+
     # Winning challenger (if promoted)
     promoted_challenger: ChallengerEvaluation | None = None
-    
+
     # Summary
     total_duration_sec: float = 0.0
     total_challengers: int = 0
     promoted: int = 0
     rejected: int = 0
     rolled_back: int = 0
-    
+
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
-    
+
     # Audit trail
     pcags: list[ProofCarryingArtifact] = field(default_factory=list)
 
@@ -176,7 +170,7 @@ class PipelineResult:
 class AutoEvolutionPipeline:
     """
     Complete auto-evolution pipeline with champion-challenger evaluation.
-    
+
     Usage:
         ```python
         pipeline = AutoEvolutionPipeline()
@@ -184,13 +178,13 @@ class AutoEvolutionPipeline:
             champion_state=current_state,
             num_challengers=3
         )
-        
+
         if result.promoted_challenger:
             print(f"Promoted: {result.promoted_challenger.challenger_id}")
             print(f"ΔL∞: {result.promoted_challenger.delta_linf:.4f}")
         ```
     """
-    
+
     def __init__(
         self,
         config: PipelineConfig | None = None,
@@ -200,7 +194,7 @@ class AutoEvolutionPipeline:
     ):
         """
         Initialize pipeline with optional custom components.
-        
+
         Args:
             config: Pipeline configuration
             worm_ledger: WORM ledger for audit trail
@@ -211,11 +205,11 @@ class AutoEvolutionPipeline:
         self.ledger = worm_ledger or create_worm_ledger()
         self.guard = sigma_guard or SigmaGuard()
         self.meta = omega_meta or OmegaMeta()
-        
+
         # State
         self.current_champion: MasterState | None = None
         self.pipeline_history: deque[PipelineResult] = deque(maxlen=100)
-        
+
     async def run_cycle(
         self,
         champion_state: MasterState,
@@ -224,25 +218,25 @@ class AutoEvolutionPipeline:
     ) -> PipelineResult:
         """
         Run complete auto-evolution cycle.
-        
+
         Args:
             champion_state: Current champion (baseline)
             num_challengers: Number of challengers to generate
             environment: Optional environment for evaluation
-            
+
         Returns:
             PipelineResult with evaluation and decision
         """
         pipeline_id = str(uuid.uuid4())
         start_time = time.time()
-        
+
         self.current_champion = champion_state
-        
+
         # Step 1: Generate Challengers (Ω-META)
         challengers = await self._generate_challengers(
             champion_state, num_challengers
         )
-        
+
         # Step 2: Evaluate each challenger
         evaluations: list[ChallengerEvaluation] = []
         for mutation in challengers:
@@ -252,17 +246,17 @@ class AutoEvolutionPipeline:
                 environment=environment,
             )
             evaluations.append(eval_result)
-            
+
             # Record in ledger
             await self._record_evaluation(eval_result)
-        
+
         # Step 3: Select winner (if any)
         promoted_challenger = self._select_winner(evaluations)
-        
+
         # Step 4: Promote or rollback
         if promoted_challenger:
             await self._promote_challenger(promoted_challenger)
-        
+
         # Step 5: Build result
         result = PipelineResult(
             pipeline_id=pipeline_id,
@@ -275,11 +269,11 @@ class AutoEvolutionPipeline:
             rejected=sum(1 for e in evaluations if e.decision == PipelineDecision.REJECTED),
             rolled_back=sum(1 for e in evaluations if e.decision == PipelineDecision.ROLLED_BACK),
         )
-        
+
         self.pipeline_history.append(result)
-        
+
         return result
-    
+
     async def _generate_challengers(
         self,
         champion_state: MasterState,
@@ -287,7 +281,7 @@ class AutoEvolutionPipeline:
     ) -> list[Mutation]:
         """Generate challengers using Ω-META."""
         challengers: list[Mutation] = []
-        
+
         for i in range(num_challengers):
             mutation = self.meta.generate_mutation(
                 mutation_type="parameter_tuning",
@@ -295,9 +289,9 @@ class AutoEvolutionPipeline:
                 parameters={"alpha_omega": 0.1 + i * 0.02, "delta_linf": 0.05},
             )
             challengers.append(mutation)
-        
+
         return challengers
-    
+
     async def _evaluate_challenger(
         self,
         champion_state: MasterState,
@@ -309,41 +303,41 @@ class AutoEvolutionPipeline:
         """
         challenger_id = mutation.mutation_id
         start_time = time.time()
-        
+
         # Simulate evaluation (in production, this would run real traffic)
         # For now, generate plausible metrics
-        
+
         # Baseline metrics (champion)
         champion_linf = 0.75
-        
+
         # Challenger metrics (slightly better)
         import random
         random.seed(hash(challenger_id) % (2**32))
-        
+
         challenger_linf = champion_linf + random.uniform(-0.05, 0.15)
         delta_linf = challenger_linf - champion_linf
-        
+
         # CAOS+ components
         C = random.uniform(0.70, 0.95)
         A = max(0.0, delta_linf / 0.10)  # Gain per cost
         O = random.uniform(0.30, 0.70)
         S = random.uniform(0.75, 0.95)
         kappa = self.config.kappa_min
-        
+
         caos_plus = compute_caos_plus(C=C, A=A, O=O, S=S, kappa=kappa)
-        
+
         # SR-Ω∞
         sr_score_val = random.uniform(0.70, 0.95)
-        
+
         # Omega-G
         omega_g = random.uniform(0.80, 0.95)
-        
+
         # Ethics/Safety gates
         ece = random.uniform(0.005, 0.015)
         rho_bias = random.uniform(1.00, 1.10)
         rho = random.uniform(0.85, 0.98)
         cost_increase = random.uniform(-0.05, 0.15)
-        
+
         # Gate evaluation
         gate_metrics = GateMetrics(
             rho=rho,
@@ -358,9 +352,9 @@ class AutoEvolutionPipeline:
             consent=True,
             eco_ok=True,
         )
-        
+
         verdict = self.guard.validate(gate_metrics)
-        
+
         # Decision logic
         decision, reason = self._make_decision(
             delta_linf=delta_linf,
@@ -369,7 +363,7 @@ class AutoEvolutionPipeline:
             omega_g=omega_g,
             verdict=verdict,
         )
-        
+
         # Create PCAg
         pcag = create_pcag(
             decision_id=challenger_id,
@@ -389,7 +383,7 @@ class AutoEvolutionPipeline:
             },
             reason=reason,
         )
-        
+
         return ChallengerEvaluation(
             challenger_id=challenger_id,
             mutation=mutation,
@@ -409,7 +403,7 @@ class AutoEvolutionPipeline:
             sigma_guard_verdict=verdict,
             pcag=pcag,
         )
-    
+
     def _make_decision(
         self,
         delta_linf: float,
@@ -420,7 +414,7 @@ class AutoEvolutionPipeline:
     ) -> tuple[PipelineDecision, str]:
         """
         Make promotion/rejection decision based on gates.
-        
+
         Criteria (from Blueprint § 9):
         1. ΔL∞ ≥ β_min
         2. CAOS+ (implicitly via κ check)
@@ -431,44 +425,44 @@ class AutoEvolutionPipeline:
         # Gate 1: Σ-Guard
         if verdict.verdict != GateStatus.PASS:
             return PipelineDecision.REJECTED, f"Σ-Guard blocked: {verdict.reason}"
-        
+
         # Gate 2: ΔL∞
         if delta_linf < self.config.beta_min:
             return PipelineDecision.REJECTED, f"ΔL∞ ({delta_linf:.4f}) < β_min ({self.config.beta_min})"
-        
+
         # Gate 3: SR-Ω∞
         if sr_score < self.config.sr_min:
             return PipelineDecision.REJECTED, f"SR-Ω∞ ({sr_score:.4f}) < threshold ({self.config.sr_min})"
-        
+
         # Gate 4: Omega-G
         if omega_g < self.config.omega_g_min:
             return PipelineDecision.REJECTED, f"Omega-G ({omega_g:.4f}) < threshold ({self.config.omega_g_min})"
-        
+
         # All gates passed
         return PipelineDecision.PROMOTED, "All gates passed: ready for promotion"
-    
+
     def _select_winner(
         self,
         evaluations: list[ChallengerEvaluation],
     ) -> ChallengerEvaluation | None:
         """
         Select best challenger (if any promoted).
-        
+
         Selection criteria:
         1. Only consider PROMOTED
         2. Sort by ΔL∞
         3. Return best
         """
         promoted = [e for e in evaluations if e.decision == PipelineDecision.PROMOTED]
-        
+
         if not promoted:
             return None
-        
+
         # Sort by ΔL∞ descending
         promoted.sort(key=lambda e: e.delta_linf, reverse=True)
-        
+
         return promoted[0]
-    
+
     async def _promote_challenger(
         self,
         evaluation: ChallengerEvaluation,
@@ -487,11 +481,11 @@ class AutoEvolutionPipeline:
                 "pcag_hash": evaluation.pcag.artifact_hash if evaluation.pcag else None,
             },
         )
-        
+
         # Update champion (in production, this would swap models/policies)
         # For now, just log
         pass
-    
+
     async def _record_evaluation(
         self,
         evaluation: ChallengerEvaluation,
@@ -509,11 +503,11 @@ class AutoEvolutionPipeline:
                 "reason": evaluation.reason,
             },
         )
-    
+
     def get_champion_history(self) -> list[PipelineResult]:
         """Get history of all pipeline executions."""
         return list(self.pipeline_history)
-    
+
     def get_latest_result(self) -> PipelineResult | None:
         """Get most recent pipeline result."""
         return self.pipeline_history[-1] if self.pipeline_history else None
@@ -531,7 +525,7 @@ async def run_auto_evolution_cycle(
 ) -> PipelineResult:
     """
     Run a single auto-evolution cycle (convenience function).
-    
+
     Example:
         ```python
         result = await run_auto_evolution_cycle(
@@ -553,7 +547,7 @@ async def run_continuous_evolution(
 ) -> list[PipelineResult]:
     """
     Run continuous evolution for multiple cycles.
-    
+
     Example:
         ```python
         results = await run_continuous_evolution(
@@ -567,19 +561,19 @@ async def run_continuous_evolution(
     """
     pipeline = AutoEvolutionPipeline(config=config)
     results: list[PipelineResult] = []
-    
+
     current_state = initial_state
-    
-    for cycle in range(num_cycles):
+
+    for _cycle in range(num_cycles):
         result = await pipeline.run_cycle(
             champion_state=current_state,
             num_challengers=challengers_per_cycle,
         )
         results.append(result)
-        
+
         # Update state if promoted
         if result.promoted_challenger:
             # In production, update current_state with promoted challenger
             pass
-    
+
     return results

@@ -99,7 +99,12 @@ def test_guards():
     print("\n[TEST] Guards (Σ-Guard and IR→IC)")
 
     try:
-        from penin.omega.guards import SigmaGuardPolicy, combined_guard_check, ir_to_ic_contractive, sigma_guard
+        from penin.omega.guards import (
+            SigmaGuardPolicy,
+            combined_guard_check,
+            ir_to_ic_contractive,
+            sigma_guard,
+        )
 
         # Test Σ-Guard with passing metrics
         good_metrics = {
@@ -256,23 +261,23 @@ def test_caos():
     print("\n[TEST] CAOS⁺ Module")
 
     try:
+        from penin.core.caos import (
+            CAOSConfig,
+        )
         from penin.omega import (
             CAOSTracker,
             compute_caos_plus,
         )
-        from penin.core.caos import (
-            CAOSConfig,
-        )
-        
+
         # Compatibility stubs for renamed/missing functions
         def apply_saturation(x, gamma=0.8):
             import math
             return math.tanh(gamma * x)
-        
+
         def caos_gradient(C, A, O, S, kappa):
             # Simplified gradient computation
             return {"dC": kappa * A, "dA": kappa * C, "dO": 1.0, "dS": 1.0}
-        
+
         def compute_caos_harmony(C, A, O, S):
             # Geometric mean as harmony approximation
             import math

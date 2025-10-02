@@ -36,6 +36,9 @@ Integration with PENIN-Ω:
 - Formal verification for critical system state changes
 """
 
-from penin.integrations.symbolic.symbolicai_adapter import SymbolicAIAdapter, SymbolicAIConfig
+from penin.integrations.symbolic.symbolicai_adapter import (
+    SymbolicAIAdapter,
+    SymbolicAIConfig,
+)
 
 __all__ = ["SymbolicAIAdapter", "SymbolicAIConfig"]

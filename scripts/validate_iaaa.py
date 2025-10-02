@@ -326,7 +326,12 @@ def test_mathematical_guarantees() -> bool:
     try:
         import numpy as np
 
-        from penin.equations import Metric, harmonic_mean_weighted, ir_to_ic, lyapunov_check
+        from penin.equations import (
+            Metric,
+            harmonic_mean_weighted,
+            ir_to_ic,
+            lyapunov_check,
+        )
 
         # Test 1: Lyapunov contratividade
         print("Teste 1: Contratividade Lyapunov...")

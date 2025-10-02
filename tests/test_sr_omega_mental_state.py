@@ -2,13 +2,10 @@
 Tests for SROmegaService mental state tracking and P2P status queries
 """
 
-import asyncio
-import json
-import time
 
 import pytest
 
-from penin.omega.sr import Recommendation, SROmegaService
+from penin.omega.sr import SROmegaService
 from penin.p2p.node import PeninNode
 from penin.p2p.protocol import MessageType, PeninProtocol
 

@@ -34,20 +34,20 @@ from dataclasses import dataclass
 @dataclass
 class SRConfig:
     """Configuration for SR-Ω∞ computation."""
-    
+
     # Weights for awareness
     w_calib: float = 0.6
     w_intro: float = 0.4
-    
+
     # Parameters
     alpha_0: float = 0.1  # Base learning rate
     gamma: float = 0.8  # Saturation parameter
     epsilon: float = 1e-6  # Numerical stability
-    
+
     # Thresholds
     sr_min_threshold: float = 0.80  # Minimum acceptable SR score
     ethics_required: bool = True  # Fail-closed ethics gate
-    
+
     def __post_init__(self):
         """Validate configuration parameters."""
         if not (0.0 <= self.w_calib <= 1.0):

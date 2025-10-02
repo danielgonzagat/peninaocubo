@@ -13,7 +13,6 @@ Provides:
 
 import time
 from contextlib import contextmanager
-from typing import Optional
 
 import requests
 
@@ -21,10 +20,10 @@ import requests
 class ToxiproxyClient:
     """
     Client for Toxiproxy - a framework for simulating network conditions.
-    
+
     Toxiproxy is a TCP proxy that can inject latency, bandwidth limitations,
     and connection failures to simulate real-world network conditions.
-    
+
     Install: docker run -d -p 8474:8474 -p 20000-20009:20000-20009 shopify/toxiproxy
     """
 
@@ -43,12 +42,12 @@ class ToxiproxyClient:
     def create_proxy(self, name: str, listen: str, upstream: str) -> dict:
         """
         Create a new proxy
-        
+
         Args:
             name: Proxy name
             listen: Address to listen on (e.g., "127.0.0.1:20000")
             upstream: Upstream service address (e.g., "127.0.0.1:8011")
-        
+
         Returns:
             Proxy configuration
         """
@@ -73,7 +72,7 @@ class ToxiproxyClient:
     def add_latency(self, proxy_name: str, latency_ms: int, jitter_ms: int = 0):
         """
         Add latency toxic to proxy
-        
+
         Args:
             proxy_name: Name of the proxy
             latency_ms: Base latency in milliseconds
@@ -96,7 +95,7 @@ class ToxiproxyClient:
     def add_bandwidth_limit(self, proxy_name: str, rate_kbps: int):
         """
         Add bandwidth limitation toxic
-        
+
         Args:
             proxy_name: Name of the proxy
             rate_kbps: Bandwidth limit in KB/s
@@ -118,7 +117,7 @@ class ToxiproxyClient:
     def add_timeout(self, proxy_name: str, timeout_ms: int):
         """
         Add timeout toxic - connections time out after specified duration
-        
+
         Args:
             proxy_name: Name of the proxy
             timeout_ms: Timeout in milliseconds
@@ -177,7 +176,7 @@ def chaos_proxy(
 ):
     """
     Context manager for chaos proxy lifecycle
-    
+
     Usage:
         with chaos_proxy("guard", 20000, 8011) as proxy:
             proxy.add_latency(500)  # Add 500ms latency
@@ -236,7 +235,7 @@ class NetworkChaos:
     def inject_latency(target_func, latency_seconds: float):
         """
         Inject latency into a function call
-        
+
         Usage:
             with NetworkChaos.inject_latency(requests.get, 2.0):
                 # All requests.get calls will be delayed by 2 seconds
@@ -264,7 +263,7 @@ class NetworkChaos:
     def simulate_packet_loss(loss_probability: float = 0.5):
         """
         Simulate packet loss by randomly failing requests
-        
+
         Args:
             loss_probability: Probability of packet loss (0.0 to 1.0)
         """
@@ -305,7 +304,7 @@ class ServiceChaos:
     def intermittent_failures(failure_rate: float = 0.3):
         """
         Simulate intermittent service failures
-        
+
         Args:
             failure_rate: Probability of failure (0.0 to 1.0)
         """
@@ -355,7 +354,7 @@ class ChaosScenario:
 def validate_fail_closed(test_func):
     """
     Decorator to validate fail-closed behavior
-    
+
     Usage:
         @validate_fail_closed
         def test_something():

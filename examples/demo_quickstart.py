@@ -147,8 +147,9 @@ print(f"    Cost: {cost_norm}")
 print(f"    Result: {linf:.4f}")
 
 # CAOS⁺
-from penin.omega import compute_caos_plus
 from penin.core.caos import CAOSState as CAOSInput  # Compatibility alias
+from penin.omega import compute_caos_plus
+
 
 def compute_caos(caos_input):
     """Wrapper for backward compatibility"""

@@ -15,7 +15,7 @@ Features:
 
 Usage:
     tracker = BudgetTracker(daily_limit_usd=100.0)
-    
+
     # Track request
     if tracker.can_proceed(cost_usd=0.05):
         tracker.track_request(
@@ -24,11 +24,11 @@ Usage:
             cost_usd=0.05,
             success=True
         )
-    
+
     # Get usage
     usage = tracker.get_usage()
     print(f"Used: ${usage['spend_today']:.2f} / ${usage['daily_limit']:.2f}")
-    
+
     # Check if soft/hard limit reached
     if tracker.is_soft_limit_reached():
         logger.warning("Approaching daily budget limit")
@@ -39,8 +39,8 @@ from __future__ import annotations
 import logging
 import time
 from collections import defaultdict
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -141,7 +141,7 @@ class BudgetTracker:
 
     def _get_current_day_utc(self) -> int:
         """Get current day as YYYYMMDD (UTC)"""
-        now_utc = datetime.now(timezone.utc)
+        now_utc = datetime.now(UTC)
         return int(now_utc.strftime("%Y%m%d"))
 
     def _check_and_reset_if_new_day(self) -> None:

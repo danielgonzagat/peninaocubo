@@ -15,11 +15,11 @@ Flow:
 6. Complete proof is stored in WORM Ledger
 """
 
-import sys
 import importlib.util
-import time
 import json
+import time
 from pathlib import Path
+
 
 # Load modules directly
 def load_module(module_name, file_path):
@@ -74,7 +74,7 @@ sr_attestation = attestation.create_sr_attestation(
     components=sr_components
 )
 
-print(f"  ✓ SR-Ω∞ attestation created and signed")
+print("  ✓ SR-Ω∞ attestation created and signed")
 print(f"    Signature: {sr_attestation.signature[:32]}...")
 print(f"    Timestamp: {sr_attestation.timestamp}")
 print()
@@ -114,7 +114,7 @@ guard_attestation = attestation.create_sigma_guard_attestation(
     aggregate_score=aggregate_score
 )
 
-print(f"  ✓ Σ-Guard attestation created and signed")
+print("  ✓ Σ-Guard attestation created and signed")
 print(f"    Signature: {guard_attestation.signature[:32]}...")
 print(f"    Timestamp: {guard_attestation.timestamp}")
 print()
@@ -129,13 +129,13 @@ chain = attestation.AttestationChain(candidate_id=candidate_id)
 
 # Add attestations
 chain.add_attestation(sr_attestation)
-print(f"✓ Added SR-Ω∞ attestation to chain")
+print("✓ Added SR-Ω∞ attestation to chain")
 
 chain.add_attestation(guard_attestation)
-print(f"✓ Added Σ-Guard attestation to chain")
+print("✓ Added Σ-Guard attestation to chain")
 
 print()
-print(f"Chain Information:")
+print("Chain Information:")
 print(f"  Candidate ID:  {chain.candidate_id}")
 print(f"  Attestations:  {len(chain.attestations)}")
 print(f"  Chain Hash:    {chain.chain_hash}")
@@ -191,9 +191,9 @@ if can_promote:
     print("    ✓ All required attestations present (SR-Ω∞, Σ-Guard)")
     print("    ✓ All validation services approved (pass verdicts)")
     print("    ✓ Mathematical proof of decision stored")
-    
+
     chain.final_decision = "promote"
-    
+
     # Create ACFA attestation for promotion
     acfa_attestation = attestation.create_acfa_attestation(
         verdict="promote",
@@ -206,12 +206,12 @@ if can_promote:
             "chain_hash": chain.chain_hash
         }
     )
-    
+
     print()
-    print(f"  ✓ ACFA League attestation created")
+    print("  ✓ ACFA League attestation created")
     print(f"    Verdict:   {acfa_attestation.verdict}")
     print(f"    Signature: {acfa_attestation.signature[:32]}...")
-    
+
 else:
     print("✗ CHECKS FAILED - PROMOTION DENIED")
     print()
@@ -222,7 +222,7 @@ else:
         print("    ✗ Missing required attestations")
     if not all_passed:
         print("    ✗ Some validations did not pass")
-    
+
     chain.final_decision = "reject"
 
 print()
@@ -281,7 +281,7 @@ print("-" * 80)
 
 # Load from file (simulating external auditor)
 print("Simulating external auditor loading attestation chain...")
-with open(output_file, 'r') as f:
+with open(output_file) as f:
     loaded_record = json.load(f)
 
 # Reconstruct chain

@@ -6,8 +6,9 @@ Standalone test for PENIN-Ω Cryptographic Attestation System
 This test loads modules directly to avoid dependency issues.
 """
 
-import sys
 import importlib.util
+import sys
+
 
 def load_module(module_name, file_path):
     """Load a module directly from file path"""

@@ -7,7 +7,10 @@ Tests adapter functionality without requiring actual SymbolicAI installation.
 import pytest
 
 from penin.integrations.base import IntegrationStatus
-from penin.integrations.symbolic.symbolicai_adapter import SymbolicAIAdapter, SymbolicAIConfig
+from penin.integrations.symbolic.symbolicai_adapter import (
+    SymbolicAIAdapter,
+    SymbolicAIConfig,
+)
 
 
 class TestSymbolicAIAdapter:

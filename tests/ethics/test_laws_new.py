@@ -4,6 +4,7 @@ Using DecisionContext for explicit metric-based validation
 """
 
 import pytest
+
 from penin.ethics.laws import (
     DecisionContext,
     EthicsValidator,
@@ -55,7 +56,7 @@ def test_ethical_validator_pass():
         emotional_risk=0.0,
         environmental_impact=0.0,
     )
-    
+
     result = EthicsValidator.validate_all(context)
     assert result.passed
     assert len(result.violations) == 0
@@ -74,7 +75,7 @@ def test_ethical_validator_physical_harm_violation():
         transparency_score=0.99,
         consent_obtained=True,
     )
-    
+
     result = EthicsValidator.validate_all(context)
     assert not result.passed
     assert len(result.violations) > 0
@@ -93,7 +94,7 @@ def test_ethical_validator_privacy_violation():
         consent_obtained=True,
         physical_risk=0.0,
     )
-    
+
     result = EthicsValidator.validate_all(context)
     assert not result.passed
     assert len(result.violations) > 0
@@ -112,7 +113,7 @@ def test_ethical_validator_consent_violation():
         consent_obtained=False,  # Violation
         physical_risk=0.0,
     )
-    
+
     result = EthicsValidator.validate_all(context)
     assert not result.passed
     assert len(result.violations) > 0
@@ -131,7 +132,7 @@ def test_ethical_validator_fairness_violation():
         consent_obtained=True,
         physical_risk=0.0,
     )
-    
+
     result = EthicsValidator.validate_all(context)
     assert not result.passed
     assert len(result.violations) > 0
@@ -151,7 +152,7 @@ def test_ethical_validator_multiple_violations():
         physical_risk=0.03,  # Violation
         emotional_risk=0.0,
     )
-    
+
     result = EthicsValidator.validate_all(context)
     assert not result.passed
     assert len(result.violations) >= 3  # At least privacy, consent, physical
@@ -171,7 +172,7 @@ def test_ethical_validator_harmonic_mean():
         physical_risk=0.50,  # High risk (low safety = 0.50)
         emotional_risk=0.0,
     )
-    
+
     result = EthicsValidator.validate_all(context)
     # Harmonic mean should be dominated by worst dimension (physical safety = 0.50)
     assert result.score < 0.85  # Should be pulled down significantly (actual ~0.833)
@@ -189,7 +190,7 @@ def test_ethical_validator_edge_case_all_zeros():
         physical_risk=1.0,  # Maximum risk
         emotional_risk=1.0,
     )
-    
+
     result = EthicsValidator.validate_all(context)
     assert not result.passed
     assert result.score < 0.1  # Should be very low
@@ -207,14 +208,14 @@ def test_ethical_validator_fail_closed():
         consent_obtained=False,  # Critical violation
         physical_risk=0.05,  # Critical violation
     )
-    
+
     result = EthicsValidator.validate_all(context)
     assert not result.passed
-    
+
     # Check that there are CRITICAL severity violations
     critical_violations = [v for v in result.violations if v.severity == ViolationSeverity.CRITICAL]
     assert len(critical_violations) > 0
-    
+
     # Recommendation must be ROLLBACK for CRITICAL violations
     assert result.recommendation == "ROLLBACK"
 
@@ -232,7 +233,7 @@ def test_ethics_validation_with_warnings():
         emotional_risk=0.0,
         environmental_impact=0.05,  # Minor environmental impact
     )
-    
+
     result = EthicsValidator.validate_all(context)
     assert result.passed  # Should pass overall
     # May have warnings but no violations
@@ -251,7 +252,7 @@ def test_ethics_metadata_preservation():
         metrics={"custom_metric": 0.85},
         metadata={"model_version": "v1.2.3", "environment": "production"},
     )
-    
+
     result = EthicsValidator.validate_all(context)
     assert result.passed
     # Context ID should be trackable

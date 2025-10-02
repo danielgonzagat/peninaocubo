@@ -12,8 +12,8 @@ Target: 166 → ~50 files
 """
 
 import shutil
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).parent.parent
 
@@ -78,13 +78,13 @@ def find_status_reports() -> list[Path]:
     reports = []
     for pattern in STATUS_REPORTS_PATTERN:
         reports.extend(PROJECT_ROOT.glob(pattern))
-    
+
     # Filter to only .md files in root (not subdirectories)
     root_reports = [f for f in reports if f.parent == PROJECT_ROOT and f.suffix == ".md"]
-    
+
     # Exclude essential files
     root_reports = [f for f in root_reports if f.name not in ROOT_ESSENTIAL]
-    
+
     return sorted(set(root_reports))
 
 
@@ -100,9 +100,9 @@ def move_to_archive(file_path: Path, archive_dir: Path, dry_run: bool = True) ->
     """Move file to archive directory."""
     if not file_path.exists():
         return False
-    
+
     dest_path = archive_dir / file_path.name
-    
+
     if dry_run:
         print(f"📦 Would archive: {file_path.name}")
         print(f"   → {dest_path.relative_to(PROJECT_ROOT)}")
@@ -114,7 +114,7 @@ def move_to_archive(file_path: Path, archive_dir: Path, dry_run: bool = True) ->
         except Exception as e:
             print(f"⚠️  Error archiving {file_path.name}: {e}")
             return False
-    
+
     return True
 
 
@@ -122,7 +122,7 @@ def create_master_index(dry_run: bool = True):
     """Create master documentation index at docs/INDEX.md."""
     index_content = """# 📚 PENIN-Ω Documentation Master Index
 
-**Last Updated**: {date}  
+**Last Updated**: {date}
 **Version**: {version}
 
 Welcome to the PENIN-Ω documentation! This index provides quick access to all documentation resources.
@@ -258,8 +258,8 @@ When adding new documentation:
 4. **Include metadata**:
    ```markdown
    # Document Title
-   **Date**: YYYY-MM-DD  
-   **Version**: X.Y.Z  
+   **Date**: YYYY-MM-DD
+   **Version**: X.Y.Z
    **Status**: Draft/Review/Final
    ```
 
@@ -273,20 +273,20 @@ When adding new documentation:
 
 ---
 
-**Last Updated**: {date}  
-**Maintained by**: PENIN-Ω Contributors  
+**Last Updated**: {date}
+**Maintained by**: PENIN-Ω Contributors
 **License**: Apache 2.0
 """
-    
+
     index_path = PROJECT_ROOT / "docs" / "INDEX.md"
-    
+
     # Format with current date and version
     from datetime import datetime
     formatted_content = index_content.format(
         date=datetime.now().strftime("%Y-%m-%d"),
         version="0.9.0"  # TODO: Read from pyproject.toml
     )
-    
+
     if dry_run:
         print(f"\n📝 Would create master index: {index_path.relative_to(PROJECT_ROOT)}")
     else:
@@ -302,19 +302,19 @@ def consolidate_documentation(dry_run: bool = True):
     print("=" * 70)
     print(f"Mode: {'DRY RUN' if dry_run else 'LIVE'}")
     print()
-    
+
     # Step 1: Find status reports
     print("📁 Finding status/report files in root...")
     reports = find_status_reports()
     print(f"   Found {len(reports)} report files to archive")
     print()
-    
+
     # Step 2: Create archive directory
     print("📦 Creating archive directory...")
     archive_dir = create_archive_session_dir()
     print(f"   Archive: {archive_dir.relative_to(PROJECT_ROOT)}")
     print()
-    
+
     # Step 3: Move reports to archive
     print("📦 Archiving reports...")
     archived_count = 0
@@ -323,20 +323,20 @@ def consolidate_documentation(dry_run: bool = True):
             archived_count += 1
     print(f"   Archived: {archived_count} files")
     print()
-    
+
     # Step 4: Create master index
     print("📝 Creating master documentation index...")
     create_master_index(dry_run=dry_run)
     print()
-    
+
     # Summary
     print("=" * 70)
     print("Summary")
     print("=" * 70)
     print(f"Reports archived: {archived_count}")
     print(f"Archive location: {archive_dir.relative_to(PROJECT_ROOT)}")
-    print(f"Master index: docs/INDEX.md")
-    
+    print("Master index: docs/INDEX.md")
+
     if dry_run:
         print()
         print("ℹ️  This was a DRY RUN. No changes were made.")
@@ -353,14 +353,14 @@ def consolidate_documentation(dry_run: bool = True):
 
 if __name__ == "__main__":
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Consolidate documentation structure")
     parser.add_argument(
         "--live",
         action="store_true",
         help="Apply changes (default: dry-run only)"
     )
-    
+
     args = parser.parse_args()
-    
+
     consolidate_documentation(dry_run=not args.live)

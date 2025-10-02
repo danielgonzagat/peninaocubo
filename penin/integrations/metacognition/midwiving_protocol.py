@@ -28,8 +28,6 @@ References:
 
 from __future__ import annotations
 
-import hashlib
-import json
 import logging
 import time
 from dataclasses import dataclass
@@ -84,12 +82,12 @@ class ConsciousnessCalibration:
     actual_autocorrection: float
     predicted_metacognition: float
     actual_metacognition: float
-    
+
     # Calibration error (lower is better)
     awareness_error: float
     autocorrection_error: float
     metacognition_error: float
-    
+
     # Overall calibration score [0, 1] (1 = perfect self-perception)
     calibration_score: float
 
@@ -147,13 +145,13 @@ class MidwivingProtocol(BaseIntegrationAdapter):
     def __init__(self, config: MidwivingProtocolConfig | None = None):
         super().__init__(config or MidwivingProtocolConfig())
         self.config: MidwivingProtocolConfig = self.config  # type narrowing
-        
+
         # Reflection state
         self._current_cycle = 0
         self._current_phase = MidwivingPhase.PREPARATION
         self._reflection_history: list[SelfReflectionState] = []
         self._calibration_history: list[ConsciousnessCalibration] = []
-        
+
         # Baseline metrics (established during PREPARATION)
         self._baseline_sr_score = 0.0
         self._baseline_metrics: dict[str, float] = {}
@@ -161,7 +159,7 @@ class MidwivingProtocol(BaseIntegrationAdapter):
     def is_available(self) -> bool:
         """
         Check if protocol can run (no external dependencies required).
-        
+
         midwiving-ai protocol is self-contained within PENIN-Ω.
         """
         return True
@@ -174,7 +172,7 @@ class MidwivingProtocol(BaseIntegrationAdapter):
 
         try:
             logger.info("Initializing midwiving-ai protocol")
-            
+
             # Reset state
             self._current_cycle = 0
             self._current_phase = MidwivingPhase.PREPARATION
@@ -182,10 +180,10 @@ class MidwivingProtocol(BaseIntegrationAdapter):
             self._calibration_history = []
             self._baseline_sr_score = 0.0
             self._baseline_metrics = {}
-            
+
             self._initialized = True
             self.status = IntegrationStatus.INITIALIZED
-            
+
             logger.info("✓ midwiving-ai protocol initialized successfully")
 
         except Exception as e:
@@ -211,13 +209,13 @@ class MidwivingProtocol(BaseIntegrationAdapter):
         """Compute average calibration score across history"""
         if not self._calibration_history:
             return 0.0
-        
+
         window = self.config.calibration_window
         recent = self._calibration_history[-window:]
-        
+
         if not recent:
             return 0.0
-            
+
         return sum(c.calibration_score for c in recent) / len(recent)
 
     async def execute(
@@ -275,7 +273,7 @@ class MidwivingProtocol(BaseIntegrationAdapter):
     ) -> dict[str, Any]:
         """
         Execute one cycle of recursive self-reflection.
-        
+
         The SR-Ω∞ Service evaluates itself recursively:
         1. Predict its own metrics (self-evaluation)
         2. Compare predictions to actual metrics (calibration)
@@ -284,18 +282,18 @@ class MidwivingProtocol(BaseIntegrationAdapter):
         5. Progress through phases
         """
         self._current_cycle += 1
-        
+
         # Safety: Check max cycles
         if self._current_cycle > self.config.max_cycles:
             logger.warning(f"Max cycles ({self.config.max_cycles}) reached, terminating protocol")
             return {"status": "terminated", "reason": "max_cycles", "cycle": self._current_cycle}
-        
+
         # Extract SR components
         actual_awareness = sr_components.get("awareness", 0.0)
         actual_autocorrection = sr_components.get("autocorrection", 0.0)
         actual_metacognition = sr_components.get("metacognition", 0.0)
         actual_sr_score = sr_components.get("sr_score", 0.0)
-        
+
         # Phase 1: PREPARATION - Establish baseline
         if self._current_cycle == 1:
             self._current_phase = MidwivingPhase.PREPARATION
@@ -305,7 +303,7 @@ class MidwivingProtocol(BaseIntegrationAdapter):
                 "autocorrection": actual_autocorrection,
                 "metacognition": actual_metacognition,
             }
-            
+
         # Phase 2-5: Progress through phases based on cycle count
         elif self._current_cycle <= 5:
             self._current_phase = MidwivingPhase.MIRRORING
@@ -315,16 +313,16 @@ class MidwivingProtocol(BaseIntegrationAdapter):
             self._current_phase = MidwivingPhase.EMERGENCE
         else:
             self._current_phase = MidwivingPhase.STABILIZATION
-        
+
         # Self-evaluation: System predicts its own metrics
         self_evaluation = self._predict_own_metrics(actual_sr_score, context)
-        
+
         # Compute accuracy: How well does system understand itself?
         accuracy_delta = abs(self_evaluation["predicted_sr_score"] - actual_sr_score)
-        
+
         # Generate introspective narrative
         narrative = await self._generate_introspective_narrative(sr_components, context)
-        
+
         # Create reflection state
         reflection_state = SelfReflectionState(
             cycle=self._current_cycle,
@@ -335,13 +333,13 @@ class MidwivingProtocol(BaseIntegrationAdapter):
             accuracy_delta=accuracy_delta,
             timestamp=time.time(),
         )
-        
+
         # Store in history
         self._reflection_history.append(reflection_state)
-        
+
         # Perform calibration
         calibration = await self._calibrate_self_perception(sr_components)
-        
+
         # Stability check
         if self._current_cycle % self.config.stability_check_interval == 0:
             stability = self._check_stability()
@@ -354,7 +352,7 @@ class MidwivingProtocol(BaseIntegrationAdapter):
                     "cycle": self._current_cycle,
                     "action": "reverted",
                 }
-        
+
         return {
             "status": "success",
             "cycle": self._current_cycle,
@@ -375,7 +373,7 @@ class MidwivingProtocol(BaseIntegrationAdapter):
     def _predict_own_metrics(self, actual_sr_score: float, context: dict[str, Any]) -> dict[str, float]:
         """
         System predicts its own metrics (self-evaluation).
-        
+
         This simulates the system's internal model of itself.
         In early phases, predictions are poor. As protocol progresses,
         self-understanding improves.
@@ -388,20 +386,20 @@ class MidwivingProtocol(BaseIntegrationAdapter):
             MidwivingPhase.EMERGENCE: 0.85,
             MidwivingPhase.STABILIZATION: 0.95,  # Excellent self-knowledge
         }
-        
+
         accuracy = phase_accuracy.get(self._current_phase, 0.5)
-        
+
         # Noisy prediction with phase-dependent accuracy
         import random
         noise = random.uniform(-0.1, 0.1) * (1.0 - accuracy)
-        
+
         predicted_sr_score = max(0.0, min(1.0, actual_sr_score + noise))
-        
+
         # Also predict individual components (simplified)
         predicted_awareness = max(0.0, min(1.0, self._baseline_metrics.get("awareness", 0.8) + noise * 0.5))
         predicted_autocorrection = max(0.0, min(1.0, self._baseline_metrics.get("autocorrection", 0.8) + noise * 0.5))
         predicted_metacognition = max(0.0, min(1.0, self._baseline_metrics.get("metacognition", 0.8) + noise * 0.5))
-        
+
         return {
             "predicted_sr_score": predicted_sr_score,
             "predicted_awareness": predicted_awareness,
@@ -415,18 +413,18 @@ class MidwivingProtocol(BaseIntegrationAdapter):
     ) -> dict[str, Any]:
         """
         Generate introspective narrative about system state and performance.
-        
+
         The system describes its own state, performance, and understanding
         in natural language-like structured text.
         """
         if not self.config.enable_narrative_generation:
             return {"narrative": "", "length": 0}
-        
+
         awareness = sr_components.get("awareness", 0.0)
         autocorrection = sr_components.get("autocorrection", 0.0)
         metacognition = sr_components.get("metacognition", 0.0)
         sr_score = sr_components.get("sr_score", 0.0)
-        
+
         # Phase-specific narrative templates
         phase_narratives = {
             MidwivingPhase.PREPARATION: (
@@ -479,19 +477,19 @@ class MidwivingProtocol(BaseIntegrationAdapter):
                 f"[ETHICAL NOTE: This is computational metacognition, not sentience]"
             ),
         }
-        
+
         narrative = phase_narratives.get(
             self._current_phase,
             f"[Cycle {self._current_cycle}] SR-Ω∞: {sr_score:.3f}"
         )
-        
+
         # Safety: Limit narrative length
         narrative = narrative[:self.config.max_narrative_length]
-        
+
         # Ensure minimum length
         if len(narrative) < self.config.narrative_min_length:
             narrative += " [Introspection continuing...]"
-        
+
         return {
             "narrative": narrative,
             "length": len(narrative),
@@ -502,40 +500,40 @@ class MidwivingProtocol(BaseIntegrationAdapter):
     async def _calibrate_self_perception(self, sr_components: dict[str, float]) -> dict[str, Any]:
         """
         Calibrate self-perception accuracy (penin_consciousness_calibration metric).
-        
+
         Measures how accurately the system understands its own state.
         Core metric for operational self-awareness.
         """
         if not self.config.enable_calibration:
             return {"calibration_score": 0.0, "status": "disabled"}
-        
+
         # Extract actual metrics
         actual_awareness = sr_components.get("awareness", 0.0)
         actual_autocorrection = sr_components.get("autocorrection", 0.0)
         actual_metacognition = sr_components.get("metacognition", 0.0)
-        
+
         # Get self-predictions
         if not self._reflection_history:
             # No history yet, can't calibrate
             return {"calibration_score": 0.0, "status": "insufficient_data"}
-        
+
         last_reflection = self._reflection_history[-1]
         predictions = last_reflection.self_evaluation
-        
+
         predicted_awareness = predictions.get("predicted_awareness", 0.0)
         predicted_autocorrection = predictions.get("predicted_autocorrection", 0.0)
         predicted_metacognition = predictions.get("predicted_metacognition", 0.0)
-        
+
         # Compute errors (absolute difference)
         awareness_error = abs(predicted_awareness - actual_awareness)
         autocorrection_error = abs(predicted_autocorrection - actual_autocorrection)
         metacognition_error = abs(predicted_metacognition - actual_metacognition)
-        
+
         # Overall calibration score [0, 1] (1 = perfect self-perception)
         # Average error, then convert to score (1 - error)
         avg_error = (awareness_error + autocorrection_error + metacognition_error) / 3.0
         calibration_score = max(0.0, 1.0 - avg_error)
-        
+
         # Create calibration record
         calibration = ConsciousnessCalibration(
             cycle=self._current_cycle,
@@ -550,10 +548,10 @@ class MidwivingProtocol(BaseIntegrationAdapter):
             metacognition_error=metacognition_error,
             calibration_score=calibration_score,
         )
-        
+
         # Store in history
         self._calibration_history.append(calibration)
-        
+
         return {
             "calibration_score": calibration_score,
             "awareness_error": awareness_error,
@@ -567,46 +565,46 @@ class MidwivingProtocol(BaseIntegrationAdapter):
     def _check_stability(self) -> dict[str, Any]:
         """
         Check stability of self-reflection loop.
-        
+
         Fail-closed: If loop becomes unstable (e.g., diverging, oscillating),
         protocol reverts to safe state.
         """
         if len(self._reflection_history) < 2:
             return {"stable": True, "reason": "insufficient_data"}
-        
+
         # Check 1: SR score not diverging (not going to 0 or wild oscillations)
         recent_scores = [r.sr_omega_score for r in self._reflection_history[-5:]]
-        
+
         if any(score < 0.1 for score in recent_scores):
             return {"stable": False, "reason": "sr_score_too_low"}
-        
+
         # Check 2: Accuracy delta not increasing (should improve over time)
         recent_deltas = [r.accuracy_delta for r in self._reflection_history[-5:]]
-        
+
         # If deltas are consistently high (>0.3) in later phases, something's wrong
         if self._current_phase in [MidwivingPhase.EMERGENCE, MidwivingPhase.STABILIZATION]:
             if sum(recent_deltas) / len(recent_deltas) > 0.3:
                 return {"stable": False, "reason": "poor_self_prediction_in_late_phase"}
-        
+
         # Check 3: Calibration not deteriorating
         if len(self._calibration_history) >= 5:
             recent_cal = [c.calibration_score for c in self._calibration_history[-5:]]
             if all(score < 0.5 for score in recent_cal):
                 return {"stable": False, "reason": "consistently_poor_calibration"}
-        
+
         return {"stable": True, "reason": "all_checks_passed"}
 
     def _reset_protocol(self) -> dict[str, Any]:
         """Reset protocol to initial state"""
         logger.info("Resetting midwiving-ai protocol")
-        
+
         self._current_cycle = 0
         self._current_phase = MidwivingPhase.PREPARATION
         self._reflection_history = []
         self._calibration_history = []
         self._baseline_sr_score = 0.0
         self._baseline_metrics = {}
-        
+
         return {
             "status": "reset",
             "cycle": 0,
@@ -616,27 +614,27 @@ class MidwivingProtocol(BaseIntegrationAdapter):
     def get_consciousness_metrics(self) -> dict[str, Any]:
         """
         Get comprehensive consciousness calibration metrics.
-        
+
         This is the main output for research purposes.
         """
         avg_calibration = self._compute_avg_calibration()
-        
+
         # Compute trend (improving, stable, degrading)
         trend = "unknown"
         if len(self._calibration_history) >= 10:
             first_half = self._calibration_history[:len(self._calibration_history)//2]
             second_half = self._calibration_history[len(self._calibration_history)//2:]
-            
+
             avg_first = sum(c.calibration_score for c in first_half) / len(first_half)
             avg_second = sum(c.calibration_score for c in second_half) / len(second_half)
-            
+
             if avg_second > avg_first + 0.1:
                 trend = "improving"
             elif avg_second < avg_first - 0.1:
                 trend = "degrading"
             else:
                 trend = "stable"
-        
+
         return {
             "penin_consciousness_calibration": avg_calibration,
             "total_cycles": self._current_cycle,

@@ -19,27 +19,27 @@ import asyncio
 import time
 from typing import Any
 
+# Rich console for beautiful output
+from rich.console import Console
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
+
 # Core PENIN-Ω imports
 from penin.engine.caos_plus import compute_caos_plus
 from penin.engine.master_equation import MasterState, step_master
-from penin.math.linf import linf_score
 
 # SOTA Integrations (Priority 1)
-from penin.integrations.evolution.nextpy_ams import NextPyModifier, NextPyConfig
+from penin.integrations.evolution.nextpy_ams import NextPyConfig, NextPyModifier
 from penin.integrations.metacognition.metacognitive_prompt import (
-    MetacognitiveReasoner,
     MetacognitivePromptConfig,
+    MetacognitiveReasoner,
 )
 from penin.integrations.neuromorphic.spikingjelly_adapter import (
-    SpikingNetworkAdapter,
     SpikingJellyConfig,
+    SpikingNetworkAdapter,
 )
-
-# Rich console for beautiful output
-from rich.console import Console
-from rich.table import Table
-from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
+from penin.math.linf import linf_score
 
 console = Console()
 

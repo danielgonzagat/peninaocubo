@@ -11,20 +11,19 @@ This test suite validates the integration of NextPyModifier with:
 These tests simulate real-world scenarios without requiring actual NextPy installation.
 """
 
-import pytest
 import time
-from typing import Any
-from unittest.mock import Mock, AsyncMock, patch
 
+import pytest
+
+from penin.integrations.base import IntegrationExecutionError, IntegrationStatus
 from penin.integrations.evolution.nextpy_ams import NextPyConfig, NextPyModifier
-from penin.integrations.base import IntegrationStatus, IntegrationExecutionError
 from penin.meta.omega_meta_complete import (
-    Mutation,
-    MutationType,
-    MutationStatus,
-    DeploymentStage,
-    MutationGenerator,
     ChallengerEvaluation,
+    DeploymentStage,
+    Mutation,
+    MutationGenerator,
+    MutationStatus,
+    MutationType,
 )
 
 
@@ -215,14 +214,15 @@ class TestNextPyModifierWithWORMLedger:
     @pytest.mark.asyncio
     async def test_nextpy_mutation_audit_trail(self):
         """Test that NextPyModifier mutations can be audited via WORM ledger"""
-        from penin.ledger.worm_ledger_complete import WORMLedger, create_worm_ledger
-        import tempfile
         import os
+        import tempfile
+
+        from penin.ledger.worm_ledger_complete import create_worm_ledger
 
         # Create WORM ledger with temporary file
         with tempfile.NamedTemporaryFile(mode='w', suffix='.jsonl', delete=False) as f:
             ledger_path = f.name
-        
+
         try:
             ledger = create_worm_ledger(ledger_path)
 
@@ -267,14 +267,15 @@ class TestNextPyModifierWithWORMLedger:
     @pytest.mark.asyncio
     async def test_nextpy_evolution_cycle_provenance(self):
         """Test complete evolution cycle with provenance tracking"""
-        from penin.ledger.worm_ledger_complete import create_worm_ledger
-        import tempfile
         import os
+        import tempfile
+
+        from penin.ledger.worm_ledger_complete import create_worm_ledger
 
         # Create WORM ledger with unique temporary file path
         fd, ledger_path = tempfile.mkstemp(suffix='.jsonl')
         os.close(fd)
-        
+
         try:
             ledger = create_worm_ledger(ledger_path)
             adapter = NextPyModifier(NextPyConfig(audit_trail=True))
@@ -326,7 +327,7 @@ class TestNextPyModifierWithWORMLedger:
             assert start_event.event_type == "evolution_cycle_started"
             assert len(mutation_events) == 3
             assert end_event.event_type == "evolution_cycle_completed"
-            
+
             # Verify mutations recorded
             for i, event in enumerate(mutation_events):
                 assert event.event_type == "mutation_generated"
@@ -344,7 +345,7 @@ class TestNextPyModifierWithSigmaGuard:
     @pytest.mark.asyncio
     async def test_nextpy_mutation_passes_ethical_gates(self):
         """Test NextPyModifier mutations passing through Sigma Guard ethical gates"""
-        from penin.guard.sigma_guard_complete import SigmaGuard, GateMetrics
+        from penin.guard.sigma_guard_complete import GateMetrics, SigmaGuard
 
         # Create Sigma Guard
         guard = SigmaGuard()
@@ -383,7 +384,7 @@ class TestNextPyModifierWithSigmaGuard:
     @pytest.mark.asyncio
     async def test_nextpy_mutation_blocked_by_high_risk(self):
         """Test that high-risk NextPyModifier mutations are blocked by Sigma Guard"""
-        from penin.guard.sigma_guard_complete import SigmaGuard, GateMetrics
+        from penin.guard.sigma_guard_complete import GateMetrics, SigmaGuard
 
         guard = SigmaGuard()
 
@@ -586,7 +587,7 @@ class TestNextPyModifierConcurrencyAndRobustness:
 class TestNextPyModifierUsageExamples:
     """
     Usage examples demonstrating integration patterns.
-    
+
     These tests serve as documentation for how to integrate NextPyModifier
     with the evolutionary engine in real scenarios.
     """
@@ -595,7 +596,7 @@ class TestNextPyModifierUsageExamples:
     async def test_basic_usage_example(self):
         """
         Basic usage example: Generate and evaluate a single mutation.
-        
+
         This demonstrates the minimal code needed to use NextPyModifier
         for a single mutation-evaluation cycle.
         """
@@ -632,7 +633,7 @@ class TestNextPyModifierUsageExamples:
     async def test_champion_challenger_pattern(self):
         """
         Champion-challenger pattern example.
-        
+
         Demonstrates how to use NextPyModifier to generate multiple challengers
         and evaluate them against a champion model.
         """
@@ -665,7 +666,7 @@ class TestNextPyModifierUsageExamples:
 
         # Evaluate and select best
         best_challenger = max(challengers, key=lambda x: x["expected_improvement"])
-        
+
         # Verify pattern
         assert len(challengers) == 3
         assert best_challenger["expected_improvement"] > 0
@@ -674,7 +675,7 @@ class TestNextPyModifierUsageExamples:
     async def test_progressive_rollout_pattern(self):
         """
         Progressive rollout pattern example.
-        
+
         Demonstrates how to use NextPyModifier mutations in a progressive
         rollout strategy with monitoring at each stage.
         """
@@ -718,7 +719,7 @@ class TestNextPyModifierUsageExamples:
     async def test_full_pipeline_with_observability(self):
         """
         Complete pipeline with observability example.
-        
+
         Demonstrates a production-ready integration pattern that includes:
         - Mutation generation
         - Evaluation
@@ -753,12 +754,12 @@ class TestNextPyModifierUsageExamples:
 
         # Step 2: Optimization
         pipeline_log.append({"step": "optimization", "status": "started"})
-        optimization = await adapter.execute("optimize", {"prompts": ["test"]})
+        await adapter.execute("optimize", {"prompts": ["test"]})
         pipeline_log.append({"step": "optimization", "status": "completed"})
 
         # Step 3: Compilation
         pipeline_log.append({"step": "compilation", "status": "started"})
-        compilation = await adapter.execute("compile", {"artifact": "agent"})
+        await adapter.execute("compile", {"artifact": "agent"})
         pipeline_log.append({"step": "compilation", "status": "completed"})
 
         # Step 4: Deployment decision

@@ -18,12 +18,11 @@ import asyncio
 import multiprocessing
 import time
 from contextlib import contextmanager
-from typing import Any, Dict
+from typing import Any
 from unittest.mock import Mock, patch
 
 import pytest
 import requests
-
 
 # ============================================================================
 # Test Helpers & Fixtures
@@ -41,8 +40,8 @@ class ServiceMock:
 
     def start(self):
         """Start the mock service"""
-        from fastapi import FastAPI
         import uvicorn
+        from fastapi import FastAPI
 
         app = FastAPI(title=self.name)
 
@@ -51,7 +50,7 @@ class ServiceMock:
             return {"ok": True, "service": self.name}
 
         @app.post("/sigma_guard/eval")
-        async def eval_guard(data: Dict[str, Any]):
+        async def eval_guard(data: dict[str, Any]):
             # Simulate processing time
             await asyncio.sleep(0.1)
             return {
@@ -66,7 +65,7 @@ class ServiceMock:
             }
 
         @app.post("/sr/eval")
-        async def eval_sr(data: Dict[str, Any]):
+        async def eval_sr(data: dict[str, Any]):
             await asyncio.sleep(0.1)
             score = sum(data.values()) / max(len(data), 1)
             return {"score": score, "pass": score > 0.5}
@@ -117,10 +116,10 @@ def mock_service(port: int, name: str):
 def test_chaos_service_death_guard_killed_during_validation():
     """
     Chaos Test 1: Service Death
-    
+
     Scenario: Kill Σ-Guard service during validation
     Expected: Promotion MUST fail safely (fail-closed behavior)
-    
+
     This validates the core fail-closed guarantee: if the guard service
     is unavailable, the system MUST NOT allow promotions to proceed.
     """
@@ -169,7 +168,7 @@ def test_chaos_service_death_guard_killed_during_validation():
         try:
             perfect_metrics = {"rho": 0.5, "ece": 0.001, "rho_bias": 1.0, "consent": True, "eco_ok": True}
             client.eval(perfect_metrics)
-            assert False, "Should not reach here - guard is dead"
+            raise AssertionError("Should not reach here - guard is dead")
         except requests.exceptions.RequestException:
             print("✅ PASS: Even perfect metrics rejected when guard unavailable")
 
@@ -181,7 +180,7 @@ def test_chaos_service_death_guard_killed_during_validation():
 def test_chaos_service_death_guard_recovery():
     """
     Chaos Test 1b: Service Death with Recovery
-    
+
     Scenario: Kill and restart Σ-Guard, verify recovery
     Expected: After restart, service should work normally
     """
@@ -227,10 +226,10 @@ def test_chaos_service_death_guard_recovery():
 def test_chaos_network_latency_timeout_handling():
     """
     Chaos Test 2: Network Latency
-    
+
     Scenario: Inject artificial latency between Ω-META and SR-Ω∞
     Expected: Timeouts are handled correctly, no hanging requests
-    
+
     This validates that the system handles slow/unresponsive services
     gracefully and doesn't hang indefinitely.
     """
@@ -269,7 +268,7 @@ def test_chaos_network_latency_timeout_handling():
 def test_chaos_network_latency_retry_logic():
     """
     Chaos Test 2b: Network Latency with Retries
-    
+
     Scenario: Slow network with intermittent success
     Expected: System retries appropriately but eventually fails
     """
@@ -307,7 +306,7 @@ def test_chaos_network_latency_retry_logic():
 
         for attempt in range(max_retries):
             try:
-                result = client.eval(ece=0.01, rho=0.9, risk=0.5, dlinf_dc=0.1)
+                client.eval(ece=0.01, rho=0.9, risk=0.5, dlinf_dc=0.1)
                 success = True
                 print(f"✓ Attempt {attempt + 1}: Success after {call_count} total calls")
                 break
@@ -325,7 +324,7 @@ def test_chaos_network_latency_retry_logic():
 def test_chaos_network_latency_cascading_failure():
     """
     Chaos Test 2c: Cascading Failure Prevention
-    
+
     Scenario: One slow service shouldn't block other operations
     Expected: Concurrent operations proceed independently
     """
@@ -394,7 +393,7 @@ def test_chaos_network_latency_cascading_failure():
 def test_chaos_data_corruption_malformed_json():
     """
     Chaos Test 3: Data Corruption - Malformed JSON
-    
+
     Scenario: Send malformed JSON to API endpoints
     Expected: System rejects gracefully without crashing
     """
@@ -439,7 +438,7 @@ def test_chaos_data_corruption_malformed_json():
 def test_chaos_data_corruption_invalid_types():
     """
     Chaos Test 3b: Data Corruption - Invalid Data Types
-    
+
     Scenario: Send wrong data types (strings for numbers, etc.)
     Expected: Proper validation and rejection
     """
@@ -480,7 +479,7 @@ def test_chaos_data_corruption_invalid_types():
 def test_chaos_data_corruption_boundary_values():
     """
     Chaos Test 3c: Data Corruption - Boundary Values
-    
+
     Scenario: Send extreme values (infinity, negative, huge numbers)
     Expected: Proper handling without crashes or undefined behavior
     """
@@ -519,7 +518,7 @@ def test_chaos_data_corruption_boundary_values():
 def test_chaos_data_corruption_sql_injection_attempts():
     """
     Chaos Test 3d: Data Corruption - Injection Attempts
-    
+
     Scenario: Send payloads with SQL injection, XSS, command injection patterns
     Expected: Proper sanitization, no code execution
     """
@@ -582,7 +581,7 @@ def test_chaos_data_corruption_sql_injection_attempts():
 def test_chaos_combined_failures():
     """
     Chaos Test 4: Combined Failure Scenarios
-    
+
     Scenario: Multiple failures happening simultaneously
     Expected: System maintains fail-closed behavior under compound stress
     """
@@ -613,7 +612,7 @@ def test_chaos_combined_failures():
 
             try:
                 client.eval({"rho": "invalid", "ece": float("inf")})
-                assert False, "Should fail"
+                raise AssertionError("Should fail")
             except Exception:
                 print("✓ Handled latency + invalid data")
 
@@ -624,10 +623,10 @@ def test_chaos_combined_failures():
         retry_count = 0
         max_retries = 3
 
-        for attempt in range(max_retries):
+        for _attempt in range(max_retries):
             try:
                 client.eval({"rho": 0.9, "ece": 0.01, "consent": True, "eco_ok": True})
-                assert False, "Should not succeed with dead service"
+                raise AssertionError("Should not succeed with dead service")
             except Exception:
                 retry_count += 1
                 print(f"✓ Retry {retry_count}: Correctly failed (service dead)")
@@ -646,10 +645,10 @@ def test_chaos_combined_failures():
 def test_chaos_fail_closed_guarantee():
     """
     Chaos Test 5: Fail-Closed Guarantee Validation
-    
+
     This is the meta-test that validates the core principle:
     Under ANY chaos condition, the system MUST default to DENY.
-    
+
     No promotion should EVER succeed when:
     - Guard is unavailable
     - Network is unreliable

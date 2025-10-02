@@ -6,12 +6,12 @@ Tests adapter functionality for structured metacognitive reasoning.
 
 import pytest
 
+from penin.integrations.base import IntegrationStatus
 from penin.integrations.metacognition.metacognitive_prompt import (
     MetacognitivePromptConfig,
     MetacognitiveReasoner,
     MetacognitiveStage,
 )
-from penin.integrations.base import IntegrationStatus
 
 
 class TestMetacognitivePromptAdapter:

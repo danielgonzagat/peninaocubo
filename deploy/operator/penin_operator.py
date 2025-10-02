@@ -13,9 +13,8 @@ It handles:
 Built with Kopf (Kubernetes Operator Pythonic Framework)
 """
 
-import asyncio
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 import kopf
 import kubernetes
@@ -52,13 +51,13 @@ def create_service_manifest(
     name: str,
     namespace: str,
     service_name: str,
-    service_config: Dict[str, Any],
-    spec: Dict[str, Any],
+    service_config: dict[str, Any],
+    spec: dict[str, Any],
     owner_references: list,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a Kubernetes Service manifest for a PENIN-Ω service."""
     port = service_config["port"]
-    
+
     return {
         "apiVersion": "v1",
         "kind": "Service",
@@ -95,10 +94,10 @@ def create_deployment_manifest(
     name: str,
     namespace: str,
     service_name: str,
-    service_config: Dict[str, Any],
-    spec: Dict[str, Any],
+    service_config: dict[str, Any],
+    spec: dict[str, Any],
     owner_references: list,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Create a Kubernetes Deployment manifest for a PENIN-Ω service."""
     # Get replica count from spec
     replicas_config = spec.get("replicas", {})
@@ -240,7 +239,7 @@ def create_redis_manifest(
     name: str,
     namespace: str,
     owner_references: list,
-) -> tuple[Dict[str, Any], Dict[str, Any]]:
+) -> tuple[dict[str, Any], dict[str, Any]]:
     """Create Redis deployment and service manifests for caching."""
     deployment = {
         "apiVersion": "apps/v1",
@@ -320,7 +319,7 @@ def create_redis_manifest(
 async def create_cluster(spec, name, namespace, logger, **kwargs):
     """
     Handler for PeninOmegaCluster creation.
-    
+
     This creates all necessary Kubernetes resources for a PENIN-Ω cluster:
     - Deployments for each microservice
     - Services for networking
@@ -347,7 +346,7 @@ async def create_cluster(spec, name, namespace, logger, **kwargs):
     if cache_config.get("enabled", True) and cache_config.get("type", "redis") == "redis":
         logger.info(f"Creating Redis cache for cluster: {name}")
         redis_deployment, redis_service = create_redis_manifest(name, namespace, owner_references)
-        
+
         k8s["apps"].create_namespaced_deployment(namespace=namespace, body=redis_deployment)
         k8s["core"].create_namespaced_service(namespace=namespace, body=redis_service)
 
@@ -393,7 +392,7 @@ async def create_cluster(spec, name, namespace, logger, **kwargs):
 async def update_cluster(spec, name, namespace, logger, old, new, **kwargs):
     """
     Handler for PeninOmegaCluster updates.
-    
+
     This handles configuration changes, scaling, and upgrades.
     """
     logger.info(f"Updating PENIN-Ω cluster: {name} in namespace: {namespace}")
@@ -401,16 +400,16 @@ async def update_cluster(spec, name, namespace, logger, old, new, **kwargs):
     k8s = get_k8s_clients()
 
     # Check what changed
-    old_spec = old.get("spec", {})
+    old.get("spec", {})
     new_spec = new.get("spec", {})
 
     # Update deployments if replicas or resources changed
-    for service_name, service_config in SERVICES.items():
+    for service_name, _service_config in SERVICES.items():
         deployment_name = f"{name}-{service_name}"
-        
+
         try:
             deployment = k8s["apps"].read_namespaced_deployment(deployment_name, namespace)
-            
+
             # Update replica count if changed
             service_key_map = {
                 "omega-meta": "omegaMeta",
@@ -418,7 +417,7 @@ async def update_cluster(spec, name, namespace, logger, old, new, **kwargs):
                 "sr-omega-infinity": "srOmegaInfinity",
                 "acfa-league": "acfaLeague",
             }
-            
+
             new_replicas = new_spec.get("replicas", {}).get(service_key_map[service_name])
             if new_replicas and new_replicas != deployment.spec.replicas:
                 logger.info(f"Scaling {service_name} to {new_replicas} replicas")
@@ -436,19 +435,19 @@ async def update_cluster(spec, name, namespace, logger, old, new, **kwargs):
 async def delete_cluster(spec, name, namespace, logger, **kwargs):
     """
     Handler for PeninOmegaCluster deletion.
-    
+
     Kubernetes will automatically delete owned resources (Deployments, Services)
     due to owner references.
     """
     logger.info(f"Deleting PENIN-Ω cluster: {name} in namespace: {namespace}")
-    logger.info(f"Kubernetes will automatically clean up owned resources")
+    logger.info("Kubernetes will automatically clean up owned resources")
 
 
 @kopf.timer("penin.ai", "v1alpha1", "peninaomegaclusters", interval=30.0)
 async def monitor_cluster(spec, name, namespace, logger, status, **kwargs):
     """
     Periodic health monitoring and status updates.
-    
+
     This runs every 30 seconds to:
     - Check service health
     - Update cluster status
@@ -462,27 +461,27 @@ async def monitor_cluster(spec, name, namespace, logger, status, **kwargs):
 
     for service_name in SERVICES.keys():
         deployment_name = f"{name}-{service_name}"
-        
+
         try:
             deployment = k8s["apps"].read_namespaced_deployment(deployment_name, namespace)
-            
+
             service_key_map = {
                 "omega-meta": "omegaMeta",
                 "sigma-guard": "sigmaGuard",
                 "sr-omega-infinity": "srOmegaInfinity",
                 "acfa-league": "acfaLeague",
             }
-            
+
             key = service_key_map[service_name]
             replicas = deployment.spec.replicas or 0
             ready_replicas = deployment.status.ready_replicas or 0
-            
+
             services_status[key] = {
                 "ready": ready_replicas == replicas and replicas > 0,
                 "replicas": replicas,
                 "readyReplicas": ready_replicas,
             }
-            
+
             if ready_replicas < replicas:
                 all_ready = False
 

@@ -59,15 +59,15 @@ Quick Start:
 ...     IncognoscibleMetrics, SilenceMetrics,
 ...     CAOSConfig, CAOSState, compute_caos_plus_complete
 ... )
->>> 
+>>>
 >>> consistency = ConsistencyMetrics(pass_at_k=0.92, ece=0.008)
 >>> autoevol = AutoevolutionMetrics(delta_linf=0.06, cost_normalized=0.15)
 >>> incog = IncognoscibleMetrics(epistemic_uncertainty=0.35)
 >>> silence = SilenceMetrics(noise_ratio=0.08)
->>> 
+>>>
 >>> config = CAOSConfig(kappa=25.0, ema_half_life=5)
 >>> state = CAOSState()
->>> 
+>>>
 >>> caos, details = compute_caos_plus_complete(
 ...     consistency, autoevol, incog, silence, config, state
 ... )
@@ -436,6 +436,61 @@ def compute_caos_plus_exponential(
     """
     Fórmula CAOS⁺ exponencial pura: (1 + κ·C·A)^(O·S)
 
+    Args:
+        c: Consistência [0, 1]
+        a: Autoevolução [0, 1]
+        o: Incognoscível [0, 1]
+        s: Silêncio [0, 1]
+        kappa: Ganho base (padrão: 20.0)
+
+    Returns:
+        CAOS⁺ score ≥ 1.0
+    """
+    # Clamp inputs
+    c = clamp01(c)
+    a = clamp01(a)
+    o = clamp01(o)
+    s = clamp01(s)
+    kappa = clamp(kappa, 1.0, 100.0)
+
+    # Base (com proteção numérica)
+    base = max(1.0 + EPS, 1.0 + kappa * c * a)
+
+    # Expoente
+    exp_term = clamp01(o * s)
+
+    # CAOS+ = base^exp_term
+    caos_plus = base ** exp_term
+
+    return caos_plus
+
+
+def phi_caos(
+    c: float,
+    a: float,
+    o: float,
+    s: float,
+    kappa: float = DEFAULT_KAPPA,
+    kappa_max: float = 10.0,
+    gamma: float = DEFAULT_GAMMA,
+) -> float:
+    """
+    Fórmula CAOS⁺ com saturação tanh: tanh(γ·log((1 + κ·C·A)^(O·S)))
+
+    Aplica saturação no espaço logarítmico para maior controle de amplificação.
+    Útil quando se quer limitar a amplificação em [0, 1].
+
+    Args:
+        c: Consistência [0, 1]
+        a: Autoevolução [0, 1]
+        o: Incognoscível [0, 1]
+        s: Silêncio [0, 1]
+        kappa: Ganho base (padrão: 2.0 para phi_caos)
+        kappa_max: Limite máximo para kappa
+        gamma: Fator de saturação (padrão: 0.7)
+
+    Returns:
+        φ(CAOS⁺) em [0, 1] (saturado via tanh)
     """
     # Clamp inputs
     c = clamp01(c)
@@ -967,7 +1022,7 @@ __all__ = [
 def example_basic_usage():
     """
     Exemplo 1: Uso Básico - Cálculo Direto de CAOS⁺
-    
+
     Demonstra o uso mais simples da função exponencial com valores de componentes
     já calculados.
     """
@@ -1001,7 +1056,7 @@ def example_basic_usage():
 def example_structured_metrics():
     """
     Exemplo 2: Uso com Métricas Estruturadas
-    
+
     Demonstra como usar a função completa com métricas estruturadas,
     incluindo todas as sub-métricas que compõem cada dimensão CAOS.
     """
@@ -1065,7 +1120,7 @@ def example_structured_metrics():
 def example_temporal_tracking():
     """
     Exemplo 3: Tracking Temporal com EMA
-    
+
     Demonstra como usar o estado (CAOSState) para suavização temporal
     via Exponential Moving Average, útil para séries temporais.
     """
@@ -1123,7 +1178,7 @@ def example_temporal_tracking():
 def example_exploration_vs_exploitation():
     """
     Exemplo 4: Exploração vs Exploração
-    
+
     Demonstra como CAOS⁺ modula entre exploração (alta incerteza)
     e exploração (alta consistência).
     """
@@ -1196,7 +1251,7 @@ def example_exploration_vs_exploitation():
 def example_kappa_tuning():
     """
     Exemplo 5: Efeito do Parâmetro κ (kappa)
-    
+
     Demonstra como κ controla a intensidade da amplificação.
     """
     print("\n" + "=" * 70)
@@ -1223,7 +1278,7 @@ def example_kappa_tuning():
 def example_edge_cases():
     """
     Exemplo 6: Casos Extremos e Edge Cases
-    
+
     Demonstra o comportamento em situações limite.
     """
     print("\n" + "=" * 70)
@@ -1268,7 +1323,7 @@ def example_edge_cases():
 def run_all_examples():
     """
     Executa todos os exemplos de uso do CAOS⁺.
-    
+
     Este função demonstra as principais funcionalidades e casos de uso
     do motor CAOS⁺, servindo como tutorial completo e referência rápida.
     """
