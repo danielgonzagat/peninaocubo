@@ -1353,6 +1353,111 @@ def example_edge_cases():
     print("   → Garantia: sempre valores válidos")
 
 
+# ============================================================================
+# HELPER FUNCTIONS FOR BACKWARD COMPATIBILITY
+# ============================================================================
+
+
+def compute_C_consistency(
+    pass_at_k: float,
+    ece: float,
+    external_verification: float,
+) -> float:
+    """
+    Compute C (Consistency) component.
+    
+    Simple averaging of:
+    - pass@k (correctness)
+    - 1-ECE (calibration)
+    - external verification score
+    
+    Args:
+        pass_at_k: Pass rate [0,1]
+        ece: Expected Calibration Error [0,1]
+        external_verification: External validation score [0,1]
+    
+    Returns:
+        Consistency score [0,1]
+    """
+    return (pass_at_k + (1.0 - ece) + external_verification) / 3.0
+
+
+def compute_A_autoevolution(
+    delta_Linf: float,
+    cost_norm: float,
+    epsilon: float = 1e-3,
+) -> float:
+    """
+    Compute A (Autoevolution) component.
+    
+    Gain per cost: ΔL∞ / (cost + ε)
+    
+    Args:
+        delta_Linf: Improvement in L∞ [0,1]
+        cost_norm: Normalized cost [0,1]
+        epsilon: Stabilizer
+    
+    Returns:
+        Autoevolution score [0,1]
+    """
+    raw = delta_Linf / (cost_norm + epsilon)
+    return clamp01(raw)
+
+
+def compute_O_unknowable(
+    epistemic_uncertainty: float,
+    ood_score: float,
+    disagreement: float = 0.0,
+) -> float:
+    """
+    Compute O (Incognoscível/Unknowable) component.
+    
+    Average of epistemic uncertainty indicators.
+    
+    Args:
+        epistemic_uncertainty: Epistemic uncertainty [0,1]
+        ood_score: Out-of-distribution score [0,1]
+        disagreement: Ensemble disagreement [0,1]
+    
+    Returns:
+        Incognoscível score [0,1]
+    """
+    if disagreement == 0.0:
+        return (epistemic_uncertainty + ood_score) / 2.0
+    return (epistemic_uncertainty + ood_score + disagreement) / 3.0
+
+
+def compute_S_silence(
+    noise_level: float,
+    redundancy: float,
+    entropy_norm: float,
+    weights: tuple[float, float, float] = (2.0, 1.0, 1.0),
+) -> float:
+    """
+    Compute S (Silence) component.
+    
+    Weighted combination of anti-noise, anti-redundancy, anti-entropy.
+    
+    Args:
+        noise_level: Noise level [0,1]
+        redundancy: Redundancy [0,1]
+        entropy_norm: Normalized entropy [0,1]
+        weights: Weights for (noise, redundancy, entropy)
+    
+    Returns:
+        Silence score [0,1]
+    """
+    v1, v2, v3 = weights
+    anti_noise = 1.0 - noise_level
+    anti_redundancy = 1.0 - redundancy
+    anti_entropy = 1.0 - entropy_norm
+    
+    weighted_sum = v1 * anti_noise + v2 * anti_redundancy + v3 * anti_entropy
+    total_weight = v1 + v2 + v3
+    
+    return weighted_sum / total_weight
+
+
 def run_all_examples():
     """
     Executa todos os exemplos de uso do CAOS⁺.
