@@ -1,101 +1,156 @@
-# PENIN-Ω Documentation Index
+# 📚 PENIN-Ω Documentation Master Index
 
-Welcome to the complete documentation for PENIN-Ω — the self-evolving AI system with ethical guarantees, mathematical safety, and full auditability.
+**Last Updated**: 2025-10-01  
+**Version**: 0.9.0
 
----
-
-## 📚 Quick Navigation
-
-### 🚀 Getting Started
-- [Main README](../README.md) - Quick start and overview
-- [Setup Guide](SETUP.md) - Installation and configuration
-- [Complete System Guide](COMPLETE_SYSTEM_GUIDE.md) - Comprehensive system documentation
-
-### 📖 Core Guides
-- [**Complete Equations Guide**](guides/PENIN_OMEGA_COMPLETE_EQUATIONS_GUIDE.md) - Detailed explanation of all 15 core equations
-- [**IA ao Cubo Vision**](guides/README_IA_CUBED_V1.md) - Vision and philosophy of IAAA system
-
-### 📊 Technical Documentation
-- [Architecture](architecture.md) - System architecture and module interactions (TODO: F12)
-- [Equations Reference](equations.md) - Mathematical foundations (TODO: F12)
-- [Operations Guide](operations/) - Deployment and operations
-- [API Reference](api/) - Auto-generated API documentation (TODO: F12)
-
-### 🛡️ Safety & Ethics
-- [Ethics Framework](ethics.md) - ΣEA/LO-14 implementation (TODO: F12)
-- [Security Guide](security.md) - SBOM, SCA, supply chain (TODO: F12)
-
-### 🔬 Advanced Topics
-- [Auto-Evolution](auto_evolution.md) - Champion/Challenger pipeline (TODO: F12)
-- [Router](router.md) - Multi-LLM orchestration with budget tracking (TODO: F12)
-- [RAG & Memory](rag_memory.md) - Self-RAG implementation (TODO: F12)
-- [Coherence](coherence.md) - Fractal coherence scoring (TODO: F12)
-- [SOTA Integration](integration_sota.md) - NextPy, SpikingJelly, etc. (TODO: F12)
-
-### 📈 Reports & Progress
-- [Session Reports](reports/) - Historical session summaries
-- [Archive](archive/) - Deprecated documentation and audit trails
+Welcome to the PENIN-Ω documentation! This index provides quick access to all documentation resources.
 
 ---
 
-## 🎯 Documentation Status
+## 🎯 Quick Start
 
-### ✅ Complete
-- [x] README and Quick Start
-- [x] Complete Equations Guide
-- [x] Setup Guide
-- [x] Contributing Guidelines
-- [x] Changelog
-
-### 🚧 In Progress (Phase 12)
-- [ ] Architecture Diagrams
-- [ ] Full Equations Reference
-- [ ] Operations Runbooks
-- [ ] Ethics Implementation Guide
-- [ ] Security & Compliance Guide
-- [ ] Auto-Evolution Pipeline Guide
-- [ ] Router & Budget Guide
-- [ ] RAG & Memory Guide
-- [ ] Coherence Scoring Guide
-- [ ] SOTA Integration Guide
-- [ ] Auto-generated API Reference
+- **[README.md](../README.md)** — Project overview, features, installation
+- **[LEIA_PRIMEIRO.md](../LEIA_PRIMEIRO.md)** — Começar aqui (Português)
+- **[CHANGELOG.md](../CHANGELOG.md)** — Release history and changes
 
 ---
 
-## 📁 Documentation Structure
+## 📖 Core Documentation
+
+### Architecture & Design
+- **[Architecture Guide](architecture.md)** — System architecture (1100+ lines)
+- **[Equations Guide](equations.md)** — Mathematical foundations (15 equations)
+- **[Complete System Guide](COMPLETE_SYSTEM_GUIDE.md)** — Comprehensive system overview
+
+### Guides & Tutorials
+- **[Setup Guide](SETUP.md)** — Installation and configuration
+- **[Equations Complete Guide](guides/PENIN_OMEGA_COMPLETE_EQUATIONS_GUIDE.md)** — Detailed equations tutorial
+
+### Operations
+- **Operations Manual** *(Coming Soon)* — Deployment, monitoring, troubleshooting
+- **[Hash Algorithm Migration](HASH_ALGORITHM_MIGRATION.md)** — Hash refactoring details
+- **[Hash Refactoring Summary](HASH_REFACTORING_SUMMARY.md)** — Hash migration summary
+
+### Ethics & Security
+- **[Ethics](ethics.md)** — ΣEA/LO-14 principles and guidelines
+- **[Security](security.md)** — Security policies and compliance
+- **[Code of Conduct](../CODE_OF_CONDUCT.md)** — Community guidelines
+
+### Contributing
+- **[Contributing Guide](../CONTRIBUTING.md)** — How to contribute
+- **[Governance](../GOVERNANCE.md)** — Project governance and decision-making
+
+---
+
+## 🧬 Technical References
+
+### Integrations
+- **[SOTA Integrations](../penin/integrations/README.md)** — Integration guide and status
+- **[NextPy Integration](tests/NEXTPY_INTEGRATION_SUMMARY.md)** — NextPy AMS integration
+- **[LLM Providers](guides/llm_providers.md)** — Multi-LLM router configuration
+
+### API Documentation
+- **API Reference** *(Coming Soon)* — Full API documentation
+- **[Penin Module](../penin/README.md)** *(if exists)* — Core module documentation
+
+---
+
+## 📊 Reports & Analysis
+
+### Current Status
+- **[Status Final](../STATUS_FINAL.md)** — Latest project status *(deprecated, will be consolidated)*
+
+### Historical Reports
+All historical session reports are archived in:
+- **[docs/archive/sessions/](archive/sessions/)** — Past session reports by date
+
+---
+
+## 🔧 Development
+
+### Testing
+- **Testing Guide** *(Coming Soon)* — Test suite documentation
+- **[Test Reports](tests/)** — Integration test reports
+
+### Tooling
+- **[Scripts](../scripts/)** — Utility scripts
+- **[Benchmarks](../benchmarks/)** — Performance benchmarks
+
+---
+
+## 📂 Documentation Structure
 
 ```
-docs/
-├── INDEX.md (this file)
-├── SETUP.md
-├── COMPLETE_SYSTEM_GUIDE.md
-├── index.md (MkDocs entry point)
-├── guides/
-│   ├── PENIN_OMEGA_COMPLETE_EQUATIONS_GUIDE.md
-│   └── README_IA_CUBED_V1.md
-├── reports/
-│   ├── ANALYSIS_REPORT.md
-│   ├── IMPLEMENTATION_PROGRESS.md
-│   ├── SESSION_REPORT_IA_CUBED.md
-│   └── ... (historical reports)
-├── operations/
-│   └── ... (runbooks, observability, etc.)
-├── archive/
-│   └── ... (historical documentation)
-└── api/ (TODO: auto-generated)
+peninaocubo/
+├── README.md                  # Project overview
+├── CHANGELOG.md               # Release notes
+├── CONTRIBUTING.md            # How to contribute
+├── GOVERNANCE.md              # Project governance
+├── CODE_OF_CONDUCT.md         # Community guidelines
+├── SECURITY.md                # Security policies
+├── LEIA_PRIMEIRO.md           # Quick start (PT-BR)
+│
+├── docs/                      # Current documentation
+│   ├── INDEX.md               # This file
+│   ├── architecture.md        # System architecture
+│   ├── equations.md           # Mathematical foundations
+│   ├── ethics.md              # Ethics and principles
+│   ├── security.md            # Security documentation
+│   ├── guides/                # Tutorials and guides
+│   ├── tests/                 # Test documentation
+│   ├── reports/               # Current reports
+│   └── archive/               # Historical documentation
+│       └── sessions/          # Archived session reports
+│
+└── penin/                     # Source code
+    ├── integrations/README.md # Integration guide
+    └── ... (source modules)
 ```
 
 ---
 
 ## 🔗 External Resources
 
-- **GitHub Repository**: https://github.com/danielgonzagat/peninaocubo
-- **Issues**: https://github.com/danielgonzagat/peninaocubo/issues
-- **Changelog**: [CHANGELOG.md](../CHANGELOG.md)
-- **Contributing**: [CONTRIBUTING.md](../CONTRIBUTING.md)
+- **[GitHub Repository](https://github.com/danielgonzagat/peninaocubo)**
+- **[GitHub Issues](https://github.com/danielgonzagat/peninaocubo/issues)**
+- **[GitHub Discussions](https://github.com/danielgonzagat/peninaocubo/discussions)**
 
 ---
 
-**Version**: 0.8.0 → 1.0.0 (in progress)  
+## 📝 Documentation Guidelines
+
+When adding new documentation:
+
+1. **Place appropriately**:
+   - Core concepts → `docs/`
+   - Guides/tutorials → `docs/guides/`
+   - Session reports → `docs/archive/sessions/YYYY-MM-DD/`
+
+2. **Update this index** when adding major documentation
+
+3. **Follow naming conventions**:
+   - Use lowercase with underscores: `my_guide.md`
+   - Date-based: `YYYY-MM-DD-report.md`
+   - Descriptive names
+
+4. **Include metadata**:
+   ```markdown
+   # Document Title
+   **Date**: YYYY-MM-DD  
+   **Version**: X.Y.Z  
+   **Status**: Draft/Review/Final
+   ```
+
+---
+
+## 🆘 Need Help?
+
+- **Issues**: Report bugs or request features on [GitHub Issues](https://github.com/danielgonzagat/peninaocubo/issues)
+- **Discussions**: Ask questions on [GitHub Discussions](https://github.com/danielgonzagat/peninaocubo/discussions)
+- **Email**: contact@example.com
+
+---
+
 **Last Updated**: 2025-10-01  
-**Status**: 🟢 Active Development - IA ao Cubo Transformation
+**Maintained by**: PENIN-Ω Contributors  
+**License**: Apache 2.0

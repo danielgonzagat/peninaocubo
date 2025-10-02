@@ -7,7 +7,11 @@ Core mathematical functions for AGAPE, L∞, OCI, CAOS⁺, SR-Ω∞, and Master 
 
 from __future__ import annotations
 
-from .agape import agape_index
+# Agape Index - Consolidated to penin.ethics.agape
+from penin.ethics.agape import AgapeIndex, compute_agape_score
+
+# Backward compatibility alias
+agape_index = compute_agape_score
 
 # Try to import legacy functions
 try:

@@ -32,6 +32,41 @@ from dataclasses import dataclass
 
 
 @dataclass
+class SRConfig:
+    """Configuration for SR-Ω∞ computation."""
+    
+    # Weights for awareness
+    w_calib: float = 0.6
+    w_intro: float = 0.4
+    
+    # Parameters
+    alpha_0: float = 0.1  # Base learning rate
+    gamma: float = 0.8  # Saturation parameter
+    epsilon: float = 1e-6  # Numerical stability
+    
+    # Thresholds
+    sr_min_threshold: float = 0.80  # Minimum acceptable SR score
+    ethics_required: bool = True  # Fail-closed ethics gate
+    
+    def __post_init__(self):
+        """Validate configuration parameters."""
+        if not (0.0 <= self.w_calib <= 1.0):
+            raise ValueError(f"w_calib must be in [0,1], got {self.w_calib}")
+        if not (0.0 <= self.w_intro <= 1.0):
+            raise ValueError(f"w_intro must be in [0,1], got {self.w_intro}")
+        if abs(self.w_calib + self.w_intro - 1.0) > 1e-6:
+            raise ValueError(f"Weights must sum to 1.0, got {self.w_calib + self.w_intro}")
+        if not (0.0 < self.alpha_0 <= 1.0):
+            raise ValueError(f"alpha_0 must be in (0,1], got {self.alpha_0}")
+        if not (0.0 < self.gamma <= 1.0):
+            raise ValueError(f"gamma must be in (0,1], got {self.gamma}")
+        if self.epsilon <= 0:
+            raise ValueError(f"epsilon must be positive, got {self.epsilon}")
+        if not (0.0 <= self.sr_min_threshold <= 1.0):
+            raise ValueError(f"sr_min_threshold must be in [0,1], got {self.sr_min_threshold}")
+
+
+@dataclass
 class SRComponents:
     """SR-Ω∞ reflexive components."""
 
@@ -231,10 +266,11 @@ def compute_alpha_effective(
 
 # Export public API
 __all__ = [
+    "SRConfig",
+    "SRComponents",
     "compute_sr_score",
     "compute_alpha_effective",
     "compute_awareness",
     "compute_autocorrection",
     "compute_metacognition",
-    "SRComponents",
 ]

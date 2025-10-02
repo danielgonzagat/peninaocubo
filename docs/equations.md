@@ -83,53 +83,505 @@ linf = compute_linf_meta(metrics, weights, cost, config, ethical_ok=True)
 
 ## 3. CAOS⁺ — Consistency, Autoevolution, Unknowable, Silence
 
+### Visão Geral
+
+CAOS⁺ é o motor de evolução adaptativa do PENIN-Ω que modula dinamicamente a taxa
+de aprendizado (α) baseado em quatro dimensões fundamentais. A fórmula equilibra
+exploração e exploração através de uma base multiplicativa e expoente adaptativo.
+
+### Fórmula Matemática
+
 **Form:**
 ```
 CAOS⁺ = (1 + κ · C · A)^(O · S)
 ```
 
-**Components (all ∈ [0, 1]):**
-- **C (Consistency)**: `(pass@k + (1-ECE) + v_ext) / 3`
-  - pass@k: Self-consistency across samples
-  - ECE: Expected Calibration Error
-  - v_ext: External verification score
-  
-- **A (Autoevolution)**: `ΔL∞ / (Cost_norm + ε)`
-  - Improvement per unit cost
-  
-- **O (Unknowable)**: `w_epi · epistemic + w_ood · ood_score`
-  - Epistemic uncertainty (model confidence)
-  - OOD: Out-of-distribution detection
-  
-- **S (Silence)**: `2(1-noise) + 1(1-redund) + 1(1-entropy)` / 4
-  - Weighted anti-noise/redundancy/entropy
+Onde:
+- **Base**: `(1 + κ · C · A)` representa o potencial de amplificação
+- **Expoente**: `(O · S)` controla a agressividade da exploração
 
-- **κ (kappa)**: Amplification gain (≥ 20, auto-tuned)
+### Componentes Detalhados
 
-**Implementation:**
+Todas as dimensões são normalizadas em [0, 1]:
+
+#### **C (Consistency / Consistência)**: 
+Mede a confiabilidade e calibração das predições.
+
+**Fórmula**: `C = w₁·pass@k + w₂·(1-ECE) + w₃·v_ext`
+
+**Sub-componentes**:
+- **pass@k**: Taxa de autoconsistência em k amostras
+  - Mede se o sistema produz resultados consistentes
+  - Valores típicos: 0.85-0.95 para sistemas calibrados
+  - Peso sugerido: 0.4
+  
+- **ECE (Expected Calibration Error)**: Erro de calibração [0, 1]
+  - Mede se probabilidades refletem frequências reais
+  - Invertido para métrica positiva: (1-ECE)
+  - Valores bons: ECE < 0.05 (então 1-ECE > 0.95)
+  - Peso sugerido: 0.3
+  
+- **v_ext**: Score de verificação externa [0, 1]
+  - Validação por oracles, testes formais, humanos
+  - Valores típicos: 0.80-0.90
+  - Peso sugerido: 0.3
+
+**Interpretação**:
+- C alto (> 0.8): Sistema confiável, pode explorar mais
+- C baixo (< 0.5): Sistema inconsistente, precisa calibrar
+
+---
+
+#### **A (Autoevolution / Autoevolução)**: 
+Mede eficiência do aprendizado (ganho por custo).
+
+**Fórmula**: `A = ΔL∞⁺ / (Cost_norm + ε)`
+
+Normalizado para [0, 1] via: `A_norm = min(A_raw / max_a, 1.0)`
+
+**Sub-componentes**:
+- **ΔL∞⁺**: Ganho de performance (apenas positivo)
+  - max(0, ΔL∞) - só considera melhorias
+  - Valores típicos: 0.01-0.10 (1%-10% de ganho)
+  
+- **Cost_norm**: Custo normalizado [0, ∞)
+  - Tempo, tokens, energia, recursos
+  - Normalizado por budget ou baseline
+  - Valores típicos: 0.05-0.20 (5%-20% do budget)
+  
+- **ε**: Estabilizador numérico (padrão: 10⁻³)
+- **max_a**: Clamp máximo para normalização (padrão: 10.0)
+
+**Interpretação**:
+- A alto (> 0.6): Aprendizado eficiente, bom ROI
+- A baixo (< 0.3): Aprendizado ineficiente ou estagnado
+
+---
+
+#### **O (Unknowable / Incognoscível)**: 
+Mede incerteza e necessidade de exploração.
+
+**Fórmula**: `O = w_epi·epistemic + w_ood·ood_score + w_ens·ensemble_disagreement`
+
+**Sub-componentes**:
+- **epistemic_uncertainty**: Incerteza epistêmica [0, 1]
+  - Entropia: H(p) = -Σ p_i log p_i
+  - Mutual Information: I(Y;θ|X) em Bayesian NNs
+  - Valores típicos: 0.2-0.5
+  - Peso sugerido: 0.4
+  
+- **ood_score**: Score out-of-distribution [0, 1]
+  - Distância de distribuição de treino (Mahalanobis, KL, etc)
+  - Detecção de anomalias, domain shift
+  - Valores típicos: 0.1-0.4
+  - Peso sugerido: 0.3
+  
+- **ensemble_disagreement**: Variância no ensemble [0, 1]
+  - Std ou variance entre predições de múltiplos modelos
+  - Normalizado por range esperado
+  - Valores típicos: 0.15-0.35
+  - Peso sugerido: 0.3
+
+**Interpretação**:
+- O alto (> 0.6): Alta incerteza → precisa EXPLORAR mais
+- O baixo (< 0.3): Baixa incerteza → pode EXPLOITAR (exploit)
+
+---
+
+#### **S (Silence / Silêncio)**: 
+Mede qualidade do sinal (anti-ruído).
+
+**Fórmula**: `S = v₁·(1-noise) + v₂·(1-redund) + v₃·(1-entropy)`
+
+Ponderação sugerida: `v₁:v₂:v₃ = 2:1:1` (ruído é mais crítico)
+
+**Sub-componentes**:
+- **(1 - noise_ratio)**: Anti-ruído [0, 1]
+  - Proporção de sinal vs ruído: SNR relacionado
+  - Valores bons: noise < 0.1 (então anti-noise > 0.9)
+  - Peso sugerido: 0.5 (2/4)
+  
+- **(1 - redundancy_ratio)**: Anti-redundância [0, 1]
+  - Proporção de informação duplicada/redundante
+  - Valores bons: redundancy < 0.15
+  - Peso sugerido: 0.25 (1/4)
+  
+- **(1 - entropy_normalized)**: Anti-entropia [0, 1]
+  - Desordem/imprevisibilidade do sinal
+  - Entropia normalizada por máximo teórico
+  - Valores bons: entropy < 0.2
+  - Peso sugerido: 0.25 (1/4)
+
+**Interpretação**:
+- S alto (> 0.8): Sinal limpo, alta confiança
+- S baixo (< 0.5): Sinal ruidoso, baixa confiança
+
+---
+
+#### **κ (kappa)**: Ganho base de amplificação
+
+**Range**: κ ≥ 20 (padrão), típico: [10, 100]
+
+**Efeito**:
+- κ = 10: Amplificação conservadora (1.0-2.5×)
+- κ = 20: Amplificação moderada (1.0-3.5×) ← **padrão**
+- κ = 50: Amplificação agressiva (1.0-5.0×)
+- κ = 100: Amplificação extrema (1.0-7.0×)
+
+**Auto-tuning**: κ pode ser otimizado via **Equação 10** (bandit meta-optimization)
+baseado em métricas de performance agregadas.
+
+---
+
+### Propriedades Matemáticas
+
+1. **Monotonicidade**: CAOS⁺ cresce monotonicamente com cada componente
+   - ∂CAOS⁺/∂C ≥ 0, ∂CAOS⁺/∂A ≥ 0, ∂CAOS⁺/∂O ≥ 0, ∂CAOS⁺/∂S ≥ 0
+
+2. **Identidade**: CAOS⁺(0,0,0,0) = 1^0 = 1 (sem amplificação)
+
+3. **Bounds**:
+   - Mínimo teórico: 1.0 (sem exploração)
+   - Máximo teórico: (1 + κ)^1 quando C=A=O=S=1
+   - Com κ=20: máximo = 21.0 (raramente alcançado)
+
+4. **Decomposição**:
+   - **Base multiplicativa**: C·A mede "qualidade" do aprendizado
+   - **Expoente adaptativo**: O·S modula agressividade
+
+5. **Invariância**: CAOS⁺ é invariante a permutações dentro de cada par (C↔A, O↔S)
+
+---
+
+### Implementação em Python
+
+#### Uso Básico (Componentes Conhecidos)
+
 ```python
-from penin.equations.caos_plus import compute_caos_plus_exponential, CAOSConfig
+from penin.core.caos import compute_caos_plus_exponential
 
-C = 0.88  # high consistency
-A = 0.40  # moderate improvement/cost
-O = 0.35  # some uncertainty
-S = 0.82  # high signal quality
+# Valores dos componentes (já calculados)
+C = 0.88  # Alta consistência
+A = 0.40  # Autoevolução moderada
+O = 0.35  # Incerteza moderada
+S = 0.82  # Alto silêncio (sinal limpo)
 kappa = 20.0
 
-config = CAOSConfig(kappa=kappa)
-caos_plus = compute_caos_plus_exponential(C, A, O, S, config)
-# caos_plus ≈ 1.86 (boost factor for step size)
+caos_plus = compute_caos_plus_exponential(C, A, O, S, kappa)
+# caos_plus ≈ 1.86 (fator de amplificação para α)
+
+# Aplicar na Equação de Penin
+alpha_base = 0.01
+alpha_effective = alpha_base * caos_plus  # α_eff ≈ 0.0186
 ```
 
-**Usage:**
-- Modulates α (step size) in Penin Equation
-- Challenger selection (higher CAOS⁺ → prioritize)
-- Adaptive β_min (death gate threshold)
+#### Uso Completo (Com Métricas Estruturadas)
 
-**Best Practices:**
-- EMA smoothing (half-life 3-10 iterations)
-- Clamp derivatives (avoid numerical instability)
-- Log-space comparison for large ranges
+```python
+from penin.core.caos import (
+    compute_caos_plus_complete,
+    ConsistencyMetrics,
+    AutoevolutionMetrics,
+    IncognoscibleMetrics,
+    SilenceMetrics,
+    CAOSConfig,
+    CAOSState
+)
+
+# Definir métricas detalhadas
+consistency = ConsistencyMetrics(
+    pass_at_k=0.92,           # 92% autoconsistência
+    ece=0.008,                # 0.8% calibration error
+    external_verification=0.88,  # 88% verificação externa
+    weight_pass=0.4,
+    weight_ece=0.3,
+    weight_external=0.3
+)
+
+autoevolution = AutoevolutionMetrics(
+    delta_linf=0.06,          # 6% ganho de performance
+    cost_normalized=0.15,     # 15% do budget
+    max_a=10.0
+)
+
+incognoscible = IncognoscibleMetrics(
+    epistemic_uncertainty=0.35,
+    ood_score=0.28,
+    ensemble_disagreement=0.30,
+    weight_epistemic=0.4,
+    weight_ood=0.3,
+    weight_ensemble=0.3
+)
+
+silence = SilenceMetrics(
+    noise_ratio=0.08,         # 8% ruído
+    redundancy_ratio=0.12,    # 12% redundância
+    entropy_normalized=0.18,  # 18% entropia
+    weight_noise=0.5,         # 2:1:1 weighting
+    weight_redundancy=0.25,
+    weight_entropy=0.25
+)
+
+# Configuração com EMA para estabilidade temporal
+config = CAOSConfig(
+    kappa=25.0,
+    ema_half_life=5,  # Suavização em 5 iterações
+    caos_min=1.0,
+    caos_max=10.0,
+    normalize_output=False
+)
+
+# Estado para tracking temporal
+state = CAOSState()
+
+# Computar CAOS⁺
+caos_plus, details = compute_caos_plus_complete(
+    consistency, autoevolution, incognoscible, silence,
+    config, state
+)
+
+print(f"CAOS⁺: {caos_plus:.4f}")
+print(f"Componentes: {details['components_raw']}")
+print(f"Suavizados (EMA): {details['components_smoothed']}")
+print(f"Estabilidade: {details['state_stability']:.3f}")
+```
+
+#### Tracking Temporal (Séries Temporais)
+
+```python
+# Para múltiplas iterações com suavização EMA
+config = CAOSConfig(kappa=20.0, ema_half_life=5)
+state = CAOSState()
+
+for t in range(num_iterations):
+    # Obter métricas da iteração t
+    consistency_t = get_consistency_metrics(t)
+    autoevolution_t = get_autoevolution_metrics(t)
+    # ... outras métricas
+    
+    # Computar CAOS⁺ com EMA do estado anterior
+    caos_t, details_t = compute_caos_plus_complete(
+        consistency_t, autoevolution_t, incognoscible_t, silence_t,
+        config, state  # state é atualizado in-place
+    )
+    
+    # Usar caos_t para modular α
+    alpha_eff = alpha_base * caos_t
+```
+
+---
+
+### Uso no Pipeline PENIN-Ω
+
+#### 1. Modulação de α na Equação de Penin
+
+```python
+# Equação de Penin: I_{t+1} = Π_{H∩S}[I_t + α_t^eff · G(I_t, E_t; P_t)]
+# onde α_t^eff = α_0 · φ(CAOS⁺) · R_t
+
+alpha_base = 0.01  # Step size base
+caos_plus = compute_caos_plus_exponential(C, A, O, S, kappa)
+sr_score = compute_sr_omega(...)  # SR-Ω∞
+
+# Função de aceleração
+def phi(caos_plus, gamma=0.8):
+    return math.tanh(gamma * math.log(caos_plus))
+
+alpha_effective = alpha_base * phi(caos_plus) * sr_score
+```
+
+#### 2. Seleção de Challengers na Liga ACFA
+
+```python
+# Priorizar challengers com maior CAOS⁺
+challengers = [
+    (challenger_1, caos_plus_1),
+    (challenger_2, caos_plus_2),
+    (challenger_3, caos_plus_3),
+]
+
+# Ordenar por CAOS⁺ (maior = mais prioritário)
+challengers_sorted = sorted(challengers, key=lambda x: x[1], reverse=True)
+
+# Testar em ordem de prioridade
+for challenger, caos in challengers_sorted:
+    if test_challenger(challenger):
+        promote_to_champion(challenger)
+        break
+```
+
+#### 3. Adaptação de β_min (Death Equation)
+
+```python
+# β_min adaptativo baseado em CAOS⁺
+def adaptive_beta_min(caos_plus, beta_base=0.01):
+    """
+    CAOS⁺ alto → sistema aprendendo bem → pode ser mais exigente (β maior)
+    CAOS⁺ baixo → sistema lutando → ser mais tolerante (β menor)
+    """
+    beta_min = beta_base * (1.0 + 0.5 * (caos_plus - 1.0))
+    return max(0.005, min(0.05, beta_min))  # Clamp [0.5%, 5%]
+```
+
+---
+
+### Best Practices
+
+#### 1. Suavização Temporal (EMA)
+
+**Problema**: Métricas podem oscilar entre iterações, causando instabilidade.
+
+**Solução**: Usar `CAOSState` com EMA (Exponential Moving Average).
+
+```python
+# Half-life: número de iterações para peso cair 50%
+config = CAOSConfig(ema_half_life=5)  # 5 iterações
+state = CAOSState()
+
+# EMA é aplicado automaticamente em compute_caos_plus_complete()
+```
+
+**Guidelines**:
+- `ema_half_life = 3`: Resposta rápida (para ambientes dinâmicos)
+- `ema_half_life = 5`: Balanceado (padrão) ← **recomendado**
+- `ema_half_life = 10`: Resposta lenta (para ambientes estáveis)
+
+#### 2. Clamps e Normalização
+
+```python
+config = CAOSConfig(
+    kappa_min=10.0,    # Mínimo de κ
+    kappa_max=100.0,   # Máximo de κ
+    caos_min=1.0,      # CAOS⁺ nunca abaixo de 1.0
+    caos_max=10.0,     # Clamp superior para evitar explosão
+    normalize_output=False  # [1, 10] ou [0, 1] se True
+)
+```
+
+#### 3. Log-space para Comparações
+
+```python
+# Para comparar CAOS⁺ em diferentes escalas
+config = CAOSConfig(use_log_space=True)
+caos, details = compute_caos_plus_complete(..., config)
+
+log_caos = details['caos_plus_log']  # log(CAOS⁺)
+# Útil para ranking, plotting, análise estatística
+```
+
+#### 4. Auditoria e WORM Ledger
+
+```python
+# Details contém TODAS métricas para auditoria
+caos, details = compute_caos_plus_complete(...)
+
+# Registrar no WORM ledger
+worm_entry = {
+    "timestamp": time.time(),
+    "caos_plus": caos,
+    "components_raw": details['components_raw'],
+    "components_smoothed": details['components_smoothed'],
+    "kappa": details['kappa'],
+    "metrics_input": details['metrics_input'],
+    "state_stability": details['state_stability'],
+}
+worm_ledger.append(worm_entry)
+```
+
+#### 5. Diagnóstico de Problemas
+
+```python
+# Se CAOS⁺ está sempre próximo de 1.0:
+# → Verificar se C·A está muito baixo (sem qualidade)
+# → Verificar se O·S está muito baixo (sem exploração)
+
+# Se CAOS⁺ oscila muito:
+# → Aumentar ema_half_life para mais suavização
+# → Verificar qualidade das métricas de entrada
+
+# Se CAOS⁺ está sempre no máximo (caos_max):
+# → Aumentar caos_max ou usar normalize_output=True
+# → Verificar se κ está muito alto
+```
+
+---
+
+### Cenários de Uso
+
+#### Cenário 1: Exploração (Alta Incerteza)
+
+```python
+# Sistema entrando em território desconhecido
+C = 0.5   # Consistência baixa (ainda incerto)
+A = 0.3   # Autoevolução baixa (aprendendo lentamente)
+O = 0.8   # ALTA incerteza (precisa explorar)
+S = 0.6   # Silêncio moderado
+
+caos = compute_caos_plus_exponential(C, A, O, S, kappa=20.0)
+# caos ≈ 1.95 (amplificação moderada para exploração)
+```
+
+#### Cenário 2: Exploração (Baixa Incerteza)
+
+```python
+# Sistema refinando em território conhecido
+C = 0.9   # ALTA consistência (confiante)
+A = 0.6   # ALTA autoevolução (aprendendo bem)
+O = 0.2   # Baixa incerteza (território conhecido)
+S = 0.9   # Alto silêncio (sinal limpo)
+
+caos = compute_caos_plus_exponential(C, A, O, S, kappa=20.0)
+# caos ≈ 1.56 (amplificação moderada para exploração)
+```
+
+#### Cenário 3: Sweet Spot (Máxima Amplificação)
+
+```python
+# Sistema aprendendo rapidamente em território parcialmente conhecido
+C = 0.85  # Alta consistência
+A = 0.7   # Alta autoevolução
+O = 0.6   # Incerteza moderada
+S = 0.85  # Alto silêncio
+
+caos = compute_caos_plus_exponential(C, A, O, S, kappa=20.0)
+# caos ≈ 3.68 (MÁXIMA amplificação - sweet spot!)
+```
+
+---
+
+### Debugging e Diagnóstico
+
+```python
+# Use print_caos_diagnostics() para debug
+def print_caos_diagnostics(details):
+    print("=== CAOS⁺ Diagnostics ===")
+    
+    raw = details['components_raw']
+    smoothed = details['components_smoothed']
+    
+    print(f"Raw:      C={raw['C']:.3f}, A={raw['A']:.3f}, "
+          f"O={raw['O']:.3f}, S={raw['S']:.3f}")
+    print(f"Smoothed: C={smoothed['C']:.3f}, A={smoothed['A']:.3f}, "
+          f"O={smoothed['O']:.3f}, S={smoothed['S']:.3f}")
+    
+    print(f"\nBase (1 + κ·C·A) = {1 + details['kappa']*smoothed['C']*smoothed['A']:.4f}")
+    print(f"Exponent (O·S) = {smoothed['O']*smoothed['S']:.4f}")
+    print(f"CAOS⁺_raw = {details['caos_plus_raw']:.4f}")
+    print(f"CAOS⁺_final = {details['caos_plus_final']:.4f}")
+    print(f"Stability = {details['state_stability']:.4f}")
+```
+
+---
+
+### Referências e Links
+
+- **Código fonte**: `penin/core/caos.py` (implementação canônica)
+- **Testes**: `tests/test_caos.py`
+- **Exemplos**: Execute `python penin/core/caos.py` para ver todos os exemplos
+- **Equação de Penin**: Ver seção 1 deste documento
+- **SR-Ω∞**: Ver seção 4 deste documento
+- **Equação 10** (Meta-optimization): Ver seção 10 deste documento
+
 
 ---
 

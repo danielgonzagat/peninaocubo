@@ -16,7 +16,7 @@ from pathlib import Path
 
 from observability import ObservabilityConfig, ObservabilityManager
 
-from penin.omega.caos import CAOSComponents, CAOSPlusEngine
+from penin.omega import CAOSComponents, CAOSPlusEngine
 
 # Imports do sistema
 from penin.omega.ethics_metrics import calculate_and_validate_ethics

@@ -1,0 +1,12 @@
+# PENIN-Ω Kubernetes Operator Requirements
+# Core operator framework
+kopf>=1.37.0
+
+# Kubernetes client
+kubernetes>=30.0.0
+
+# Async support
+asyncio-throttle>=1.0.0
+
+# Logging
+structlog>=23.1.0

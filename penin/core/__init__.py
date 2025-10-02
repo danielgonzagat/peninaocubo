@@ -66,6 +66,11 @@ from .caos import (
     phi_caos,
 )
 
+# Persistence and state management
+from .artifacts import NumericVectorArtifact
+from .orchestrator import OmegaMetaOrchestrator
+from .serialization import StateEncoder, state_decoder
+
 # Public API
 __all__ = [
     # Version
@@ -102,4 +107,9 @@ __all__ = [
     "EPS",
     "DEFAULT_KAPPA",
     "DEFAULT_GAMMA",
+    # Persistence
+    "NumericVectorArtifact",
+    "OmegaMetaOrchestrator",
+    "StateEncoder",
+    "state_decoder",
 ]

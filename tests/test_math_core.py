@@ -9,7 +9,7 @@ import math
 import numpy as np
 import pytest
 
-from penin.math.caos_plus_complete import (
+from penin.core.caos import (
     CAOSComponents,
     caos_plus_simple,
     compute_A_autoevolution,

@@ -31,7 +31,9 @@ from __future__ import annotations
 import warnings
 
 # Import from canonical location
-from penin.core.caos import compute_caos_plus_exponential as _compute_caos_plus_exponential
+from penin.core.caos import (
+    compute_caos_plus_exponential as _compute_caos_plus_exponential,
+)
 
 # Deprecation warning on module import
 warnings.warn(
