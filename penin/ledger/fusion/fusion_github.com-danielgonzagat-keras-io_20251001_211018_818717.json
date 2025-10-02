@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-keras-io",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/keras-io",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/keras-io",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8127981857474388,
+    "delta_linf": 0.0032392594100593653,
+    "sr": 0.8654528088918411,
+    "G": 0.8657197779793699,
+    "ece": 0.011356940180101945,
+    "rho_bias": 1.0137266525688347,
+    "fp": 0.023024596500449523
+  },
+  "gate_pass": true,
+  "timestamp": 1759363818.7173278,
+  "_slug": "github.com-danielgonzagat-keras-io"
+}

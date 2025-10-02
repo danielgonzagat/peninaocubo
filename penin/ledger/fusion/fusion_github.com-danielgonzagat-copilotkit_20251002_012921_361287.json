@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-copilotkit",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/CopilotKit",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/CopilotKit",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8129990704977079,
+    "delta_linf": 0.0032410758003984354,
+    "sr": 0.8653499545215722,
+    "G": 0.8663262652592063,
+    "ece": 0.01135365736033605,
+    "rho_bias": 1.0129689434825806,
+    "fp": 0.02303558971638603
+  },
+  "gate_pass": true,
+  "timestamp": 1759379361.287437,
+  "_slug": "github.com-danielgonzagat-copilotkit"
+}

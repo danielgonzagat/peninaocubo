@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-motia",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/motia",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/motia",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8130688890974137,
+    "delta_linf": 0.0032403141342738457,
+    "sr": 0.8657102381204522,
+    "G": 0.8660633149319016,
+    "ece": 0.011348392688775912,
+    "rho_bias": 1.0133022115679822,
+    "fp": 0.023026728176650677
+  },
+  "gate_pass": true,
+  "timestamp": 1759356197.611635,
+  "_slug": "github.com-danielgonzagat-motia"
+}

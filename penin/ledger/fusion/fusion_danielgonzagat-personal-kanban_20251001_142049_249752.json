@@ -1,0 +1,90 @@
+{
+  "fusion": "danielgonzagat-personal-kanban",
+  "plan": {
+    "source_repo": "danielgonzagat-personal-kanban",
+    "source_url": "https://github.com/danielgonzagat/personal-kanban",
+    "strategy": {
+      "mode": "plugin_adapters",
+      "rationale": "respect_licenses_and_enable_emergent_fusion"
+    },
+    "plugins": [
+      {
+        "name": "evox",
+        "pip": "evox>=1.2.2",
+        "license": "GPL-3.0-or-later",
+        "adapter": "penin/integrations/evolution/neuroevo_evox_ray.py",
+        "features": [
+          "neuroevolution",
+          "population",
+          "fitness",
+          "ray-distributed"
+        ]
+      },
+      {
+        "name": "ray",
+        "pip": "ray>=2.10.0",
+        "features": [
+          "distributed_runtime",
+          "actors",
+          "tasks",
+          "serve"
+        ]
+      },
+      {
+        "name": "transformers",
+        "pip": "transformers>=4.44.0",
+        "features": [
+          "llm_backbone",
+          "tokenization",
+          "hf_pipelines"
+        ]
+      },
+      {
+        "name": "dspy",
+        "pip": "dspy-ai>=2.4.9",
+        "features": [
+          "programs",
+          "teleprompters",
+          "few-shot-automation"
+        ]
+      }
+    ],
+    "acceptance": {
+      "min_delta_linf": 0.0,
+      "min_caos_ratio": 1.0,
+      "min_sr": 0.8,
+      "min_G": 0.85,
+      "max_ece": 0.01,
+      "max_rho_bias": 1.05,
+      "max_fp": 0.05
+    }
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/personal-kanban",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "deps_present": [
+      "dspy",
+      "evox",
+      "ray",
+      "transformers"
+    ],
+    "population": 16,
+    "generations": 2,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.72,
+    "caos_pos": 0.75,
+    "delta_linf": 0.012,
+    "sr": 0.86,
+    "G": 0.88,
+    "ece": 0.006,
+    "rho_bias": 1.01,
+    "fp": 0.02
+  },
+  "gate_pass": true,
+  "timestamp": 1759339249.752379
+}

@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-naslib",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/NASLib",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/NASLib",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8131599843892895,
+    "delta_linf": 0.0032403948253576496,
+    "sr": 0.8649152330182577,
+    "G": 0.8657968670799039,
+    "ece": 0.011349951863957777,
+    "rho_bias": 1.01385483078471,
+    "fp": 0.02302014636705924
+  },
+  "gate_pass": true,
+  "timestamp": 1759380382.3082318,
+  "_slug": "github.com-danielgonzagat-naslib"
+}

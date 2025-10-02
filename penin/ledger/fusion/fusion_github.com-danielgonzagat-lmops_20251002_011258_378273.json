@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-lmops",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/LMOps",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/LMOps",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.813121842737867,
+    "delta_linf": 0.0032415904165424042,
+    "sr": 0.8652796737434879,
+    "G": 0.8659058404757924,
+    "ece": 0.011346904787072183,
+    "rho_bias": 1.0131385989410946,
+    "fp": 0.02303108842638964
+  },
+  "gate_pass": true,
+  "timestamp": 1759378378.2730932,
+  "_slug": "github.com-danielgonzagat-lmops"
+}

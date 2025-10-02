@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-cradle",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/Cradle",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/Cradle",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8128488671654017,
+    "delta_linf": 0.003240271592355605,
+    "sr": 0.8656159830516088,
+    "G": 0.8663194478983878,
+    "ece": 0.01135142340595507,
+    "rho_bias": 1.013495204805857,
+    "fp": 0.02303899526151922
+  },
+  "gate_pass": true,
+  "timestamp": 1759365622.495893,
+  "_slug": "github.com-danielgonzagat-cradle"
+}

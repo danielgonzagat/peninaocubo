@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-ai-agents-for-beginners",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/ai-agents-for-beginners",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/ai-agents-for-beginners",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8131371436712475,
+    "delta_linf": 0.003240152843209204,
+    "sr": 0.865649956395195,
+    "G": 0.8661855260744502,
+    "ece": 0.01135708788022284,
+    "rho_bias": 1.0130147634474382,
+    "fp": 0.023029736971730615
+  },
+  "gate_pass": true,
+  "timestamp": 1759362777.0697012,
+  "_slug": "github.com-danielgonzagat-ai-agents-for-beginners"
+}

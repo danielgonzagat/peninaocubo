@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-did-verification-consensus-protocol",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/did-verification-consensus-protocol",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/did-verification-consensus-protocol",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8131198603206774,
+    "delta_linf": 0.0032396375721973833,
+    "sr": 0.8653852742212326,
+    "G": 0.8661298154312711,
+    "ece": 0.011354050850612673,
+    "rho_bias": 1.0135117953560462,
+    "fp": 0.023035356034830833
+  },
+  "gate_pass": true,
+  "timestamp": 1759395896.384107,
+  "_slug": "github.com-danielgonzagat-did-verification-consensus-protocol"
+}

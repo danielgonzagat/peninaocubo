@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-openvino",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/openvino",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/openvino",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8128846260456949,
+    "delta_linf": 0.003242121660663432,
+    "sr": 0.865085998193675,
+    "G": 0.8658879957758299,
+    "ece": 0.01135439835831349,
+    "rho_bias": 1.013379408041096,
+    "fp": 0.02303805309366273
+  },
+  "gate_pass": true,
+  "timestamp": 1759397262.255782,
+  "_slug": "github.com-danielgonzagat-openvino"
+}

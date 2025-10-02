@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-megaiaaa",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/megaIAAA",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/megaIAAA",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8131144087629874,
+    "delta_linf": 0.0032399885730107414,
+    "sr": 0.865117408399271,
+    "G": 0.8659149622417707,
+    "ece": 0.011355524205018014,
+    "rho_bias": 1.013469326546481,
+    "fp": 0.02302023965344115
+  },
+  "gate_pass": true,
+  "timestamp": 1759374723.354032,
+  "_slug": "github.com-danielgonzagat-megaiaaa"
+}

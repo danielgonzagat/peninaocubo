@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-mlflow",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/mlflow",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/mlflow",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8131485127204607,
+    "delta_linf": 0.003241630430791756,
+    "sr": 0.8652941819703918,
+    "G": 0.8664055998867256,
+    "ece": 0.01134960853412677,
+    "rho_bias": 1.0136547409434447,
+    "fp": 0.023019556951197215
+  },
+  "gate_pass": true,
+  "timestamp": 1759374839.963493,
+  "_slug": "github.com-danielgonzagat-mlflow"
+}

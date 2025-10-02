@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-alien",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/alien",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/alien",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8130948975611345,
+    "delta_linf": 0.0032400230867948633,
+    "sr": 0.8653323366355165,
+    "G": 0.8656901235790974,
+    "ece": 0.011353349482263434,
+    "rho_bias": 1.013822794137998,
+    "fp": 0.0230195408009219
+  },
+  "gate_pass": true,
+  "timestamp": 1759376801.5793679,
+  "_slug": "github.com-danielgonzagat-alien"
+}

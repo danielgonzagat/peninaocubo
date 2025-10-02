@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-langgraph",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/langgraph",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/langgraph",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.812894997125272,
+    "delta_linf": 0.003241924467269455,
+    "sr": 0.8649786303467899,
+    "G": 0.8663214835463824,
+    "ece": 0.011347215947036143,
+    "rho_bias": 1.013500294529847,
+    "fp": 0.02303357750268007
+  },
+  "gate_pass": true,
+  "timestamp": 1759363464.029736,
+  "_slug": "github.com-danielgonzagat-langgraph"
+}

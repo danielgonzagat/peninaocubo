@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-tfjs-core",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/tfjs-core",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/tfjs-core",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8127608944251028,
+    "delta_linf": 0.0032412386061182017,
+    "sr": 0.8657045539393856,
+    "G": 0.8658276750710334,
+    "ece": 0.011347091267391163,
+    "rho_bias": 1.0134144464081398,
+    "fp": 0.023030368383008003
+  },
+  "gate_pass": true,
+  "timestamp": 1759384415.6087732,
+  "_slug": "github.com-danielgonzagat-tfjs-core"
+}

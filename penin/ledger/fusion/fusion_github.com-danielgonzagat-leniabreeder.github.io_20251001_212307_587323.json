@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-leniabreeder.github.io",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/leniabreeder.github.io",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/leniabreeder.github.io",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8130335595875576,
+    "delta_linf": 0.0032415485000013974,
+    "sr": 0.8653902513984575,
+    "G": 0.865744826212691,
+    "ece": 0.011353162249338813,
+    "rho_bias": 1.0130894710453788,
+    "fp": 0.023022226849343908
+  },
+  "gate_pass": true,
+  "timestamp": 1759364587.3235781,
+  "_slug": "github.com-danielgonzagat-leniabreeder.github.io"
+}

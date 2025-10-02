@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-autopoietic-nets",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/autopoietic-nets",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/autopoietic-nets",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.812855424189076,
+    "delta_linf": 0.003240524516668177,
+    "sr": 0.8650988205508235,
+    "G": 0.8662412518177364,
+    "ece": 0.011346601672308863,
+    "rho_bias": 1.0133304636294813,
+    "fp": 0.023017724496416116
+  },
+  "gate_pass": true,
+  "timestamp": 1759390373.066346,
+  "_slug": "github.com-danielgonzagat-autopoietic-nets"
+}

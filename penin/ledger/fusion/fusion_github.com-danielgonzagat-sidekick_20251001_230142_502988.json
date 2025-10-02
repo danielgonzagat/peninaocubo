@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-sidekick",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/Sidekick",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/Sidekick",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.813085542266842,
+    "delta_linf": 0.0032400677821286844,
+    "sr": 0.8653019258254699,
+    "G": 0.8662207238962958,
+    "ece": 0.01135306420009662,
+    "rho_bias": 1.0130324681810987,
+    "fp": 0.023028948373620853
+  },
+  "gate_pass": true,
+  "timestamp": 1759370502.987512,
+  "_slug": "github.com-danielgonzagat-sidekick"
+}

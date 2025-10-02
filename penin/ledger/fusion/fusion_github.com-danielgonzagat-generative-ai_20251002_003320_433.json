@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-generative-ai",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/generative-ai",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/generative-ai",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8130981211203887,
+    "delta_linf": 0.0032402079854612223,
+    "sr": 0.8654127852913667,
+    "G": 0.8659204753408097,
+    "ece": 0.011346504899838652,
+    "rho_bias": 1.013772368125081,
+    "fp": 0.023020764808506046
+  },
+  "gate_pass": true,
+  "timestamp": 1759376000.433037,
+  "_slug": "github.com-danielgonzagat-generative-ai"
+}

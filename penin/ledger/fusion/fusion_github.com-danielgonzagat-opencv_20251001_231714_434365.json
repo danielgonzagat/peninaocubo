@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-opencv",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/opencv",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/opencv",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8130465109671502,
+    "delta_linf": 0.003239159362608975,
+    "sr": 0.8653452430780351,
+    "G": 0.8659542473010218,
+    "ece": 0.011356733437014257,
+    "rho_bias": 1.0137562246960217,
+    "fp": 0.023021656953488012
+  },
+  "gate_pass": true,
+  "timestamp": 1759371434.3647711,
+  "_slug": "github.com-danielgonzagat-opencv"
+}

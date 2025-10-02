@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-streamlit",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/streamlit",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/streamlit",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.813012966722977,
+    "delta_linf": 0.0032402565936034402,
+    "sr": 0.8651441419685348,
+    "G": 0.8657643965304548,
+    "ece": 0.011349690606066271,
+    "rho_bias": 1.013865738176536,
+    "fp": 0.02302409392385324
+  },
+  "gate_pass": true,
+  "timestamp": 1759363381.0367842,
+  "_slug": "github.com-danielgonzagat-streamlit"
+}

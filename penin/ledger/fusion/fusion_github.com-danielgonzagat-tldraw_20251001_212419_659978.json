@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-tldraw",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/tldraw",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/tldraw",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.812831524906572,
+    "delta_linf": 0.0032419128585682504,
+    "sr": 0.8655968788614322,
+    "G": 0.8660209231023726,
+    "ece": 0.011355394490249698,
+    "rho_bias": 1.0134597270031558,
+    "fp": 0.02303494964239235
+  },
+  "gate_pass": true,
+  "timestamp": 1759364659.977738,
+  "_slug": "github.com-danielgonzagat-tldraw"
+}

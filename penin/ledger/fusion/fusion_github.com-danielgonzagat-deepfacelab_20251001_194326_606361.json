@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-deepfacelab",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/DeepFaceLab",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/DeepFaceLab",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8128996712663654,
+    "delta_linf": 0.0032406583207849966,
+    "sr": 0.8653919742430339,
+    "G": 0.865827855485625,
+    "ece": 0.011347509738789873,
+    "rho_bias": 1.013749810004776,
+    "fp": 0.02302856162774219
+  },
+  "gate_pass": true,
+  "timestamp": 1759358606.360872,
+  "_slug": "github.com-danielgonzagat-deepfacelab"
+}
