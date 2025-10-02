@@ -6,7 +6,7 @@ theme:
 nav:
   - Home: index.md
   - Guias:
-      - Master Equation: guides/master_equation.md
+      - Equação Mestra: guides/master_equation.md
       - Equações Completas: guides/PENIN_OMEGA_COMPLETE_EQUATIONS_GUIDE.md
       - IA³ v1.0: guides/README_IA_CUBED_V1.md
 markdown_extensions:
