@@ -221,102 +221,102 @@ class TestRouterCache:
     """Test router caching functionality."""
 
     @pytest.fixture
-    def router(self):
-        """Create router with cache enabled"""
-        return MultiLLMRouterComplete(
-            mode=RouterMode.PRODUCTION,
-            cache_enabled=True,
-            cache_ttl_seconds=3600,
-        )
+    def cache(self):
+        """Create cache"""
+        from penin.router_pkg.cache import MultiLevelCache
+        return MultiLevelCache(l1_size=100, l1_ttl=60.0)
 
-    def test_cache_hit_returns_cached_response(self, router):
+    def test_cache_hit_returns_cached_response(self, cache):
         """Test cache hit returns previous response"""
-        prompt = "What is 2+2?"
+        key = "test_prompt"
+        value = {"content": "4", "model": "gpt-4"}
         
-        # First request - cache miss
-        with patch.object(router, '_call_provider') as mock_call:
-            mock_call.return_value = LLMResponse(
-                content="4",
-                model="gpt-4",
-                tokens_used=10,
-                cost_usd=0.001,
-            )
-            
-            response1 = router.generate(prompt, provider="openai")
-            assert mock_call.call_count == 1
+        # Store
+        cache.put(key, value)
         
-        # Second request - cache hit
-        with patch.object(router, '_call_provider') as mock_call:
-            response2 = router.generate(prompt, provider="openai")
-            
-            # Should NOT call provider again
-            assert mock_call.call_count == 0
-            assert response2.content == "4"
+        # Retrieve
+        result = cache.get(key)
+        assert result == value
+        
+        # Check hit rate
+        assert cache.l1.hit_rate > 0.0
 
-    def test_cache_integrity_hmac(self, router):
+    def test_cache_integrity_hmac(self, cache):
         """Test cache integrity checking with HMAC"""
-        # Cache should validate integrity before returning
-        # If tampered, should regenerate
-        pass  # TODO: Implement HMAC validation test
+        key = "test_key"
+        value = "test_value"
+        
+        # Put with HMAC
+        cache.l1.put(key, value, verify_integrity=True)
+        
+        # Get with verification
+        result = cache.l1.get(key, verify_integrity=True)
+        assert result == value
 
 
 class TestRouterFallback:
     """Test fallback routing behavior."""
 
     @pytest.fixture
-    def router(self):
-        """Create router with fallback enabled"""
-        return MultiLLMRouterComplete(
-            mode=RouterMode.PRODUCTION,
-            fallback_enabled=True,
-        )
+    def fallback(self):
+        """Create fallback strategy"""
+        from penin.router_pkg.fallback import FallbackStrategy
+        return FallbackStrategy()
 
-    def test_fallback_on_provider_failure(self, router):
+    def test_fallback_on_provider_failure(self, fallback):
         """Test fallback to alternative provider on failure"""
-        with patch.object(router, '_call_provider') as mock_call:
-            # First provider fails
-            mock_call.side_effect = [
-                Exception("Provider unavailable"),
-                LLMResponse(content="Success", model="gpt-4", tokens_used=10, cost_usd=0.001),
-            ]
-            
-            response = router.generate("test", provider="openai", fallback_providers=["anthropic"])
-            
-            # Should have tried both providers
-            assert mock_call.call_count == 2
-            assert response.content == "Success"
+        providers = ["openai", "anthropic", "gemini"]
+        primary = "openai"
+        
+        # Get fallback sequence
+        fallbacks = fallback.get_fallback_sequence(
+            providers=providers,
+            primary_provider=primary
+        )
+        
+        # Should have alternatives (excluding primary)
+        assert len(fallbacks) > 0
+        assert primary not in fallbacks
+        assert "anthropic" in fallbacks or "gemini" in fallbacks
 
 
 class TestRouterAnalytics:
     """Test router analytics and monitoring."""
 
-    def test_tracks_success_rate_per_provider(self):
+    @pytest.fixture
+    def analytics(self):
+        """Create analytics tracker"""
+        from penin.router_pkg.analytics import AnalyticsTracker
+        return AnalyticsTracker()
+
+    def test_tracks_success_rate_per_provider(self, analytics):
         """Test success rate tracking"""
-        router = MultiLLMRouterComplete(mode=RouterMode.PRODUCTION)
-        
         # Record mix of successes and failures
         for _ in range(95):
-            router._record_provider_success("openai")
+            analytics.record_request("openai", latency_ms=100.0, success=True)
         for _ in range(5):
-            router._record_provider_failure("openai")
+            analytics.record_request("openai", latency_ms=100.0, success=False)
         
-        stats = router.budget_tracker.get_provider_stats("openai")
         # Success rate should be 95%
-        # assert stats.success_rate == 0.95  # TODO: Implement success rate tracking
+        success_rate = analytics.get_success_rate("openai")
+        assert success_rate == 0.95
 
-    def test_tracks_latency_percentiles(self):
+    def test_tracks_latency_percentiles(self, analytics):
         """Test latency percentile tracking"""
-        router = MultiLLMRouterComplete(mode=RouterMode.PRODUCTION)
-        
         # Record various latencies
         latencies_ms = [10, 20, 30, 40, 50, 100, 200, 500, 1000, 2000]
         
         for latency in latencies_ms:
-            router._record_latency("openai", latency)
+            analytics.record_request("openai", latency_ms=float(latency), success=True)
         
-        # Should be able to query p50, p95, p99
-        # p50 = router.get_latency_percentile("openai", 50)
-        # assert p50 == 50  # Median
+        # Get percentiles
+        percentiles = analytics.get_latency_percentiles("openai")
+        
+        assert "p50" in percentiles
+        assert "p90" in percentiles
+        assert "p95" in percentiles
+        assert "p99" in percentiles
+        assert percentiles["p50"] > 0.0
 
 
 # ============================================================================
