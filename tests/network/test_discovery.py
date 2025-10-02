@@ -8,7 +8,6 @@ Tests for UDP-based peer discovery service.
 import json
 import socket
 import time
-from unittest.mock import MagicMock
 
 import pytest
 
