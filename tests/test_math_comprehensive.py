@@ -53,29 +53,26 @@ class TestMathModulesLoad:
         assert oci is not None
 
 
-class TestMathClassesInstantiate:
-    """Test math classes can be instantiated"""
+class TestMathDataStructures:
+    """Test math data structures"""
 
-    def test_sr_omega_calculator_init(self):
-        """Test SROmegaCalculator can be created"""
-        from penin.math.sr_omega_infinity import SROmegaCalculator
+    def test_consistency_metrics_structure(self):
+        """Test ConsistencyMetrics dataclass"""
+        from penin.core.caos import ConsistencyMetrics
         
-        calc = SROmegaCalculator()
-        assert calc is not None
+        metrics = ConsistencyMetrics(pass_at_k=0.9, ece=0.01)
+        
+        assert metrics.pass_at_k == 0.9
+        assert metrics.ece == 0.01
 
-    def test_risk_profile_creation(self):
-        """Test RiskProfile can be created"""
-        from penin.math.ir_ic_contractivity import RiskProfile
+    def test_autoevolution_metrics_structure(self):
+        """Test AutoevolutionMetrics dataclass"""
+        from penin.core.caos import AutoevolutionMetrics
         
-        profile = RiskProfile(
-            idolatry=0.1,
-            harm_physical=0.2,
-            harm_emotional=0.1,
-            privacy=0.05
-        )
+        metrics = AutoevolutionMetrics(delta_linf=0.05, cost_normalized=0.02)
         
-        assert profile is not None
-        assert profile.idolatry == 0.1
+        assert metrics.delta_linf == 0.05
+        assert metrics.cost_normalized == 0.02
 
 
 class TestMathUtilityFunctions:
