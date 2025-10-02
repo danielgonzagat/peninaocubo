@@ -1407,3 +1407,11 @@ def compute_O_unknowable(A, eps: float = 1e-12):
         return 1.0 - compute_C_consistency(A, eps=eps)
     except Exception:
         return 1.0
+
+
+def compute_S_silence(A, threshold: float = 1e-12):
+    import numpy as np
+    M = np.asarray(A, dtype=float)
+    if M.size == 0: return 1.0
+    silent = np.sum(np.abs(M) <= threshold)
+    return float(silent) / float(M.size)

@@ -50,16 +50,18 @@ def _plan_candidates(base: Path) -> list[Path]:
     c += [base.with_suffix(".yaml"), base.with_suffix(".yml")]
     return c
 
-def load_plan(path: Union[str, Path]) -> Dict[str, Any]:
+def load_plan(path: 'str | Path') -> 'dict[str, object]':
+    from pathlib import Path
     p = Path(path)
     if yaml is None:
         raise RuntimeError("PyYAML não instalado; pip install pyyaml")
     for cand in _plan_candidates(p):
-        if cand.exists():
-            data = yaml.safe_load(cand.read_text(encoding="utf-8")) or {}
-            if not isinstance(data, dict):
-                raise ValueError(f"Plano malformado: {cand}")
-            data["_policy_file"] = str(cand)
-            data["_policy"] = os.getenv("FUSE_POLICY","") or "default"
-            return data
+        for _c in (cand, Path(__file__).resolve().parents[1]/cand, Path.cwd()/cand):
+            if _c.exists():
+                data = yaml.safe_load(_c.read_text(encoding='utf-8')) or {}
+                if not isinstance(data, dict):
+                    raise ValueError(f"Plano malformado: {_c}")
+                data['_policy_file'] = str(_c)
+                data['_policy'] = os.getenv('FUSE_POLICY','') or 'default'
+                return data
     raise FileNotFoundError(f"Plano não encontrado: {p}")
