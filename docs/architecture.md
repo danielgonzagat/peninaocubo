@@ -540,7 +540,7 @@ curl -X POST http://localhost:8012/sr/fractal_coherence \
 #### Referências
 
 - **Implementação**: `penin/omega/fractal.py`, `penin/sr/sr_service.py`
-- **Testes**: `tests/test_vida_plus.py::TestFractal`
+- **Testes**: `tests/test_fractal_coherence_f7.py`
 - **Documentação API**: `http://localhost:8012/docs` (Swagger UI)
 
 ---
