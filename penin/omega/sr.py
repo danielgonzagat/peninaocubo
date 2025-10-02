@@ -441,6 +441,36 @@ class SROmegaEngine:
         }
 
         return passed, gate_details
+    
+    def create_attestation(self, components: SRComponents, candidate_id: str, tau: float = 0.8) -> Any:
+        """
+        Create cryptographic attestation for SR evaluation
+        
+        Args:
+            components: SR components
+            candidate_id: ID of the candidate being evaluated
+            tau: Threshold for passing
+            
+        Returns:
+            Attestation object or None if unavailable
+        """
+        try:
+            from penin.omega.attestation import create_sr_attestation
+            
+            sr_score, details = self.compute_sr(components)
+            passed = sr_score >= tau
+            verdict = "pass" if passed else "fail"
+            
+            attestation = create_sr_attestation(
+                verdict=verdict,
+                candidate_id=candidate_id,
+                sr_score=sr_score,
+                components=components.to_dict()
+            )
+            
+            return attestation
+        except ImportError:
+            return None
 
     def analyze_non_compensatory(self, components: SRComponents) -> dict[str, Any]:
         """

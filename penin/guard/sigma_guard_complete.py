@@ -94,6 +94,7 @@ class SigmaGuardVerdict:
     action: str  # "promote", "rollback", "canary", "quarantine"
     timestamp: str = field(default_factory=lambda: datetime.now(UTC).isoformat())
     hash_proof: str = ""
+    attestation: Any | None = None  # Cryptographic attestation (avoid circular import)
 
     def __post_init__(self):
         """Generate hash proof for auditability."""
@@ -112,6 +113,34 @@ class SigmaGuardVerdict:
                 "timestamp": self.timestamp,
             }
             self.hash_proof = hashlib.sha256(json.dumps(proof_data, sort_keys=True).encode()).hexdigest()
+    
+    def create_attestation(self, candidate_id: str) -> Any:
+        """Create cryptographic attestation for this verdict"""
+        try:
+            from penin.omega.attestation import create_sigma_guard_attestation
+            
+            gates_data = [
+                {
+                    "name": g.gate_name,
+                    "status": g.status.value if hasattr(g.status, 'value') else str(g.status),
+                    "value": g.value,
+                    "threshold": g.threshold,
+                    "passed": g.passed,
+                }
+                for g in self.gates
+            ]
+            
+            verdict_str = "pass" if self.passed else "fail"
+            attestation = create_sigma_guard_attestation(
+                verdict=verdict_str,
+                candidate_id=candidate_id,
+                gates=gates_data,
+                aggregate_score=self.aggregate_score
+            )
+            self.attestation = attestation
+            return attestation
+        except ImportError:
+            return None
 
 
 class SigmaGuard:
