@@ -6,7 +6,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from penin.meta.guard_client import GuardClient, SRClient
-from penin.omega.caos import phi_caos
+from penin.omega import phi_caos
 from penin.omega.ledger import SQLiteWORMLedger, WORMEvent
 from penin.plugins.mammoth_adapter import continual_step_mammoth
 from penin.plugins.naslib_adapter import propose_with_naslib

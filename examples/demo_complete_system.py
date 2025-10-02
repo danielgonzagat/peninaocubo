@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from penin.guard.sigma_guard_complete import GateMetrics, SigmaGuard
 from penin.ledger.worm_ledger_complete import create_pcag, create_worm_ledger
-from penin.math.caos_plus_complete import CAOSComponents, compute_caos_plus
+from penin.core.caos import CAOSComponents, compute_caos_plus
 from penin.math.linf_complete import compute_linf
 from penin.math.sr_omega_infinity import SRComponents, compute_sr_score
 from penin.meta.omega_meta_complete import MutationType, create_omega_meta

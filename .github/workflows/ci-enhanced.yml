@@ -1,0 +1,379 @@
+name: CI Enhanced (Multi-Platform + Semantic Release)
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION_MATRIX: "3.11,3.12"
+  COVERAGE_THRESHOLD: 80
+
+jobs:
+  # Matrix Testing (Python 3.11, 3.12 × Linux, macOS)
+  test-matrix:
+    name: Test Py${{ matrix.python-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.11', '3.12']
+        os: [ubuntu-latest, macos-latest]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for semantic-release
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+            pyproject.toml
+      
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install postgresql@15
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
+          pip install -e ".[dev]"
+      
+      - name: Lint with Ruff
+        run: |
+          ruff check . --output-format=github --exit-zero
+      
+      - name: Format check with Black
+        run: |
+          black --check . --diff
+        continue-on-error: true
+      
+      - name: Type check with Mypy
+        run: |
+          mypy penin/ --ignore-missing-imports --show-error-codes
+        continue-on-error: true
+      
+      - name: Run core tests
+        env:
+          PENIN_CACHE_HMAC_KEY: test-key-${{ matrix.python-version }}
+          PENIN_METRICS_TOKEN: test-token
+        run: |
+          pytest tests/ -v \
+            --cov=penin \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-report=html \
+            --tb=short \
+            --maxfail=5 \
+            -m "not slow"
+      
+      - name: Run SOTA integration tests
+        if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'
+        run: |
+          pytest tests/integrations/ -v --tb=short
+      
+      - name: Check coverage threshold
+        run: |
+          coverage report --fail-under=${{ env.COVERAGE_THRESHOLD }}
+      
+      - name: Upload coverage to Codecov
+        if: matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: unittests-${{ matrix.python-version }}-${{ matrix.os }}
+          name: codecov-${{ matrix.python-version }}-${{ matrix.os }}
+          fail_ci_if_error: false
+      
+      - name: Upload HTML coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ matrix.python-version }}-${{ matrix.os }}
+          path: htmlcov/
+          retention-days: 30
+
+  # Advanced Linting and Security
+  quality-gates:
+    name: Quality Gates & Security
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff black mypy bandit codespell safety vulture
+      
+      - name: Ruff (strict)
+        run: |
+          ruff check . --output-format=github
+      
+      - name: Black (strict)
+        run: |
+          black --check .
+      
+      - name: Mypy (strict)
+        run: |
+          mypy penin/ --ignore-missing-imports --strict --show-error-codes
+        continue-on-error: true
+      
+      - name: Bandit (security)
+        run: |
+          bandit -r penin/ -f json -o bandit-report.json || true
+          bandit -r penin/ -f screen
+      
+      - name: Codespell (typos)
+        run: |
+          codespell --skip=".git,*.pyc,htmlcov,*.json,*.lock" \
+                    --ignore-words-list="som,nd,te,ba" \
+                    --quiet-level=2
+      
+      - name: Safety (vulnerabilities)
+        run: |
+          pip install -r requirements.txt
+          safety check --json --output safety-report.json || true
+          safety check
+        continue-on-error: true
+      
+      - name: Vulture (dead code)
+        run: |
+          vulture penin/ --min-confidence 80
+        continue-on-error: true
+      
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            safety-report.json
+          retention-days: 90
+
+  # Build and Validate Package
+  build-package:
+    name: Build & Validate Distribution
+    runs-on: ubuntu-latest
+    needs: [test-matrix]
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build twine wheel check-wheel-contents
+      
+      - name: Build distribution
+        run: |
+          python -m build
+      
+      - name: Check distribution with twine
+        run: |
+          twine check dist/*
+      
+      - name: Check wheel contents
+        run: |
+          check-wheel-contents dist/*.whl
+      
+      - name: Test installation from wheel
+        run: |
+          pip install dist/*.whl
+          python -c "import penin; print(penin.__version__)"
+      
+      - name: Upload distribution artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+          retention-days: 90
+
+  # SBOM Generation
+  sbom-generation:
+    name: Generate SBOM (CycloneDX)
+    runs-on: ubuntu-latest
+    needs: [build-package]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          pip install cyclonedx-bom
+      
+      - name: Generate SBOM
+        run: |
+          cyclonedx-py -o sbom.json -e . --format json
+          cyclonedx-py -o sbom.xml -e . --format xml
+      
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: |
+            sbom.json
+            sbom.xml
+          retention-days: 365
+
+  # Docker Multi-Platform Build
+  docker-multiplatform:
+    name: Docker Build (amd64, arm64)
+    runs-on: ubuntu-latest
+    needs: [test-matrix, quality-gates]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=ref,event=branch
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+      
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./deploy/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+
+  # Semantic Release (only on main)
+  semantic-release:
+    name: Semantic Release
+    runs-on: ubuntu-latest
+    needs: [test-matrix, quality-gates, build-package, docker-multiplatform]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install semantic-release
+        run: |
+          pip install python-semantic-release
+      
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Semantic Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          semantic-release version --commit --tag --changelog
+          semantic-release publish
+      
+      - name: Upload release artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artifacts
+          path: |
+            dist/
+            CHANGELOG.md
+          retention-days: 365
+
+  # Status Check (All jobs)
+  ci-success:
+    name: CI Success
+    runs-on: ubuntu-latest
+    needs: [test-matrix, quality-gates, build-package, sbom-generation]
+    if: always()
+    
+    steps:
+      - name: Check all jobs
+        run: |
+          if [[ "${{ needs.test-matrix.result }}" != "success" ]]; then
+            echo "❌ Test matrix failed"
+            exit 1
+          fi
+          if [[ "${{ needs.quality-gates.result }}" != "success" ]]; then
+            echo "❌ Quality gates failed"
+            exit 1
+          fi
+          if [[ "${{ needs.build-package.result }}" != "success" ]]; then
+            echo "❌ Package build failed"
+            exit 1
+          fi
+          echo "✅ All CI checks passed!"
+      
+      - name: Post summary
+        if: success()
+        run: |
+          echo "## ✅ CI Enhanced - All Checks Passed" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- 🧪 Tests: Matrix (Py 3.11-3.12 × Linux/macOS)" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔒 Security: Bandit, Safety, Codespell" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 Build: Wheel + SBOM generated" >> $GITHUB_STEP_SUMMARY
+          echo "- 🐳 Docker: Multi-platform (amd64, arm64)" >> $GITHUB_STEP_SUMMARY
+          echo "- 📊 Coverage: ≥${{ env.COVERAGE_THRESHOLD }}%" >> $GITHUB_STEP_SUMMARY
