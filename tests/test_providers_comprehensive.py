@@ -17,9 +17,9 @@ class TestProviderModulesLoad:
         assert base is not None
 
     def test_openai_provider_loads(self):
-        """Test OpenAI provider loads"""
-        from penin.providers import openai
-        assert openai is not None
+        """Test OpenAI provider module loads"""
+        from penin.providers import openai_provider
+        assert openai_provider is not None
 
     def test_providers_directory_exists(self):
         """Test providers directory structure"""
