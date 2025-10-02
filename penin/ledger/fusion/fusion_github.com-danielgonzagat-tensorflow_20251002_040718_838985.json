@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-tensorflow",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/tensorflow",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/tensorflow",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8127880799692012,
+    "delta_linf": 0.0032417165259324113,
+    "sr": 0.8649734529178463,
+    "G": 0.8661158643883587,
+    "ece": 0.01135424368462829,
+    "rho_bias": 1.0133511835058815,
+    "fp": 0.023018356920324536
+  },
+  "gate_pass": true,
+  "timestamp": 1759388838.9856489,
+  "_slug": "github.com-danielgonzagat-tensorflow"
+}

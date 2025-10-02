@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-supervision",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/supervision",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/supervision",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.812851134184176,
+    "delta_linf": 0.0032419701313394075,
+    "sr": 0.8656857769914973,
+    "G": 0.8662161606366706,
+    "ece": 0.011347975897868288,
+    "rho_bias": 1.013064958743668,
+    "fp": 0.023017536629896668
+  },
+  "gate_pass": true,
+  "timestamp": 1759385543.33585,
+  "_slug": "github.com-danielgonzagat-supervision"
+}

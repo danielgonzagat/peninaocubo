@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-weaviate",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/weaviate",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/weaviate",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8129668471471951,
+    "delta_linf": 0.003240665686241826,
+    "sr": 0.864927254543721,
+    "G": 0.8663433107727176,
+    "ece": 0.011357049264731066,
+    "rho_bias": 1.0134806429052672,
+    "fp": 0.023035192387215388
+  },
+  "gate_pass": true,
+  "timestamp": 1759386083.7306292,
+  "_slug": "github.com-danielgonzagat-weaviate"
+}

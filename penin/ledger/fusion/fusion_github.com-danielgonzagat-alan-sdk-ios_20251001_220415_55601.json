@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-alan-sdk-ios",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/alan-sdk-ios",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/alan-sdk-ios",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.812965294313678,
+    "delta_linf": 0.0032407256379003557,
+    "sr": 0.8655813906635628,
+    "G": 0.8661204320940977,
+    "ece": 0.01134632301326478,
+    "rho_bias": 1.0131285567434016,
+    "fp": 0.023016868940639076
+  },
+  "gate_pass": true,
+  "timestamp": 1759367055.600982,
+  "_slug": "github.com-danielgonzagat-alan-sdk-ios"
+}

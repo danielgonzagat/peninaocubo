@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-chinese-llm-benchmark",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/chinese-llm-benchmark",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/chinese-llm-benchmark",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8130503853755019,
+    "delta_linf": 0.0032409283580094664,
+    "sr": 0.8649350578302979,
+    "G": 0.8663864815401425,
+    "ece": 0.011355598370610707,
+    "rho_bias": 1.0129947409553617,
+    "fp": 0.023017230563875224
+  },
+  "gate_pass": true,
+  "timestamp": 1759360578.223417,
+  "_slug": "github.com-danielgonzagat-chinese-llm-benchmark"
+}

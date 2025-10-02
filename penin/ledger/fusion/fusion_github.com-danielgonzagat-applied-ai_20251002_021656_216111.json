@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-applied-ai",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/applied-ai",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/applied-ai",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8130667891276302,
+    "delta_linf": 0.0032411572877825584,
+    "sr": 0.8655398232924228,
+    "G": 0.8660387421615523,
+    "ece": 0.011346846911156934,
+    "rho_bias": 1.0133013292910535,
+    "fp": 0.023022214400462093
+  },
+  "gate_pass": true,
+  "timestamp": 1759382216.111233,
+  "_slug": "github.com-danielgonzagat-applied-ai"
+}

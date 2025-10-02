@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-real-time-voice-cloning",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/Real-Time-Voice-Cloning",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/Real-Time-Voice-Cloning",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8131255822047527,
+    "delta_linf": 0.0032413398578046673,
+    "sr": 0.8649449785601934,
+    "G": 0.8660906544272353,
+    "ece": 0.011354636933834181,
+    "rho_bias": 1.0135305951491835,
+    "fp": 0.023037050802314222
+  },
+  "gate_pass": true,
+  "timestamp": 1759382736.960453,
+  "_slug": "github.com-danielgonzagat-real-time-voice-cloning"
+}

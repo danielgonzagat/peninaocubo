@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-alpha-zero-general",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/alpha-zero-general",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/alpha-zero-general",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8131556856094815,
+    "delta_linf": 0.0032393316485720114,
+    "sr": 0.8656128709974478,
+    "G": 0.8660971248623595,
+    "ece": 0.011346874173815573,
+    "rho_bias": 1.0133871971409159,
+    "fp": 0.023026238852982044
+  },
+  "gate_pass": true,
+  "timestamp": 1759354796.60528,
+  "_slug": "github.com-danielgonzagat-alpha-zero-general"
+}

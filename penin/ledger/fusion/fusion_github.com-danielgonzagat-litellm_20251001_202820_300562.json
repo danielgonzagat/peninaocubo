@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-litellm",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/litellm",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/litellm",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8131106865979457,
+    "delta_linf": 0.00324180845115228,
+    "sr": 0.8657150689003579,
+    "G": 0.8657010434480344,
+    "ece": 0.011348491484521479,
+    "rho_bias": 1.0138691065962502,
+    "fp": 0.023030319012169793
+  },
+  "gate_pass": true,
+  "timestamp": 1759361300.561693,
+  "_slug": "github.com-danielgonzagat-litellm"
+}

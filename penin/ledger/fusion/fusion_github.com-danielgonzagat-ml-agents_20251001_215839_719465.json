@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-ml-agents",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/ml-agents",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/ml-agents",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8131365045498987,
+    "delta_linf": 0.003241434742067444,
+    "sr": 0.8651599704934599,
+    "G": 0.8657595333323612,
+    "ece": 0.011351754734834654,
+    "rho_bias": 1.0134877448783113,
+    "fp": 0.023035573868235123
+  },
+  "gate_pass": true,
+  "timestamp": 1759366719.464988,
+  "_slug": "github.com-danielgonzagat-ml-agents"
+}

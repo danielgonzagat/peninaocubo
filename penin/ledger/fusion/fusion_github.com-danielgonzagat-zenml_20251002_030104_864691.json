@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-zenml",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/zenml",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/zenml",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8129927764253022,
+    "delta_linf": 0.0032407507211334166,
+    "sr": 0.8653244748110657,
+    "G": 0.8659657285176651,
+    "ece": 0.011346450429637205,
+    "rho_bias": 1.0130644782346618,
+    "fp": 0.023023087423554685
+  },
+  "gate_pass": true,
+  "timestamp": 1759384864.690986,
+  "_slug": "github.com-danielgonzagat-zenml"
+}

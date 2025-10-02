@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-logicmoo_workspace",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/logicmoo_workspace",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/logicmoo_workspace",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8130000539851674,
+    "delta_linf": 0.0032399760815211287,
+    "sr": 0.8652198393837492,
+    "G": 0.8658149200981212,
+    "ece": 0.01135580037494845,
+    "rho_bias": 1.0133655199086482,
+    "fp": 0.02301854104801287
+  },
+  "gate_pass": true,
+  "timestamp": 1759392228.305059,
+  "_slug": "github.com-danielgonzagat-logicmoo_workspace"
+}

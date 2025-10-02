@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-transformer-explainer",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/transformer-explainer",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/transformer-explainer",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8131228306744045,
+    "delta_linf": 0.0032393297644803067,
+    "sr": 0.8657100702214477,
+    "G": 0.8658927049135843,
+    "ece": 0.011349814179843766,
+    "rho_bias": 1.013783519760225,
+    "fp": 0.02303001665737054
+  },
+  "gate_pass": true,
+  "timestamp": 1759358890.891721,
+  "_slug": "github.com-danielgonzagat-transformer-explainer"
+}

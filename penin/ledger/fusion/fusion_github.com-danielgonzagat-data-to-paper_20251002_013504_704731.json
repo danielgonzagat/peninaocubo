@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-data-to-paper",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/data-to-paper",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/data-to-paper",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8129359650136327,
+    "delta_linf": 0.0032410128490862966,
+    "sr": 0.8655789304625701,
+    "G": 0.8662224608297446,
+    "ece": 0.011350516511138484,
+    "rho_bias": 1.0135200057042193,
+    "fp": 0.023026005578381838
+  },
+  "gate_pass": true,
+  "timestamp": 1759379704.731175,
+  "_slug": "github.com-danielgonzagat-data-to-paper"
+}

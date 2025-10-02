@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-mygym",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/myGym",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/myGym",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8131024247089701,
+    "delta_linf": 0.003240187322041895,
+    "sr": 0.8648758144717047,
+    "G": 0.8660200766839229,
+    "ece": 0.011346291075898221,
+    "rho_bias": 1.0133237350054782,
+    "fp": 0.02302396145804355
+  },
+  "gate_pass": true,
+  "timestamp": 1759366345.287894,
+  "_slug": "github.com-danielgonzagat-mygym"
+}

@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-aequitas",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/aequitas",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/aequitas",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8128832516787833,
+    "delta_linf": 0.0032404669509680578,
+    "sr": 0.8649787779271586,
+    "G": 0.865688397036494,
+    "ece": 0.011356000415797728,
+    "rho_bias": 1.0129161562283189,
+    "fp": 0.023028000663165092
+  },
+  "gate_pass": true,
+  "timestamp": 1759377452.198565,
+  "_slug": "github.com-danielgonzagat-aequitas"
+}

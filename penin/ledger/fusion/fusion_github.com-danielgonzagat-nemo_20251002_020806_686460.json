@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-nemo",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/NeMo",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/NeMo",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8128276834812158,
+    "delta_linf": 0.003240504182551563,
+    "sr": 0.8653749385081306,
+    "G": 0.8657171368789246,
+    "ece": 0.011347426730331359,
+    "rho_bias": 1.0133657944121097,
+    "fp": 0.023029943887968272
+  },
+  "gate_pass": true,
+  "timestamp": 1759381686.4600692,
+  "_slug": "github.com-danielgonzagat-nemo"
+}
