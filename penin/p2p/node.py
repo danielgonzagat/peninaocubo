@@ -3,11 +3,14 @@ PENIN Node - P2P Node Implementation
 
 Implements a PENIN-Ω node that can communicate via the PENIN protocol,
 handle status queries, and exchange knowledge with other nodes.
+Includes network discovery capabilities.
 """
 
 import asyncio
 from typing import Any
 
+from penin.config import settings
+from penin.network.discovery import PeerDiscoveryService
 from penin.omega.sr import SROmegaService
 from penin.p2p.protocol import MessageType, PeninMessage, PeninProtocol
 
@@ -18,23 +21,43 @@ class PeninNode:
 
     Handles P2P communication, including status queries and knowledge exchange.
     Integrates with SROmegaService to provide mental state introspection.
+    Includes peer discovery on local network.
     """
 
-    def __init__(self, node_id: str, sr_service: SROmegaService | None = None):
+    def __init__(
+        self,
+        node_id: str,
+        sr_service: SROmegaService | None = None,
+        orchestrator: Any | None = None,
+        enable_discovery: bool = True,
+    ):
         """
         Initialize PENIN node
 
         Args:
             node_id: Unique identifier for this node
             sr_service: Optional SROmegaService instance (creates new one if not provided)
+            orchestrator: Optional OmegaMetaOrchestrator instance for peer management
+            enable_discovery: Whether to enable automatic peer discovery (default: True)
         """
         self.node_id = node_id
         self.protocol = PeninProtocol(node_id)
         self.sr_service = sr_service or SROmegaService()
+        self.orchestrator = orchestrator
         self.peers: dict[str, dict[str, Any]] = {}
         self.status_responses: dict[str, dict[str, Any]] = (
             {}
         )  # Store responses by peer_id
+
+        # Initialize discovery service
+        self.discovery_service: PeerDiscoveryService | None = None
+        if enable_discovery:
+            self.discovery_service = PeerDiscoveryService(
+                node_id=node_id,
+                port=settings.PENIN_DISCOVERY_PORT,
+                broadcast_interval=settings.PENIN_DISCOVERY_INTERVAL,
+                on_peer_discovered=self._on_peer_discovered,
+            )
 
         # Register message handlers
         self._register_handlers()
@@ -145,4 +168,43 @@ class PeninNode:
             "protocol_version": self.protocol.VERSION,
             "peers_count": len(self.peers),
             "sr_service_active": self.sr_service is not None,
+            "discovery_enabled": self.discovery_service is not None,
+            "discovery_running": (
+                self.discovery_service.is_running if self.discovery_service else False
+            ),
         }
+
+    def _on_peer_discovered(self, peer_info: dict[str, Any]) -> None:
+        """
+        Callback when a new peer is discovered.
+
+        Args:
+            peer_info: Information about the discovered peer
+        """
+        peer_id = peer_info["id"]
+        self.peers[peer_id] = peer_info
+
+        # Update orchestrator's known_peers if available
+        if self.orchestrator and hasattr(self.orchestrator, "known_peers"):
+            peer_address = f"{peer_info['address']}:{peer_info['port']}"
+            self.orchestrator.known_peers.add(peer_address)
+
+    def start_discovery(self) -> None:
+        """Start the peer discovery service."""
+        if self.discovery_service:
+            self.discovery_service.start()
+
+    def stop_discovery(self) -> None:
+        """Stop the peer discovery service."""
+        if self.discovery_service:
+            self.discovery_service.stop()
+
+    def __enter__(self):
+        """Context manager entry - starts discovery."""
+        self.start_discovery()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit - stops discovery."""
+        self.stop_discovery()
+        return False

@@ -50,6 +50,7 @@ class OmegaMetaOrchestrator:
         self.knowledge_base: dict[str, NumericVectorArtifact] = {}
         self.task_history: deque = deque(maxlen=history_maxlen)
         self.score_history: deque = deque(maxlen=history_maxlen)
+        self.known_peers: set[str] = set()
 
     def add_knowledge(self, key: str, artifact: NumericVectorArtifact) -> None:
         """
@@ -93,6 +94,7 @@ class OmegaMetaOrchestrator:
             "knowledge_base": self.knowledge_base,
             "task_history": self.task_history,
             "score_history": self.score_history,
+            "known_peers": list(self.known_peers),
         }
 
         path = Path(filepath)
@@ -130,6 +132,7 @@ class OmegaMetaOrchestrator:
         self.score_history = state.get(
             "score_history", deque(maxlen=self.score_history.maxlen)
         )
+        self.known_peers = set(state.get("known_peers", []))
 
         return True
 
