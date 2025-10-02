@@ -1,10 +1,7 @@
-"""Pytest configuration for ensuring the package is importable from source."""
-
-from __future__ import annotations
-
-import sys
-from pathlib import Path
-
-ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+import sys, multiprocessing as mp
+if sys.platform == "darwin":
+    try:
+        mp.set_start_method("fork", force=True)
+    except RuntimeError:
+        # já setado; segue o baile
+        pass
