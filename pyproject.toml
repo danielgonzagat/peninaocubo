@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "penin"
-version = "1.0.0-beta2"
+version = "0.9.0"
 description = "PENIN-Ω: IA³ Auto-Evolutiva com Ética Embutida"
 readme = "README.md"
 license = {text = "Apache-2.0"}
@@ -42,7 +42,7 @@ full = [
 ]
 
 [project.scripts]
-penin = "penin.__main__:main"
+penin = "penin.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
