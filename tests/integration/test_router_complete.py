@@ -72,21 +72,15 @@ class TestRouterBudgetTracking:
         assert stats.tokens_total == 7500
 
 
-@pytest.mark.skip(reason="Circuit breaker internals not fully implemented")
 class TestRouterCircuitBreakers:
     """Test circuit breaker functionality."""
 
     @pytest.fixture
     def router(self):
         """Create router with circuit breaker config"""
-        # Circuit breaker is enabled by default (enable_circuit_breaker=True)
-        # Using empty provider list for testing
-        return MultiLLMRouterComplete(
-            providers=[],
-            mode=RouterMode.PRODUCTION,
-            daily_budget_usd=100.0,
-            enable_circuit_breaker=True,
-        )
+        from penin.router_pkg.circuit_breaker import CircuitBreakerManager
+        # Using circuit breaker manager directly for testing
+        return CircuitBreakerManager()
 
     def test_circuit_breaker_opens_after_failures(self, router):
         """Test circuit breaker opens after N failures"""
@@ -94,78 +88,93 @@ class TestRouterCircuitBreakers:
         
         # Simulate 3 consecutive failures
         for _ in range(3):
-            router._record_provider_failure(provider_name)
+            router.record_failure(provider_name)
         
         # Circuit should be open
-        assert router._is_circuit_open(provider_name) is True
+        assert router.get_state(provider_name).value == "open"
 
     def test_circuit_breaker_half_open_recovery(self, router):
         """Test circuit breaker enters half-open state after timeout"""
+        from penin.router_pkg.circuit_breaker import CircuitBreakerConfig
+        import time
+        
         provider_name = "openai"
+        # Use short timeout for testing
+        router._breakers[provider_name] = router.get_breaker(provider_name)
+        router._breakers[provider_name].config.timeout_seconds = 0.01
         
         # Open circuit
         for _ in range(3):
-            router._record_provider_failure(provider_name)
+            router.record_failure(provider_name)
         
-        assert router._is_circuit_open(provider_name) is True
+        assert router.get_state(provider_name).value == "open"
         
-        # Simulate timeout passing
-        import time
-        time.sleep(0.1)  # Small sleep for test
+        # Wait for timeout
+        time.sleep(0.02)
         
-        # After timeout, should be half-open (allowing test requests)
-        # In real implementation, this would check timestamp
+        # Should transition to half-open
+        assert router.get_state(provider_name).value == "half_open"
 
     def test_circuit_breaker_closes_on_success(self, router):
         """Test circuit breaker closes after successful request"""
+        import time
         provider_name = "openai"
         
         # Open circuit
+        router._breakers[provider_name] = router.get_breaker(provider_name)
+        router._breakers[provider_name].config.timeout_seconds = 0.01
         for _ in range(3):
-            router._record_provider_failure(provider_name)
+            router.record_failure(provider_name)
+        
+        assert router.get_state(provider_name).value == "open"
+        
+        # Wait for half-open
+        time.sleep(0.02)
+        assert router.get_state(provider_name).value == "half_open"
         
         # Record success
-        router._record_provider_success(provider_name)
+        router.record_success(provider_name)
         
-        # Check that failure count reset
-        # Circuit should eventually close
+        # Circuit should close
+        assert router.get_state(provider_name).value == "closed"
 
 
-@pytest.mark.skip(reason="Missing providers parameter and cost optimization not fully implemented")
 class TestRouterCostOptimization:
     """Test cost optimization routing."""
 
     @pytest.fixture
-    def router(self):
-        """Create cost-optimized router"""
-        return MultiLLMRouterComplete(
-            mode=RouterMode.PRODUCTION,
-            daily_budget_usd=100.0,
-        )
+    def optimizer(self):
+        """Create cost optimizer"""
+        from penin.router_pkg.cost_optimizer import CostOptimizer, OptimizationStrategy
+        return CostOptimizer(strategy=OptimizationStrategy.CHEAPEST)
 
-    def test_selects_cheapest_provider(self, router):
-        """Test router selects cheapest available provider"""
-        # Mock provider pricing
-        with patch('penin.providers.pricing.get_provider_cost') as mock_cost:
-            mock_cost.side_effect = lambda p: {
-                'openai': 0.002,
-                'anthropic': 0.003,
-                'gemini': 0.001,  # Cheapest
-            }.get(p, 0.01)
-            
-            # Get best provider for cost mode
-            provider = router._select_provider_cost_optimized(['openai', 'anthropic', 'gemini'])
-            
-            # Should select gemini (cheapest)
-            assert provider == 'gemini'
-
-    def test_respects_budget_in_selection(self, router):
-        """Test provider selection respects remaining budget"""
-        # Use 95% of budget
-        router.budget_tracker.record_request("openai", cost_usd=95.0, tokens_used=100000)
+    def test_selects_cheapest_provider(self, optimizer):
+        """Test optimizer selects cheapest available provider"""
+        providers = ["openai", "anthropic", "gemini"]
+        costs = {"openai": 0.002, "anthropic": 0.003, "gemini": 0.001}
         
-        # Try to select provider for expensive request
-        # Should block or select cheapest
+        selected = optimizer.select_provider(
+            providers=providers,
+            provider_costs=costs,
+            estimated_tokens=1000
+        )
+        
+        assert selected == "gemini"  # Cheapest
+
+    def test_respects_budget_in_selection(self, optimizer):
+        """Test optimizer respects remaining budget"""
+        providers = ["openai", "anthropic"]
+        costs = {"openai": 0.05, "anthropic": 0.02}
+        
+        # With $3 budget and 100k tokens, only anthropic is affordable
+        selected = optimizer.select_provider(
+            providers=providers,
+            provider_costs=costs,
+            estimated_tokens=100000,
+            budget_remaining=3.0
+        )
+        
+        assert selected == "anthropic"
         assert router.budget_tracker.is_soft_limit_exceeded() is True
 
 
@@ -209,7 +218,6 @@ class TestRouterPerformance:
         assert router.budget_tracker.used_usd == 10.0  # 100 * 0.1
 
 
-@pytest.mark.skip(reason="cache_enabled parameter doesn't exist, use enable_cache")
 class TestRouterCache:
     """Test router caching functionality."""
 
@@ -253,7 +261,6 @@ class TestRouterCache:
         pass  # TODO: Implement HMAC validation test
 
 
-@pytest.mark.skip(reason="fallback_enabled parameter doesn't exist")
 class TestRouterFallback:
     """Test fallback routing behavior."""
 
@@ -281,7 +288,6 @@ class TestRouterFallback:
             assert response.content == "Success"
 
 
-@pytest.mark.skip(reason="Analytics API not fully implemented")
 class TestRouterAnalytics:
     """Test router analytics and monitoring."""
 
