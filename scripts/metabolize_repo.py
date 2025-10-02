@@ -163,7 +163,7 @@ def main():
     ap.add_argument("--jitter", type=float, default=0.0)
     args, unknown = ap.parse_known_args()
     if unknown:
-        print(f"ℹ️  ignorando args não reconhecidos: {unknown}", file=sys.stderr)
+        print(f"ℹ️  Ignoring unrecognized args: {unknown}", file=sys.stderr)
 
     src  = _norm_url(args.src)
     slug = repo_slug(src)
