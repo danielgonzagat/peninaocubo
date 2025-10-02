@@ -473,7 +473,7 @@ class TestIdempotencyProperties:
         assert len(verdict1.gates) == len(verdict2.gates)
 
         # Each gate result should be identical
-        for g1, g2 in zip(verdict1.gates, verdict2.gates, strict=False):
+        for g1, g2 in zip(verdict1.gates, verdict2.gates, strict=True):
             assert g1.gate_name == g2.gate_name
             assert g1.passed == g2.passed
             assert g1.status == g2.status
