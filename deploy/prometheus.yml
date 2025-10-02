@@ -1,0 +1,50 @@
+# Prometheus Configuration for PENIN-Ω
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'penin-omega'
+    environment: 'development'
+
+# Scrape configurations
+scrape_configs:
+  # PENIN-Ω Metrics
+  - job_name: 'penin-metrics'
+    static_configs:
+      - targets: ['host.docker.internal:9100']
+        labels:
+          service: 'penin-main'
+  
+  # Σ-Guard Service
+  - job_name: 'sigma-guard'
+    static_configs:
+      - targets: ['host.docker.internal:8001']
+        labels:
+          service: 'sigma-guard'
+  
+  # Ω-META Service
+  - job_name: 'omega-meta'
+    static_configs:
+      - targets: ['host.docker.internal:8002']
+        labels:
+          service: 'omega-meta'
+  
+  # SR-Ω∞ Service
+  - job_name: 'sr-omega'
+    static_configs:
+      - targets: ['host.docker.internal:8003']
+        labels:
+          service: 'sr-omega'
+  
+  # ACFA League Service
+  - job_name: 'acfa-league'
+    static_configs:
+      - targets: ['host.docker.internal:8004']
+        labels:
+          service: 'acfa-league'
+  
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
