@@ -74,7 +74,7 @@ class ServiceMock:
         def run_server():
             uvicorn.run(app, host="127.0.0.1", port=self.port, log_level="error")
 
-        self.process = multiprocessing.Process(target=run_server, daemon=True)
+        self.process = multiprocessing.Process(target=run_server)
         self.process.start()
         self.alive = True
         # Wait for service to be ready
