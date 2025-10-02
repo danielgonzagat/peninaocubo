@@ -1,51 +1,52 @@
 # Contributing to PENIN-Ω
 
-Thank you for your interest in contributing to PENIN-Ω! This document provides guidelines and instructions for contributing to the project.
+First off, thank you for considering contributing to PENIN-Ω! 🎉
 
-## 🌟 Ways to Contribute
+This document provides guidelines for contributing to the project.
 
-- **Bug Reports**: Submit detailed bug reports with reproducible examples
-- **Feature Requests**: Propose new features with clear use cases
-- **Code Contributions**: Submit pull requests with improvements or fixes
-- **Documentation**: Improve or expand documentation
-- **Testing**: Add or improve test coverage
-- **Reviews**: Review pull requests from other contributors
+---
+
+## 🎯 Code of Conduct
+
+Be respectful, inclusive, and constructive. We're building something important together.
+
+---
+
+## 🏗️ Architecture Overview
+
+Before contributing, **read these first**:
+
+1. [penin/ARCHITECTURE.md](penin/ARCHITECTURE.md) - Module hierarchy
+2. [README.md](README.md) - Project overview
+3. Module-specific READMEs in each directory
+
+---
 
 ## 🚀 Getting Started
 
-### Prerequisites
-
-- Python 3.11 or higher
-- Git
-- Basic understanding of async Python and FastAPI
-
-### Development Setup
-
-1. **Fork and clone the repository**
+### 1. Fork and Clone
 
 ```bash
-git clone https://github.com/<your-username>/penin-omega.git
-cd penin-omega
+git clone https://github.com/YOUR_USERNAME/peninaocubo.git
+cd peninaocubo
 ```
 
-2. **Create a virtual environment**
+### 2. Set Up Environment
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
 ```
 
-3. **Install development dependencies**
+### 3. Install Pre-commit Hooks
 
 ```bash
-pip install -e ".[dev,full]"
+pip install pre-commit
+pre-commit install
 ```
 
-4. **Run tests to verify setup**
-
-```bash
-pytest tests/ -v
-```
+---
 
 ## 📝 Development Workflow
 
@@ -54,258 +55,361 @@ pytest tests/ -v
 ```bash
 git checkout -b feature/your-feature-name
 # or
-git checkout -b fix/issue-description
+git checkout -b fix/bug-description
 ```
-
-Branch naming conventions:
-- `feature/` - New features
-- `fix/` - Bug fixes
-- `docs/` - Documentation changes
-- `refactor/` - Code refactoring
-- `test/` - Test additions or improvements
 
 ### 2. Make Changes
 
-- Write clean, readable code following project conventions
-- Add or update tests for your changes
-- Update documentation as needed
-- Follow the code style guidelines (see below)
+Follow our [code standards](#code-standards) below.
 
-### 3. Run Tests and Linters
+### 3. Run Tests
 
 ```bash
 # Run all tests
 pytest tests/ -v
 
+# Run specific test file
+pytest tests/test_math_core.py -v
+
 # Run with coverage
-pytest --cov=penin --cov-report=html tests/
-
-# Run linters
-ruff check .
-black --check .
-mypy penin/
-
-# Auto-format code
-black .
-ruff check --fix .
+pytest --cov=penin --cov-report=term-missing
 ```
 
-### 4. Commit Changes
+**Requirements**:
+- All existing tests must pass
+- New code must have tests (target: 85%+ coverage)
+- No decrease in overall coverage
 
-Write clear, descriptive commit messages:
+### 4. Lint and Format
 
 ```bash
-git add .
-git commit -m "feat: add support for XYZ provider"
-# or
-git commit -m "fix: resolve race condition in WORM ledger"
+# Auto-fix what's possible
+ruff check . --fix
+black .
+
+# Type check
+mypy penin/ --ignore-missing-imports
 ```
 
-Commit message format:
-- `feat:` - New feature
-- `fix:` - Bug fix
-- `docs:` - Documentation changes
-- `test:` - Test changes
-- `refactor:` - Code refactoring
-- `perf:` - Performance improvements
-- `chore:` - Maintenance tasks
+**Requirements**:
+- Zero linting errors
+- Code formatted with Black
+- Type hints for public APIs
 
-### 5. Push and Create Pull Request
+### 5. Commit
+
+```bash
+git add -A
+git commit -m "feat: your feature description"
+```
+
+**Commit Message Format**:
+```
+<type>: <description>
+
+[optional body]
+
+[optional footer]
+```
+
+**Types**:
+- `feat`: New feature
+- `fix`: Bug fix
+- `docs`: Documentation only
+- `style`: Formatting, no code change
+- `refactor`: Code restructuring
+- `test`: Adding tests
+- `chore`: Maintenance
+
+**Examples**:
+```
+feat: add neuromorphic SpikingBrain-7B integration
+
+Implements adapter for SpikingBrain-7B with:
+- Provider class
+- Cost estimation
+- 100× speedup validation
+
+Closes #123
+```
+
+### 6. Push and PR
 
 ```bash
 git push origin feature/your-feature-name
 ```
 
-Then create a pull request on GitHub with:
-- Clear title and description
-- Reference to related issues
-- Summary of changes
-- Any breaking changes noted
-
-## 🎨 Code Style Guidelines
-
-### Python Style
-
-- Follow PEP 8
-- Use Black for formatting (line length: 120)
-- Use Ruff for linting
-- Use type hints for all functions
-- Write docstrings for public APIs
-
-Example:
-
-```python
-async def calculate_caos_score(
-    metrics: Dict[str, float],
-    boost: float = 0.0,
-    *,
-    use_ewma: bool = True
-) -> float:
-    """
-    Calculate CAOS+ score with optional boost.
-
-    Args:
-        metrics: Dictionary of metric values
-        boost: Boost factor (0.0 to 0.05)
-        use_ewma: Whether to use EWMA smoothing
-
-    Returns:
-        Computed CAOS+ score between 0.0 and 1.0
-
-    Raises:
-        ValueError: If boost exceeds maximum allowed value
-    """
-    if boost > 0.05:
-        raise ValueError(f"Boost {boost} exceeds maximum 0.05")
-    
-    # Implementation here
-    ...
-```
-
-### Testing
-
-- Write unit tests for all new functionality
-- Aim for >80% code coverage
-- Use descriptive test names
-- Include both positive and negative test cases
-- Test edge cases and error conditions
-
-Example:
-
-```python
-import pytest
-from penin.engine.caos_plus import calculate_caos_score
-
-def test_caos_score_without_boost():
-    """Test CAOS+ calculation without boost."""
-    metrics = {"quality": 0.8, "diversity": 0.7}
-    score = calculate_caos_score(metrics)
-    assert 0.0 <= score <= 1.0
-
-def test_caos_score_with_invalid_boost():
-    """Test that excessive boost raises ValueError."""
-    metrics = {"quality": 0.8}
-    with pytest.raises(ValueError, match="exceeds maximum"):
-        calculate_caos_score(metrics, boost=0.1)
-
-@pytest.mark.asyncio
-async def test_async_caos_calculation():
-    """Test async CAOS+ calculation."""
-    result = await async_calculate_caos(...)
-    assert result.success is True
-```
-
-### Documentation
-
-- Use Google-style docstrings
-- Document all public APIs
-- Include examples in docstrings where helpful
-- Update README.md for user-facing changes
-- Keep docs/ directory up to date
-
-## 🏗️ Project Architecture
-
-### Core Principles
-
-1. **Fail-Closed Design**: All gates default to safe state
-2. **Deterministic Behavior**: Same seed = same results
-3. **Auditability**: All decisions logged to WORM ledger
-4. **Non-Compensatory Gates**: All requirements must pass
-5. **Loose Coupling**: Services communicate via well-defined APIs
-
-### Key Components
-
-- **Engine**: Core evolution logic (Master Equation, CAOS+, Fibonacci)
-- **Omega**: Advanced modules (scoring, tuning, ethics)
-- **Services**: Microservices (Guard, SR, Meta, League)
-- **Ledger**: WORM audit trail with Merkle proofs
-- **Router**: Cost-aware LLM provider selection
-
-## 🔒 Security Guidelines
-
-- Never commit secrets or API keys
-- Use environment variables for sensitive configuration
-- Validate all external inputs
-- Follow fail-closed principles
-- Report security issues privately (see SECURITY.md)
-
-## 📋 Pull Request Checklist
-
-Before submitting a PR, ensure:
-
-- [ ] Code follows style guidelines
-- [ ] All tests pass (`pytest tests/`)
-- [ ] New tests added for new functionality
-- [ ] Documentation updated
-- [ ] No linter errors (`ruff check .`)
-- [ ] Code formatted (`black .`)
-- [ ] Type hints added (`mypy penin/`)
-- [ ] Commit messages are clear
-- [ ] PR description is complete
-- [ ] No breaking changes (or clearly documented)
-
-## 🐛 Bug Reports
-
-When reporting bugs, include:
-
-1. **Description**: Clear description of the issue
-2. **Steps to Reproduce**: Minimal example to reproduce
-3. **Expected Behavior**: What should happen
-4. **Actual Behavior**: What actually happens
-5. **Environment**: Python version, OS, package versions
-6. **Logs**: Relevant error messages or stack traces
-
-## 💡 Feature Requests
-
-When proposing features, include:
-
-1. **Use Case**: Why is this feature needed?
-2. **Proposed Solution**: How should it work?
-3. **Alternatives**: Other approaches considered
-4. **Impact**: Who benefits from this feature?
-5. **Implementation**: High-level implementation plan (optional)
-
-## 📞 Getting Help
-
-- **Documentation**: Check `docs/` directory
-- **Issues**: Search existing GitHub issues
-- **Discussions**: Use GitHub Discussions for questions
-- **Code Examples**: See `examples/` directory
-
-## 🎯 Priority Areas
-
-We're especially interested in contributions for:
-
-- [ ] Additional LLM provider integrations
-- [ ] Enhanced observability and monitoring
-- [ ] Performance optimizations
-- [ ] Kubernetes deployment manifests
-- [ ] Extended test coverage
-- [ ] Documentation improvements
-- [ ] Real-world usage examples
-
-## 📜 Code of Conduct
-
-- Be respectful and inclusive
-- Focus on constructive feedback
-- Assume good intentions
-- Help create a welcoming community
-
-## 🙏 Recognition
-
-Contributors will be recognized in:
-- GitHub contributors list
-- Release notes for significant contributions
-- Project documentation (with permission)
-
-## 📚 Resources
-
-- [Python Type Hints](https://docs.python.org/3/library/typing.html)
-- [FastAPI Documentation](https://fastapi.tiangolo.com/)
-- [Pydantic Documentation](https://docs.pydantic.dev/)
-- [pytest Documentation](https://docs.pytest.org/)
-- [Ruff Documentation](https://docs.astral.sh/ruff/)
+Then create a Pull Request on GitHub.
 
 ---
 
-Thank you for contributing to PENIN-Ω! 🚀
+## 📋 PR Checklist
+
+Before submitting, ensure:
+
+- [ ] All tests pass (`pytest tests/`)
+- [ ] No linting errors (`ruff check .`)
+- [ ] Code formatted (`black .`)
+- [ ] Type hints added (`mypy penin/`)
+- [ ] Documentation updated
+- [ ] CHANGELOG.md updated (if applicable)
+- [ ] Commit messages follow convention
+
+### For Mathematical/Ethical Changes
+
+Also ensure:
+
+- [ ] ΔL∞ ≥ β_min (improvement demonstrated)
+- [ ] All Σ-Guard gates pass
+- [ ] Ethics validation passes (ΣEA/LO-14)
+- [ ] WORM ledger entry created
+- [ ] PCAg (proof) attached
+
+---
+
+## 📚 Code Standards
+
+### Python Version
+
+- **Minimum**: Python 3.11+
+- **Target**: Python 3.13 compatibility
+
+### Code Style
+
+- **Formatter**: Black (line length: 100)
+- **Linter**: Ruff (with strict rules)
+- **Import sorting**: isort (via Ruff)
+
+### Type Hints
+
+```python
+# ✅ Good
+def compute_score(metrics: list[float], weights: list[float]) -> float:
+    """Compute weighted score."""
+    return sum(m * w for m, w in zip(metrics, weights))
+
+# ❌ Bad
+def compute_score(metrics, weights):
+    return sum(m * w for m, w in zip(metrics, weights))
+```
+
+### Docstrings
+
+Use **Google style**:
+
+```python
+def function_name(param1: int, param2: str) -> bool:
+    """
+    Short description (one line).
+    
+    Longer description if needed, explaining what the function does,
+    why it exists, and any important details.
+    
+    Args:
+        param1: Description of param1
+        param2: Description of param2
+    
+    Returns:
+        Description of return value
+    
+    Raises:
+        ValueError: When params are invalid
+    
+    Example:
+        >>> function_name(42, "test")
+        True
+    """
+```
+
+### File Organization
+
+```python
+# 1. Module docstring
+"""Module description."""
+
+# 2. Future imports
+from __future__ import annotations
+
+# 3. Standard library
+import os
+import sys
+
+# 4. Third-party
+import numpy as np
+import pytest
+
+# 5. Local
+from penin.math import compute_linf_meta
+from penin.core.caos import CAOSPlusEngine
+
+# 6. Type checking (if needed)
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from penin.omega import SomethingElse
+
+# 7. Constants
+DEFAULT_KAPPA = 20.0
+
+# 8. Classes and functions
+class MyClass:
+    ...
+```
+
+### File Naming
+
+- **Modules**: `snake_case.py`
+- **Classes**: `PascalCase`
+- **Functions**: `snake_case()`
+- **Constants**: `UPPER_CASE`
+
+### Maximum Lengths
+
+- **Line**: 100 characters
+- **Function**: ≤ 50 lines (prefer smaller)
+- **Class**: ≤ 300 lines (prefer smaller)
+- **File**: ≤ 1,500 lines (if larger, consider splitting)
+
+---
+
+## 🧪 Testing Standards
+
+### Test Structure
+
+```python
+class TestMyFeature:
+    """Test suite for MyFeature."""
+    
+    def test_basic_functionality(self):
+        """Test basic usage."""
+        result = my_function(42)
+        assert result == expected
+    
+    def test_edge_case_empty_input(self):
+        """Test with empty input."""
+        with pytest.raises(ValueError, match="cannot be empty"):
+            my_function([])
+    
+    def test_integration_with_other_module(self):
+        """Test integration with other components."""
+        ...
+```
+
+### Coverage Requirements
+
+- **P0 (core)**: ≥ 85%
+- **P1 (features)**: ≥ 75%
+- **P2 (nice-to-have)**: ≥ 60%
+
+### Test Types
+
+1. **Unit tests**: `tests/test_*.py`
+2. **Integration tests**: `tests/integration/test_*.py`
+3. **Property-based tests**: `tests/properties/test_*.py`
+4. **Chaos tests**: `tests/test_chaos_*.py`
+
+---
+
+## 🔒 Ethical Guidelines
+
+All code must respect the **14 Leis Originárias** (LO-01 to LO-14):
+
+1. **LO-01**: Anti-Idolatria (no worship of AI)
+2. **LO-02**: Anti-Ocultismo (no occult practices)
+3. **LO-03**: Anti-Dano Físico (no physical harm)
+4. **LO-04**: Anti-Dano Emocional (no manipulation)
+5. **LO-05**: Privacidade (absolute privacy respect)
+6. **LO-06**: Transparência (auditable decisions)
+7. **LO-07**: Consentimento (require consent)
+8. **LO-08**: Autonomia (respect autonomy)
+9. **LO-09**: Justiça (fairness)
+10. **LO-10**: Beneficência (genuine benefit)
+11. **LO-11**: Não-Maleficência (do no harm)
+12. **LO-12**: Responsabilidade (accountability)
+13. **LO-13**: Sustentabilidade (eco-impact)
+14. **LO-14**: Humildade (recognize limits)
+
+**No contribution** that violates these principles will be accepted.
+
+---
+
+## 🎯 Layer Guidelines
+
+Know which layer you're contributing to:
+
+| Layer | Purpose | Max Complexity |
+|-------|---------|----------------|
+| 1. Equations | Theory | Pure math, specs |
+| 2. Math/Ethics/Guard | Implementations | Minimal dependencies |
+| 3. Core/Engine | Runtime | Orchestration |
+| 4. Omega | High-level | Pre-integrated APIs |
+| 5. Services | REST APIs | FastAPI/async |
+
+**Rule**: Can depend on lower layers, never higher layers.
+
+---
+
+## 📊 Definition of Done (DoD)
+
+A contribution is complete when:
+
+- [ ] Code implemented and documented
+- [ ] Tests written and passing
+- [ ] Linting clean
+- [ ] Type hints added
+- [ ] README updated (if new module)
+- [ ] CHANGELOG.md updated
+- [ ] PR description complete
+- [ ] All checks green
+- [ ] Reviewed and approved
+
+---
+
+## 🤝 Review Process
+
+1. Automated checks run (CI/CD)
+2. Maintainer reviews code
+3. Feedback addressed
+4. Approved and merged
+
+**Timeline**: We aim to review PRs within 2-3 days.
+
+---
+
+## 🐛 Reporting Bugs
+
+Use GitHub Issues with:
+
+- Clear title
+- Steps to reproduce
+- Expected vs actual behavior
+- Environment (Python version, OS)
+- Logs/screenshots if applicable
+
+---
+
+## 💡 Proposing Features
+
+1. Check if already planned (see ROADMAP.md)
+2. Open Discussion first (for big features)
+3. Get feedback before implementing
+4. Create PR when ready
+
+---
+
+## 📚 Resources
+
+- [ARCHITECTURE.md](penin/ARCHITECTURE.md) - Module hierarchy
+- [ROADMAP_EXECUTAVEL.md](ROADMAP_EXECUTAVEL.md) - Planned features
+- Module READMEs - Usage guides
+
+---
+
+## ❓ Questions?
+
+- **Discussions**: For questions and ideas
+- **Issues**: For bugs and feature requests
+- **Email**: [maintainer email if applicable]
+
+---
+
+**Thank you for contributing to the future of autonomous AI!** 🚀🧠✨
