@@ -48,8 +48,7 @@ jobs:
 
       - name: Generate SBOM with Syft
         run: |
-          syft dir:. -o cyclonedx-json=sbom-syft.json
-          syft dir:. -o spdx-json=sbom-syft-spdx.json
+          syft dir:. -o cyclonedx-json=sbom-syft.json,spdx-json=sbom-syft-spdx.json
 
       - name: Upload SBOM artifacts
         uses: actions/upload-artifact@v4
