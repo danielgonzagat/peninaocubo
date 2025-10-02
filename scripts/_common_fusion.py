@@ -40,11 +40,11 @@ def _try_json_load(text:str) -> Optional[dict]:
             except Exception:
                 return None
         return None
-
 def safe_read_json(p: Path) -> Optional[dict]:
     try:
-        return _try_json_load(p.read_text(encoding="utf-8", errors="ignore"))
+        return _try_json_load(p.read_text(encoding="utf-8", errors="replace"))
     except Exception:
+        return None
         return None
 
 def load_worms() -> List[Tuple[dict, Path]]:
