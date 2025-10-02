@@ -1,0 +1,263 @@
+name: Chaos Engineering Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'penin/**'
+      - 'tests/test_chaos_engineering.py'
+      - 'tests/chaos_utils.py'
+      - '.github/workflows/chaos-tests.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'penin/**'
+      - 'tests/test_chaos_engineering.py'
+      - 'tests/chaos_utils.py'
+  schedule:
+    # Run chaos tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_level:
+        description: 'Test level to run'
+        required: false
+        default: 'standard'
+        type: choice
+        options:
+          - quick
+          - standard
+          - full
+
+jobs:
+  chaos-tests:
+    name: Chaos Engineering Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12']
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest pytest-asyncio pytest-timeout pytest-cov
+
+      - name: Display Python version
+        run: python -c "import sys; print(sys.version)"
+
+      - name: Run quick chaos tests
+        if: github.event.inputs.test_level == 'quick' || github.event_name == 'pull_request'
+        run: |
+          pytest tests/test_chaos_engineering.py \
+            -m "chaos and not slow" \
+            -v \
+            --tb=short \
+            --cov=penin \
+            --cov-report=xml \
+            --cov-report=term
+
+      - name: Run standard chaos tests
+        if: github.event.inputs.test_level == 'standard' || (github.event_name == 'push' && github.event.inputs.test_level != 'full')
+        run: |
+          pytest tests/test_chaos_engineering.py \
+            -m chaos \
+            -v \
+            --tb=short \
+            --cov=penin \
+            --cov-report=xml \
+            --cov-report=term
+
+      - name: Run full chaos tests
+        if: github.event.inputs.test_level == 'full' || github.event_name == 'schedule'
+        run: |
+          pytest tests/test_chaos_engineering.py \
+            -v \
+            --tb=long \
+            --cov=penin \
+            --cov-report=xml \
+            --cov-report=html \
+            --cov-report=term
+
+      - name: Upload coverage reports
+        if: always()
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          flags: chaos-tests
+          name: chaos-coverage-${{ matrix.python-version }}
+          fail_ci_if_error: false
+
+      - name: Upload coverage HTML
+        if: github.event.inputs.test_level == 'full' || github.event_name == 'schedule'
+        uses: actions/upload-artifact@v4
+        with:
+          name: chaos-coverage-html-${{ matrix.python-version }}
+          path: htmlcov/
+          retention-days: 7
+
+      - name: Generate test report
+        if: always()
+        run: |
+          pytest tests/test_chaos_engineering.py \
+            -m chaos \
+            -v \
+            --tb=no \
+            --no-header \
+            > chaos-test-results.txt || true
+          echo "## Chaos Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          cat chaos-test-results.txt >> $GITHUB_STEP_SUMMARY || echo "No results" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+
+  chaos-tests-with-toxiproxy:
+    name: Chaos Tests with Toxiproxy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name == 'schedule' || github.event.inputs.test_level == 'full'
+
+    services:
+      toxiproxy:
+        image: ghcr.io/shopify/toxiproxy:latest
+        ports:
+          - 8474:8474
+          - 20000:20000
+          - 20001:20001
+          - 20002:20002
+        options: >-
+          --health-cmd "wget -q -O- http://localhost:8474/version"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest pytest-asyncio pytest-timeout requests
+
+      - name: Verify Toxiproxy is running
+        run: |
+          curl http://localhost:8474/version
+          echo "Toxiproxy is available"
+
+      - name: Run chaos tests with Toxiproxy
+        env:
+          TOXIPROXY_HOST: localhost
+          TOXIPROXY_PORT: 8474
+        run: |
+          pytest tests/test_chaos_examples.py::test_example_toxiproxy_integration -v -s || true
+
+      - name: Run full chaos suite
+        run: |
+          pytest tests/test_chaos_engineering.py -v --tb=short
+
+  fail-closed-validation:
+    name: Validate Fail-Closed Guarantee
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install pytest pytest-asyncio pytest-timeout
+
+      - name: Run fail-closed guarantee test
+        run: |
+          pytest tests/test_chaos_engineering.py::test_chaos_fail_closed_guarantee -v -s
+
+      - name: Validate critical chaos scenarios
+        run: |
+          pytest tests/test_chaos_engineering.py \
+            -k "service_death or fail_closed" \
+            -v \
+            --tb=short
+
+  chaos-test-report:
+    name: Generate Chaos Test Report
+    runs-on: ubuntu-latest
+    needs: [chaos-tests, fail-closed-validation]
+    if: always()
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create chaos test summary
+        run: |
+          cat << 'EOF' > chaos-summary.md
+          # 🌪️ Chaos Engineering Test Summary
+
+          ## Test Suite Status
+          - **Chaos Tests**: ${{ needs.chaos-tests.result }}
+          - **Fail-Closed Validation**: ${{ needs.fail-closed-validation.result }}
+
+          ## Scenarios Tested
+          1. ✅ Service Death (Σ-Guard pod kill)
+          2. ✅ Network Latency (timeout handling)
+          3. ✅ Data Corruption (malformed inputs)
+          4. ✅ Combined Failures
+          5. ✅ Fail-Closed Guarantee
+
+          ## Key Validations
+          - System defaults to DENY when services fail
+          - Timeouts are handled correctly (no hanging)
+          - Invalid data is rejected gracefully
+          - Service recovery works as expected
+          - No silent failures under chaos
+
+          ## Next Steps
+          - Review any failed tests
+          - Update resilience documentation
+          - Consider additional chaos scenarios
+          EOF
+          
+          cat chaos-summary.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('chaos-summary.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });

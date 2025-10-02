@@ -8,10 +8,10 @@ não-compensatório onde uma dimensão baixa compromete o score total.
 """
 
 import math
-from typing import Dict, Any, List, Optional
-from typing_extensions import Tuple
+import time
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 
 class SRAggregationMethod(Enum):
@@ -40,7 +40,7 @@ class SRComponents:
             metacognition=max(min_val, min(max_val, self.metacognition)),
         )
 
-    def to_dict(self) -> Dict[str, float]:
+    def to_dict(self) -> dict[str, float]:
         return {
             "awareness": self.awareness,
             "ethics": self.ethics,
@@ -48,14 +48,14 @@ class SRComponents:
             "metacognition": self.metacognition,
         }
 
-    def to_list(self) -> List[float]:
+    def to_list(self) -> list[float]:
         return [self.awareness, self.ethics, self.autocorrection, self.metacognition]
 
 
 # Standalone functions for compatibility with tests
 def compute_sr_omega(
     awareness: float, ethics_ok: bool, autocorrection: float, metacognition: float, config: "SRConfig" = None
-) -> Tuple[float, Dict[str, Any]]:
+) -> tuple[float, dict[str, Any]]:
     """Compute SR-Ω∞ score"""
     if config is None:
         config = SRConfig()
@@ -81,7 +81,7 @@ def compute_sr_omega(
     return sr_score, details
 
 
-def harmonic_mean(values: List[float]) -> float:
+def harmonic_mean(values: list[float]) -> float:
     """Harmonic mean of values"""
     if not values:
         return 0.0
@@ -94,7 +94,7 @@ def harmonic_mean(values: List[float]) -> float:
     return len(filtered) / sum(1.0 / v for v in filtered)
 
 
-def geometric_mean(values: List[float]) -> float:
+def geometric_mean(values: list[float]) -> float:
     """Geometric mean of values"""
     if not values:
         return 0.0
@@ -111,7 +111,7 @@ def geometric_mean(values: List[float]) -> float:
     return product ** (1.0 / len(filtered))
 
 
-def min_soft_pnorm(values: List[float], p: float = -5.0) -> float:
+def min_soft_pnorm(values: list[float], p: float = -5.0) -> float:
     """Min-soft p-norm approximation"""
     if not values:
         return 0.0
@@ -142,7 +142,7 @@ def min_soft_pnorm(values: List[float], p: float = -5.0) -> float:
         return min(result, min_val * 1.2)
 
 
-def compute_awareness_score(internal_state: Dict[str, float], confidence: float, num_cycles: int) -> float:
+def compute_awareness_score(internal_state: dict[str, float], confidence: float, num_cycles: int) -> float:
     """Compute awareness score from internal state"""
     # Simple heuristic based on resource usage and confidence
     cpu = internal_state.get("cpu", 0.5)
@@ -160,7 +160,7 @@ def compute_awareness_score(internal_state: Dict[str, float], confidence: float,
     return max(0.0, min(1.0, awareness))
 
 
-def compute_autocorrection_score(error_history: List[float], improvement_threshold: float = 0.1) -> float:
+def compute_autocorrection_score(error_history: list[float], improvement_threshold: float = 0.1) -> float:
     """Compute autocorrection score from error history"""
     if len(error_history) < 2:
         return 0.5  # Neutral score for insufficient data
@@ -230,7 +230,7 @@ class SRTracker:
 
     def update(
         self, awareness: float, ethics_ok: bool, autocorrection: float, metacognition: float
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """Update with new SR values"""
         sr_score, _ = compute_sr_omega(awareness, ethics_ok, autocorrection, metacognition)
 
@@ -289,7 +289,7 @@ class SROmegaEngine:
 
     def __init__(
         self,
-        weights: Optional[Dict[str, float]] = None,
+        weights: dict[str, float] | None = None,
         method: SRAggregationMethod = SRAggregationMethod.HARMONIC,
         p_norm: float = -10.0,  # Para min-soft (negativo)
         epsilon: float = 1e-9,
@@ -315,7 +315,7 @@ class SROmegaEngine:
         self.p_norm = p_norm
         self.epsilon = epsilon
 
-    def _harmonic_mean(self, components: SRComponents) -> Tuple[float, Dict[str, Any]]:
+    def _harmonic_mean(self, components: SRComponents) -> tuple[float, dict[str, Any]]:
         """Média harmônica ponderada"""
         comp_dict = components.to_dict()
 
@@ -336,7 +336,7 @@ class SROmegaEngine:
 
         return sr_score, details
 
-    def _min_soft(self, components: SRComponents) -> Tuple[float, Dict[str, Any]]:
+    def _min_soft(self, components: SRComponents) -> tuple[float, dict[str, Any]]:
         """Min-soft via p-norm negativo"""
         comp_list = components.to_list()
         weights_list = [self.weights[k] for k in ["awareness", "ethics", "autocorrection", "metacognition"]]
@@ -345,11 +345,13 @@ class SROmegaEngine:
         # Para p << 0, aproxima o mínimo ponderado
         if self.p_norm == 0:
             # Caso especial: média geométrica
-            log_sum = sum(w * math.log(max(self.epsilon, x)) for w, x in zip(weights_list, comp_list))
+            log_sum = sum(w * math.log(max(self.epsilon, x)) for w, x in zip(weights_list, comp_list, strict=False))
             sr_score = math.exp(log_sum)
         else:
             # p-norm geral
-            powered_sum = sum(w * (max(self.epsilon, x) ** self.p_norm) for w, x in zip(weights_list, comp_list))
+            powered_sum = sum(
+                w * (max(self.epsilon, x) ** self.p_norm) for w, x in zip(weights_list, comp_list, strict=False)
+            )
             sr_score = powered_sum ** (1.0 / self.p_norm)
 
         details = {
@@ -361,7 +363,7 @@ class SROmegaEngine:
 
         return max(0.0, min(1.0, sr_score)), details
 
-    def _geometric_mean(self, components: SRComponents) -> Tuple[float, Dict[str, Any]]:
+    def _geometric_mean(self, components: SRComponents) -> tuple[float, dict[str, Any]]:
         """Média geométrica ponderada"""
         comp_dict = components.to_dict()
 
@@ -377,7 +379,7 @@ class SROmegaEngine:
 
         return sr_score, details
 
-    def compute_sr(self, components: SRComponents) -> Tuple[float, Dict[str, Any]]:
+    def compute_sr(self, components: SRComponents) -> tuple[float, dict[str, Any]]:
         """
         Computa SR-Ω∞ usando método configurado
 
@@ -414,7 +416,7 @@ class SROmegaEngine:
 
         return sr_score, details
 
-    def gate_check(self, components: SRComponents, tau: float = 0.8) -> Tuple[bool, Dict[str, Any]]:
+    def gate_check(self, components: SRComponents, tau: float = 0.8) -> tuple[bool, dict[str, Any]]:
         """
         Verifica se SR passa no gate
 
@@ -439,8 +441,38 @@ class SROmegaEngine:
         }
 
         return passed, gate_details
+    
+    def create_attestation(self, components: SRComponents, candidate_id: str, tau: float = 0.8) -> Any:
+        """
+        Create cryptographic attestation for SR evaluation
+        
+        Args:
+            components: SR components
+            candidate_id: ID of the candidate being evaluated
+            tau: Threshold for passing
+            
+        Returns:
+            Attestation object or None if unavailable
+        """
+        try:
+            from penin.omega.attestation import create_sr_attestation
+            
+            sr_score, details = self.compute_sr(components)
+            passed = sr_score >= tau
+            verdict = "pass" if passed else "fail"
+            
+            attestation = create_sr_attestation(
+                verdict=verdict,
+                candidate_id=candidate_id,
+                sr_score=sr_score,
+                components=components.to_dict()
+            )
+            
+            return attestation
+        except ImportError:
+            return None
 
-    def analyze_non_compensatory(self, components: SRComponents) -> Dict[str, Any]:
+    def analyze_non_compensatory(self, components: SRComponents) -> dict[str, Any]:
         """
         Analisa comportamento não-compensatório
 
@@ -471,13 +503,13 @@ class SROmegaEngine:
 
         return analysis
 
-    def update_weights(self, new_weights: Dict[str, float]) -> None:
+    def update_weights(self, new_weights: dict[str, float]) -> None:
         """Atualiza pesos com normalização"""
         weight_sum = sum(new_weights.values())
         if weight_sum > 0:
             self.weights = {k: v / weight_sum for k, v in new_weights.items()}
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """Retorna configuração atual"""
         return {"weights": self.weights, "method": self.method.value, "p_norm": self.p_norm, "epsilon": self.epsilon}
 
@@ -491,7 +523,7 @@ class SRWithEthicsGate(SROmegaEngine):
 
     def compute_sr_with_ethics_gate(
         self, components: SRComponents, ethics_ok: bool = True
-    ) -> Tuple[float, Dict[str, Any]]:
+    ) -> tuple[float, dict[str, Any]]:
         """
         Computa SR com gate ético rígido
 
@@ -544,7 +576,7 @@ def quick_sr_min_soft(
 
 def quick_sr_gate(
     awareness: float, ethics: float, autocorrection: float, metacognition: float, tau: float = 0.8
-) -> Tuple[bool, float]:
+) -> tuple[bool, float]:
     """Gate rápido de SR"""
     engine = SROmegaEngine()
     components = SRComponents(awareness, ethics, autocorrection, metacognition)
@@ -554,7 +586,7 @@ def quick_sr_gate(
 
 def validate_sr_non_compensatory(
     awareness: float, ethics: float, autocorrection: float, metacognition: float
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     Valida comportamento não-compensatório do SR
 
@@ -582,7 +614,7 @@ def compute_sr_omega(
     metacognition: float,
     method: str = "harmonic",
     config: "SRConfig" = None,
-) -> Tuple[float, Dict[str, Any]]:
+) -> tuple[float, dict[str, Any]]:
     """
     Compute SR-Ω∞ score (convenience function)
 
@@ -616,7 +648,7 @@ def compute_sr_omega(
     return sr_score, details
 
 
-def harmonic_mean(values: List[float]) -> float:
+def harmonic_mean(values: list[float]) -> float:
     """Compute harmonic mean of values"""
     if not values:
         return 0.0
@@ -626,7 +658,7 @@ def harmonic_mean(values: List[float]) -> float:
     return len(safe_values) / sum(1.0 / v for v in safe_values)
 
 
-def geometric_mean(values: List[float]) -> float:
+def geometric_mean(values: list[float]) -> float:
     """Compute geometric mean of values"""
     if not values:
         return 0.0
@@ -639,7 +671,7 @@ def geometric_mean(values: List[float]) -> float:
     return math.exp(log_sum / len(safe_values))
 
 
-def min_soft_pnorm(values: List[float], p: float = -10.0) -> float:
+def min_soft_pnorm(values: list[float], p: float = -10.0) -> float:
     """Compute min-soft p-norm approximation"""
     if not values:
         return 0.0
@@ -657,7 +689,7 @@ def min_soft_pnorm(values: List[float], p: float = -10.0) -> float:
         return powered_sum ** (1.0 / p)
 
 
-def compute_awareness_score(state_dict: Dict[str, Any], *args) -> float:
+def compute_awareness_score(state_dict: dict[str, Any], *args) -> float:
     """Compute awareness score from system state"""
     # Handle different input types
     if isinstance(state_dict, (int, float)):
@@ -680,7 +712,7 @@ def compute_awareness_score(state_dict: Dict[str, Any], *args) -> float:
     return max(0.0, min(1.0, awareness))
 
 
-def compute_autocorrection_score(state_dict: Dict[str, Any], *args) -> float:
+def compute_autocorrection_score(state_dict: dict[str, Any], *args) -> float:
     """Compute autocorrection score from system state"""
     # Handle different input types
     if isinstance(state_dict, (int, float)):
@@ -703,7 +735,7 @@ def compute_autocorrection_score(state_dict: Dict[str, Any], *args) -> float:
     return max(0.0, min(1.0, autocorrection))
 
 
-def compute_metacognition_score(state_dict: Dict[str, Any], *args) -> float:
+def compute_metacognition_score(state_dict: dict[str, Any], *args) -> float:
     """Compute metacognition score from system state"""
     # Handle different input types
     if isinstance(state_dict, (int, float)):
@@ -732,7 +764,7 @@ class SRConfig:
 
     def __init__(
         self,
-        weights: Optional[Dict[str, float]] = None,
+        weights: dict[str, float] | None = None,
         method: str = "harmonic",
         p_norm: float = -10.0,
         aggregation: str = None,
@@ -746,7 +778,7 @@ class SRConfig:
             self.method = aggregation
         self.p_norm = p_norm
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {"weights": self.weights, "method": self.method, "p_norm": self.p_norm}
 
     def update(self, **kwargs):
@@ -764,7 +796,7 @@ class SRTracker:
         self.sr_history = []
         self.components_history = []
 
-    def add_measurement(self, sr_score: float, components: Dict[str, float]):
+    def add_measurement(self, sr_score: float, components: dict[str, float]):
         """Add an SR measurement"""
         self.sr_history.append(sr_score)
         self.components_history.append(components.copy())
@@ -775,7 +807,7 @@ class SRTracker:
 
     def update(
         self, awareness: float, ethics: float, autocorrection: float, metacognition: float
-    ) -> Tuple[float, float]:
+    ) -> tuple[float, float]:
         """Update tracker with new SR components and return SR score and EMA"""
         sr_score, details = compute_sr_omega(awareness, ethics, autocorrection, metacognition)
         components = {
@@ -798,7 +830,7 @@ class SRTracker:
 
         return sr_score, ema
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get SR statistics"""
         if not self.sr_history:
             return {"count": 0, "avg_sr": 0.0, "stability": "unknown"}
@@ -841,3 +873,187 @@ class SRTracker:
             return "declining"
         else:
             return "stable"
+
+
+@dataclass
+class Recommendation:
+    """Represents a recommendation made by SR-Omega"""
+
+    recommendation_id: str
+    task: str
+    timestamp: float
+    expected_sr: float
+    metadata: dict[str, Any]
+
+
+@dataclass
+class Outcome:
+    """Represents the outcome of a recommendation"""
+
+    recommendation_id: str
+    success: bool
+    timestamp: float
+    actual_sr: float | None
+    message: str
+
+
+class SROmegaService:
+    """
+    SR-Omega Service - Tracks mental state and provides introspection capabilities
+    
+    This service maintains state about:
+    - Pending recommendations that haven't been reported back on
+    - Recent outcomes (success/failure) of recommendations
+    - Current concerns (tasks/metrics with low success rates)
+    """
+
+    def __init__(self, max_pending: int = 100, max_outcomes: int = 50):
+        """
+        Initialize SR-Omega service
+        
+        Args:
+            max_pending: Maximum number of pending recommendations to track
+            max_outcomes: Maximum number of recent outcomes to track
+        """
+        self.pending_recommendations: list[Recommendation] = []
+        self.recent_outcomes: list[Outcome] = []
+        self.max_pending = max_pending
+        self.max_outcomes = max_outcomes
+        self.sr_tracker = SRTracker()
+        self.task_success_rates: dict[str, dict[str, Any]] = {}
+
+    def add_recommendation(
+        self, recommendation_id: str, task: str, expected_sr: float, metadata: dict[str, Any] | None = None
+    ) -> None:
+        """
+        Add a new recommendation to pending list
+        
+        Args:
+            recommendation_id: Unique identifier for the recommendation
+            task: Task name or description
+            expected_sr: Expected SR score
+            metadata: Additional metadata about the recommendation
+        """
+        rec = Recommendation(
+            recommendation_id=recommendation_id,
+            task=task,
+            timestamp=time.time(),
+            expected_sr=expected_sr,
+            metadata=metadata or {},
+        )
+        self.pending_recommendations.append(rec)
+
+        # Limit size
+        if len(self.pending_recommendations) > self.max_pending:
+            self.pending_recommendations.pop(0)
+
+    def report_outcome(
+        self, recommendation_id: str, success: bool, actual_sr: float | None = None, message: str = ""
+    ) -> None:
+        """
+        Report the outcome of a recommendation
+        
+        Args:
+            recommendation_id: ID of the recommendation
+            success: Whether the recommendation was successful
+            actual_sr: Actual SR score achieved (if available)
+            message: Additional message about the outcome
+        """
+        # Extract task name before removing from pending
+        task_name = None
+        for rec in self.pending_recommendations:
+            if rec.recommendation_id == recommendation_id:
+                task_name = rec.task
+                break
+
+        # Remove from pending
+        self.pending_recommendations = [r for r in self.pending_recommendations if r.recommendation_id != recommendation_id]
+
+        # Add to outcomes
+        outcome = Outcome(
+            recommendation_id=recommendation_id,
+            success=success,
+            timestamp=time.time(),
+            actual_sr=actual_sr,
+            message=message,
+        )
+        self.recent_outcomes.append(outcome)
+
+        # Limit size
+        if len(self.recent_outcomes) > self.max_outcomes:
+            self.recent_outcomes.pop(0)
+
+        # Update task success rates
+        if task_name:
+            self._update_task_success_rate(task_name, success)
+
+    def _update_task_success_rate(self, task: str, success: bool) -> None:
+        """Update success rate tracking for a task"""
+        if task not in self.task_success_rates:
+            self.task_success_rates[task] = {"total": 0, "successes": 0, "rate": 0.0}
+
+        self.task_success_rates[task]["total"] += 1
+        if success:
+            self.task_success_rates[task]["successes"] += 1
+
+        total = self.task_success_rates[task]["total"]
+        successes = self.task_success_rates[task]["successes"]
+        self.task_success_rates[task]["rate"] = successes / total if total > 0 else 0.0
+
+    def get_mental_state(self) -> dict[str, Any]:
+        """
+        Get the current mental state of the SR-Omega service
+        
+        Returns:
+            Dictionary containing:
+            - pending_recommendations: List of pending recommendations
+            - recent_outcomes: Log of recent outcomes
+            - current_concerns: List of tasks/metrics with low success rates
+        """
+        # Identify current concerns (tasks with low success rates)
+        concerns = []
+        for task, stats in self.task_success_rates.items():
+            if stats["total"] >= 3 and stats["rate"] < 0.5:  # At least 3 attempts and <50% success
+                concerns.append(
+                    {
+                        "task": task,
+                        "success_rate": stats["rate"],
+                        "total_attempts": stats["total"],
+                        "severity": "high" if stats["rate"] < 0.3 else "medium",
+                    }
+                )
+
+        # Format pending recommendations
+        pending_list = [
+            {
+                "id": rec.recommendation_id,
+                "task": rec.task,
+                "expected_sr": rec.expected_sr,
+                "age_seconds": time.time() - rec.timestamp,
+                "metadata": rec.metadata,
+            }
+            for rec in self.pending_recommendations
+        ]
+
+        # Format recent outcomes
+        outcomes_list = [
+            {
+                "id": out.recommendation_id,
+                "success": out.success,
+                "actual_sr": out.actual_sr,
+                "message": out.message,
+                "timestamp": out.timestamp,
+            }
+            for out in self.recent_outcomes
+        ]
+
+        # Get SR tracker stats
+        sr_stats = self.sr_tracker.get_stats()
+
+        return {
+            "pending_recommendations": pending_list,
+            "recent_outcomes": outcomes_list,
+            "current_concerns": concerns,
+            "sr_statistics": sr_stats,
+            "timestamp": time.time(),
+        }

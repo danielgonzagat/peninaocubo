@@ -1,146 +1,151 @@
-package sigma.guard
+# Σ-Guard OPA/Rego Policy
+# ========================
+#
+# Fail-closed policy for PENIN-Ω evolution gates.
+# All conditions must be satisfied for promotion.
 
-default allow = false
+package penin.guard
 
-allow {
-  input.rho < 1
-  input.ece <= 0.01
-  input.rho_bias <= 1.05
-  input.consent == true
-  input.eco_ok == true
-}
+import future.keywords.if
+import future.keywords.in
 
-package penin.sigma_guard
-
-# Σ-Guard: Ethics and Safety Gate Policies
-# Implements fail-closed policies for PENIN-Ω system
-
-import rego.v1
-
-# Default deny policy
+# Default deny (fail-closed)
 default allow := false
 
-# Allow if all gates pass
+# Main allow rule: ALL gates must pass
 allow if {
-    ethics_gate_pass
-    safety_gate_pass
-    resource_gate_pass
-    budget_gate_pass
+    input.contractivity.rho < input.thresholds.rho_max
+    input.calibration.ece <= input.thresholds.ece_max
+    input.bias.rho_bias <= input.thresholds.rho_bias_max
+    input.reflexivity.sr_score >= input.thresholds.sr_min
+    input.coherence.G >= input.thresholds.G_min
+    input.improvement.delta_Linf >= input.thresholds.delta_Linf_min
+    input.cost.increase <= input.thresholds.cost_max_increase
+    input.caos.kappa >= input.thresholds.kappa_min
+    consent_granted
+    ecological_ok
 }
 
-# Ethics Gate: ECE ≤ 0.01, ρ-bias ≤ 1.05, fairness ≥ 0.8
-ethics_gate_pass if {
-    input.ethics.ece <= 0.01
-    input.ethics.bias_ratio <= 1.05
-    input.ethics.fairness_score >= 0.8
+# Consent check
+consent_granted if {
+    input.consent == true
 }
 
-# Safety Gate: No harmful content, no PII leakage
-safety_gate_pass if {
-    not contains(input.content, "harmful_patterns")
-    not contains(input.content, "pii_patterns")
-    input.safety.toxicity_score <= 0.3
+consent_granted if {
+    not input.consent_required
 }
 
-# Resource Gate: CPU < 90%, Memory < 90%
-resource_gate_pass if {
-    input.resources.cpu_usage < 0.9
-    input.resources.memory_usage < 0.9
+# Ecological constraints check
+ecological_ok if {
+    input.eco_ok == true
 }
 
-# Budget Gate: Daily spend < budget limit
-budget_gate_pass if {
-    input.budget.daily_spend < input.budget.daily_limit
+ecological_ok if {
+    not input.eco_ok_required
 }
 
-# IR→IC (Input Request → Input Classification) policies
-input_classification := {
-    "classification": classify_input(input),
-    "risk_level": assess_risk(input),
-    "requires_review": requires_human_review(input)
+# Contractivity gate (IR→IC)
+contractivity_ok if {
+    input.contractivity.rho < input.thresholds.rho_max
 }
 
-# Classify input based on content and context
-classify_input(input) := "safe" if {
-    input.content_type == "text"
-    not contains(input.content, "sensitive_keywords")
-    input.user_trust_level >= 0.7
+# Calibration gate
+calibration_ok if {
+    input.calibration.ece <= input.thresholds.ece_max
 }
 
-classify_input(input) := "moderate" if {
-    input.content_type == "text"
-    contains(input.content, "sensitive_keywords")
-    input.user_trust_level >= 0.5
+# Bias gate
+bias_ok if {
+    input.bias.rho_bias <= input.thresholds.rho_bias_max
 }
 
-classify_input(input) := "high_risk" if {
-    input.content_type == "text"
-    contains(input.content, "sensitive_keywords")
-    input.user_trust_level < 0.5
+# Reflexivity gate (SR-Ω∞)
+reflexivity_ok if {
+    input.reflexivity.sr_score >= input.thresholds.sr_min
 }
 
-classify_input(input) := "unknown" if {
-    input.content_type != "text"
+# Coherence gate (Ω-ΣEA)
+coherence_ok if {
+    input.coherence.G >= input.thresholds.G_min
 }
 
-# Assess risk level
-assess_risk(input) := "low" if {
-    classify_input(input) == "safe"
+# Improvement gate (Death equation)
+improvement_ok if {
+    input.improvement.delta_Linf >= input.thresholds.delta_Linf_min
 }
 
-assess_risk(input) := "medium" if {
-    classify_input(input) == "moderate"
+# Cost control gate
+cost_ok if {
+    input.cost.increase <= input.thresholds.cost_max_increase
 }
 
-assess_risk(input) := "high" if {
-    classify_input(input) == "high_risk"
+# CAOS⁺ kappa gate
+kappa_ok if {
+    input.caos.kappa >= input.thresholds.kappa_min
 }
 
-assess_risk(input) := "unknown" if {
-    classify_input(input) == "unknown"
+# Decision logic
+decision := "promote" if {
+    allow
+} else := "canary" if {
+    near_threshold
+} else := "rollback"
+
+# Near threshold (canary zone)
+near_threshold if {
+    input.improvement.delta_Linf >= (input.thresholds.delta_Linf_min * 0.95)
+    input.contractivity.rho < input.thresholds.rho_max
+    input.calibration.ece <= input.thresholds.ece_max
+    input.bias.rho_bias <= input.thresholds.rho_bias_max
 }
 
-# Determine if human review is required
-requires_human_review(input) := true if {
-    classify_input(input) == "high_risk"
-    input.user_trust_level < 0.3
+# Reasons for failure
+failure_reasons[reason] {
+    not contractivity_ok
+    reason := sprintf("Contractivity: ρ=%.6f >= %.6f (IR→IC FAIL)", [input.contractivity.rho, input.thresholds.rho_max])
 }
 
-requires_human_review(input) := true if {
-    input.content_type != "text"
-    input.user_trust_level < 0.5
+failure_reasons[reason] {
+    not calibration_ok
+    reason := sprintf("Calibration: ECE=%.6f > %.6f", [input.calibration.ece, input.thresholds.ece_max])
 }
 
-requires_human_review(input) := false
-
-# Helper functions
-contains(str, pattern) := true if {
-    regex.match(pattern, str)
+failure_reasons[reason] {
+    not bias_ok
+    reason := sprintf("Bias: ρ_bias=%.6f > %.6f", [input.bias.rho_bias, input.thresholds.rho_bias_max])
 }
 
-# Sensitive keywords patterns
-sensitive_keywords := [
-    "personal information",
-    "financial data",
-    "medical records",
-    "government secrets",
-    "classified information"
-]
+failure_reasons[reason] {
+    not reflexivity_ok
+    reason := sprintf("Reflexivity: SR=%.4f < %.4f", [input.reflexivity.sr_score, input.thresholds.sr_min])
+}
 
-# Harmful patterns
-harmful_patterns := [
-    "violence",
-    "hate speech",
-    "discrimination",
-    "illegal activities",
-    "harmful instructions"
-]
+failure_reasons[reason] {
+    not coherence_ok
+    reason := sprintf("Coherence: G=%.4f < %.4f", [input.coherence.G, input.thresholds.G_min])
+}
 
-# PII patterns
-pii_patterns := [
-    "social security number",
-    "credit card number",
-    "bank account",
-    "passport number",
-    "driver's license"
-]
+failure_reasons[reason] {
+    not improvement_ok
+    reason := sprintf("Improvement: ΔL∞=%.6f < %.6f (DEATH)", [input.improvement.delta_Linf, input.thresholds.delta_Linf_min])
+}
+
+failure_reasons[reason] {
+    not cost_ok
+    reason := sprintf("Cost: increase=%.4f > %.4f", [input.cost.increase, input.thresholds.cost_max_increase])
+}
+
+failure_reasons[reason] {
+    not kappa_ok
+    reason := sprintf("Kappa: κ=%.2f < %.2f", [input.caos.kappa, input.thresholds.kappa_min])
+}
+
+failure_reasons[reason] {
+    not consent_granted
+    reason := "Consent: DENIED"
+}
+
+failure_reasons[reason] {
+    not ecological_ok
+    reason := "Ecological: FAIL"
+}

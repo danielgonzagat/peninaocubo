@@ -1,0 +1,197 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: penin-system
+  labels:
+    app: penin-omega
+    component: operator
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: penin-operator
+  namespace: penin-system
+  labels:
+    app: penin-omega
+    component: operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: penin-operator-role
+  labels:
+    app: penin-omega
+    component: operator
+rules:
+  # Watch and manage custom resources
+  - apiGroups:
+      - penin.ai
+    resources:
+      - peninaomegaclusters
+      - peninaomegaclusters/status
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  
+  # Manage deployments
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+      - deployments/status
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  
+  # Manage services
+  - apiGroups:
+      - ""
+    resources:
+      - services
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  
+  # Manage configmaps
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  
+  # Manage secrets
+  - apiGroups:
+      - ""
+    resources:
+      - secrets
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  
+  # Manage persistent volumes
+  - apiGroups:
+      - ""
+    resources:
+      - persistentvolumeclaims
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  
+  # Read pods for monitoring
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - pods/log
+    verbs:
+      - get
+      - list
+      - watch
+  
+  # Events for status reporting
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: penin-operator-binding
+  labels:
+    app: penin-omega
+    component: operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: penin-operator-role
+subjects:
+  - kind: ServiceAccount
+    name: penin-operator
+    namespace: penin-system
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: penin-operator
+  namespace: penin-system
+  labels:
+    app: penin-omega
+    component: operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: penin-omega
+      component: operator
+  template:
+    metadata:
+      labels:
+        app: penin-omega
+        component: operator
+    spec:
+      serviceAccountName: penin-operator
+      containers:
+        - name: operator
+          image: ghcr.io/danielgonzagat/penin-operator:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - /app/penin_operator.py
+          env:
+            - name: WATCH_NAMESPACE
+              value: ""  # Empty means watch all namespaces
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 5

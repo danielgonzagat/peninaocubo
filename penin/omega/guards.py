@@ -10,13 +10,12 @@ Implementa:
 """
 
 import time
-from typing import Dict, Any, List, Optional
-from typing_extensions import Tuple
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
 # Import do módulo de métricas éticas
-from .ethics_metrics import EthicsCalculator, EthicsMetrics, calculate_and_validate_ethics
+from .ethics_metrics import EthicsCalculator
 
 
 class GuardResultType(Enum):
@@ -38,7 +37,7 @@ class GuardViolation:
     message: str
     severity: str = "high"  # high, medium, low
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "guard": self.guard_name,
             "metric": self.metric,
@@ -50,7 +49,7 @@ class GuardViolation:
 
 
 # Standalone functions for compatibility with tests
-def sigma_guard(metrics: Dict[str, Any], policy: "SigmaGuardPolicy" = None) -> "GuardResult":
+def sigma_guard(metrics: dict[str, Any], policy: "SigmaGuardPolicy" = None) -> "GuardResult":
     """Standalone sigma guard function"""
     if policy is None:
         policy = SigmaGuardPolicy()
@@ -60,7 +59,7 @@ def sigma_guard(metrics: Dict[str, Any], policy: "SigmaGuardPolicy" = None) -> "
     return result
 
 
-def ir_to_ic_contractive(risk_history: List[float], rho_threshold: float = 1.0) -> "GuardResult":
+def ir_to_ic_contractive(risk_history: list[float], rho_threshold: float = 1.0) -> "GuardResult":
     """Standalone IR→IC contractivity check"""
     guard = IRICGuard(rho_threshold)
     result, violations, details = guard.check(risk_history)
@@ -68,8 +67,8 @@ def ir_to_ic_contractive(risk_history: List[float], rho_threshold: float = 1.0) 
 
 
 def combined_guard_check(
-    metrics: Dict[str, Any], risk_history: List[float], policy: "SigmaGuardPolicy" = None
-) -> Tuple[bool, Dict[str, Any]]:
+    metrics: dict[str, Any], risk_history: list[float], policy: "SigmaGuardPolicy" = None
+) -> tuple[bool, dict[str, Any]]:
     """Combined guard check"""
     if policy is None:
         policy = SigmaGuardPolicy()
@@ -89,11 +88,11 @@ class GuardResult:
     """Result from a guard check"""
 
     passed: bool
-    violations: List[GuardViolation]
-    details: Dict[str, Any]
+    violations: list[GuardViolation]
+    details: dict[str, Any]
     timestamp: str
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "passed": self.passed,
             "violations": [v.to_dict() for v in self.violations],
@@ -108,7 +107,7 @@ class IRICGuard:
     def __init__(self, rho_threshold: float = 1.0):
         self.rho_threshold = rho_threshold
 
-    def check(self, risk_history: List[float]) -> Tuple[GuardResult, List[GuardViolation], Dict[str, Any]]:
+    def check(self, risk_history: list[float]) -> tuple[GuardResult, list[GuardViolation], dict[str, Any]]:
         """Check if risk is contractive (IR→IC)"""
         violations = []
 
@@ -242,8 +241,8 @@ class SigmaGuard:
         self.ethics_calc = EthicsCalculator()
 
     def check(
-        self, state_dict: Dict[str, Any], dataset_id: Optional[str] = None, seed: Optional[int] = None
-    ) -> Tuple[GuardResult, List[GuardViolation], Dict[str, Any]]:
+        self, state_dict: dict[str, Any], dataset_id: str | None = None, seed: int | None = None
+    ) -> tuple[GuardResult, list[GuardViolation], dict[str, Any]]:
         """
         Executa verificação Σ-Guard
 
@@ -259,14 +258,6 @@ class SigmaGuard:
 
         try:
             # Calcular métricas éticas reais
-            config = {
-                "ethics": {
-                    "ece_max": self.ece_max,
-                    "rho_bias_max": self.rho_bias_max,
-                    "consent_required": self.require_consent,
-                    "eco_ok_required": self.require_eco,
-                }
-            }
 
             # Use provided metrics directly for now
             metrics = state_dict
@@ -387,10 +378,10 @@ class SigmaGuard:
 
     def update_thresholds(
         self,
-        ece_max: Optional[float] = None,
-        rho_bias_max: Optional[float] = None,
-        require_consent: Optional[bool] = None,
-        require_eco: Optional[bool] = None,
+        ece_max: float | None = None,
+        rho_bias_max: float | None = None,
+        require_consent: bool | None = None,
+        require_eco: bool | None = None,
     ) -> None:
         """Atualiza thresholds do guard"""
         if ece_max is not None:
@@ -402,7 +393,7 @@ class SigmaGuard:
         if require_eco is not None:
             self.require_eco = require_eco
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """Retorna configuração atual"""
         return {
             "ece_max": self.ece_max,
@@ -430,7 +421,7 @@ class IRtoICGuard:
         self.min_history = min_history_length
         self.contraction_factor = contraction_factor
 
-    def check_contractive(self, risk_series: List[float]) -> Tuple[GuardResult, List[GuardViolation], Dict[str, Any]]:
+    def check_contractive(self, risk_series: list[float]) -> tuple[GuardResult, list[GuardViolation], dict[str, Any]]:
         """
         Verifica contratividade da série de risco
 
@@ -580,7 +571,7 @@ class IRtoICGuard:
         """Aplica fator de contração ao risco atual"""
         return current_risk * self.contraction_factor
 
-    def get_config(self) -> Dict[str, Any]:
+    def get_config(self) -> dict[str, Any]:
         """Retorna configuração atual"""
         return {"rho_max": self.rho_max, "min_history": self.min_history, "contraction_factor": self.contraction_factor}
 
@@ -592,7 +583,7 @@ class GuardOrchestrator:
     Executa Σ-Guard e IR→IC em sequência, fail-closed
     """
 
-    def __init__(self, sigma_guard: Optional[SigmaGuard] = None, iric_guard: Optional[IRtoICGuard] = None):
+    def __init__(self, sigma_guard: SigmaGuard | None = None, iric_guard: IRtoICGuard | None = None):
         """
         Args:
             sigma_guard: Instância do Σ-Guard (default: padrão)
@@ -603,11 +594,11 @@ class GuardOrchestrator:
 
     def check_all_guards(
         self,
-        state_dict: Dict[str, Any],
-        risk_series: Optional[List[float]] = None,
-        dataset_id: Optional[str] = None,
-        seed: Optional[int] = None,
-    ) -> Tuple[bool, List[GuardViolation], Dict[str, Any]]:
+        state_dict: dict[str, Any],
+        risk_series: list[float] | None = None,
+        dataset_id: str | None = None,
+        seed: int | None = None,
+    ) -> tuple[bool, list[GuardViolation], dict[str, Any]]:
         """
         Executa todos os guards
 
@@ -651,7 +642,7 @@ class GuardOrchestrator:
 
         return all_passed, all_violations, evidence
 
-    def get_guard_summary(self) -> Dict[str, Any]:
+    def get_guard_summary(self) -> dict[str, Any]:
         """Retorna resumo de configuração dos guards"""
         return {
             "sigma_guard": self.sigma_guard.get_config(),
@@ -662,8 +653,8 @@ class GuardOrchestrator:
 
 # Funções de conveniência
 def quick_sigma_guard_check(
-    state_dict: Dict[str, Any], ece_max: float = 0.01, rho_bias_max: float = 1.05
-) -> Tuple[bool, List[str]]:
+    state_dict: dict[str, Any], ece_max: float = 0.01, rho_bias_max: float = 1.05
+) -> tuple[bool, list[str]]:
     """Verificação rápida do Σ-Guard"""
     guard = SigmaGuard(ece_max=ece_max, rho_bias_max=rho_bias_max)
     result, violations, _ = guard.check(state_dict)
@@ -674,7 +665,7 @@ def quick_sigma_guard_check(
     return passed, messages
 
 
-def quick_iric_check(risk_series: List[float], rho_max: float = 0.95) -> Tuple[bool, float]:
+def quick_iric_check(risk_series: list[float], rho_max: float = 0.95) -> tuple[bool, float]:
     """Verificação rápida do IR→IC"""
     guard = IRtoICGuard(rho_max=rho_max)
     result, violations, analysis = guard.check_contractive(risk_series)
@@ -685,7 +676,7 @@ def quick_iric_check(risk_series: List[float], rho_max: float = 0.95) -> Tuple[b
     return passed, max_ratio
 
 
-def full_guard_check(state_dict: Dict[str, Any], risk_series: Optional[List[float]] = None) -> Dict[str, Any]:
+def full_guard_check(state_dict: dict[str, Any], risk_series: list[float] | None = None) -> dict[str, Any]:
     """
     Verificação completa de todos os guards
 

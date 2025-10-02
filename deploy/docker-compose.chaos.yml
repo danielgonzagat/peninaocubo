@@ -1,0 +1,174 @@
+version: '3.8'
+
+# Docker Compose configuration for Chaos Engineering Tests
+# This sets up Toxiproxy alongside PENIN-Ω services for realistic chaos testing
+
+services:
+  # Toxiproxy - Network Chaos Injection
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:latest
+    container_name: penin-toxiproxy
+    ports:
+      - "8474:8474"      # Toxiproxy API
+      - "20000-20009:20000-20009"  # Proxy ports
+    networks:
+      - chaos-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8474/version"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # Σ-Guard Service (for testing)
+  sigma-guard-test:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: penin-sigma-guard-test
+    command: uvicorn penin.guard.sigma_guard_service:app --host 0.0.0.0 --port 8011
+    ports:
+      - "8011:8011"
+    networks:
+      - chaos-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8011/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # SR-Ω∞ Service (for testing)
+  sr-omega-test:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: penin-sr-omega-test
+    command: python -c "from fastapi import FastAPI; import uvicorn; app = FastAPI(); @app.get('/health'); async def health(): return {'ok': True}; @app.post('/sr/eval'); async def eval(data: dict): return {'score': 0.8, 'pass': True}; uvicorn.run(app, host='0.0.0.0', port=8012)"
+    ports:
+      - "8012:8012"
+    networks:
+      - chaos-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8012/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Ω-META Service (for testing)
+  omega-meta-test:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: penin-omega-meta-test
+    command: uvicorn penin.meta.omega_meta_service:app --host 0.0.0.0 --port 8013
+    ports:
+      - "8013:8013"
+    environment:
+      - PENIN_GUARD_URL=http://sigma-guard-test:8011
+      - PENIN_SR_URL=http://sr-omega-test:8012
+    depends_on:
+      - sigma-guard-test
+      - sr-omega-test
+    networks:
+      - chaos-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8013/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Redis (for caching tests)
+  redis-test:
+    image: redis:7-alpine
+    container_name: penin-redis-test
+    ports:
+      - "6380:6379"
+    networks:
+      - chaos-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Chaos Test Runner
+  chaos-tests:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: penin-chaos-tests
+    command: >
+      bash -c "
+        pip install pytest pytest-asyncio pytest-timeout &&
+        sleep 15 &&
+        pytest tests/test_chaos_engineering.py -v
+      "
+    depends_on:
+      - toxiproxy
+      - sigma-guard-test
+      - sr-omega-test
+      - omega-meta-test
+    networks:
+      - chaos-network
+    environment:
+      - TOXIPROXY_HOST=toxiproxy
+      - PENIN_GUARD_URL=http://sigma-guard-test:8011
+      - PENIN_SR_URL=http://sr-omega-test:8012
+      - PENIN_META_URL=http://omega-meta-test:8013
+    volumes:
+      - ../tests:/app/tests:ro
+      - chaos-results:/app/results
+
+  # Monitoring - Prometheus (optional)
+  prometheus-chaos:
+    image: prom/prometheus:latest
+    container_name: penin-prometheus-chaos
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=1d'
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus/prometheus-chaos.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-chaos-data:/prometheus
+    networks:
+      - chaos-network
+    profiles:
+      - monitoring
+
+  # Grafana (optional)
+  grafana-chaos:
+    image: grafana/grafana:latest
+    container_name: penin-grafana-chaos
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=chaos123
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/dashboards/chaos.json
+    volumes:
+      - grafana-chaos-data:/var/lib/grafana
+    networks:
+      - chaos-network
+    depends_on:
+      - prometheus-chaos
+    profiles:
+      - monitoring
+
+volumes:
+  chaos-results:
+    driver: local
+  prometheus-chaos-data:
+    driver: local
+  grafana-chaos-data:
+    driver: local
+
+networks:
+  chaos-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16

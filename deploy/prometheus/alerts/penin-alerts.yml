@@ -1,0 +1,174 @@
+groups:
+  - name: penin_core_alerts
+    interval: 30s
+    rules:
+      # Critical: Ethics Gate Failures
+      - alert: EthicsGateFailureHigh
+        expr: rate(penin_gate_fail_total{gate="sigma_guard"}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+          component: sigma-guard
+        annotations:
+          summary: "High rate of Σ-Guard gate failures"
+          description: "Ethics gate failing at {{ $value | humanizePercentage }} (threshold: 10%)"
+
+      # Critical: Contractividade Violation
+      - alert: ContractividadeViolation
+        expr: penin_rho > 1.0
+        for: 1m
+        labels:
+          severity: critical
+          component: ir-ic
+        annotations:
+          summary: "Contratividade (ρ) exceeded 1.0"
+          description: "ρ = {{ $value }}, system risk increasing (must be < 1.0)"
+
+      # Critical: L∞ Degradation
+      - alert: LinfDegradationSevere
+        expr: delta(penin_delta_linf[10m]) < -0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: master-equation
+        annotations:
+          summary: "Severe L∞ degradation detected"
+          description: "L∞ decreased by {{ $value }} in 10 minutes"
+
+      # Warning: Low CAOS+ Score
+      - alert: CaosPlusLow
+        expr: penin_caos_plus < 1.5
+        for: 5m
+        labels:
+          severity: warning
+          component: caos-plus
+        annotations:
+          summary: "CAOS+ score below threshold"
+          description: "CAOS+ = {{ $value }} (expected ≥ 1.5)"
+
+      # Warning: SR-Ω∞ Degradation
+      - alert: SRScoreLow
+        expr: penin_sr_score < 0.75
+        for: 5m
+        labels:
+          severity: warning
+          component: sr-omega-infinity
+        annotations:
+          summary: "Self-reflection score low"
+          description: "SR = {{ $value }} (expected ≥ 0.80)"
+
+      # Critical: ECE Calibration Failure
+      - alert: ECECalibrationFailure
+        expr: penin_ece > 0.02
+        for: 2m
+        labels:
+          severity: critical
+          component: ethics
+        annotations:
+          summary: "Expected Calibration Error too high"
+          description: "ECE = {{ $value }} (threshold: 0.01)"
+
+      # Critical: Bias Ratio Violation
+      - alert: BiasRatioViolation
+        expr: penin_rho_bias > 1.10
+        for: 2m
+        labels:
+          severity: critical
+          component: ethics
+        annotations:
+          summary: "Bias ratio exceeds acceptable threshold"
+          description: "ρ_bias = {{ $value }} (threshold: 1.05)"
+
+      # Warning: High Cost
+      - alert: HighCostDetected
+        expr: rate(penin_cost_total[5m]) > 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: router
+        annotations:
+          summary: "Cost rate elevated"
+          description: "Cost rate: ${{ $value }}/minute"
+
+      # Critical: Budget Exceeded
+      - alert: BudgetExceeded
+        expr: (penin_daily_spend_usd / penin_budget_daily_usd) > 0.95
+        for: 1m
+        labels:
+          severity: critical
+          component: router
+        annotations:
+          summary: "Daily budget 95% consumed"
+          description: "Spent: ${{ $value | humanize }} / ${{ query \"penin_budget_daily_usd\" | humanize }}"
+
+  - name: penin_performance_alerts
+    interval: 30s
+    rules:
+      # Warning: High Latency
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(penin_cycle_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: performance
+        annotations:
+          summary: "High evolution cycle latency"
+          description: "P95 latency: {{ $value }}s (threshold: 5s)"
+
+      # Warning: Low Cache Hit Rate
+      - alert: LowCacheHitRate
+        expr: penin_router_hit_rate < 0.5
+        for: 10m
+        labels:
+          severity: warning
+          component: cache
+        annotations:
+          summary: "Low cache hit rate"
+          description: "Hit rate: {{ $value | humanizePercentage }} (expected ≥ 50%)"
+
+      # Critical: High Error Rate
+      - alert: HighErrorRate
+        expr: rate(penin_errors_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+        annotations:
+          summary: "Elevated error rate"
+          description: "Error rate: {{ $value | humanizePercentage }}"
+
+  - name: penin_infrastructure_alerts
+    interval: 1m
+    rules:
+      # Critical: Service Down
+      - alert: ServiceDown
+        expr: up{job=~"penin.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: infrastructure
+        annotations:
+          summary: "PENIN-Ω service down"
+          description: "Service {{ $labels.job }} is unreachable"
+
+      # Warning: High Memory Usage
+      - alert: HighMemoryUsage
+        expr: (container_memory_usage_bytes{name=~"penin.*"} / container_spec_memory_limit_bytes{name=~"penin.*"}) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High memory usage"
+          description: "Container {{ $labels.name }}: {{ $value | humanizePercentage }} memory used"
+
+      # Warning: High CPU Usage
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total{name=~"penin.*"}[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High CPU usage"
+          description: "Container {{ $labels.name }}: {{ $value | humanizePercentage }} CPU used"

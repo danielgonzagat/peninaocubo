@@ -4,8 +4,6 @@ Teste de integração completa do sistema PENIN-Ω (1/8 até 8/8)
 """
 
 import sys
-import json
-import asyncio
 from pathlib import Path
 
 
@@ -15,7 +13,9 @@ def test_module_1():
     try:
         import subprocess
 
-        result = subprocess.run([sys.executable, "1_de_8", "--test"], capture_output=True, text=True, timeout=30)
+        result = subprocess.run(
+            [sys.executable, "1_de_8", "--test"], check=False, capture_output=True, text=True, timeout=30
+        )
         if result.returncode == 0:
             print("✅ 1/8 (Core) - All tests passed")
             return True
@@ -33,12 +33,12 @@ def test_module_2():
     try:
         import subprocess
 
-        result = subprocess.run([sys.executable, "2_de_8"], capture_output=True, text=True, timeout=10)
+        result = subprocess.run([sys.executable, "2_de_8"], check=False, capture_output=True, text=True, timeout=10)
         if "PLANO GERADO" in result.stdout:
             print("✅ 2/8 (Strategy) - Working")
             return True
         else:
-            print(f"❌ 2/8 (Strategy) - No plan generated")
+            print("❌ 2/8 (Strategy) - No plan generated")
             return False
     except Exception as e:
         print(f"❌ 2/8 (Strategy) - Error: {e}")
@@ -51,12 +51,14 @@ def test_module_3():
     try:
         import subprocess
 
-        result = subprocess.run([sys.executable, "3_de_8", "--seed", "42"], capture_output=True, text=True, timeout=15)
+        result = subprocess.run(
+            [sys.executable, "3_de_8", "--seed", "42"], check=False, capture_output=True, text=True, timeout=15
+        )
         if "RELATÓRIO DE AQUISIÇÃO" in result.stdout:
             print("✅ 3/8 (Acquisition) - Working")
             return True
         else:
-            print(f"❌ 3/8 (Acquisition) - No report generated")
+            print("❌ 3/8 (Acquisition) - No report generated")
             return False
     except Exception as e:
         print(f"❌ 3/8 (Acquisition) - Error: {e}")
@@ -69,12 +71,14 @@ def test_module_4():
     try:
         import subprocess
 
-        result = subprocess.run([sys.executable, "4_de_8", "--test"], capture_output=True, text=True, timeout=20)
+        result = subprocess.run(
+            [sys.executable, "4_de_8", "--test"], check=False, capture_output=True, text=True, timeout=20
+        )
         if "tests completed" in result.stdout.lower():
             print("✅ 4/8 (Mutation) - Tests completed")
             return True
         else:
-            print(f"❌ 4/8 (Mutation) - Tests failed")
+            print("❌ 4/8 (Mutation) - Tests failed")
             return False
     except Exception as e:
         print(f"❌ 4/8 (Mutation) - Error: {e}")
@@ -87,12 +91,14 @@ def test_module_5():
     try:
         import subprocess
 
-        result = subprocess.run([sys.executable, "5_de_8", "--test"], capture_output=True, text=True, timeout=20)
+        result = subprocess.run(
+            [sys.executable, "5_de_8", "--test"], check=False, capture_output=True, text=True, timeout=20
+        )
         if "All tests passed" in result.stdout or "tests completed" in result.stdout.lower():
             print("✅ 5/8 (Crucible) - Tests passed")
             return True
         else:
-            print(f"❌ 5/8 (Crucible) - Tests failed")
+            print("❌ 5/8 (Crucible) - Tests failed")
             return False
     except Exception as e:
         print(f"❌ 5/8 (Crucible) - Error: {e}")
@@ -108,9 +114,9 @@ def test_integration_flow():
         sys.path.insert(0, str(Path.cwd()))
 
         # Test basic imports with fallback loader for script files
-        from importlib import import_module
-        import importlib.util
         import importlib.machinery
+        import importlib.util
+        from importlib import import_module
 
         def _fallback_load(module_name: str) -> bool:
             p = Path.cwd() / module_name
@@ -190,4 +196,4 @@ def main():
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

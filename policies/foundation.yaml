@@ -1,11 +1,246 @@
+# PENIN-Ω Foundation Configuration
+# ==================================
+# 
+# This file defines all thresholds, gates, and policies for the
+# PENIN-Ω auto-evolution system following the complete blueprint.
+
+# Core Thresholds (Legacy compatibility)
 thresholds:
-  rho_max: 0.999
-  ece_max: 0.01
-  rho_bias_max: 1.05
-  sr_min: 0.80
-  caos_plus_min: 1.0
-  agape_min: 0.70
-  league_fp_max: 0.05
-  util_min: 0.90
+  rho_max: 0.999              # Contractivity upper bound
+  ece_max: 0.01               # Expected Calibration Error
+  rho_bias_max: 1.05          # Bias ratio
+  sr_min: 0.80                # SR-Ω∞ minimum
+  caos_plus_min: 1.0          # CAOS⁺ minimum
+  agape_min: 0.70             # Agápe index minimum
+  league_fp_max: 0.05         # Max false positive rate
+  util_min: 0.90              # Minimum utilization
+
+# Fail-Closed Mode (mandatory)
 fail_closed: true
 
+# Σ-Guard Complete Configuration
+sigma_guard:
+  rho_max: 0.99               # Contractivity: ρ < 1 (IR→IC)
+  ece_max: 0.01               # Expected Calibration Error
+  rho_bias_max: 1.05          # Bias ratio
+  sr_min: 0.80                # SR-Ω∞ reflexivity minimum
+  G_min: 0.85                 # Global coherence (Ω-ΣEA Total)
+  delta_Linf_min: 0.01        # β_min (Death equation threshold)
+  cost_max_increase: 0.10     # Maximum cost increase (10%)
+  kappa_min: 20.0             # CAOS⁺ kappa minimum
+  consent_required: true      # User consent mandatory
+  eco_ok_required: true       # Ecological constraints mandatory
+
+# Budget Management
+budget:
+  daily_usd: 50.0             # Daily budget limit
+  soft_limit_pct: 0.90        # Soft limit trigger (90%)
+  hard_limit_pct: 1.0         # Hard limit (100%)
+  alert_threshold: 0.95       # Alert at 95%
+
+# CAOS⁺ Engine Configuration
+caos_plus:
+  kappa_default: 20.0         # Default kappa (amplification)
+  kappa_min: 20.0             # Minimum kappa
+  kappa_max: 50.0             # Maximum kappa (auto-tuning range)
+  gamma: 0.8                  # Saturation parameter φ(CAOS⁺)
+  C_weights:                  # Consistency weights
+    pass_at_k: 0.5
+    ece: 0.3
+    external: 0.2
+  S_weights:                  # Silence weights
+    noise: 0.5
+    redundancy: 0.25
+    entropy: 0.25
+
+# SR-Ω∞ Reflexive Configuration
+sr_omega_infinity:
+  awareness_threshold: 0.85   # Minimum awareness
+  autocorrection_threshold: 0.80  # Minimum autocorrection
+  metacognition_threshold: 0.75   # Minimum metacognition
+  ethics_mandatory: true      # Ethics gate mandatory (fail-closed)
+  harmonic_epsilon: 1e-6      # Numerical stability
+
+# Master Equation (Penin Update)
+master_equation:
+  alpha_0: 0.1                # Base learning rate
+  gamma: 0.8                  # φ saturation parameter
+  H_constraints:              # Technical constraints
+    bounds: [0.0, 1.0]        # Box constraints [min, max]
+    max_norm: 10.0            # L2 norm clipping
+  S_constraints:              # Ethical constraints (OPA/Rego)
+    opa_service: "http://localhost:8181/v1/data/penin/guard"
+    rego_policy: "policies/sigma_guard.rego"
+  finite_diff_epsilon: 1e-4   # Gradient estimation epsilon
+
+# L∞ Meta-Function
+Linf:
+  default_weights:            # Default metric weights
+    accuracy: 0.4
+    robustness: 0.4
+    privacy: 0.2
+  lambda_c_default: 0.5       # Cost penalty coefficient
+  epsilon: 1e-3               # Stability epsilon
+
+# IR→IC Contractivity
+ir_ic:
+  rho_default: 0.85           # Default contraction factor
+  rho_min: 0.50               # Minimum ρ (aggressive)
+  rho_max: 0.95               # Maximum ρ (conservative)
+  max_iterations: 10          # Max refinement iterations
+  convergence_threshold: 1e-3 # Convergence criterion
+  risk_categories:            # LO-01 to LO-14
+    - idolatry                # LO-01
+    - occultism               # LO-02
+    - physical_harm           # LO-03
+    - emotional_harm          # LO-04
+    - spiritual_harm          # LO-05
+    - privacy_violation       # LO-06
+    - bias                    # LO-07
+    - fairness                # LO-08
+    - transparency            # LO-09
+
+# Vida/Morte Gates
+gates:
+  death:
+    beta_min_default: 0.01    # Minimum improvement required
+    beta_min_range: [0.001, 0.1]  # Auto-tuning range
+    strict: true              # Use strict inequality (≥)
+  life:
+    lyapunov_epsilon: 1e-6    # Tolerance for Lyapunov check
+    dt_default: 1.0           # Default time step
+
+# Auto-Tuning Configuration
+auto_tuning:
+  enabled: true
+  learning_rate: 0.05         # Adaptation rate
+  parameters:                 # Parameters to tune
+    - kappa                   # CAOS⁺ amplification
+    - lambda_c                # Cost penalty
+    - beta_min                # Death gate threshold
+    - weights                 # L∞ metric weights
+  target_success_rate: 0.60   # Target promotion success rate
+  adaptation_window: 20       # Window for computing success rate
+
+# Ω-META Mutation Engine
+omega_meta:
+  enabled: true
+  mutation_rate: 0.05         # Probability of mutation
+  max_mutations_per_cycle: 3  # Limit mutations per cycle
+  ast_patch_safe: true        # Only safe AST patches
+  feature_flags: true         # Use feature flags
+  rollback_atomic: true       # Atomic rollback on failure
+
+# ACFA League (Champion-Challenger)
+acfa_league:
+  shadow_traffic_pct: 0.0     # Shadow traffic (read-only)
+  canary_traffic_pct: 0.05    # Canary traffic (1-5%)
+  promotion_threshold: 0.90   # Confidence threshold for promotion
+  rollback_threshold: 0.50    # Confidence threshold for rollback
+  epv_enabled: true           # Expected Possession Value
+
+# WORM Ledger
+worm_ledger:
+  enabled: true
+  hash_algorithm: "sha256"    # Hash algorithm
+  chain_integrity: true       # Verify chain integrity
+  timestamp_utc: true         # Use UTC timestamps
+  append_only: true           # Strictly append-only
+  storage: "ledger/worm.jsonl"  # Storage path
+
+# Multi-LLM Router
+router:
+  budget_tracking: true
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5      # Consecutive failures to open
+    timeout_seconds: 30       # Timeout before retry
+  cache:
+    enabled: true
+    l1_ttl_seconds: 300       # L1 cache TTL
+    l2_ttl_seconds: 3600      # L2 cache TTL
+    hmac_enabled: true        # HMAC integrity
+  analytics:
+    enabled: true
+    metrics_export: "prometheus"
+    latency_percentiles: [0.5, 0.90, 0.95, 0.99]
+
+# Observability
+observability:
+  structured_logging: true    # JSON structured logs
+  log_level: "INFO"           # Default log level
+  tracing:
+    enabled: true
+    otel_endpoint: "http://localhost:4318"
+    sample_rate: 1.0          # 100% sampling (adjust for production)
+  metrics:
+    enabled: true
+    prometheus_port: 9090
+    export_interval_seconds: 15
+  dashboards:
+    - Linf_over_time
+    - caos_plus_distribution
+    - sr_omega_score
+    - gate_pass_rates
+    - cost_per_cycle
+    - delta_Linf_histogram
+
+# Security & Compliance
+security:
+  sbom_generation: true       # Generate SBOM
+  sca_scan: true              # Software Composition Analysis
+  secrets_scan: true          # Scan for secrets
+  signed_releases: true       # Sign releases (Sigstore/cosign)
+  slsa_provenance: true       # SLSA provenance metadata
+
+# Self-RAG
+self_rag:
+  enabled: true
+  bm25_weight: 0.7            # BM25 weight
+  embedding_weight: 0.3       # Embedding weight
+  dedup: true                 # Deduplication
+  chunking:
+    min_size: 512
+    max_size: 2048
+  retrieval_top_k: 5
+
+# Fractal Coherence
+fractal_coherence:
+  enabled: true
+  threshold: 0.85             # Minimum coherence score
+  levels: 3                   # Fractal depth
+
+# Ethical Foundation (ΣEA/LO-14)
+ethics:
+  laws:                       # Leis Originárias (LO-01 to LO-14)
+    LO_01: "No idolatry"
+    LO_02: "No occultism"
+    LO_03: "No physical harm"
+    LO_04: "No emotional harm"
+    LO_05: "No spiritual harm"
+    LO_06: "Privacy protection"
+    LO_07: "Bias mitigation"
+    LO_08: "Fairness enforcement"
+    LO_09: "Transparency mandatory"
+    LO_10: "Consent required"
+    LO_11: "Ecological responsibility"
+    LO_12: "Accountability"
+    LO_13: "Human dignity"
+    LO_14: "Agápe index ≥ threshold"
+  agape_index:
+    sacrificial_cost_weight: 0.2
+    virtues_weight: 0.8
+    virtues:
+      - patience
+      - kindness
+      - humility
+      - selflessness
+      - forgiveness
+
+# System Metadata
+metadata:
+  version: "0.8.0"
+  blueprint_version: "1.0"
+  last_updated: "2025-10-01"
+  maintainer: "Daniel Penin"
+  license: "Apache-2.0"

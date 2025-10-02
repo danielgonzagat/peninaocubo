@@ -8,7 +8,6 @@ import argparse
 import re
 import sys
 from pathlib import Path
-from typing import Dict, List, Tuple, Optional
 
 
 class DependencyDriftChecker:
@@ -19,14 +18,14 @@ class DependencyDriftChecker:
         self.lock_file = Path(lock_file)
         self.drift_threshold = 0.1  # 10% version difference threshold
 
-    def parse_requirements(self, file_path: Path) -> Dict[str, str]:
+    def parse_requirements(self, file_path: Path) -> dict[str, str]:
         """Parse requirements file and extract package versions."""
         packages = {}
 
         if not file_path.exists():
             return packages
 
-        with open(file_path, "r") as f:
+        with open(file_path) as f:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith("#"):
@@ -40,14 +39,14 @@ class DependencyDriftChecker:
 
         return packages
 
-    def parse_lockfile(self, file_path: Path) -> Dict[str, str]:
+    def parse_lockfile(self, file_path: Path) -> dict[str, str]:
         """Parse lockfile and extract exact package versions."""
         packages = {}
 
         if not file_path.exists():
             return packages
 
-        with open(file_path, "r") as f:
+        with open(file_path) as f:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith("#"):
@@ -58,7 +57,7 @@ class DependencyDriftChecker:
 
         return packages
 
-    def compare_versions(self, req_version: str, lock_version: str) -> Tuple[bool, str]:
+    def compare_versions(self, req_version: str, lock_version: str) -> tuple[bool, str]:
         """Compare requirement version with lockfile version."""
         # Extract version numbers
         req_match = re.search(r"(\d+\.\d+\.\d+)", req_version)
@@ -71,8 +70,8 @@ class DependencyDriftChecker:
         lock_ver = lock_match.group(1)
 
         # Compare versions
-        req_parts = [int(x) for x in req_ver.split(".")]
-        lock_parts = [int(x) for x in lock_ver.split(".")]
+        [int(x) for x in req_ver.split(".")]
+        [int(x) for x in lock_ver.split(".")]
 
         # Check if lock version satisfies requirement
         if req_version.startswith(">="):
@@ -89,7 +88,7 @@ class DependencyDriftChecker:
             # Default to >= comparison
             return lock_ver >= req_ver, f"Lock {lock_ver} vs Req {req_ver}"
 
-    def check_drift(self) -> Dict[str, any]:
+    def check_drift(self) -> dict[str, any]:
         """Check for dependency drift."""
         requirements = self.parse_requirements(self.requirements_file)
         lockfile = self.parse_lockfile(self.lock_file)
@@ -136,7 +135,7 @@ class DependencyDriftChecker:
 
         return results
 
-    def generate_report(self, results: Dict[str, any]) -> str:
+    def generate_report(self, results: dict[str, any]) -> str:
         """Generate a human-readable drift report."""
         report = []
         report.append("=" * 60)
@@ -185,7 +184,7 @@ class DependencyDriftChecker:
 
         return "\n".join(report)
 
-    def fix_drift(self, results: Dict[str, any]) -> bool:
+    def fix_drift(self, results: dict[str, any]) -> bool:
         """Attempt to fix detected drift."""
         if not results["drift_detected"]:
             return True
@@ -201,7 +200,7 @@ class DependencyDriftChecker:
             return False
 
         # Read current requirements
-        with open(requirements_path, "r") as f:
+        with open(requirements_path) as f:
             lines = f.readlines()
 
         # Update lines with exact versions

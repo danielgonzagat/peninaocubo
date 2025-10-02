@@ -1,0 +1,62 @@
+apiVersion: penin.ai/v1alpha1
+kind: PeninOmegaCluster
+metadata:
+  name: penin-dev
+  namespace: default
+spec:
+  version: "0.9.0"
+  
+  # Replica counts for development
+  replicas:
+    omegaMeta: 1
+    sigmaGuard: 1
+    srOmegaInfinity: 1
+    acfaLeague: 1
+  
+  # Resource limits (minimal for dev)
+  resources:
+    omegaMeta:
+      cpu: "250m"
+      memory: "256Mi"
+    sigmaGuard:
+      cpu: "250m"
+      memory: "256Mi"
+    srOmegaInfinity:
+      cpu: "250m"
+      memory: "256Mi"
+    acfaLeague:
+      cpu: "250m"
+      memory: "256Mi"
+  
+  # PENIN-Ω Configuration
+  config:
+    budgetDailyUsd: 1.0
+    
+    caosPlus:
+      maxBoost: 0.05
+      kappa: 20.0
+    
+    sigmaGuard:
+      eceThreshold: 0.01
+      biasThreshold: 1.05
+    
+    evolution:
+      seed: 12345
+  
+  # Observability
+  observability:
+    metrics: true
+    tracing: false
+    logging:
+      level: "DEBUG"
+  
+  # Storage
+  storage:
+    wormLedger:
+      enabled: true
+      storageClass: "standard"
+      size: "5Gi"
+    
+    cache:
+      enabled: true
+      type: "redis"

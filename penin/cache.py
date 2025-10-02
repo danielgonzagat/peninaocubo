@@ -7,7 +7,7 @@ import os
 import time
 from collections import OrderedDict
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 try:
     import orjson  # type: ignore  # os testes usam orjson quando disponível
@@ -58,10 +58,10 @@ class SecureCache:
         self._key = (os.environ.get("PENIN_CACHE_HMAC_KEY") or "dev").encode("utf-8")
 
         # L1 com LRU simples: {key: {"value":..., "timestamp":...}}
-        self._l1: "OrderedDict[str, Dict[str, Any]]" = OrderedDict()
+        self._l1: OrderedDict[str, dict[str, Any]] = OrderedDict()
 
         # métricas básicas
-        self._hits: Dict[str, int] = {"l1": 0, "l2": 0, "misses": 0}
+        self._hits: dict[str, int] = {"l1": 0, "l2": 0, "misses": 0}
         self._evictions = 0
 
     # ---------- utilidades ----------
@@ -92,7 +92,7 @@ class SecureCache:
             self._l1.popitem(last=False)
             self._evictions += 1
 
-    def get(self, key: str) -> Optional[Any]:
+    def get(self, key: str) -> Any | None:
         # L1
         if key in self._l1:
             rec = self._l1[key]
@@ -155,7 +155,7 @@ class SecureCache:
             except Exception:
                 pass
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """Get cache statistics."""
         l2_files = len(list(self.cache_dir.glob("*.json")))
         hits_l1 = self._hits.get("l1", 0)
@@ -178,7 +178,7 @@ class SecureCache:
         # aqui não há recursos persistentes a fechar além de arquivos por operação
         pass
 
-    def __enter__(self) -> "SecureCache":
+    def __enter__(self) -> SecureCache:
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "peninaocubo"
-version = "0.8.0"
-description = "PENIN-Ω auto-evolution system with Master Equation, CAOS+, SR-Ω∞, and ethical AI orchestration"
+version = "0.9.0"
+description = "PENIN-Ω auto-evolution system with Master Equation, CAOS+, SR-Ω∞, SOTA integrations, and ethical AI orchestration for true IA³"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
@@ -78,8 +78,10 @@ dev = [
     "pytest>=7.3.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.1.0",
+    "hypothesis>=6.0.0",
     "ruff>=0.6.0",
     "black>=23.0.0",
+    "flake8>=6.0.0",
     "mypy>=1.3.0",
     "pre-commit>=3.3.0",
 ]
@@ -88,6 +90,72 @@ docs = [
     "mkdocs>=1.5.0",
     "mkdocs-material>=9.0.0",
     "mkdocstrings[python]>=0.24.0",
+]
+
+# SOTA Integration Extras (Priority 1-3)
+nextpy = [
+    "nextpy>=0.4.0",  # Autonomous Modifying System (P1)
+]
+
+metacog = [
+    # Metacognitive-Prompting dependencies (P1)
+    # Add specific requirements when implementing
+]
+
+spikingjelly = [
+    "spikingjelly>=0.0.0.0.14",  # Neuromorphic computing (P1)
+    "torch>=2.0.0",
+]
+
+goneat = [
+    # goNEAT dependencies (P2)
+    # Add when implementing
+]
+
+mammoth = [
+    "mammoth-continual>=0.1.0",  # Continual learning (P2)
+]
+
+symbolicai = [
+    "symbolicai>=0.3.0",  # Neurosymbolic integration (P2)
+]
+
+midwiving = [
+    # midwiving-ai dependencies (P3)
+    # Add when implementing
+]
+
+opencog = [
+    # OpenCog AtomSpace dependencies (P3)
+    # Add when implementing
+]
+
+swarmrl = [
+    # SwarmRL dependencies (P3)
+    # Add when implementing
+]
+
+# Kubernetes Operator
+operator = [
+    "kopf>=1.37.0",
+    "kubernetes>=30.0.0",
+]
+
+# All SOTA integrations combined
+sota-p1 = [
+    "peninaocubo[nextpy,metacog,spikingjelly]",
+]
+
+sota-p2 = [
+    "peninaocubo[goneat,mammoth,symbolicai]",
+]
+
+sota-p3 = [
+    "peninaocubo[midwiving,opencog,swarmrl]",
+]
+
+sota-full = [
+    "peninaocubo[sota-p1,sota-p2,sota-p3]",
 ]
 
 [project.urls]
@@ -109,7 +177,7 @@ include = ["penin", "penin.*"]
 namespaces = false
 
 [tool.black]
-line-length = 120
+line-length = 88
 target-version = ["py311", "py312"]
 include = '\.pyi?$'
 extend-exclude = '''
@@ -123,7 +191,7 @@ extend-exclude = '''
 '''
 
 [tool.ruff]
-line-length = 120
+line-length = 88
 target-version = "py311"
 extend-exclude = ["docs/archive", ".venv", "build", "dist"]
 
