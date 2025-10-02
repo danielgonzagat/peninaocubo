@@ -72,6 +72,21 @@ def main():
             print(f"   stderr: {e.stderr}")
             continue
         # ler novidade do último WORM do slug
+        nov = None
+        # Try to parse novelty value from subprocess output
+        try:
+            # Assume output is JSON with a 'novelty' field
+            out_json = json.loads(result.stdout)
+            nov = out_json.get("novelty")
+        except Exception:
+            # Fallback: try to parse a line like 'novelty: <value>'
+            for line in result.stdout.splitlines():
+                if line.lower().startswith("novelty:"):
+                    try:
+                        nov = float(line.split(":",1)[1].strip())
+                    except Exception:
+                        nov = None
+                    break
         if nov is not None:
             roll.append(nov)
             if len(roll) > args.stop_window:
