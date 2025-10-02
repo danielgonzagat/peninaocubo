@@ -65,6 +65,7 @@ def main():
             "--population", str(args.pop),
             "--generations", str(args.gen),
             "--jitter", str(args.jitter),
+        ]
         try:
             result = subprocess.run(cmd, check=True, capture_output=True, text=True)
         except subprocess.CalledProcessError as e:
