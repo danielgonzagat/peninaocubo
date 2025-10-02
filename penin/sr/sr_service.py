@@ -403,8 +403,16 @@ def quick_sr_score(
 # ============================================================================
 
 try:
-    from fastapi import FastAPI
+    from fastapi import FastAPI, HTTPException, Depends, status
+    from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+    from fastapi.middleware.cors import CORSMiddleware
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
     from pydantic import BaseModel, Field
+    
+    # Rate limiter
+    limiter = Limiter(key_func=get_remote_address)
     
     app = FastAPI(
         title="SR-Ω∞ Service",
@@ -412,7 +420,31 @@ try:
         version="1.0.0",
     )
     
-    # Global SR service instance
+    # Add rate limiting
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    
+    # Add CORS middleware with restrictive settings
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[""],  # Restrict to known origins
+        allow_credentials=True,
+        allow_methods=["GET", "POST"],
+        allow_headers=["*"],
+    )
+    
+    # Security scheme
+    security = HTTPBearer()
+    
+    def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+        """Verify API token."""
+        # TODO: Implement proper token verification
+        if not credentials.credentials or credentials.credentials != "your-secret-token":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
     _global_sr_service = SRService()
     
     class ScoreRequest(BaseModel):
