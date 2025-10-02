@@ -250,13 +250,15 @@ class NetworkChaos:
             time.sleep(latency_seconds)
             return original_func(*args, **kwargs)
 
-        with patch.object(
-            target_func.__self__ if hasattr(target_func, "__self__") else target_func,
-            target_func.__name__,
-            delayed_func,
-        ):
-            yield
-
+        # Try to patch using import path string
+        if hasattr(target_func, "__module__") and hasattr(target_func, "__name__"):
+            patch_target = f"{target_func.__module__}.{target_func.__name__}"
+            with patch(patch_target, delayed_func):
+                yield
+        else:
+            raise TypeError(
+                "target_func must be a function with __module__ and __name__ attributes (e.g., a module-level function)."
+            )
     @staticmethod
     @contextmanager
     def simulate_packet_loss(loss_probability: float = 0.5):
