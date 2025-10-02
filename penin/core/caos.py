@@ -1358,3 +1358,29 @@ if __name__ == "__main__":
     # Executar todos os exemplos quando o módulo é chamado diretamente
     run_all_examples()
 
+
+# --- auto-injetado: compute_A_autoevolution (contrativo e estável) ---
+from __future__ import annotations
+import numpy as _np
+
+def compute_A_autoevolution(phi, lam: float = 1.0):
+    """
+    Gera uma matriz A estável a partir de um potencial 1D 'phi'.
+    A = I - lam * L_norm, onde L é uma Laplaciana normalizada construída
+    de similaridades gaussianas sobre (phi). Para lam in (0,1], rho(A) <= 1.
+    """
+    v = _np.asarray(phi, dtype=float).ravel()
+    n = v.size
+    if n == 0:
+        return _np.zeros((0, 0))
+    var = float(_np.var(v)) + 1e-12
+    diffs = v[:, None] - v[None, :]
+    W = _np.exp(-(diffs ** 2) / var)
+    _np.fill_diagonal(W, 0.0)
+    D = _np.diag(W.sum(axis=1))
+    # normaliza pela maior diagonal para garantir passo seguro
+    scale = float(_np.max(_np.diag(D))) + 1e-12
+    L = D - W
+    I = _np.eye(n)
+    A = I - float(lam) * (L / scale)
+    return A
