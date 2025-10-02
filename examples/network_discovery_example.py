@@ -87,7 +87,7 @@ def example_state_persistence():
 
     # Create orchestrator and node
     orchestrator = OmegaMetaOrchestrator()
-    node = PeninNode(
+    _ = PeninNode(
         node_id="node-epsilon",
         orchestrator=orchestrator,
         enable_discovery=True,
