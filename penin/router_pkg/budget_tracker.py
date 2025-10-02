@@ -98,12 +98,12 @@ class BudgetTracker:
         auto_reset: bool = True,
     ):
         """
-        Initialize budget tracker
-
+        Initialize budget tracker.
+        
         Args:
-            daily_limit_usd: Daily budget limit in USD
-            soft_limit_ratio: Ratio for soft limit warning (0.95 = 95%)
-            auto_reset: Automatically reset at midnight UTC
+            daily_limit_usd: Maximum daily budget in USD
+            soft_limit_ratio: Ratio for soft warning (0.95 = 95%)
+            auto_reset: Auto-reset daily at midnight UTC
         """
         if daily_limit_usd <= 0:
             raise ValueError("daily_limit_usd must be positive")
@@ -138,6 +138,31 @@ class BudgetTracker:
             f"BudgetTracker initialized: daily_limit=${daily_limit_usd:.2f}, "
             f"soft_limit={soft_limit_ratio*100:.0f}%"
         )
+    
+    # ========================================================================
+    # PROPERTIES (for test compatibility)
+    # ========================================================================
+    
+    @property
+    def used_usd(self) -> float:
+        """Total USD spent today"""
+        return self.spend_today_usd
+
+    @property
+    def remaining_usd(self) -> float:
+        """Remaining budget in USD"""
+        return max(0.0, self.daily_limit_usd - self.spend_today_usd)
+
+    @property  
+    def usage_pct(self) -> float:
+        """Usage percentage [0, 1]"""
+        if self.daily_limit_usd == 0:
+            return 1.0
+        return min(1.0, self.spend_today_usd / self.daily_limit_usd)
+    
+    # ========================================================================
+    # INTERNAL HELPERS
+    # ========================================================================
 
     def _get_current_day_utc(self) -> int:
         """Get current day as YYYYMMDD (UTC)"""
@@ -157,6 +182,113 @@ class BudgetTracker:
             )
             self.reset()
             self.current_day_utc = current_day
+    
+    # ========================================================================
+    # RECORDING METHODS
+    # ========================================================================
+    
+    def record_request(self, provider: str, cost_usd: float, tokens_used: int, success: bool = True):
+        """
+        Record a request for tracking (simplified API).
+        
+        Args:
+            provider: Provider name (e.g., "openai")
+            cost_usd: Cost in USD
+            tokens_used: Number of tokens consumed
+            success: Whether request succeeded
+        """
+        self._check_and_reset_if_new_day()
+        
+        # Update totals
+        self.spend_today_usd += cost_usd
+        self.tokens_consumed += tokens_used
+        self.requests_count += 1
+        
+        # Update provider stats
+        stats = self.provider_stats[provider]
+        stats.requests_total += 1
+        if success:
+            stats.requests_success += 1
+        else:
+            stats.requests_failed += 1
+        stats.tokens_total += tokens_used
+        stats.cost_total_usd += cost_usd
+        
+        # Add to history (keep last 1000)
+        self.request_history.append(
+            RequestRecord(
+                timestamp=time.time(),
+                provider=provider,
+                tokens=tokens_used,
+                cost_usd=cost_usd,
+                success=success,
+            )
+        )
+        if len(self.request_history) > 1000:
+            self.request_history.pop(0)
+        
+        logger.debug(
+            f"Tracked: {provider} ${cost_usd:.4f} ({tokens_used} tokens) success={success}"
+        )
+
+    def track_request(
+        self,
+        provider: str,
+        tokens: int,
+        cost_usd: float,
+        success: bool,
+        endpoint: str | None = None,
+    ) -> None:
+        """
+        Track a completed request (full API).
+
+        Args:
+            provider: Provider name (e.g., "openai", "anthropic")
+            tokens: Number of tokens consumed
+            cost_usd: Actual cost in USD
+            success: Whether request succeeded
+            endpoint: Optional endpoint identifier
+        """
+        self.record_request(provider, cost_usd, tokens, success)
+    
+    # ========================================================================
+    # CHECK METHODS
+    # ========================================================================
+    
+    def is_soft_limit_exceeded(self) -> bool:
+        """Check if soft limit exceeded"""
+        self._check_and_reset_if_new_day()
+        return self.usage_pct >= self.soft_limit_ratio
+
+    def is_hard_limit_exceeded(self) -> bool:
+        """Check if hard limit exceeded"""
+        self._check_and_reset_if_new_day()
+        return self.usage_pct >= 1.0
+
+    def can_afford_request(self, estimated_cost: float) -> bool:
+        """
+        Check if we can afford a request.
+        
+        Args:
+            estimated_cost: Estimated cost in USD
+        
+        Returns:
+            True if within budget, False otherwise
+        """
+        self._check_and_reset_if_new_day()
+        return (self.spend_today_usd + estimated_cost) <= self.daily_limit_usd
+
+    def get_provider_stats(self, provider: str) -> ProviderStats:
+        """
+        Get statistics for a provider.
+        
+        Args:
+            provider: Provider name
+        
+        Returns:
+            ProviderStats for that provider
+        """
+        return self.provider_stats[provider]
 
     def reset(self) -> None:
         """Reset all counters (manual or automatic at midnight UTC)"""
@@ -210,194 +342,73 @@ class BudgetTracker:
 
         return True
 
-    def track_request(
-        self,
-        provider: str,
-        tokens: int,
-        cost_usd: float,
-        success: bool,
-        endpoint: str | None = None,
-    ) -> None:
-        """
-        Track a completed request
-
-        Args:
-            provider: Provider name (e.g., "openai", "anthropic")
-            tokens: Number of tokens consumed
-            cost_usd: Actual cost in USD
-            success: Whether request succeeded
-            endpoint: Optional endpoint identifier
-        """
-        self._check_and_reset_if_new_day()
-
-        # Update global counters
-        self.spend_today_usd += cost_usd
-        self.tokens_consumed += tokens
-        self.requests_count += 1
-
-        # Update provider stats
-        stats = self.provider_stats[provider]
-        stats.requests_total += 1
-        if success:
-            stats.requests_success += 1
-        else:
-            stats.requests_failed += 1
-        stats.tokens_total += tokens
-        stats.cost_total_usd += cost_usd
-
-        # Add to audit trail
-        record = RequestRecord(
-            timestamp=time.time(),
-            provider=provider,
-            tokens=tokens,
-            cost_usd=cost_usd,
-            success=success,
-            endpoint=endpoint,
-        )
-        self.request_history.append(record)
-
-        # Trim history if too large
-        if len(self.request_history) > self.max_history:
-            self.request_history = self.request_history[-self.max_history :]
-
-        logger.debug(
-            f"Tracked request: provider={provider}, tokens={tokens}, "
-            f"cost=${cost_usd:.4f}, success={success}"
-        )
-
-    def get_usage_percent(self) -> float:
-        """
-        Get current usage as percentage of daily limit
-
-        Returns:
-            Usage percentage [0, 100+]
-        """
-        self._check_and_reset_if_new_day()
-        return (self.spend_today_usd / self.daily_limit_usd) * 100.0
-
-    def get_remaining_budget(self) -> float:
-        """
-        Get remaining budget in USD
-
-        Returns:
-            Remaining budget (can be negative if overrun)
-        """
-        self._check_and_reset_if_new_day()
-        return self.daily_limit_usd - self.spend_today_usd
-
     def is_soft_limit_reached(self) -> bool:
         """Check if soft limit reached"""
         self._check_and_reset_if_new_day()
         return self.spend_today_usd >= (self.daily_limit_usd * self.soft_limit_ratio)
 
     def is_hard_limit_reached(self) -> bool:
-        """Check if hard limit reached"""
+        """Check if hard limit reached (cannot proceed)"""
         self._check_and_reset_if_new_day()
         return self.spend_today_usd >= self.daily_limit_usd
 
     def get_usage(self) -> dict[str, Any]:
         """
-        Get comprehensive usage statistics
+        Get current usage statistics
 
         Returns:
-            Dictionary with usage details
+            Dict with spend_today, daily_limit, remaining, percent, etc.
         """
         self._check_and_reset_if_new_day()
 
         return {
-            "daily_limit_usd": self.daily_limit_usd,
-            "spend_today_usd": self.spend_today_usd,
-            "remaining_usd": self.get_remaining_budget(),
-            "usage_percent": self.get_usage_percent(),
-            "tokens_consumed": self.tokens_consumed,
-            "requests_count": self.requests_count,
+            "spend_today": self.spend_today_usd,
+            "daily_limit": self.daily_limit_usd,
+            "remaining": max(0.0, self.daily_limit_usd - self.spend_today_usd),
+            "percent": (self.spend_today_usd / self.daily_limit_usd) * 100.0,
+            "tokens": self.tokens_consumed,
+            "requests": self.requests_count,
             "soft_limit_reached": self.is_soft_limit_reached(),
             "hard_limit_reached": self.is_hard_limit_reached(),
-            "last_reset_timestamp": self.last_reset_timestamp,
-            "current_day_utc": self.current_day_utc,
         }
 
-    def get_provider_stats(self, provider: str | None = None) -> dict[str, Any]:
+    def get_provider_breakdown(self) -> dict[str, dict[str, Any]]:
         """
-        Get provider-level statistics
-
-        Args:
-            provider: Specific provider name, or None for all
+        Get breakdown by provider
 
         Returns:
-            Dictionary with provider stats
+            Dict mapping provider → stats dict
         """
         self._check_and_reset_if_new_day()
 
-        if provider is not None:
-            stats = self.provider_stats.get(provider, ProviderStats())
-            return {
-                "provider": provider,
-                "requests_total": stats.requests_total,
-                "requests_success": stats.requests_success,
-                "requests_failed": stats.requests_failed,
-                "success_rate": stats.success_rate(),
-                "tokens_total": stats.tokens_total,
-                "cost_total_usd": stats.cost_total_usd,
-                "avg_cost_per_request": stats.avg_cost_per_request(),
-            }
-
-        # All providers
-        return {
-            prov: {
-                "requests_total": stats.requests_total,
-                "requests_success": stats.requests_success,
-                "requests_failed": stats.requests_failed,
-                "success_rate": stats.success_rate(),
-                "tokens_total": stats.tokens_total,
-                "cost_total_usd": stats.cost_total_usd,
-                "avg_cost_per_request": stats.avg_cost_per_request(),
-            }
-            for prov, stats in self.provider_stats.items()
-        }
-
-    def export_metrics(self) -> dict[str, float]:
-        """
-        Export metrics for Prometheus
-
-        Returns:
-            Dictionary of metric_name -> value
-        """
-        self._check_and_reset_if_new_day()
-
-        usage = self.get_usage()
-
-        metrics = {
-            "penin_budget_daily_usd": self.daily_limit_usd,
-            "penin_daily_spend_usd": self.spend_today_usd,
-            "penin_daily_remaining_usd": usage["remaining_usd"],
-            "penin_budget_usage_percent": usage["usage_percent"],
-            "penin_tokens_consumed_total": float(self.tokens_consumed),
-            "penin_requests_total": float(self.requests_count),
-            "penin_soft_limit_reached": float(usage["soft_limit_reached"]),
-            "penin_hard_limit_reached": float(usage["hard_limit_reached"]),
-        }
-
-        # Per-provider metrics
+        breakdown = {}
         for provider, stats in self.provider_stats.items():
-            metrics[f'penin_provider_requests_total{{provider="{provider}"}}'] = float(
-                stats.requests_total
-            )
-            metrics[f'penin_provider_cost_usd{{provider="{provider}"}}'] = (
-                stats.cost_total_usd
-            )
-            metrics[f'penin_provider_success_rate{{provider="{provider}"}}'] = (
-                stats.success_rate()
-            )
+            breakdown[provider] = {
+                "requests": stats.requests_total,
+                "tokens": stats.tokens_total,
+                "cost_usd": stats.cost_total_usd,
+                "success_rate": stats.success_rate(),
+                "avg_cost": stats.avg_cost_per_request(),
+            }
 
-        return metrics
+        return breakdown
 
-    def __repr__(self) -> str:
-        """String representation"""
+    def export_metrics(self) -> dict[str, Any]:
+        """
+        Export metrics for Prometheus/monitoring
+
+        Returns:
+            Dict with all metrics
+        """
         usage = self.get_usage()
-        return (
-            f"BudgetTracker(spend=${usage['spend_today_usd']:.2f}/"
-            f"${usage['daily_limit_usd']:.2f}, "
-            f"{usage['usage_percent']:.1f}%, "
-            f"requests={usage['requests_count']})"
-        )
+        breakdown = self.get_provider_breakdown()
+
+        return {
+            "budget": usage,
+            "providers": breakdown,
+            "timestamp": time.time(),
+            "day_utc": self.current_day_utc,
+        }
+
+
+__all__ = ["BudgetTracker", "ProviderStats", "RequestRecord"]
