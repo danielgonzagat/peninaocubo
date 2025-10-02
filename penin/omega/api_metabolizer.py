@@ -57,43 +57,56 @@ def get_provider_stats(provider: str | None = None) -> dict[str, Any]:
         "recent_calls": [],
     }
     
-    with LOG.open("rb") as f:
-        for line in f:
-            try:
-                it = orjson.loads(line)
-                p = it.get("p", "unknown")
-                
-                # Filter by provider if specified
-                if provider and p != provider:
+    try:
+        with LOG.open("rb") as f:
+            for line in f:
+                try:
+                    it = orjson.loads(line)
+                    p = it.get("p", "unknown")
+                    
+                    # Filter by provider if specified
+                    if provider and p != provider:
+                        continue
+                    
+                    stats["total_calls"] += 1
+                    
+                    if p not in stats["providers"]:
+                        stats["providers"][p] = {
+                            "calls": 0,
+                            "endpoints": set(),
+                            "first_call": it.get("t"),
+                            "last_call": it.get("t"),
+                        }
+                    
+                    stats["providers"][p]["calls"] += 1
+                    stats["providers"][p]["last_call"] = it.get("t")
+                    
+                    endpoint = it.get("e")
+                    if endpoint:
+                        stats["providers"][p]["endpoints"].add(endpoint)
+                    
+                    # Keep last 10 calls
+                    if len(stats["recent_calls"]) < 10:
+                        stats["recent_calls"].append({
+                            "provider": p,
+                            "endpoint": endpoint,
+                            "timestamp": it.get("t"),
+                        })
+                    
+                except orjson.JSONDecodeError:
+                    # Skip malformed JSON lines
                     continue
-                
-                stats["total_calls"] += 1
-                
-                if p not in stats["providers"]:
-                    stats["providers"][p] = {
-                        "calls": 0,
-                        "endpoints": set(),
-                        "first_call": it.get("t"),
-                        "last_call": it.get("t"),
-                    }
-                
-                stats["providers"][p]["calls"] += 1
-                stats["providers"][p]["last_call"] = it.get("t")
-                
-                endpoint = it.get("e")
-                if endpoint:
-                    stats["providers"][p]["endpoints"].add(endpoint)
-                
-                # Keep last 10 calls
-                if len(stats["recent_calls"]) < 10:
-                    stats["recent_calls"].append({
-                        "provider": p,
-                        "endpoint": endpoint,
-                        "timestamp": it.get("t"),
-                    })
-                
-            except Exception:
-                continue
+                except Exception as e:
+                    # Log unexpected errors but continue processing
+                    print(f"Warning: Error processing log line: {e}")
+                    continue
+    
+    except (IOError, OSError) as e:
+        return {
+            "total_calls": 0,
+            "providers": {},
+            "error": f"Failed to read log file: {e}",
+        }
     
     # Convert sets to lists for JSON serialization
     for p in stats["providers"]:
