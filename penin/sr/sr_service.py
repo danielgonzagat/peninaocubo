@@ -450,7 +450,7 @@ try:
     class ScoreRequest(BaseModel):
         """Request model for SR score computation."""
         ece: float = Field(default=0.01, ge=0.0, le=1.0, description="Expected Calibration Error")
-        rho: float = Field(default=0.90, ge=0.0, le=2.0, description="Contractividade ratio")
+        rho: float = Field(default=0.90, ge=0.0, le=2.0, description="Contractivity ratio")
         delta_linf: float = Field(default=0.05, ge=-1.0, le=1.0, description="Change in L∞")
         delta_cost: float = Field(default=0.10, ge=0.0, description="Change in cost")
     
