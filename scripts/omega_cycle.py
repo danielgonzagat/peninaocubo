@@ -91,18 +91,19 @@ def stats_from_files(files: List[str]) -> Tuple[float,float,int]:
     # retorna (mean_score, mean_nov_global, n)
     import json
     scores=[]; novs=[]
-    for name in files:
-        p = WORM_DIR/name
         try:
-            s = p.read_text(encoding="utf-8", errors="ignore")
-            # leitura leniente (arquivos WORM podem ter “lixo” após JSON)
+            s = p.read_text(encoding="utf-8", errors="replace")
+            # leitura leniente (arquivos WORM podem ter "lixo" após JSON)
             i=s.find("{"); k=s.rfind("}")
-            if i==-1 or k==-1 or k<=i: continue
+            if i==-1 or k==-1 or k<=i: 
+                print(f"Warning: Invalid JSON structure in {p.name}", file=sys.stderr)
+                continue
             j=json.loads(s[i:k+1])
             m=j.get("metrics") or {}
             scores.append(float(score(m)))
             novs.append(float(((j.get("novelty") or {}).get("vs_global")) or 0.0))
-        except Exception:
+        except Exception as e:
+            print(f"Warning: Failed to parse {p.name}: {e}", file=sys.stderr)
             continue
     n=len(scores)
     if n==0: return (0.0, 0.0, 0)
