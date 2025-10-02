@@ -136,6 +136,8 @@ def compute_linf_meta(
 
     result = base * penalty
     logger.debug(f"L∞ computed: base={base:.4f}, penalty={penalty:.4f}, result={result:.4f}")
+    result = base * penalty
+    logger.debug(f"L∞ computed: base={base:.4f}, penalty={penalty:.4f}, result={result:.4f}")
 
     return result
     return base * penalty
