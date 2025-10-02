@@ -179,7 +179,7 @@ class TestOriginLaws:
         assert result.score < 0.90, f"Harmonic mean should be lower than arithmetic, got {result.score}"
 
         # Verify it's influenced by worst dimension
-        (1.0 + 0.50 + 1.0) / 3
+        # (1.0 + 0.50 + 1.0) / 3  # arithmetic mean for comparison
 
     def test_validator_suggested_fixes(self):
         """Violations should include suggested fixes"""
