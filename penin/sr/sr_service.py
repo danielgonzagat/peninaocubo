@@ -396,3 +396,112 @@ def quick_sr_score(
     metacognition = min(1.0, max(0.0, delta_linf / delta_cost)) if delta_cost > 0 else 0.0
     
     return compute_sr_score(awareness, ethics_ok, autocorrection, metacognition)
+
+
+# ============================================================================
+# FastAPI Application
+# ============================================================================
+
+try:
+    from fastapi import FastAPI, HTTPException, Depends, status
+    from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+    from fastapi.middleware.cors import CORSMiddleware
+    from slowapi import Limiter, _rate_limit_exceeded_handler
+    from slowapi.util import get_remote_address
+    from slowapi.errors import RateLimitExceeded
+    from pydantic import BaseModel, Field
+    
+    # Rate limiter
+    limiter = Limiter(key_func=get_remote_address)
+    
+    app = FastAPI(
+        title="SR-Ω∞ Service",
+        description="Self-Reflection & Metacognition Service",
+        version="1.0.0",
+    )
+    
+    # Add rate limiting
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    
+    # Add CORS middleware with restrictive settings
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[""],  # Restrict to known origins
+        allow_credentials=True,
+        allow_methods=["GET", "POST"],
+        allow_headers=["*"],
+    )
+    
+    # Security scheme
+    security = HTTPBearer()
+    
+    def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+        """Verify API token."""
+        # TODO: Implement proper token verification
+        if not credentials.credentials or credentials.credentials != "your-secret-token":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+    _global_sr_service = SRService()
+    
+    class ScoreRequest(BaseModel):
+        """Request model for SR score computation."""
+        ece: float = Field(default=0.01, ge=0.0, le=1.0, description="Expected Calibration Error")
+        rho: float = Field(default=0.90, ge=0.0, le=2.0, description="Contractivity ratio")
+        delta_linf: float = Field(default=0.05, ge=-1.0, le=1.0, description="Change in L∞")
+        delta_cost: float = Field(default=0.10, ge=0.0, description="Change in cost")
+    
+    @app.get("/health")
+    async def health():
+        """Health check endpoint."""
+        return {"ok": True, "service": "SR-Ω∞", "version": "1.0.0"}
+    
+    @app.get("/sr/score")
+    async def get_latest_score():
+        """Get latest SR-Ω∞ score."""
+        score = _global_sr_service.get_latest_score()
+        if not score:
+            return {"error": "No scores available", "sr_score": 0.0}
+        return {
+            "sr_score": score.sr_score,
+            "awareness": score.awareness,
+            "ethics_ok": score.ethics_ok,
+            "autocorrection": score.autocorrection,
+            "metacognition": score.metacognition,
+            "timestamp": score.timestamp,
+        }
+    
+    @app.post("/sr/compute")
+    async def compute_score(request: ScoreRequest):
+        """Compute new SR-Ω∞ score."""
+        score = _global_sr_service.compute_score(
+            ece=request.ece,
+            rho=request.rho,
+            delta_linf=request.delta_linf,
+            delta_cost=request.delta_cost,
+        )
+        return {
+            "sr_score": score.sr_score,
+            "awareness": score.awareness,
+            "ethics_ok": score.ethics_ok,
+            "autocorrection": score.autocorrection,
+            "metacognition": score.metacognition,
+            "timestamp": score.timestamp,
+        }
+    
+    @app.get("/sr/health_report")
+    async def get_health_report():
+        """Get detailed health report."""
+        return _global_sr_service.get_health_report()
+    
+    @app.get("/sr/average")
+    async def get_average(window: int = 10):
+        """Get average SR-Ω∞ score over window."""
+        return {"sr_avg": _global_sr_service.get_average_score(window=window)}
+
+except ImportError:
+    # FastAPI not available - service can still be used programmatically
+    app = None
