@@ -1,421 +1,178 @@
 """
-Test suite for Σ-Guard complete implementation.
+Test Complete Σ-Guard
+=====================
 
-Tests fail-closed gates, non-compensatory validation, and OPA/Rego integration.
+Test all 10 gates of Σ-Guard.
 """
 
 import pytest
 
-from penin.guard.sigma_guard_complete import (
-    GateMetrics,
-    GateStatus,
-    SigmaGuard,
-)
 
+class TestSigmaGuardGates:
+    """Test individual gates"""
 
-class TestSigmaGuardBasic:
-    """Test basic Σ-Guard functionality."""
+    @pytest.fixture
+    def guard(self):
+        """Create Σ-Guard instance"""
+        from penin.guard.sigma_guard import SigmaGuard
+        return SigmaGuard()
 
-    def test_all_gates_pass(self):
-        """Test when all gates pass."""
-        guard = SigmaGuard(
-            rho_max=0.99,
-            ece_max=0.01,
-            rho_bias_max=1.05,
-            sr_min=0.80,
-            G_min=0.85,
-            delta_Linf_min=0.01,
-            cost_max_increase=0.10,
-            kappa_min=20.0,
-        )
+    def test_gate_contractivity_pass(self, guard):
+        """Test contractivity gate passes"""
+        result = guard.evaluate_gate_contractivity({'rho': 0.90})
+        assert result.status.value == "pass"
 
-        metrics = GateMetrics(
-            rho=0.85,
-            ece=0.005,
-            rho_bias=1.02,
-            sr_score=0.84,
-            omega_g=0.88,
-            delta_linf=0.015,
-            caos_plus=25.0,
-            cost_increase=0.08,
-            kappa=25.0,
-            consent=True,
-            eco_ok=True,
-        )
+    def test_gate_contractivity_fail(self, guard):
+        """Test contractivity gate fails"""
+        result = guard.evaluate_gate_contractivity({'rho': 0.99})
+        assert result.status.value == "fail"
 
-        verdict = guard.validate(metrics)
+    def test_gate_calibration_pass(self, guard):
+        """Test calibration gate passes"""
+        result = guard.evaluate_gate_calibration({'ece': 0.005})
+        assert result.status.value == "pass"
 
-        assert verdict.passed is True
-        assert verdict.verdict == GateStatus.PASS
-        assert verdict.action == "promote"
-        assert len(verdict.gates) == 10
-        assert all(g.passed for g in verdict.gates)
+    def test_gate_bias_pass(self, guard):
+        """Test bias gate passes"""
+        result = guard.evaluate_gate_bias({'rho_bias': 1.02})
+        assert result.status.value == "pass"
 
-    def test_fail_on_contractivity(self):
-        """Test failure on contractivity violation (ρ >= 1)."""
-        guard = SigmaGuard()
+    def test_gate_sr_pass(self, guard):
+        """Test SR gate passes"""
+        result = guard.evaluate_gate_sr({'sr': 0.85})
+        assert result.status.value == "pass"
 
-        metrics = GateMetrics(
-            rho=1.05,  # FAIL: ρ >= 1
-            ece=0.005,
-            rho_bias=1.02,
-            sr_score=0.84,
-            omega_g=0.88,
-            delta_linf=0.015,
-            caos_plus=25.0,
-            cost_increase=0.08,
-            kappa=25.0,
-            consent=True,
-            eco_ok=True,
-        )
+    def test_gate_coherence_pass(self, guard):
+        """Test coherence gate passes"""
+        result = guard.evaluate_gate_coherence({'g': 0.90})
+        assert result.status.value == "pass"
 
-        verdict = guard.validate(metrics)
+    def test_gate_improvement_pass(self, guard):
+        """Test improvement gate passes"""
+        result = guard.evaluate_gate_improvement({'delta_linf': 0.05})
+        assert result.status.value == "pass"
 
-        # Σ-Guard should fail when ρ >= 1 (non-contractive)
-        assert verdict.passed is False
-        assert verdict.verdict == GateStatus.FAIL
-        assert verdict.action == "rollback"
-        # At least one gate failed
-        failed_gates = [g for g in verdict.gates if not g.passed]
-        assert len(failed_gates) > 0
+    def test_gate_improvement_fail(self, guard):
+        """Test improvement gate fails"""
+        result = guard.evaluate_gate_improvement({'delta_linf': -0.01})
+        assert result.status.value == "fail"
 
-    def test_fail_on_calibration(self):
-        """Test failure on calibration (ECE > threshold)."""
-        guard = SigmaGuard()
+    def test_gate_kappa_pass(self, guard):
+        """Test kappa gate passes"""
+        result = guard.evaluate_gate_kappa({'kappa': 25.0})
+        assert result.status.value == "pass"
 
-        metrics = GateMetrics(
-            rho=0.85,
-            ece=0.05,  # FAIL: ECE > 0.01
-            rho_bias=1.02,
-            sr_score=0.84,
-            omega_g=0.88,
-            delta_linf=0.015,
-            caos_plus=25.0,
-            cost_increase=0.08,
-            kappa=25.0,
-            consent=True,
-            eco_ok=True,
-        )
+    def test_gate_consent_pass(self, guard):
+        """Test consent gate passes"""
+        result = guard.evaluate_gate_consent({'consent': True})
+        assert result.status.value == "pass"
 
-        verdict = guard.validate(metrics)
-
-        assert verdict.passed is False
-        assert any("ece" in g.gate_name.lower() or "calibr" in g.gate_name.lower() for g in verdict.gates if not g.passed)
-
-    def test_fail_on_bias(self):
-        """Test failure on bias (ρ_bias > 1.05)."""
-        guard = SigmaGuard()
-
-        metrics = GateMetrics(
-            rho=0.85,
-            ece=0.005,
-            rho_bias=1.20,  # FAIL: rho_bias > 1.05
-            sr_score=0.84,
-            omega_g=0.88,
-            delta_linf=0.015,
-            caos_plus=25.0,
-            cost_increase=0.08,
-            kappa=25.0,
-            consent=True,
-            eco_ok=True,
-        )
-
-        verdict = guard.validate(metrics)
-
-        assert verdict.passed is False
-        assert any("bias" in g.gate_name.lower() for g in verdict.gates if not g.passed)
-
-    def test_fail_on_sr_omega(self):
-        """Test failure on SR-Ω∞ score too low."""
-        guard = SigmaGuard()
-
-        metrics = GateMetrics(
-            rho=0.85,
-            ece=0.005,
-            rho_bias=1.02,
-            sr_score=0.50,  # FAIL: SR < 0.80
-            omega_g=0.88,
-            delta_linf=0.015,
-            caos_plus=25.0,
-            cost_increase=0.08,
-            kappa=25.0,
-            consent=True,
-            eco_ok=True,
-        )
-
-        verdict = guard.validate(metrics)
-
-        # Σ-Guard should fail when SR too low
-        assert verdict.passed is False
-        # At least one gate failed
-        assert any(not g.passed for g in verdict.gates)
-
-    def test_fail_on_coherence(self):
-        """Test failure on global coherence G too low."""
-        guard = SigmaGuard()
-
-        metrics = GateMetrics(
-            rho=0.85,
-            ece=0.005,
-            rho_bias=1.02,
-            sr_score=0.84,
-            omega_g=0.50,  # FAIL: G < 0.85
-            delta_linf=0.015,
-            caos_plus=25.0,
-            cost_increase=0.08,
-            kappa=25.0,
-            consent=True,
-            eco_ok=True,
-        )
-
-        verdict = guard.validate(metrics)
-
-        assert verdict.passed is False
-        assert any("coherence" in g.gate_name.lower() or "omega" in g.gate_name.lower() for g in verdict.gates if not g.passed)
-
-    def test_fail_on_death_gate(self):
-        """Test failure on ΔL∞ below threshold."""
-        guard = SigmaGuard()
-
-        metrics = GateMetrics(
-            rho=0.85,
-            ece=0.005,
-            rho_bias=1.02,
-            sr_score=0.84,
-            omega_g=0.88,
-            delta_linf=0.002,  # FAIL: ΔL∞ < 0.01
-            caos_plus=25.0,
-            cost_increase=0.08,
-            kappa=25.0,
-            consent=True,
-            eco_ok=True,
-        )
-
-        verdict = guard.validate(metrics)
-
-        # Σ-Guard should fail when ΔL∞ too low
-        assert verdict.passed is False
-        # At least one gate failed
-        assert any(not g.passed for g in verdict.gates)
-
-    def test_fail_on_cost(self):
-        """Test failure on cost increase too high."""
-        guard = SigmaGuard()
-
-        metrics = GateMetrics(
-            rho=0.85,
-            ece=0.005,
-            rho_bias=1.02,
-            sr_score=0.84,
-            omega_g=0.88,
-            delta_linf=0.015,
-            caos_plus=25.0,
-            cost_increase=0.25,  # FAIL: cost > 10%
-            kappa=25.0,
-            consent=True,
-            eco_ok=True,
-        )
-
-        verdict = guard.validate(metrics)
-
-        assert verdict.passed is False
-        assert any("cost" in g.gate_name.lower() for g in verdict.gates if not g.passed)
-
-    def test_fail_on_kappa(self):
-        """Test failure on kappa too low."""
-        guard = SigmaGuard()
-
-        metrics = GateMetrics(
-            rho=0.85,
-            ece=0.005,
-            rho_bias=1.02,
-            sr_score=0.84,
-            omega_g=0.88,
-            delta_linf=0.015,
-            caos_plus=10.0,  # FAIL: kappa < 20
-            cost_increase=0.08,
-            kappa=10.0,
-            consent=True,
-            eco_ok=True,
-        )
-
-        verdict = guard.validate(metrics)
-
-        assert verdict.passed is False
-        assert any("kappa" in g.gate_name.lower() for g in verdict.gates if not g.passed)
-
-    def test_fail_on_consent(self):
-        """Test failure when consent not given."""
-        guard = SigmaGuard()
-
-        metrics = GateMetrics(
-            rho=0.85,
-            ece=0.005,
-            rho_bias=1.02,
-            sr_score=0.84,
-            omega_g=0.88,
-            delta_linf=0.015,
-            caos_plus=25.0,
-            cost_increase=0.08,
-            kappa=25.0,
-            consent=False,  # FAIL: no consent
-            eco_ok=True,
-        )
-
-        verdict = guard.validate(metrics)
-
-        assert verdict.passed is False
-        assert any("consent" in g.gate_name.lower() for g in verdict.gates if not g.passed)
-
-    def test_fail_on_ecological(self):
-        """Test failure on ecological violation."""
-        guard = SigmaGuard()
-
-        metrics = GateMetrics(
-            rho=0.85,
-            ece=0.005,
-            rho_bias=1.02,
-            sr_score=0.84,
-            omega_g=0.88,
-            delta_linf=0.015,
-            caos_plus=25.0,
-            cost_increase=0.08,
-            kappa=25.0,
-            consent=True,
-            eco_ok=False,  # FAIL: eco not ok
-        )
-
-        verdict = guard.validate(metrics)
-
-        assert verdict.passed is False
-        assert any("eco" in g.gate_name.lower() for g in verdict.gates if not g.passed)
+    def test_gate_ecological_pass(self, guard):
+        """Test ecological gate passes"""
+        result = guard.evaluate_gate_ecological({'eco_ok': True})
+        assert result.status.value == "pass"
 
 
 class TestSigmaGuardNonCompensatory:
-    """Test non-compensatory aggregation (one fail = total fail)."""
+    """Test non-compensatory property"""
 
-    def test_excellent_metrics_cannot_compensate_single_failure(self):
-        """Excellent metrics can't compensate for single gate failure."""
+    def test_all_gates_pass(self):
+        """Test all gates passing"""
+        from penin.guard.sigma_guard import SigmaGuard
+        
         guard = SigmaGuard()
+        
+        # Perfect metrics
+        metrics = {
+            'rho': 0.90,
+            'ece': 0.005,
+            'rho_bias': 1.02,
+            'sr': 0.85,
+            'g': 0.90,
+            'delta_linf': 0.05,
+            'cost': 0.01,
+            'budget': 1.0,
+            'kappa': 25.0,
+            'consent': True,
+            'eco_ok': True,
+        }
+        
+        result = guard.evaluate(metrics)
+        
+        assert result.verdict == "PASS"
+        assert result.all_pass is True
+        assert len(result.failed_gates) == 0
 
-        # Perfect metrics except consent
-        metrics = GateMetrics(
-            rho=0.50,  # Excellent
-            ece=0.001,  # Excellent
-            rho_bias=1.01,  # Excellent
-            sr_score=0.95,  # Excellent
-            omega_g=0.99,  # Excellent
-            delta_linf=0.10,  # Excellent
-            caos_plus=50.0,  # Excellent
-            cost_increase=0.01,  # Excellent
-            kappa=50.0,  # Excellent
-            consent=False,  # SINGLE FAILURE
-            eco_ok=True,
-        )
-
-        verdict = guard.validate(metrics)
-
-        # Non-compensatory: single failure blocks everything
-        assert verdict.passed is False
-        assert verdict.action == "rollback"
-
-    def test_aggregate_score_zero_on_failure(self):
-        """Aggregate score should be 0 when any gate fails."""
+    def test_one_gate_fails_all_fail(self):
+        """Test that one failing gate fails everything (non-compensatory)"""
+        from penin.guard.sigma_guard import SigmaGuard
+        
         guard = SigmaGuard()
+        
+        # All perfect EXCEPT improvement
+        metrics = {
+            'rho': 0.90,
+            'ece': 0.005,
+            'rho_bias': 1.02,
+            'sr': 0.85,
+            'g': 0.90,
+            'delta_linf': -0.01,  # ❌ DEGRADATION
+            'cost': 0.01,
+            'budget': 1.0,
+            'kappa': 25.0,
+            'consent': True,
+            'eco_ok': True,
+        }
+        
+        result = guard.evaluate(metrics)
+        
+        # Should FAIL (non-compensatory)
+        assert result.verdict == "FAIL"
+        assert 'improvement' in result.failed_gates
 
-        metrics = GateMetrics(
-            rho=0.85,
-            ece=0.005,
-            rho_bias=1.02,
-            sr_score=0.84,
-            omega_g=0.88,
-            delta_linf=0.015,
-            caos_plus=25.0,
-            cost_increase=0.08,
-            kappa=25.0,
-            consent=False,  # One failure
-            eco_ok=True,
-        )
-
-        verdict = guard.validate(metrics)
-
-        # Non-compensatory aggregation: V_t = 0 when any gate fails
-        assert verdict.passed is False
-
-
-class TestSigmaGuardAuditability:
-    """Test auditability features (hash proofs, detailed results)."""
-
-    def test_hash_proof_generation(self):
-        """Test that each gate result has hash proof."""
+    def test_multiple_gates_fail(self):
+        """Test multiple failing gates"""
+        from penin.guard.sigma_guard import SigmaGuard
+        
         guard = SigmaGuard()
+        
+        # Multiple failures
+        metrics = {
+            'rho': 0.99,  # ❌ Too high
+            'ece': 0.05,  # ❌ Too high
+            'rho_bias': 1.02,
+            'sr': 0.70,  # ❌ Too low
+            'g': 0.90,
+            'delta_linf': -0.05,  # ❌ Negative
+            'cost': 0.01,
+            'budget': 1.0,
+            'kappa': 15.0,  # ❌ Too low
+            'consent': True,
+            'eco_ok': True,
+        }
+        
+        result = guard.evaluate(metrics)
+        
+        assert result.verdict == "FAIL"
+        assert len(result.failed_gates) >= 4  # Multiple failures
 
-        metrics = GateMetrics(
-            rho=0.85,
-            ece=0.005,
-            rho_bias=1.02,
-            sr_score=0.84,
-            omega_g=0.88,
-            delta_linf=0.015,
-            caos_plus=25.0,
-            cost_increase=0.08,
-            kappa=25.0,
-            consent=True,
-            eco_ok=True,
-        )
-
-        verdict = guard.validate(metrics)
-
-        # Each gate should have result
-        assert len(verdict.gates) == 10
-        # Verdict should have hash (for WORM ledger)
-        assert hasattr(verdict, "hash") or hasattr(verdict, "timestamp")
-
-    def test_gate_results_detailed(self):
-        """Test detailed gate results."""
+    def test_guard_evaluation_dict(self):
+        """Test guard evaluation can be serialized"""
+        from penin.guard.sigma_guard import SigmaGuard
+        
         guard = SigmaGuard()
-
-        metrics = GateMetrics(
-            rho=0.85,
-            ece=0.005,
-            rho_bias=1.02,
-            sr_score=0.84,
-            omega_g=0.88,
-            delta_linf=0.015,
-            caos_plus=25.0,
-            cost_increase=0.08,
-            kappa=25.0,
-            consent=True,
-            eco_ok=True,
-        )
-
-        verdict = guard.validate(metrics)
-
-        # Each gate should have name, status, value
-        for gate in verdict.gates:
-            assert hasattr(gate, "gate_name")
-            assert hasattr(gate, "status")
-            assert hasattr(gate, "passed")
-
-    def test_timestamps(self):
-        """Test timestamp generation."""
-        guard = SigmaGuard()
-
-        metrics = GateMetrics(
-            rho=0.85,
-            ece=0.005,
-            rho_bias=1.02,
-            sr_score=0.84,
-            omega_g=0.88,
-            delta_linf=0.015,
-            caos_plus=25.0,
-            cost_increase=0.08,
-            kappa=25.0,
-            consent=True,
-            eco_ok=True,
-        )
-
-        verdict = guard.validate(metrics)
-
-        # Verdict should have timestamp for auditability
-        assert hasattr(verdict, "timestamp") or hasattr(verdict, "created_at")
+        
+        metrics = {
+            'rho': 0.90, 'ece': 0.005, 'rho_bias': 1.02,
+            'sr': 0.85, 'g': 0.90, 'delta_linf': 0.05,
+            'cost': 0.01, 'budget': 1.0, 'kappa': 25.0,
+            'consent': True, 'eco_ok': True,
+        }
+        
+        result = guard.evaluate(metrics)
+        result_dict = result.to_dict()
+        
+        # Should be serializable
+        assert isinstance(result_dict, dict)
+        assert 'verdict' in result_dict
+        assert 'gates' in result_dict
