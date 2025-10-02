@@ -91,7 +91,6 @@ def cosine(a: List[float], b: List[float]) -> float:
     if denominator == 0:
         return 0.0  # Handle zero vectors case
     return _dot(a,b) / denominator
-    return _dot(a,b)/(_norm(a)*_norm(b))
 
 def novelty(vec: List[float], ref: Optional[List[float]]) -> Optional[float]:
     if not ref: return None
