@@ -61,7 +61,7 @@ def ensure_inventory() -> None:
             "stars": r.get("stargazerCount") or 0,
         })
     inv.write_text(_json.dumps(outv, indent=2), encoding="utf-8")
-    print(f"✔ inventário criado: {inv} ({len(outv)} repos)")
+    print(f"✔ Inventory created: {inv} ({len(outv)} repos)")
 
 def load_state() -> dict:
     if STATE_F.exists():
