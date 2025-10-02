@@ -81,13 +81,14 @@ def vectorize(m: dict) -> List[float]:
     return vec
 
 def _dot(a: List[float], b: List[float]) -> float:
-def _norm(a: List[float]) -> float:
-    norm_val = math.sqrt(_dot(a,a))
-    return norm_val if norm_val > 1e-12 else 1e-12
-    return math.sqrt(_dot(a,a)) or 1e-12
 
 def cosine(a: List[float], b: List[float]) -> float:
-    return _dot(a,b)/(_norm(a)*_norm(b))
+    norm_a = _norm(a)
+    norm_b = _norm(b)
+    denominator = norm_a * norm_b
+    if denominator == 0:
+        return 0.0  # Handle zero vectors case
+    return _dot(a,b) / denominator
 
 def novelty(vec: List[float], ref: Optional[List[float]]) -> Optional[float]:
     if not ref: return None

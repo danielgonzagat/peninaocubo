@@ -76,8 +76,8 @@ def main():
           "|#|Slug|Repo|Score|novG|SR|G|DeltaLInf|CR|ECE|rho|FP|WORM|\n",
           "|-:|:--|:--|--:|--:|--:|--:|--:|--:|--:|--:|--:|:--|\n"]
     for i,r in enumerate(rows_sorted[:50],1):
-        md.append(f'|{i}|{r["slug"]}|{r["repo"]}|{r["score"]:.5f}|{(r["nov_global"] or 0):.3f}|{(r["sr"] or 0):.3f}|{(r["G"] or 0):.3f}|{(r["delta_linf"] or 0):.4f}|{(r["caos_ratio"] or 0):.3f}|{(r["ece"] or 0):.4f}|{(r["rho_bias"] or 0):.3f}|{(r["fp"] or 0):.3f}|{r["worm_file"]}|')
-    (OUT_DIR/"top_50.md").write_text("\n".join(md), encoding="utf-8")
+        md.append(f'|{i}|{r["slug"] or ""}|{r["repo"] or ""}|{r["score"]:.5f}|{(r["nov_global"] or 0):.3f}|{(r["sr"] or 0):.3f}|{(r["G"] or 0):.3f}|{(r["delta_linf"] or 0):.4f}|{(r["caos_ratio"] or 0):.3f}|{(r["ece"] or 0):.4f}|{(r["rho_bias"] or 0):.3f}|{(r["fp"] or 0):.3f}|{r["worm_file"] or ""}|')
+    (OUT_DIR/"top_50.md").write_text("\\n".join(md), encoding="utf-8")
     print(f"OK: {len(rows)} WORMs → {OUT_DIR/'summary.csv'} & {OUT_DIR/'top_50.md'}")
 
 if __name__ == "__main__":
