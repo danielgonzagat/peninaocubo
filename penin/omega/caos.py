@@ -25,12 +25,16 @@ from penin.core.caos import (
     phi_caos,
 )
 
+# Import _clamp from life_eq for backward compatibility
+from penin.omega.life_eq import _clamp
+
 __all__ = [
     # Functions
     "phi_caos",
     "compute_caos_plus",
     "compute_caos_plus_exponential",
     "caos_plus",
+    "_clamp",  # Utility function
     # Classes
     "CAOSComponents",
     "CAOSConfig",
