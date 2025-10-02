@@ -71,9 +71,7 @@ class MetacognitivePromptConfig(IntegrationConfig):
     integrate_with_sigma_guard: bool = Field(default=True, description="Integrate with Σ-Guard validation")
 
     # Confidence calibration
-    enable_confidence_calibration: bool = Field(
-        default=True, description="Calibrate confidence scores to reduce ECE"
-    )
+    enable_confidence_calibration: bool = Field(default=True, description="Calibrate confidence scores to reduce ECE")
     temperature_scaling: bool = Field(default=True, description="Apply temperature scaling for calibration")
 
 

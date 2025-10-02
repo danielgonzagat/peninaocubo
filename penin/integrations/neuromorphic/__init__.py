@@ -41,10 +41,15 @@ Performance Targets:
 - Energy: 1000× lower for neuromorphic hardware
 """
 
-from penin.integrations.neuromorphic.spikingjelly_adapter import SpikingJellyConfig, SpikingNetworkAdapter
+from penin.integrations.neuromorphic.spikingjelly_adapter import (
+    SpikingJellyConfig,
+    SpikingNetworkAdapter,
+)
 
 try:
-    from penin.integrations.neuromorphic.spiking_brain_adapter import SpikingBrainAdapter
+    from penin.integrations.neuromorphic.spiking_brain_adapter import (
+        SpikingBrainAdapter,
+    )
 
     __all__ = ["SpikingNetworkAdapter", "SpikingJellyConfig", "SpikingBrainAdapter"]
 except ImportError:

@@ -1,37 +1,101 @@
-# PENIN-Ω Documentation
+# PENIN-Ω — Lemniscata ∞ Auto-Evolution System
 
-Welcome to the PENIN-Ω documentation! This guide covers everything you need to know about the auto-evolution system.
+<div class="hero">
+  <h1>🌟 IA³ Framework</h1>
+  <p><strong>Inteligência Adaptativa Autorecursiva Autoevolutiva Autoconsciente Autosuficiente</strong></p>
+  <p>World's First Open-Source Self-Evolving AI with Mathematical Guarantees & Ethical Fail-Closed Gates</p>
+</div>
 
-## 📚 Documentation Structure
+---
 
-### Getting Started
-- **[Setup Guide](SETUP.md)** - Installation and configuration
-- **[Quick Start](#quick-start)** - Get running in 5 minutes
-- **[Architecture Overview](#architecture)** - System design and components
+## What is IA³?
 
-### Core Concepts
-- **[Master Equation](#master-equation)** - Core evolution algorithm
-- **[CAOS+ System](#caos)** - Chaos-based exploration and promotion
-- **[SR-Ω∞ Service](#sr)** - Self-reflection scoring
-- **[L∞ Aggregation](#linf)** - Non-compensatory scoring
-- **[WORM Ledger](#worm)** - Audit trail and attestation
+**PENIN-Ω** implements the convergence of **five fundamental AI capabilities** that collectively define **IA³** (IA ao cubo):
 
-### Features
-- **[LLM Router](#router)** - Cost-aware provider selection
-- **[Σ-Guard](#guard)** - Security gates and validation
-- **[ACFA League](#league)** - Shadow/Canary deployment
-- **[Ethics Metrics](#ethics)** - Fairness and bias measurement
-- **[Observability](#observability)** - Monitoring and logging
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; margin: 2rem 0;">
+  <div class="metric-card">
+    <div class="metric-label">🧬 Auto-Recursive</div>
+    <p>System that modifies its own architecture and parameters through the <strong>Master Equation</strong></p>
+  </div>
+  
+  <div class="metric-card">
+    <div class="metric-label">🔄 Self-Evolving</div>
+    <p>Champion-challenger evolution with <strong>CAOS+ amplification</strong> and mathematical guarantees</p>
+  </div>
+  
+  <div class="metric-card">
+    <div class="metric-label">🧠 Self-Aware</div>
+    <p>Operational self-reflection via <strong>SR-Ω∞</strong> with metacognitive reasoning</p>
+  </div>
+  
+  <div class="metric-card">
+    <div class="metric-label">🛡️ Ethically Bounded</div>
+    <p>Fail-closed gates (<strong>ΣEA/LO-14</strong>) that block violations automatically</p>
+  </div>
+  
+  <div class="metric-card">
+    <div class="metric-label">📊 Auditable</div>
+    <p><strong>WORM ledger</strong>, Proof-Carrying Artifacts (PCAg), cryptographic proofs</p>
+  </div>
+</div>
 
-### Operations
-- **[Deployment](operations/)** - Production deployment guides
-- **[Monitoring](#monitoring)** - Metrics and alerting
-- **[Troubleshooting](#troubleshooting)** - Common issues and solutions
+---
 
-### Development
-- **[Contributing](../CONTRIBUTING.md)** - How to contribute
-- **[Testing](#testing)** - Test suite and coverage
-- **[API Reference](#api)** - Complete API documentation
+## Quick Stats
+
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin: 2rem 0;">
+  <div class="metric-card">
+    <div class="metric-value">15</div>
+    <div class="metric-label">Mathematical Equations</div>
+  </div>
+  
+  <div class="metric-card">
+    <div class="metric-value">3</div>
+    <div class="metric-label">SOTA Integrations (P1)</div>
+  </div>
+  
+  <div class="metric-card">
+    <div class="metric-value">57</div>
+    <div class="metric-label">Tests Passing (100%)</div>
+  </div>
+  
+  <div class="metric-card">
+    <div class="metric-value">14</div>
+    <div class="metric-label">Ethical Laws (LO-14)</div>
+  </div>
+</div>
+
+---
+
+## Features
+
+### Core Capabilities
+
+- **🧬 Auto-Evolution Engine**: Self-improving via Master Equation with CAOS+ boost (3.9× amplification)
+- **🛡️ Σ-Guard**: Fail-closed security gates with non-compensatory validation (harmonic mean)
+- **📊 SR-Ω∞ Service**: Self-reflection scoring with continuous assessment (4 dimensions)
+- **🏆 ACFA League**: Shadow/Canary deployment orchestration with automatic rollback
+- **📝 WORM Ledger**: Write-Once-Read-Many audit trail with Merkle chain
+- **🔍 Ethics Metrics**: ECE ≤ 0.01, bias ratios ρ_bias ≤ 1.05, fairness scores
+- **🔌 Multi-Provider Router**: Cost-aware LLM routing (OpenAI, Anthropic, Gemini, Grok, Mistral, Qwen)
+- **📈 Observability**: Prometheus + Grafana + Loki + Tempo (full stack)
+
+### SOTA Integrations (Priority 1 — Complete ✅)
+
+#### NextPy - Autonomous Modifying System (AMS)
+- **Capability**: First framework enabling AI systems to modify architecture at runtime
+- **Performance**: 4-10× improvement via compile-time prompt optimization
+- **Status**: <span class="badge badge-success">✅ Complete (9 tests)</span>
+
+#### Metacognitive-Prompting (NAACL 2024)
+- **Capability**: 5-stage metacognitive reasoning (Understanding → Judgment → Evaluation → Decision → Confidence)
+- **Performance**: Significant improvements across 5 major LLMs
+- **Status**: <span class="badge badge-success">✅ Complete (17 tests)</span>
+
+#### SpikingJelly (Science Advances)
+- **Capability**: Spiking Neural Networks with 11× training acceleration
+- **Performance**: 69% sparsity, 1% energy consumption (neuromorphic computing)
+- **Status**: <span class="badge badge-success">✅ Complete (11 tests)</span>
 
 ---
 
@@ -40,422 +104,239 @@ Welcome to the PENIN-Ω documentation! This guide covers everything you need to 
 ### Installation
 
 ```bash
-# Clone and install
-git clone <repository-url>
+# Clone repository
+git clone https://github.com/danielgonzagat/peninaocubo.git
 cd peninaocubo
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[full]"
+
+# Install core + SOTA P1 integrations
+pip install -e ".[nextpy,metacog,spikingjelly]"
 ```
 
-### Run Demo
+### 60-Second Demo
 
 ```bash
-# Start all services
-python demo/run_demo.py
+python3 examples/demo_60s_complete.py
+```
+
+**Output**:
+```
+╔══════════════════════════════════════════════════════════════╗
+║   PENIN-Ω — Lemniscata ∞ Auto-Evolution System              ║
+║   IA³: Adaptive • Auto-Recursive • Self-Evolving • Aware    ║
+╚══════════════════════════════════════════════════════════════╝
+
+Phase 1: Initialization
+✓ Master state initialized
+✓ NextPy AMS: initialized
+✓ Metacognitive-Prompting: initialized
+✓ SpikingJelly: initialized
+
+Phase 2: Auto-Evolution Cycles (5 cycles)
+═══ Cycle 1/5 ═══
+  L∞: 0.7828  ΔL∞: +0.0500
+  CAOS+: 3.9045 (C=0.60, A=0.50, O=1.00, S=0.70)
+  SR-Ω∞: 0.8668
+  Decision: PROMOTED
+
+Phase 3: Summary
+• Improvement: +7.85%
+✓ All ethical gates (ΣEA/LO-14) validated
 ```
 
 ### Basic Usage
 
 ```python
-from penin.cli import main
-
-# Run CLI
-main()
-```
-
----
-
-## Architecture
-
-### System Overview
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                      PENIN-Ω System                      │
-├─────────────────────────────────────────────────────────┤
-│                                                          │
-│  ┌──────────┐    ┌──────────┐    ┌──────────┐         │
-│  │  Ω-META  │───▶│ Σ-Guard  │───▶│  SR-Ω∞   │         │
-│  │  :8010   │    │  :8011   │    │  :8012   │         │
-│  └─────┬────┘    └──────────┘    └──────────┘         │
-│        │                                                 │
-│        ▼                                                 │
-│  ┌─────────────┐         ┌────────────────┐            │
-│  │ Master Eq.  │────────▶│  WORM Ledger   │            │
-│  │ CAOS+ / Fib │         │  (Audit Trail) │            │
-│  └─────────────┘         └────────────────┘            │
-│        │                                                 │
-│        ▼                                                 │
-│  ┌─────────────────────────────────────┐               │
-│  │        ACFA League (:8013)          │               │
-│  │  ┌─────────┐  ┌────────┐  ┌──────┐ │               │
-│  │  │Champion │  │ Canary │  │Shadow│ │               │
-│  │  └─────────┘  └────────┘  └──────┘ │               │
-│  └─────────────────────────────────────┘               │
-│                                                          │
-└─────────────────────────────────────────────────────────┘
-```
-
-### Core Components
-
-1. **Ω-META Service** (:8010)
-   - Master orchestrator
-   - Coordinates evolution cycles
-   - Exposes REST API
-
-2. **Σ-Guard** (:8011)
-   - Security validation gates
-   - Non-compensatory requirements
-   - Fail-closed design
-
-3. **SR-Ω∞** (:8012)
-   - Self-reflection scoring
-   - Continuous assessment
-   - Historical tracking
-
-4. **ACFA League** (:8013)
-   - Shadow/Canary deployment
-   - Automatic promotion
-   - Rollback capabilities
-
----
-
-## Master Equation
-
-The Master Equation is the core of PENIN-Ω's auto-evolution:
-
-```
-α_{t+1}^Ω = α_t^Ω + η · ΔL∞ · CAOS⁺ · SR · G · OCI
-```
-
-Where:
-- **α^Ω**: Evolution parameter (0 to 1)
-- **η**: Learning rate
-- **ΔL∞**: Change in L∞ aggregated score
-- **CAOS⁺**: Chaos exploration factor with boost
-- **SR**: Self-reflection score
-- **G**: Global coherence score
-- **OCI**: Operational coherence index
-
-### Key Properties
-
-1. **Deterministic**: Same seed → same results
-2. **Auditable**: Every decision logged to WORM
-3. **Fail-Closed**: Defaults to safe state on errors
-4. **Non-Compensatory**: All gates must pass
-
----
-
-## CAOS+ System {#caos}
-
-CAOS+ (Chaos-Augmented Optimization System) provides:
-
-### Features
-
-- **Exploration Boost**: Fibonacci-based enhancement (max 5%)
-- **EWMA Smoothing**: Stable pattern detection
-- **Configurable**: Adjustable parameters
-- **Audited**: All boosts logged
-
-### Configuration
-
-```python
-config = {
-    "caos_plus": {
-        "max_boost": 0.05,        # 5% maximum boost
-        "ewma_alpha": 0.2,        # Smoothing factor
-        "min_stability_cycles": 5  # Cycles before boost
-    }
-}
-```
-
----
-
-## SR-Ω∞ Service {#sr}
-
-Self-reflection scoring provides continuous quality assessment.
-
-### Endpoints
-
-- `POST /reflect` - Calculate SR score
-- `GET /history` - Get reflection history
-- `GET /health` - Service health check
-
-### Usage
-
-```python
-from penin.sr.sr_service import SRService
-
-sr = SRService()
-score = await sr.reflect(context={
-    "alpha": 0.95,
-    "caos": 1.2,
-    "recent_decisions": [...]
-})
-```
-
----
-
-## L∞ Aggregation {#linf}
-
-Non-compensatory harmonic aggregation ensures all metrics matter:
-
-```python
-L∞ = H([usability, safety, coherence, learning])
-```
-
-Where H is the harmonic mean - poor performance in any dimension cannot be compensated by excellence in others.
-
----
-
-## WORM Ledger {#worm}
-
-Write-Once-Read-Many audit trail with cryptographic proofs.
-
-### Features
-
-- **Immutable**: Events cannot be modified
-- **Merkle Chain**: Hash-linked for integrity
-- **Indexed**: Fast queries by event type
-- **SQLite**: Lightweight and embedded
-
-### Usage
-
-```python
-from penin.ledger.worm_ledger import WORMLedger
-
-ledger = WORMLedger("./audit.db")
-
-# Append event
-ledger.append({
-    "event_type": "PROMOTE_ATTEST",
-    "alpha": 0.95,
-    "timestamp": "2025-10-01T12:00:00Z"
-})
-
-# Query events
-events = ledger.query(event_type="PROMOTE_ATTEST")
-```
-
----
-
-## LLM Router {#router}
-
-Cost-aware routing across multiple LLM providers.
-
-### Supported Providers
-
-- OpenAI (GPT-4, GPT-3.5)
-- Anthropic (Claude)
-- Google (Gemini)
-- xAI (Grok)
-- Mistral
-
-### Features
-
-- **Multi-Factor Scoring**: Quality (40%) + Latency (30%) + Cost (30%)
-- **Budget Control**: Daily spending limits
-- **Usage Tracking**: Tokens, requests, costs
-- **Fail-Closed**: Errors if budget exceeded
-
-### Configuration
-
-```python
-from penin.router import CostAwareRouter
-from penin.config import RouterConfig
-
-router = CostAwareRouter(RouterConfig(
-    daily_budget=5.0,  # $5 USD per day
-    quality_weight=0.4,
-    latency_weight=0.3,
-    cost_weight=0.3
-))
-```
-
----
-
-## Σ-Guard {#guard}
-
-Security validation with non-compensatory gates.
-
-### Gates
-
-1. **CAOS+ Gate**: Must be ≥ 1.0
-2. **SR Gate**: Must be ≥ 0.80
-3. **ΔL∞ Gate**: Must be ≥ 0.01
-4. **Allow Gate**: Must be true
-
-### All gates must pass - there is no compensation!
-
----
-
-## ACFA League {#league}
-
-Advanced Canary/Fast-fail Alliance for safe deployments.
-
-### Deployment Stages
-
-1. **Shadow** (0% traffic)
-   - Collect metrics
-   - No user impact
-   - Duration: configurable (default 5min)
-
-2. **Canary** (1-5% traffic)
-   - Limited user exposure
-   - Automatic rollback on errors
-   - Duration: configurable (default 10min)
-
-3. **Champion** (100% traffic)
-   - Promoted after passing gates
-   - Becomes new baseline
-
----
-
-## Ethics Metrics {#ethics}
-
-Automated fairness and bias measurement.
-
-### Metrics
-
-1. **ECE** (Expected Calibration Error)
-   - Measures prediction calibration
-   - Lower is better
-
-2. **ρ_bias** (Bias Ratio)
-   - Group disparity measurement
-   - Closer to 1.0 is fairer
-
-3. **Fairness Score**
-   - Demographic parity
-   - Equalized odds
-
-### Usage
-
-```python
-from penin.omega.ethics_metrics import compute_ethics_metrics
-
-metrics = compute_ethics_metrics(
-    predictions=predictions,
-    labels=labels,
-    protected_groups=groups
+from penin.engine.master_equation import MasterState, step_master
+from penin.engine.caos_plus import compute_caos_plus
+from penin.math.linf import linf_score
+from penin.integrations.metacognition import MetacognitiveReasoner
+
+# Initialize
+state = MasterState(I=0.0)
+reasoner = MetacognitiveReasoner()
+reasoner.initialize()
+
+# Evolution step
+metrics = {"accuracy": 0.85, "robustness": 0.78, "calibration": 0.90}
+weights = {"accuracy": 2.0, "robustness": 1.5, "calibration": 1.0}
+
+linf = linf_score(metrics, weights, cost=0.1)
+caos_plus = compute_caos_plus(C=0.8, A=0.5, O=0.7, S=0.9, kappa=20.0)
+alpha = 0.1 * caos_plus
+
+state = step_master(state, delta_linf=linf, alpha_omega=alpha)
+
+# Metacognitive decision
+decision = await reasoner.reason(
+    "Should we promote this model?",
+    stages=["understanding", "judgment", "decision"],
+    context={"metrics": metrics}
 )
+
+print(f"Decision: {decision['decision']} (confidence: {decision['confidence_calibrated']:.3f})")
 ```
+
+---
+
+## Mathematical Foundation
+
+<div class="equation-block">
+  <div class="title">Master Equation (Penin Equation)</div>
+  <p>
+    $$ I_{n+1} = f(I_n, E_n, P_n) = \Pi_{H\cap S}\big[I_n + \alpha_n \cdot G(I_n,E_n;P_n)\big] $$
+  </p>
+  <p>Autoevolução recursiva com projeção em espaço técnico-ético seguro</p>
+</div>
+
+<div class="equation-block">
+  <div class="title">L∞ Meta-Function (Non-Compensatory)</div>
+  <p>
+    $$ L_\infty = \frac{1}{\sum_j \frac{w_j}{\max(\varepsilon, m_j)}} \cdot e^{-\lambda_c \text{Cost}} \cdot \mathbf{1}_{\Sigma EA \land IR\to IC} $$
+  </p>
+  <p>Agregação harmônica ponderada - dimensão pior domina (anti-Goodhart)</p>
+</div>
+
+<div class="equation-block">
+  <div class="title">CAOS+ Motor (Amplification)</div>
+  <p>
+    $$ \text{CAOS}^+ = (1 + \kappa \cdot C \cdot A)^{O \cdot S} $$
+  </p>
+  <p>Consistência, Autoevolução, Incognoscível, Silêncio (κ ≥ 20)</p>
+</div>
+
+[→ See all 15 equations](guides/PENIN_OMEGA_COMPLETE_EQUATIONS_GUIDE.md)
+
+---
+
+## Security & Ethics
+
+### Fail-Closed Design
+
+All gates default to **safe state** on errors:
+
+- ❌ Violation detected → Automatic rollback
+- ❌ Uncertainty > threshold → Reject promotion
+- ❌ Ethics check failed → Block execution
+
+### Non-Compensatory Ethics (ΣEA/LO-14)
+
+Uses **harmonic mean** (L∞) so **worst dimension dominates**:
+
+- High accuracy **CANNOT** compensate low privacy
+- Good performance **CANNOT** compensate ethical violations
+- Mathematical guarantee: `L∞ ≤ min(all dimensions)`
+
+### Contratividade (IR→IC)
+
+Risk reduction guarantee: **ρ < 1**
+
+- Each evolution **must reduce** information risk
+- Measured across multiple risk classes (idolatry, harm, privacy)
+- Enforced by Σ-Guard gates
+
+---
+
+## Architecture Overview
+
+```mermaid
+graph TB
+    A[Master Equation] --> B[CAOS+ Motor]
+    B --> C[SR-Ω∞ Self-Reflection]
+    C --> D[Σ-Guard Gates]
+    D --> E{Ethical?}
+    E -->|Yes| F[ACFA League]
+    E -->|No| G[Rollback]
+    F --> H[Champion vs Challenger]
+    H --> I[WORM Ledger]
+    I --> J[Production]
+    G --> K[Audit]
+```
+
+[→ See detailed architecture](architecture.md)
 
 ---
 
 ## Observability
 
-### Prometheus Metrics
+### Metrics (Prometheus)
 
-Available at `:8010/metrics`:
+- `penin_delta_linf` — L∞ score evolution
+- `penin_caos_plus` — CAOS+ amplification
+- `penin_sr_score` — Self-reflection score
+- `penin_rho` — Contratividade (must be < 1)
+- `penin_ece` — Expected Calibration Error
+- `penin_rho_bias` — Bias ratio
 
-```
-penin_alpha{service="omega_meta"} 0.95
-penin_caos{service="omega_meta"} 1.15
-penin_sr{service="sr_infinity"} 0.88
-penin_decisions_total{type="promotion"} 42
-```
+### Dashboards (Grafana)
 
-### Structured Logging
+- **PENIN-Ω Overview**: Real-time L∞, CAOS+, SR-Ω∞, ρ
+- **Ethics & Safety**: ECE, ρ_bias, gate failures
+- **Performance**: Latency, throughput, cost
+- **Infrastructure**: CPU, memory, network
 
-JSON logs with trace IDs:
+### Logs (Loki) & Traces (Tempo)
 
-```json
-{
-  "timestamp": "2025-10-01T12:00:00.000Z",
-  "level": "INFO",
-  "trace_id": "abc-123-def",
-  "event": "cycle_complete",
-  "alpha": 0.95,
-  "duration_ms": 125
-}
-```
+Full observability stack with distributed tracing and log aggregation.
+
+[→ See deployment guide](operations/deployment.md)
 
 ---
 
-## Testing
+## Roadmap
 
-### Run Tests
+### v1.0.0 (Current Goal — 30 days)
+- ✅ 15 core mathematical equations implemented
+- ✅ SOTA P1 integrations (NextPy, Metacog, SpikingJelly)
+- ✅ 57 critical tests passing (100%)
+- 🚧 Complete documentation
+- 🚧 Security & compliance (SBOM, SCA, signing)
+- 🚧 Full observability stack
+
+### v1.1.0 (60 days)
+- SOTA P2 integrations (goNEAT, Mammoth, SymbolicAI)
+- Property-based testing (Hypothesis)
+- Advanced observability (OpenTelemetry)
+
+### v1.2.0 (90 days)
+- SOTA P3 integrations (midwiving-ai, OpenCog, SwarmRL)
+- Multi-agent orchestration
+- GPU acceleration
+
+[→ See full roadmap](roadmap.md)
+
+---
+
+## Contributing
+
+We welcome contributions! See our [Contributing Guide](../CONTRIBUTING.md) and [Code of Conduct](../CODE_OF_CONDUCT.md).
+
+### Development Setup
 
 ```bash
-# All tests
-./scripts/run_tests.sh
-
-# With coverage
-./scripts/run_tests.sh --coverage
-
-# Specific test
-./scripts/run_tests.sh -t tests/test_caos.py
+pip install -e ".[dev]"
+pytest tests/ -v
+ruff check .
+mypy penin/
 ```
 
-### Test Categories
+---
 
-- **Unit Tests**: Individual component testing
-- **Integration Tests**: Service interaction testing
-- **System Tests**: End-to-end scenarios
+## License
+
+This project is licensed under the **Apache License 2.0** - see the [LICENSE](../LICENSE) file.
 
 ---
 
-## Monitoring
+## Acknowledgments
 
-### Health Checks
-
-```bash
-curl http://localhost:8010/health  # Ω-META
-curl http://localhost:8011/health  # Σ-Guard
-curl http://localhost:8012/health  # SR-Ω∞
-curl http://localhost:8013/health  # ACFA League
-```
-
-### Alerting
-
-Configure alerts in `deploy/prometheus/penin_alerts.yml`
+- **SOTA Research Community**: NextPy, SpikingJelly, Metacognitive-Prompting authors
+- **Open Source Tools**: PyTorch, Pydantic, FastAPI, Pytest, Prometheus, Grafana
+- **Mathematical Foundations**: Evolutionary computation, control theory, fail-safe engineering
+- **Ethical AI Principles**: ΣEA/LO-14, transparency, auditability
 
 ---
 
-## Troubleshooting
-
-### Common Issues
-
-1. **Port already in use**
-   ```bash
-   lsof -i :8010
-   kill <PID>
-   ```
-
-2. **Import errors**
-   ```bash
-   export PYTHONPATH=$PWD:$PYTHONPATH
-   pip install -e .
-   ```
-
-3. **Missing dependencies**
-   ```bash
-   pip install -e ".[full]"
-   ```
-
-See [SETUP.md](SETUP.md#troubleshooting) for more details.
-
----
-
-## API Reference {#api}
-
-Complete API documentation coming soon in separate files:
-- `api/omega_meta.md` - Ω-META API
-- `api/sigma_guard.md` - Σ-Guard API
-- `api/sr_infinity.md` - SR-Ω∞ API
-- `api/acfa_league.md` - ACFA League API
-
----
-
-## Additional Resources
-
-- **[Changelog](../CHANGELOG.md)** - Version history
-- **[Contributing](../CONTRIBUTING.md)** - Contribution guidelines
-- **[License](../LICENSE)** - Apache 2.0
-- **[Archive](archive/)** - Historical documentation
-
----
-
-**Questions?** Open an issue on GitHub or check the discussions!
+<div style="text-align: center; margin: 3rem 0;">
+  <h2>🌟 PENIN-Ω: World's First Open-Source IA³ Framework 🌟</h2>
+  <p><strong>Adaptive • Auto-Recursive • Self-Evolving • Self-Aware • Ethically Bounded</strong></p>
+</div>

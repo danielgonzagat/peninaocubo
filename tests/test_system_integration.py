@@ -154,7 +154,7 @@ def test_scoring_integration():
     """Test scoring module integration with all components"""
     print("\n=== Integration: Scoring System ===")
 
-    from penin.omega.caos import caos_plus
+    from penin.omega import caos_plus
     from penin.omega.scoring import linf_harmonic
     from penin.omega.sr import sr_omega
 

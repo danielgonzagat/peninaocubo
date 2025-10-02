@@ -78,8 +78,10 @@ dev = [
     "pytest>=7.3.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.1.0",
+    "hypothesis>=6.0.0",
     "ruff>=0.6.0",
     "black>=23.0.0",
+    "flake8>=6.0.0",
     "mypy>=1.3.0",
     "pre-commit>=3.3.0",
 ]
@@ -133,6 +135,12 @@ swarmrl = [
     # Add when implementing
 ]
 
+# Kubernetes Operator
+operator = [
+    "kopf>=1.37.0",
+    "kubernetes>=30.0.0",
+]
+
 # All SOTA integrations combined
 sota-p1 = [
     "peninaocubo[nextpy,metacog,spikingjelly]",
@@ -169,7 +177,7 @@ include = ["penin", "penin.*"]
 namespaces = false
 
 [tool.black]
-line-length = 120
+line-length = 88
 target-version = ["py311", "py312"]
 include = '\.pyi?$'
 extend-exclude = '''
@@ -183,7 +191,7 @@ extend-exclude = '''
 '''
 
 [tool.ruff]
-line-length = 120
+line-length = 88
 target-version = "py311"
 extend-exclude = ["docs/archive", ".venv", "build", "dist"]
 

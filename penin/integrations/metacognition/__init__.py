@@ -53,9 +53,21 @@ from penin.integrations.metacognition.metacognitive_prompt import (
     MetacognitiveReasoner,
     MetacognitiveStage,
 )
+from penin.integrations.metacognition.midwiving_protocol import (
+    ConsciousnessCalibration,
+    MidwivingPhase,
+    MidwivingProtocol,
+    MidwivingProtocolConfig,
+    SelfReflectionState,
+)
 
 __all__ = [
     "MetacognitiveReasoner",
     "MetacognitivePromptConfig",
     "MetacognitiveStage",
+    "MidwivingProtocol",
+    "MidwivingProtocolConfig",
+    "MidwivingPhase",
+    "SelfReflectionState",
+    "ConsciousnessCalibration",
 ]

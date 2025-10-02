@@ -3,7 +3,7 @@ PENIN-Ω Complete WORM Ledger — Write Once, Read Many
 
 Immutable audit trail with:
 - Append-only storage (JSONL format)
-- SHA-256 hash chain (Merkle-like)
+- BLAKE2b hash chain (modern, efficient)
 - UTC timestamps
 - Proof-Carrying Artifacts (PCAg)
 - Cryptographic integrity
@@ -14,17 +14,26 @@ Design principles:
 - Deterministic: reproducible hashes
 - Auditable: full provenance chain
 - Tamper-evident: hash verification
+
+Hash Algorithm Evolution:
+- v1.0: SHA-256 (legacy)
+- v2.0: BLAKE2b-256 (current) - faster, more secure, modern
 """
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from penin.ledger.hash_utils import (
+    HASH_ALGORITHM,
+    compute_hash,
+    hash_json,
+)
 
 try:
     import orjson
@@ -38,8 +47,7 @@ except ImportError:
 # Constants
 # ============================================================================
 
-LEDGER_VERSION = "1.0.0"
-HASH_ALGORITHM = "sha256"
+LEDGER_VERSION = "2.0.0"  # Updated for BLAKE2b
 ENCODING = "utf-8"
 
 
@@ -97,12 +105,8 @@ class ProofCarryingArtifact:
             "metadata": metadata or {},
         }
 
-        if ORJSON_AVAILABLE:
-            canonical = orjson.dumps(data, option=orjson.OPT_SORT_KEYS)
-        else:
-            canonical = json.dumps(data, sort_keys=True).encode()
-
-        artifact_hash = hashlib.sha256(canonical).hexdigest()
+        # Use hash_json for consistent hashing
+        artifact_hash = hash_json(data)
 
         return cls(
             decision_id=decision_id,
@@ -143,12 +147,8 @@ class ProofCarryingArtifact:
             "metadata": self.metadata,
         }
 
-        if ORJSON_AVAILABLE:
-            canonical = orjson.dumps(data, option=orjson.OPT_SORT_KEYS)
-        else:
-            canonical = json.dumps(data, sort_keys=True).encode()
-
-        computed_hash = hashlib.sha256(canonical).hexdigest()
+        # Use hash_json for consistent hashing
+        computed_hash = hash_json(data)
         return computed_hash == self.artifact_hash
 
     def __str__(self) -> str:
@@ -193,7 +193,7 @@ class WORMEvent:
         """Create new event with computed hash."""
         timestamp = datetime.now(UTC).isoformat()
 
-        # Compute hash
+        # Compute hash using hash_json
         data = {
             "event_type": event_type,
             "event_id": event_id,
@@ -203,12 +203,7 @@ class WORMEvent:
             "sequence_number": sequence_number,
         }
 
-        if ORJSON_AVAILABLE:
-            canonical = orjson.dumps(data, option=orjson.OPT_SORT_KEYS)
-        else:
-            canonical = json.dumps(data, sort_keys=True).encode()
-
-        event_hash = hashlib.sha256(canonical).hexdigest()
+        event_hash = hash_json(data)
 
         return cls(
             event_type=event_type,
@@ -243,12 +238,8 @@ class WORMEvent:
             "sequence_number": self.sequence_number,
         }
 
-        if ORJSON_AVAILABLE:
-            canonical = orjson.dumps(data, option=orjson.OPT_SORT_KEYS)
-        else:
-            canonical = json.dumps(data, sort_keys=True).encode()
-
-        computed_hash = hashlib.sha256(canonical).hexdigest()
+        # Use hash_json for consistent hashing
+        computed_hash = hash_json(data)
         return computed_hash == self.event_hash
 
     def __str__(self) -> str:
@@ -513,14 +504,14 @@ class WORMLedger:
         if not hashes:
             return None
 
-        # Build Merkle tree
+        # Build Merkle tree using BLAKE2b
         while len(hashes) > 1:
             next_level = []
             for i in range(0, len(hashes), 2):
                 left = hashes[i]
                 right = hashes[i + 1] if i + 1 < len(hashes) else left
                 combined = (left + right).encode()
-                next_level.append(hashlib.sha256(combined).hexdigest())
+                next_level.append(compute_hash(combined))
             hashes = next_level
 
         return hashes[0]

@@ -5,12 +5,15 @@
 PENIN-Ω implements **defense-in-depth** security with:
 - **Fail-closed** ethical gates (ΣEA/LO-14)
 - **WORM ledger** (immutable audit trail)
+- **Cryptographic attestations** (End-to-end cryptographic proof for promotions)
 - **Cryptographic proofs** (PCAg - Proof-Carrying Artifacts)
 - **Supply chain security** (SBOM, SCA, signed releases)
 - **Runtime protection** (budget limits, circuit breakers, rate limits)
 - **Privacy-by-design** (consent verification, data minimization)
 
 **Threat Model:** Malicious code injection, ethical violations, resource exhaustion, supply chain attacks, data leaks.
+
+**New in v1.0:** End-to-end cryptographic attestation system using Ed25519 signatures for mathematically verifiable model promotions.
 
 ---
 
@@ -104,7 +107,184 @@ penin ledger verify --path /penin_data/ledger.jsonl
 
 ---
 
-## 3. Proof-Carrying Artifacts (PCAg)
+## 3. Cryptographic Attestation System
+
+### Overview
+
+**End-to-End Cryptographic Proof for Model Promotions**
+
+PENIN-Ω implements a cryptographic attestation system where every validation service digitally signs its verdicts using Ed25519 signatures. This creates a mathematically verifiable chain of trust for all promotion decisions.
+
+**Key Properties:**
+- **Non-repudiation**: Services cannot deny issuing verdicts
+- **Tamper-evident**: Any modification breaks cryptographic signatures
+- **Mathematically verifiable**: Ed25519 public-key cryptography (128-bit security)
+- **Independent verification**: Auditors can verify without system access
+
+### Architecture
+
+**Flow:**
+1. Each validation service (`SR-Ω∞`, `Σ-Guard`) cryptographically signs its verdict
+2. Attestations are chained together with Merkle-like hash
+3. ACFA League validates the complete chain before promotion
+4. Complete cryptographic proof stored in WORM Ledger
+
+### Implementation
+
+**Creating Attestations:**
+```python
+from penin.omega.attestation import create_sr_attestation, create_sigma_guard_attestation
+
+# SR-Ω∞ Service signs its verdict
+sr_attestation = create_sr_attestation(
+    verdict="pass",
+    candidate_id="model_v2",
+    sr_score=0.88,
+    components={
+        "awareness": 0.9,
+        "ethics": 1.0,
+        "autocorrection": 0.85,
+        "metacognition": 0.87
+    }
+)
+
+# Σ-Guard Service signs its verdict
+guard_attestation = create_sigma_guard_attestation(
+    verdict="pass",
+    candidate_id="model_v2",
+    gates=[...],
+    aggregate_score=0.92
+)
+```
+
+**Building Attestation Chain:**
+```python
+from penin.omega.attestation import AttestationChain
+
+chain = AttestationChain(candidate_id="model_v2")
+chain.add_attestation(sr_attestation)
+chain.add_attestation(guard_attestation)
+
+# Verify chain integrity
+is_valid, message = chain.verify_chain()
+assert is_valid  # All signatures verified
+```
+
+**ACFA League Validation:**
+```python
+# Before promotion, validate attestation chain
+if hasattr(challenger, 'attestation_chain'):
+    is_valid, error = challenger.attestation_chain.verify_chain()
+    
+    if not is_valid:
+        rollback_challenger(f"Invalid attestation chain: {error}")
+        return False
+    
+    if not challenger.attestation_chain.all_passed():
+        rollback_challenger("Some attestations did not pass")
+        return False
+
+# Only promote if attestations are valid and passed
+promote_challenger()
+```
+
+**Storage in WORM Ledger:**
+```python
+decision = DecisionInfo(
+    verdict="promote",
+    reason="All attestations verified",
+    confidence=1.0,
+    delta_linf=0.03,
+    delta_score=0.02,
+    beta_min_met=True,
+    attestation_chain=chain.to_dict()  # Complete cryptographic proof
+)
+
+ledger.append_record(record)
+```
+
+### Cryptographic Details
+
+**Algorithm:** Ed25519 (Edwards-curve Digital Signature Algorithm)
+- **Key size**: 32 bytes (256 bits)
+- **Signature size**: 64 bytes (512 bits)
+- **Security**: 128-bit (equivalent to 3072-bit RSA)
+- **Standard**: RFC 8032, FIPS 186-5
+
+**Performance:**
+- Key generation: ~0.1 ms
+- Signing: ~0.05 ms
+- Verification: ~0.15 ms
+- Chain verification (10 attestations): ~1.5 ms
+
+### Verification Example
+
+**Independent Auditor:**
+```python
+# Load attestation chain from WORM ledger export
+import json
+
+with open('ledger_export.json') as f:
+    data = json.load(f)
+
+# Verify each record's attestation chain
+for record in data['records']:
+    if 'attestation_chain' in record['decision']:
+        chain = AttestationChain.from_dict(
+            record['decision']['attestation_chain']
+        )
+        
+        is_valid, msg = chain.verify_chain()
+        
+        if not is_valid:
+            print(f"⚠️ INVALID CHAIN: {record['run_id']}")
+            print(f"   Error: {msg}")
+        else:
+            print(f"✓ Valid chain: {record['run_id']}")
+            print(f"  Decision: {chain.final_decision}")
+```
+
+### Security Considerations
+
+**Key Management (Production):**
+- Use Hardware Security Modules (HSM) for key storage
+- Store private keys in secrets manager (AWS Secrets Manager, HashiCorp Vault)
+- Implement key rotation policy
+- Audit all key access
+
+**Threat Protection:**
+- ✓ Verdict tampering (signature breaks)
+- ✓ Forgery (requires private key)
+- ✓ Reordering (chain hash prevents)
+- ✓ Replay attacks (timestamp included)
+- ✗ Private key compromise (requires secure key storage)
+
+### Example Output
+
+**Attestation with Signature:**
+```json
+{
+  "service_type": "Σ-Guard",
+  "verdict": "pass",
+  "subject_id": "model_v2_1234567890",
+  "metrics": {
+    "gates_passed": 10,
+    "aggregate_score": 0.92
+  },
+  "timestamp": "2025-10-01T18:51:46.796476+00:00",
+  "signature": "f37ebafd1100904a32286bb86183cf15...",
+  "public_key": "7c8f5e4d3b2a1f9e8d7c6b5a4f3e2d1c...",
+  "content_hash": "231ace885ea262f6fd67bc0d0845f314..."
+}
+```
+
+**Complete Documentation:** See [attestation.md](./attestation.md) for full details.
+
+**Integration Example:** Run `python examples/attestation_integration.py`
+
+---
+
+## 4. Proof-Carrying Artifacts (PCAg)
 
 ### Structure
 

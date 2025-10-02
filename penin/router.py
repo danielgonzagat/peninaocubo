@@ -32,6 +32,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+ORJSON_AVAILABLE: bool
 try:
     import orjson
 
@@ -48,17 +49,17 @@ from penin.providers.base import BaseProvider, LLMResponse
 # Constants and Configuration
 # ============================================================================
 
-CACHE_HMAC_SECRET = getattr(settings, "PENIN_CACHE_HMAC_SECRET", "penin-cache-integrity-key")
-CACHE_L1_MAX_SIZE = getattr(settings, "PENIN_CACHE_L1_MAX_SIZE", 1000)
-CACHE_L2_MAX_SIZE = getattr(settings, "PENIN_CACHE_L2_MAX_SIZE", 10000)
-CACHE_TTL_SECONDS = getattr(settings, "PENIN_CACHE_TTL_SECONDS", 3600)
+CACHE_HMAC_SECRET: str = getattr(settings, "PENIN_CACHE_HMAC_SECRET", "penin-cache-integrity-key")
+CACHE_L1_MAX_SIZE: int = getattr(settings, "PENIN_CACHE_L1_MAX_SIZE", 1000)
+CACHE_L2_MAX_SIZE: int = getattr(settings, "PENIN_CACHE_L2_MAX_SIZE", 10000)
+CACHE_TTL_SECONDS: int = getattr(settings, "PENIN_CACHE_TTL_SECONDS", 3600)
 
-BUDGET_SOFT_CUTOFF = 0.95  # Warn at 95%
-BUDGET_HARD_CUTOFF = 1.00  # Block at 100%
+BUDGET_SOFT_CUTOFF: float = 0.95  # Warn at 95%
+BUDGET_HARD_CUTOFF: float = 1.00  # Block at 100%
 
-CB_FAILURE_THRESHOLD = 3
-CB_RECOVERY_TIMEOUT = 60.0
-CB_HALF_OPEN_MAX_CALLS = 1
+CB_FAILURE_THRESHOLD: int = 3
+CB_RECOVERY_TIMEOUT: float = 60.0
+CB_HALF_OPEN_MAX_CALLS: int = 1
 
 
 # ============================================================================
@@ -316,14 +317,14 @@ class CircuitBreaker:
         failure_threshold: int = CB_FAILURE_THRESHOLD,
         recovery_timeout_s: float = CB_RECOVERY_TIMEOUT,
         half_open_max_calls: int = CB_HALF_OPEN_MAX_CALLS,
-    ):
-        self.failure_threshold = failure_threshold
-        self.recovery_timeout_s = recovery_timeout_s
-        self.half_open_max_calls = half_open_max_calls
-        self._state = ProviderHealth.HEALTHY
-        self._failure_count = 0
-        self._last_failure_time = 0.0
-        self._half_open_calls = 0
+    ) -> None:
+        self.failure_threshold: int = failure_threshold
+        self.recovery_timeout_s: float = recovery_timeout_s
+        self.half_open_max_calls: int = half_open_max_calls
+        self._state: ProviderHealth = ProviderHealth.HEALTHY
+        self._failure_count: int = 0
+        self._last_failure_time: float = 0.0
+        self._half_open_calls: int = 0
 
     def can_call(self) -> bool:
         """Check if provider can be called."""
@@ -379,12 +380,12 @@ class CircuitBreaker:
 class CacheEntry:
     """Cache entry with HMAC integrity."""
 
-    def __init__(self, key: str, value: Any, ttl: float):
-        self.key = key
-        self.value = value
-        self.created_at = time.time()
-        self.ttl = ttl
-        self.hmac = self._compute_hmac()
+    def __init__(self, key: str, value: Any, ttl: float) -> None:
+        self.key: str = key
+        self.value: Any = value
+        self.created_at: float = time.time()
+        self.ttl: float = ttl
+        self.hmac: str = self._compute_hmac()
 
     def _compute_hmac(self) -> str:
         """Compute HMAC-SHA256 for integrity."""
@@ -418,17 +419,17 @@ class HMACCache:
         max_size_l1: int = CACHE_L1_MAX_SIZE,
         max_size_l2: int = CACHE_L2_MAX_SIZE,
         ttl: float = CACHE_TTL_SECONDS,
-    ):
-        self.max_size_l1 = max_size_l1
-        self.max_size_l2 = max_size_l2
-        self.ttl = ttl
+    ) -> None:
+        self.max_size_l1: int = max_size_l1
+        self.max_size_l2: int = max_size_l2
+        self.ttl: float = ttl
         self._l1: dict[str, CacheEntry] = {}
         self._l2: dict[str, CacheEntry] = {}
-        self._hit_count = 0
-        self._miss_count = 0
-        self._integrity_failures = 0
+        self._hit_count: int = 0
+        self._miss_count: int = 0
+        self._integrity_failures: int = 0
 
-    def _make_key(self, messages: list[dict[str, Any]], **kwargs) -> str:
+    def _make_key(self, messages: list[dict[str, Any]], **kwargs: Any) -> str:
         """Create cache key from request parameters."""
         if ORJSON_AVAILABLE:
             data = orjson.dumps({"messages": messages, **kwargs}, option=orjson.OPT_SORT_KEYS)
@@ -553,22 +554,22 @@ class MultiLLMRouterComplete:
         self.providers: list[BaseProvider] = provider_list[:max_parallel]
 
         # Weights
-        self.cost_weight = cost_weight
-        self.latency_weight = latency_weight
-        self.quality_weight = quality_weight
+        self.cost_weight: float = cost_weight
+        self.latency_weight: float = latency_weight
+        self.quality_weight: float = quality_weight
 
         # Features
-        self.enable_circuit_breaker = enable_circuit_breaker
-        self.enable_cache = enable_cache
-        self.mode = mode
+        self.enable_circuit_breaker: bool = enable_circuit_breaker
+        self.enable_cache: bool = enable_cache
+        self.mode: RouterMode = mode
 
         # State persistence
-        self._state_path = state_path or Path.home() / ".penin_router_complete_state.json"
+        self._state_path: Path = state_path or Path.home() / ".penin_router_complete_state.json"
 
         # Budget
         daily_budget = daily_budget_usd if daily_budget_usd is not None else settings.PENIN_BUDGET_DAILY_USD
-        self._budget = BudgetTracker(daily_budget_usd=float(daily_budget))
-        self._budget_lock = asyncio.Lock()
+        self._budget: BudgetTracker = BudgetTracker(daily_budget_usd=float(daily_budget))
+        self._budget_lock: asyncio.Lock = asyncio.Lock()
 
         # Provider tracking
         self._provider_ids: dict[int, str] = {}
@@ -583,7 +584,7 @@ class MultiLLMRouterComplete:
         self._cache: HMACCache | None = HMACCache() if enable_cache else None
 
         # Persistence
-        self._persistence_lock = asyncio.Lock()
+        self._persistence_lock: asyncio.Lock = asyncio.Lock()
         self._load_state()
 
     def _initialize_providers(self) -> None:
@@ -601,7 +602,7 @@ class MultiLLMRouterComplete:
 
             # Set provider ID on provider object
             if not getattr(provider, "provider_id", None):
-                provider.provider_id = provider_id
+                provider.provider_id = provider_id  # type: ignore[attr-defined]
 
             # Initialize stats
             self.provider_stats[provider_id] = ProviderStats(provider_id=provider_id)
@@ -807,7 +808,7 @@ class MultiLLMRouterComplete:
             cache_key = self._cache._make_key(messages, system=system, tools=tools, temperature=temperature)
             cached = self._cache.get(cache_key)
             if cached is not None:
-                return cached
+                return cached  # type: ignore[no-any-return]
 
         # Check budget (hard cutoff)
         async with self._budget_lock:
@@ -853,7 +854,7 @@ class MultiLLMRouterComplete:
             if isinstance(result, Exception):
                 errors.append(str(result))
                 continue
-            successful.append(result)
+            successful.append(result)  # type: ignore[arg-type]
 
         if not successful:
             raise RuntimeError(f"All providers failed. Errors: {errors}")

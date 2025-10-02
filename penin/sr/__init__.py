@@ -7,4 +7,16 @@ Self-reflection scoring with continuous assessment.
 
 from __future__ import annotations
 
-__all__ = []
+from penin.sr.sr_service import (
+    SRScore,
+    SRService,
+    compute_sr_score,
+    quick_sr_score,
+)
+
+__all__ = [
+    "SRScore",
+    "SRService",
+    "compute_sr_score",
+    "quick_sr_score",
+]
