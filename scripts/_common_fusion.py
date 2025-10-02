@@ -81,9 +81,9 @@ def vectorize(m: dict) -> List[float]:
     return vec
 
 def _dot(a: List[float], b: List[float]) -> float:
-    return sum(x*y for x,y in zip(a,b))
-
 def _norm(a: List[float]) -> float:
+    norm_val = math.sqrt(_dot(a,a))
+    return norm_val if norm_val > 1e-12 else 1e-12
     return math.sqrt(_dot(a,a)) or 1e-12
 
 def cosine(a: List[float], b: List[float]) -> float:
