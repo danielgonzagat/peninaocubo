@@ -120,8 +120,12 @@ class OmegaMetaOrchestrator:
             state = json.load(f, object_hook=state_decoder)
 
         self.knowledge_base = state.get("knowledge_base", {})
-        self.task_history = state.get("task_history", deque(maxlen=self.task_history.maxlen))
-        self.score_history = state.get("score_history", deque(maxlen=self.score_history.maxlen))
+        self.task_history = state.get(
+            "task_history", deque(maxlen=self.task_history.maxlen)
+        )
+        self.score_history = state.get(
+            "score_history", deque(maxlen=self.score_history.maxlen)
+        )
 
         return True
 
@@ -136,5 +140,9 @@ class OmegaMetaOrchestrator:
             "knowledge_base_size": len(self.knowledge_base),
             "task_history_size": len(self.task_history),
             "score_history_size": len(self.score_history),
-            "avg_score": sum(self.score_history) / len(self.score_history) if self.score_history else 0.0,
+            "avg_score": (
+                sum(self.score_history) / len(self.score_history)
+                if self.score_history
+                else 0.0
+            ),
         }

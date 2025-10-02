@@ -19,7 +19,13 @@ async def health():
 
 @app.post("/sigma_guard/eval")
 async def eval_guard(m: Metrics):
-    allow = (m.rho < 1.0) and (m.ece <= 0.01) and (m.rho_bias <= 1.05) and m.consent and m.eco_ok
+    allow = (
+        (m.rho < 1.0)
+        and (m.ece <= 0.01)
+        and (m.rho_bias <= 1.05)
+        and m.consent
+        and m.eco_ok
+    )
     return {
         "allow": allow,
         "reasons": {

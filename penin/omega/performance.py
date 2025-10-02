@@ -85,9 +85,9 @@ class PerformanceOptimizer:
                     # Clean up old entries if cache is full
                     if len(self._cache) >= self.max_cache_size:
                         # Remove oldest entries (simple FIFO)
-                        oldest_keys = sorted(self._cache.keys(), key=lambda k: self._cache[k][1])[
-                            : len(self._cache) - self.max_cache_size + 1
-                        ]
+                        oldest_keys = sorted(
+                            self._cache.keys(), key=lambda k: self._cache[k][1]
+                        )[: len(self._cache) - self.max_cache_size + 1]
                         for key in oldest_keys:
                             del self._cache[key]
 
@@ -132,12 +132,17 @@ class ResourceMonitor:
         """Get memory usage with caching"""
         return self._get_cached_resource("memory", self._measure_memory)
 
-    def _get_cached_resource(self, resource_name: str, measure_func: Callable[[], float]) -> float:
+    def _get_cached_resource(
+        self, resource_name: str, measure_func: Callable[[], float]
+    ) -> float:
         """Get cached resource value or measure new one"""
         with self._lock:
             current_time = time.time()
 
-            if resource_name not in self._cached_values or current_time - self._last_update > self.update_interval:
+            if (
+                resource_name not in self._cached_values
+                or current_time - self._last_update > self.update_interval
+            ):
                 self._cached_values[resource_name] = measure_func()
                 self._last_update = current_time
 
@@ -172,7 +177,9 @@ class ComputationalOptimizer:
         return hash(data)
 
     @staticmethod
-    def batch_process(items: list, batch_size: int = 100, process_func: Callable = None):
+    def batch_process(
+        items: list, batch_size: int = 100, process_func: Callable = None
+    ):
         """Process items in batches for efficiency"""
         if not process_func:
             return items
@@ -255,7 +262,10 @@ def get_performance_stats() -> dict[str, Any]:
     return {
         "cache_stats": _performance_optimizer.get_cache_stats(),
         "memory_usage_mb": _memory_manager.get_memory_usage_mb(),
-        "resource_cache": {"cpu": _resource_monitor.get_cpu_usage(), "memory": _resource_monitor.get_memory_usage()},
+        "resource_cache": {
+            "cpu": _resource_monitor.get_cpu_usage(),
+            "memory": _resource_monitor.get_memory_usage(),
+        },
     }
 
 

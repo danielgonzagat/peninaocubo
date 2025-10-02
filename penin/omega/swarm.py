@@ -18,7 +18,10 @@ def _init():
 def heartbeat(node: str, payload: dict):
     _init()
     with sqlite3.connect(DB) as con:
-        con.execute("INSERT INTO hb(node,ts,payload) VALUES(?,?,?)", (node, time.time(), json.dumps(payload)))
+        con.execute(
+            "INSERT INTO hb(node,ts,payload) VALUES(?,?,?)",
+            (node, time.time(), json.dumps(payload)),
+        )
         con.commit()
 
 

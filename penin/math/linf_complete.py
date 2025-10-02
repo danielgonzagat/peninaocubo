@@ -75,7 +75,9 @@ def compute_Linf(
 
     # Validate
     if len(m_vals) != len(w_vals):
-        raise ValueError(f"Metrics ({len(m_vals)}) and weights ({len(w_vals)}) length mismatch")
+        raise ValueError(
+            f"Metrics ({len(m_vals)}) and weights ({len(w_vals)}) length mismatch"
+        )
 
     if len(m_vals) == 0:
         return 0.0

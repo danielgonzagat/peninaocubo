@@ -156,7 +156,9 @@ class SpikingBrainAdapter(BaseIntegration):
             logger.error(f"Failed to initialize SpikingBrain-7B: {e}")
             return False
 
-    def generate_spiking(self, prompt: str, max_tokens: int = 512, **kwargs) -> tuple[str, dict[str, Any]]:
+    def generate_spiking(
+        self, prompt: str, max_tokens: int = 512, **kwargs
+    ) -> tuple[str, dict[str, Any]]:
         """
         Generate text using spiking neural network
 
@@ -202,7 +204,9 @@ class SpikingBrainAdapter(BaseIntegration):
 
         return generated_text, metrics
 
-    def hybrid_generate(self, prompt: str, fallback_model: Any = None, **kwargs) -> tuple[str, dict[str, Any]]:
+    def hybrid_generate(
+        self, prompt: str, fallback_model: Any = None, **kwargs
+    ) -> tuple[str, dict[str, Any]]:
         """
         Hybrid generation: SNN first, fallback to traditional if quality low
 
@@ -228,7 +232,9 @@ class SpikingBrainAdapter(BaseIntegration):
         else:
             # Fallback to traditional LLM
             if fallback_model is None:
-                logger.warning("No fallback model provided, returning SNN output anyway")
+                logger.warning(
+                    "No fallback model provided, returning SNN output anyway"
+                )
                 snn_metrics["mode"] = "snn_no_fallback"
                 snn_metrics["quality_score"] = quality_score
                 return snn_output, snn_metrics
@@ -338,7 +344,9 @@ class SpikingBrainAdapter(BaseIntegration):
         }
 
 
-def create_spiking_brain_adapter(config: dict[str, Any] | None = None) -> SpikingBrainAdapter:
+def create_spiking_brain_adapter(
+    config: dict[str, Any] | None = None,
+) -> SpikingBrainAdapter:
     """Create and initialize SpikingBrain-7B adapter"""
     if config:
         sb_config = SpikingBrainConfig(**config)

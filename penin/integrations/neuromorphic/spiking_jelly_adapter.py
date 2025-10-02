@@ -121,7 +121,9 @@ class SpikingJellyAdapter(BaseIntegration):
             self.spikingjelly_available = True
             return True
         except ImportError:
-            logger.warning("SpikingJelly not available. Install: pip install spikingjelly")
+            logger.warning(
+                "SpikingJelly not available. Install: pip install spikingjelly"
+            )
             return False
 
     def initialize(self) -> bool:
@@ -137,7 +139,9 @@ class SpikingJellyAdapter(BaseIntegration):
 
                 self.neuron_class = LIFNode
             else:
-                logger.warning(f"Neuron type {self.snn_config.neuron_type} not yet supported, using LIF")
+                logger.warning(
+                    f"Neuron type {self.snn_config.neuron_type} not yet supported, using LIF"
+                )
                 from spikingjelly.activation_based.neuron import LIFNode
 
                 self.neuron_class = LIFNode
@@ -175,7 +179,9 @@ class SpikingJellyAdapter(BaseIntegration):
         elif self.snn_config.encoding_type == "latency":
             return encoding.LatencyEncoder(self.snn_config.time_steps)
         else:
-            logger.warning(f"Encoding {self.snn_config.encoding_type} not supported, using rate")
+            logger.warning(
+                f"Encoding {self.snn_config.encoding_type} not supported, using rate"
+            )
             return encoding.PoissonEncoder()
 
     def _create_decoder(self):
@@ -298,7 +304,9 @@ class SpikingJellyAdapter(BaseIntegration):
             logger.error(f"SNN forward pass failed: {e}")
             raise
 
-    def estimate_speedup(self, model_size: int, batch_size: int = 1) -> dict[str, float]:
+    def estimate_speedup(
+        self, model_size: int, batch_size: int = 1
+    ) -> dict[str, float]:
         """
         Estimate speedup vs dense ANN
 
@@ -347,7 +355,8 @@ class SpikingJellyAdapter(BaseIntegration):
 
             return {
                 "compute_ops": snn_ops,
-                "memory_mb": (model_size * 4 / 1e6) * (1.0 - sparsity),  # 4 bytes per param
+                "memory_mb": (model_size * 4 / 1e6)
+                * (1.0 - sparsity),  # 4 bytes per param
                 "tokens": 0,
                 "usd": 0.0,  # No API cost for local SNN
             }

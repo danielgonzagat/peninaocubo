@@ -43,8 +43,14 @@ class DeepSeekProvider(BaseProvider):
             **kwargs,
         )
         choice = resp.choices[0]
-        content = getattr(choice.message, "content", "") if hasattr(choice, "message") else ""
-        tool_calls = getattr(choice.message, "tool_calls", []) if hasattr(choice, "message") else []
+        content = (
+            getattr(choice.message, "content", "") if hasattr(choice, "message") else ""
+        )
+        tool_calls = (
+            getattr(choice.message, "tool_calls", [])
+            if hasattr(choice, "message")
+            else []
+        )
         usage = getattr(resp, "usage", None)
         tokens_in = usage_value(usage, "prompt_tokens")
         tokens_out = usage_value(usage, "completion_tokens")

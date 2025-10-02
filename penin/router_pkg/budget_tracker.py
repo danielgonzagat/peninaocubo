@@ -380,13 +380,13 @@ class BudgetTracker:
 
         # Per-provider metrics
         for provider, stats in self.provider_stats.items():
-            metrics[f"penin_provider_requests_total{{provider=\"{provider}\"}}"] = (
-                float(stats.requests_total)
+            metrics[f'penin_provider_requests_total{{provider="{provider}"}}'] = float(
+                stats.requests_total
             )
-            metrics[f"penin_provider_cost_usd{{provider=\"{provider}\"}}"] = (
+            metrics[f'penin_provider_cost_usd{{provider="{provider}"}}'] = (
                 stats.cost_total_usd
             )
-            metrics[f"penin_provider_success_rate{{provider=\"{provider}\"}}"] = (
+            metrics[f'penin_provider_success_rate{{provider="{provider}"}}'] = (
                 stats.success_rate()
             )
 

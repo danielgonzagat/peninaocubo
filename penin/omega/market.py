@@ -18,10 +18,16 @@ class Offer:
 
 
 class InternalMarket:
-    def match(self, needs: list[Need], offers: list[Offer]) -> list[tuple[Need, Offer, float]]:
+    def match(
+        self, needs: list[Need], offers: list[Offer]
+    ) -> list[tuple[Need, Offer, float]]:
         trades: list[tuple[Need, Offer, float]] = []
         for n in needs:
-            candidates = [o for o in offers if o.resource == n.resource and o.price <= n.max_price and o.qty > 0]
+            candidates = [
+                o
+                for o in offers
+                if o.resource == n.resource and o.price <= n.max_price and o.qty > 0
+            ]
             if not candidates:
                 continue
             # Choose lowest price

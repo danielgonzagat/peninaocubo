@@ -10,7 +10,9 @@ class MasterState:
     S: dict | None = None
 
 
-def step_master(state: MasterState, delta_linf: float, alpha_omega: float) -> MasterState:
+def step_master(
+    state: MasterState, delta_linf: float, alpha_omega: float
+) -> MasterState:
     """
     I_{t+1} = Π_{H∩S}[ I_t + α_t^Ω · ΔL_∞ ]
     Projection Π is a placeholder here; we keep I scalar for demo and safety.

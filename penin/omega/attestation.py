@@ -28,15 +28,18 @@ from typing import Any
 try:
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import ed25519
+
     HAS_CRYPTOGRAPHY = True
 except ImportError:
     # Fallback: use hashlib-based HMAC for signing (not true public-key crypto, but acceptable for MVP)
     import hmac
+
     HAS_CRYPTOGRAPHY = False
 
 
 class ServiceType(str, Enum):
     """Type of validation service"""
+
     SR_OMEGA = "SR-Ω∞"
     SIGMA_GUARD = "Σ-Guard"
     ACFA_LEAGUE = "ACFA-League"
@@ -61,23 +64,24 @@ class SignatureKeyPair:
             private_bytes = private_key.private_bytes(
                 encoding=serialization.Encoding.Raw,
                 format=serialization.PrivateFormat.Raw,
-                encryption_algorithm=serialization.NoEncryption()
+                encryption_algorithm=serialization.NoEncryption(),
             )
 
             public_bytes = public_key.public_bytes(
                 encoding=serialization.Encoding.Raw,
-                format=serialization.PublicFormat.Raw
+                format=serialization.PublicFormat.Raw,
             )
         else:
             # Fallback: generate random key material for HMAC
             import os
+
             private_bytes = os.urandom(32)
             public_bytes = hashlib.sha256(private_bytes).digest()
 
         return cls(
             service_type=service_type,
             private_key_bytes=private_bytes,
-            public_key_bytes=public_bytes
+            public_key_bytes=public_bytes,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -128,21 +132,23 @@ class Attestation:
     def sign(self, key_pair: SignatureKeyPair) -> None:
         """Sign the attestation with a private key"""
         if key_pair.service_type != self.service_type:
-            raise ValueError(f"Key pair service type {key_pair.service_type} does not match {self.service_type}")
+            raise ValueError(
+                f"Key pair service type {key_pair.service_type} does not match {self.service_type}"
+            )
 
         # Compute content hash
         self.content_hash = self.compute_content_hash()
 
         # Sign the hash
         if HAS_CRYPTOGRAPHY:
-            private_key = ed25519.Ed25519PrivateKey.from_private_bytes(key_pair.private_key_bytes)
+            private_key = ed25519.Ed25519PrivateKey.from_private_bytes(
+                key_pair.private_key_bytes
+            )
             signature_bytes = private_key.sign(self.content_hash.encode())
         else:
             # Fallback: HMAC-based signing
             signature_bytes = hmac.new(
-                key_pair.private_key_bytes,
-                self.content_hash.encode(),
-                hashlib.sha256
+                key_pair.private_key_bytes, self.content_hash.encode(), hashlib.sha256
             ).digest()
 
         self.signature = signature_bytes.hex()
@@ -165,7 +171,9 @@ class Attestation:
             public_key_bytes = bytes.fromhex(self.public_key)
 
             if HAS_CRYPTOGRAPHY:
-                public_key = ed25519.Ed25519PublicKey.from_public_bytes(public_key_bytes)
+                public_key = ed25519.Ed25519PublicKey.from_public_bytes(
+                    public_key_bytes
+                )
                 try:
                     public_key.verify(signature_bytes, self.content_hash.encode())
                     return True
@@ -221,7 +229,9 @@ class AttestationChain:
     def add_attestation(self, attestation: Attestation) -> None:
         """Add an attestation to the chain"""
         if not attestation.verify():
-            raise ValueError(f"Cannot add unverified attestation from {attestation.service_type}")
+            raise ValueError(
+                f"Cannot add unverified attestation from {attestation.service_type}"
+            )
 
         self.attestations.append(attestation)
         self._update_chain_hash()
@@ -318,14 +328,14 @@ class AttestationManager:
         service_type: ServiceType,
         verdict: str,
         subject_id: str,
-        metrics: dict[str, Any]
+        metrics: dict[str, Any],
     ) -> Attestation:
         """Create and sign an attestation"""
         attestation = Attestation(
             service_type=service_type,
             verdict=verdict,
             subject_id=subject_id,
-            metrics=metrics
+            metrics=metrics,
         )
 
         key_pair = self.key_pairs[service_type]
@@ -359,11 +369,9 @@ def get_attestation_manager() -> AttestationManager:
 
 # Convenience functions
 
+
 def create_sr_attestation(
-    verdict: str,
-    candidate_id: str,
-    sr_score: float,
-    components: dict[str, float]
+    verdict: str, candidate_id: str, sr_score: float, components: dict[str, float]
 ) -> Attestation:
     """Create attestation from SR-Ω∞ service"""
     manager = get_attestation_manager()
@@ -374,15 +382,12 @@ def create_sr_attestation(
         metrics={
             "sr_score": sr_score,
             "components": components,
-        }
+        },
     )
 
 
 def create_sigma_guard_attestation(
-    verdict: str,
-    candidate_id: str,
-    gates: list[dict[str, Any]],
-    aggregate_score: float
+    verdict: str, candidate_id: str, gates: list[dict[str, Any]], aggregate_score: float
 ) -> Attestation:
     """Create attestation from Σ-Guard service"""
     manager = get_attestation_manager()
@@ -393,14 +398,12 @@ def create_sigma_guard_attestation(
         metrics={
             "gates": gates,
             "aggregate_score": aggregate_score,
-        }
+        },
     )
 
 
 def create_acfa_attestation(
-    verdict: str,
-    candidate_id: str,
-    promotion_decision: dict[str, Any]
+    verdict: str, candidate_id: str, promotion_decision: dict[str, Any]
 ) -> Attestation:
     """Create attestation from ACFA League"""
     manager = get_attestation_manager()
@@ -408,7 +411,7 @@ def create_acfa_attestation(
         service_type=ServiceType.ACFA_LEAGUE,
         verdict=verdict,
         subject_id=candidate_id,
-        metrics=promotion_decision
+        metrics=promotion_decision,
     )
 
 

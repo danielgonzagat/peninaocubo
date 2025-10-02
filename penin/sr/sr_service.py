@@ -298,7 +298,11 @@ class SRService:
                 "awareness": {
                     "value": latest.awareness,
                     "threshold": self.thresholds["awareness"],
-                    "status": "ok" if latest.awareness >= self.thresholds["awareness"] else "warning",
+                    "status": (
+                        "ok"
+                        if latest.awareness >= self.thresholds["awareness"]
+                        else "warning"
+                    ),
                 },
                 "ethics": {
                     "value": 1.0 if latest.ethics_ok else 0.0,
@@ -307,12 +311,20 @@ class SRService:
                 "autocorrection": {
                     "value": latest.autocorrection,
                     "threshold": self.thresholds["autocorrection"],
-                    "status": "ok" if latest.autocorrection >= self.thresholds["autocorrection"] else "warning",
+                    "status": (
+                        "ok"
+                        if latest.autocorrection >= self.thresholds["autocorrection"]
+                        else "warning"
+                    ),
                 },
                 "metacognition": {
                     "value": latest.metacognition,
                     "threshold": self.thresholds["metacognition"],
-                    "status": "ok" if latest.metacognition >= self.thresholds["metacognition"] else "warning",
+                    "status": (
+                        "ok"
+                        if latest.metacognition >= self.thresholds["metacognition"]
+                        else "warning"
+                    ),
                 },
             },
             "history_size": len(self.score_history),
@@ -390,9 +402,11 @@ def quick_sr_score(
         ```
     """
     awareness = max(0.0, 1.0 - ece)
-    ethics_ok = (rho < 1.0)
+    ethics_ok = rho < 1.0
     autocorrection = max(0.0, 1.0 - rho)
-    metacognition = min(1.0, max(0.0, delta_linf / delta_cost)) if delta_cost > 0 else 0.0
+    metacognition = (
+        min(1.0, max(0.0, delta_linf / delta_cost)) if delta_cost > 0 else 0.0
+    )
 
     return compute_sr_score(awareness, ethics_ok, autocorrection, metacognition)
 
@@ -438,19 +452,30 @@ try:
     def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
         """Verify API token."""
         # TODO: Implement proper token verification
-        if not credentials.credentials or credentials.credentials != "your-secret-token":
+        if (
+            not credentials.credentials
+            or credentials.credentials != "your-secret-token"
+        ):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid authentication credentials",
                 headers={"WWW-Authenticate": "Bearer"},
             )
+
     _global_sr_service = SRService()
 
     class ScoreRequest(BaseModel):
         """Request model for SR score computation."""
-        ece: float = Field(default=0.01, ge=0.0, le=1.0, description="Expected Calibration Error")
-        rho: float = Field(default=0.90, ge=0.0, le=2.0, description="Contractivity ratio")
-        delta_linf: float = Field(default=0.05, ge=-1.0, le=1.0, description="Change in L∞")
+
+        ece: float = Field(
+            default=0.01, ge=0.0, le=1.0, description="Expected Calibration Error"
+        )
+        rho: float = Field(
+            default=0.90, ge=0.0, le=2.0, description="Contractivity ratio"
+        )
+        delta_linf: float = Field(
+            default=0.05, ge=-1.0, le=1.0, description="Change in L∞"
+        )
         delta_cost: float = Field(default=0.10, ge=0.0, description="Change in cost")
 
     @app.get("/health")

@@ -12,14 +12,18 @@ class OmegaNode:
     children: list[OmegaNode] = field(default_factory=list)
 
 
-def build_fractal(root_cfg: dict[str, Any], depth: int, branching: int, prefix="Ω") -> OmegaNode:
+def build_fractal(
+    root_cfg: dict[str, Any], depth: int, branching: int, prefix="Ω"
+) -> OmegaNode:
     root = OmegaNode(id=f"{prefix}-0", depth=0, config=dict(root_cfg))
     frontier = [root]
     for d in range(1, depth + 1):
         nxt = []
         for node in frontier:
             for i in range(branching):
-                child = OmegaNode(id=f"{prefix}-{d}-{i}", depth=d, config=dict(root_cfg))
+                child = OmegaNode(
+                    id=f"{prefix}-{d}-{i}", depth=d, config=dict(root_cfg)
+                )
                 node.children.append(child)
                 nxt.append(child)
         frontier = nxt

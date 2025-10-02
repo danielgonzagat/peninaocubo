@@ -10,7 +10,10 @@ class AdaGradTuner:
         self.g2: dict[str, float] = {}
 
     def update(
-        self, params: dict[str, float], grads: dict[str, float], bounds: dict[str, tuple[float, float]] | None = None
+        self,
+        params: dict[str, float],
+        grads: dict[str, float],
+        bounds: dict[str, tuple[float, float]] | None = None,
     ) -> dict[str, float]:
         updated: dict[str, float] = {}
         for k, v in params.items():
@@ -69,7 +72,12 @@ def quick_tune_kappa(history: list[dict[str, Any]]) -> tuple[float, dict[str, An
     else:
         new_kappa = 2.0
 
-    return new_kappa, {"method": "heuristic", "iterations": len(history), "avg_u": avg_u, "avg_cost": avg_cost}
+    return new_kappa, {
+        "method": "heuristic",
+        "iterations": len(history),
+        "avg_u": avg_u,
+        "avg_cost": avg_cost,
+    }
 
 
 class PeninAutoTuner:

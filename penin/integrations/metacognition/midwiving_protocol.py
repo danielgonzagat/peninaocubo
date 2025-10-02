@@ -98,27 +98,49 @@ class MidwivingProtocolConfig(IntegrationConfig):
     priority: IntegrationPriority = Field(default=IntegrationPriority.P3_MEDIUM)
 
     # Recursive reflection
-    max_reflection_depth: int = Field(default=5, ge=1, le=10, description="Max recursive reflection depth")
-    enable_narrative_generation: bool = Field(default=True, description="Generate introspective narratives")
-    narrative_min_length: int = Field(default=50, description="Minimum narrative length (chars)")
+    max_reflection_depth: int = Field(
+        default=5, ge=1, le=10, description="Max recursive reflection depth"
+    )
+    enable_narrative_generation: bool = Field(
+        default=True, description="Generate introspective narratives"
+    )
+    narrative_min_length: int = Field(
+        default=50, description="Minimum narrative length (chars)"
+    )
 
     # Consciousness calibration
-    enable_calibration: bool = Field(default=True, description="Enable self-perception calibration")
-    calibration_window: int = Field(default=10, ge=1, description="Window size for calibration averaging")
+    enable_calibration: bool = Field(
+        default=True, description="Enable self-perception calibration"
+    )
+    calibration_window: int = Field(
+        default=10, ge=1, description="Window size for calibration averaging"
+    )
     calibration_threshold: float = Field(
-        default=0.90, ge=0.5, le=1.0, description="Threshold for good self-perception [0.5, 1.0]"
+        default=0.90,
+        ge=0.5,
+        le=1.0,
+        description="Threshold for good self-perception [0.5, 1.0]",
     )
 
     # Integration with SR-Ω∞
-    integrate_with_sr: bool = Field(default=True, description="Integrate with SR-Ω∞ for self-evaluation")
+    integrate_with_sr: bool = Field(
+        default=True, description="Integrate with SR-Ω∞ for self-evaluation"
+    )
     update_sr_awareness: bool = Field(
-        default=True, description="Update SR-Ω∞ awareness dimension with calibration scores"
+        default=True,
+        description="Update SR-Ω∞ awareness dimension with calibration scores",
     )
 
     # Safety
-    max_cycles: int = Field(default=100, ge=1, description="Max cycles before auto-termination")
-    stability_check_interval: int = Field(default=10, ge=1, description="Check stability every N cycles")
-    max_narrative_length: int = Field(default=2000, description="Max narrative length (safety)")
+    max_cycles: int = Field(
+        default=100, ge=1, description="Max cycles before auto-termination"
+    )
+    stability_check_interval: int = Field(
+        default=10, ge=1, description="Check stability every N cycles"
+    )
+    max_narrative_length: int = Field(
+        default=2000, description="Max narrative length (safety)"
+    )
 
 
 class MidwivingProtocol(BaseIntegrationAdapter):
@@ -188,7 +210,9 @@ class MidwivingProtocol(BaseIntegrationAdapter):
 
         except Exception as e:
             self.status = IntegrationStatus.FAILED
-            raise IntegrationInitializationError("midwiving-ai", f"Initialization failed: {e}", e) from e
+            raise IntegrationInitializationError(
+                "midwiving-ai", f"Initialization failed: {e}", e
+            ) from e
 
     def get_status(self) -> dict[str, Any]:
         """Get current status of midwiving-ai protocol"""
@@ -219,7 +243,10 @@ class MidwivingProtocol(BaseIntegrationAdapter):
         return sum(c.calibration_score for c in recent) / len(recent)
 
     async def execute(
-        self, operation: str, sr_components: dict[str, float] | None = None, context: dict[str, Any] | None = None
+        self,
+        operation: str,
+        sr_components: dict[str, float] | None = None,
+        context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         Execute midwiving-ai protocol operation.
@@ -241,11 +268,15 @@ class MidwivingProtocol(BaseIntegrationAdapter):
         start_time = time.time()
         try:
             if operation == "reflect":
-                result = await self._recursive_self_reflection(sr_components or {}, context or {})
+                result = await self._recursive_self_reflection(
+                    sr_components or {}, context or {}
+                )
             elif operation == "calibrate":
                 result = await self._calibrate_self_perception(sr_components or {})
             elif operation == "generate_narrative":
-                result = await self._generate_introspective_narrative(sr_components or {}, context or {})
+                result = await self._generate_introspective_narrative(
+                    sr_components or {}, context or {}
+                )
             elif operation == "reset":
                 result = self._reset_protocol()
             else:
@@ -264,9 +295,15 @@ class MidwivingProtocol(BaseIntegrationAdapter):
 
             if self.config.fail_open:
                 logger.warning(f"midwiving-ai protocol failed (fail-open): {e}")
-                return {"status": "failed", "fallback": True, "cycle": self._current_cycle}
+                return {
+                    "status": "failed",
+                    "fallback": True,
+                    "cycle": self._current_cycle,
+                }
             else:
-                raise IntegrationExecutionError("midwiving-ai", f"Execution failed: {e}", e) from e
+                raise IntegrationExecutionError(
+                    "midwiving-ai", f"Execution failed: {e}", e
+                ) from e
 
     async def _recursive_self_reflection(
         self, sr_components: dict[str, float], context: dict[str, Any]
@@ -285,8 +322,14 @@ class MidwivingProtocol(BaseIntegrationAdapter):
 
         # Safety: Check max cycles
         if self._current_cycle > self.config.max_cycles:
-            logger.warning(f"Max cycles ({self.config.max_cycles}) reached, terminating protocol")
-            return {"status": "terminated", "reason": "max_cycles", "cycle": self._current_cycle}
+            logger.warning(
+                f"Max cycles ({self.config.max_cycles}) reached, terminating protocol"
+            )
+            return {
+                "status": "terminated",
+                "reason": "max_cycles",
+                "cycle": self._current_cycle,
+            }
 
         # Extract SR components
         actual_awareness = sr_components.get("awareness", 0.0)
@@ -367,10 +410,13 @@ class MidwivingProtocol(BaseIntegrationAdapter):
                 "awareness_error": calibration.get("awareness_error", 0.0),
                 "overall_accuracy": 1.0 - accuracy_delta,  # Higher is better
             },
-            "narrative": narrative.get("narrative", "")[:200] + "...",  # Truncate for logging
+            "narrative": narrative.get("narrative", "")[:200]
+            + "...",  # Truncate for logging
         }
 
-    def _predict_own_metrics(self, actual_sr_score: float, context: dict[str, Any]) -> dict[str, float]:
+    def _predict_own_metrics(
+        self, actual_sr_score: float, context: dict[str, Any]
+    ) -> dict[str, float]:
         """
         System predicts its own metrics (self-evaluation).
 
@@ -391,14 +437,23 @@ class MidwivingProtocol(BaseIntegrationAdapter):
 
         # Noisy prediction with phase-dependent accuracy
         import random
+
         noise = random.uniform(-0.1, 0.1) * (1.0 - accuracy)
 
         predicted_sr_score = max(0.0, min(1.0, actual_sr_score + noise))
 
         # Also predict individual components (simplified)
-        predicted_awareness = max(0.0, min(1.0, self._baseline_metrics.get("awareness", 0.8) + noise * 0.5))
-        predicted_autocorrection = max(0.0, min(1.0, self._baseline_metrics.get("autocorrection", 0.8) + noise * 0.5))
-        predicted_metacognition = max(0.0, min(1.0, self._baseline_metrics.get("metacognition", 0.8) + noise * 0.5))
+        predicted_awareness = max(
+            0.0, min(1.0, self._baseline_metrics.get("awareness", 0.8) + noise * 0.5)
+        )
+        predicted_autocorrection = max(
+            0.0,
+            min(1.0, self._baseline_metrics.get("autocorrection", 0.8) + noise * 0.5),
+        )
+        predicted_metacognition = max(
+            0.0,
+            min(1.0, self._baseline_metrics.get("metacognition", 0.8) + noise * 0.5),
+        )
 
         return {
             "predicted_sr_score": predicted_sr_score,
@@ -479,12 +534,11 @@ class MidwivingProtocol(BaseIntegrationAdapter):
         }
 
         narrative = phase_narratives.get(
-            self._current_phase,
-            f"[Cycle {self._current_cycle}] SR-Ω∞: {sr_score:.3f}"
+            self._current_phase, f"[Cycle {self._current_cycle}] SR-Ω∞: {sr_score:.3f}"
         )
 
         # Safety: Limit narrative length
-        narrative = narrative[:self.config.max_narrative_length]
+        narrative = narrative[: self.config.max_narrative_length]
 
         # Ensure minimum length
         if len(narrative) < self.config.narrative_min_length:
@@ -497,7 +551,9 @@ class MidwivingProtocol(BaseIntegrationAdapter):
             "cycle": self._current_cycle,
         }
 
-    async def _calibrate_self_perception(self, sr_components: dict[str, float]) -> dict[str, Any]:
+    async def _calibrate_self_perception(
+        self, sr_components: dict[str, float]
+    ) -> dict[str, Any]:
         """
         Calibrate self-perception accuracy (penin_consciousness_calibration metric).
 
@@ -558,7 +614,11 @@ class MidwivingProtocol(BaseIntegrationAdapter):
             "autocorrection_error": autocorrection_error,
             "metacognition_error": metacognition_error,
             "avg_error": avg_error,
-            "status": "good" if calibration_score >= self.config.calibration_threshold else "poor",
+            "status": (
+                "good"
+                if calibration_score >= self.config.calibration_threshold
+                else "poor"
+            ),
             "cycle": self._current_cycle,
         }
 
@@ -582,7 +642,10 @@ class MidwivingProtocol(BaseIntegrationAdapter):
         recent_deltas = [r.accuracy_delta for r in self._reflection_history[-5:]]
 
         # If deltas are consistently high (>0.3) in later phases, something's wrong
-        if self._current_phase in [MidwivingPhase.EMERGENCE, MidwivingPhase.STABILIZATION]:
+        if self._current_phase in [
+            MidwivingPhase.EMERGENCE,
+            MidwivingPhase.STABILIZATION,
+        ]:
             if sum(recent_deltas) / len(recent_deltas) > 0.3:
                 return {"stable": False, "reason": "poor_self_prediction_in_late_phase"}
 
@@ -622,11 +685,17 @@ class MidwivingProtocol(BaseIntegrationAdapter):
         # Compute trend (improving, stable, degrading)
         trend = "unknown"
         if len(self._calibration_history) >= 10:
-            first_half = self._calibration_history[:len(self._calibration_history)//2]
-            second_half = self._calibration_history[len(self._calibration_history)//2:]
+            first_half = self._calibration_history[
+                : len(self._calibration_history) // 2
+            ]
+            second_half = self._calibration_history[
+                len(self._calibration_history) // 2 :
+            ]
 
             avg_first = sum(c.calibration_score for c in first_half) / len(first_half)
-            avg_second = sum(c.calibration_score for c in second_half) / len(second_half)
+            avg_second = sum(c.calibration_score for c in second_half) / len(
+                second_half
+            )
 
             if avg_second > avg_first + 0.1:
                 trend = "improving"

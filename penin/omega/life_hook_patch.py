@@ -60,7 +60,11 @@ def _extract_metrics(*args, **kwargs) -> dict[str, Any]:
                     out[k] = a[k]
         else:
             # objetos com .metrics / .to_dict / __dict__
-            for src in (getattr(a, "metrics", None), getattr(a, "to_dict", None), getattr(a, "__dict__", None)):
+            for src in (
+                getattr(a, "metrics", None),
+                getattr(a, "to_dict", None),
+                getattr(a, "__dict__", None),
+            ):
                 try:
                     d = src() if callable(src) else src
                     if isinstance(d, dict):
@@ -102,7 +106,11 @@ def _wrap_promote(fn, where: str):
         mode = _vida_check_or_block()  # None | "strict"
         metrics = _extract_metrics(*args, **kwargs)
         verdict = life_equation(
-            **{k: v for k, v in metrics.items() if k in inspect.signature(life_equation).parameters}
+            **{
+                k: v
+                for k, v in metrics.items()
+                if k in inspect.signature(life_equation).parameters
+            }
         )
         if not verdict.ok:
             msg = f"[VIDA+] BLOCKED at {where} — reasons={verdict.reasons}"
@@ -139,15 +147,26 @@ def auto_patch() -> dict[str, bool]:
     patched: dict[str, bool] = {}
     # alvos prováveis
     _try_patch("penin.omega.league", "promote", "league.promote", patched)
-    _try_patch("penin.omega.league", "promote_variant", "league.promote_variant", patched)
+    _try_patch(
+        "penin.omega.league", "promote_variant", "league.promote_variant", patched
+    )
     _try_patch("penin.omega.runners", "promote", "runners.promote", patched)
-    _try_patch("penin.omega.runners", "evolve_one_cycle", "runners.evolve_one_cycle", patched)
+    _try_patch(
+        "penin.omega.runners", "evolve_one_cycle", "runners.evolve_one_cycle", patched
+    )
     _try_patch("penin_cli_simple", "promote", "penin_cli_simple.promote", patched)
     # adicionais prováveis no seu repo
     _try_patch("league_service", "promote", "league_service.promote", patched)
-    _try_patch("league_service", "promote_variant", "league_service.promote_variant", patched)
+    _try_patch(
+        "league_service", "promote_variant", "league_service.promote_variant", patched
+    )
     _try_patch("penin.league.acfa_service", "promote", "acfa_service.promote", patched)
-    _try_patch("penin.league.acfa_service", "promote_variant", "acfa_service.promote_variant", patched)
+    _try_patch(
+        "penin.league.acfa_service",
+        "promote_variant",
+        "acfa_service.promote_variant",
+        patched,
+    )
     _try_patch("penin.omega.vida_runner", "evolve", "vida_runner.evolve", patched)
     _try_patch("penin.omega.vida_runner", "promote", "vida_runner.promote", patched)
     return patched

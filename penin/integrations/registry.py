@@ -149,7 +149,9 @@ class IntegrationRegistry:
         Returns:
             List of integration names
         """
-        return [name for name, adapter in self._adapters.items() if adapter.is_available()]
+        return [
+            name for name, adapter in self._adapters.items() if adapter.is_available()
+        ]
 
     def list_active(self) -> list[str]:
         """
@@ -163,7 +165,8 @@ class IntegrationRegistry:
         return [
             name
             for name, adapter in self._adapters.items()
-            if adapter.status in (IntegrationStatus.ACTIVE, IntegrationStatus.INITIALIZED)
+            if adapter.status
+            in (IntegrationStatus.ACTIVE, IntegrationStatus.INITIALIZED)
         ]
 
     def unregister(self, name: str) -> bool:

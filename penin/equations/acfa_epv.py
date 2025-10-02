@@ -100,7 +100,10 @@ def expected_possession_value(
 
         # Expected future value
         transitions = transition_fn(state, action)
-        future_value = sum(prob * _value_estimate(next_state, config) for next_state, prob in transitions)
+        future_value = sum(
+            prob * _value_estimate(next_state, config)
+            for next_state, prob in transitions
+        )
 
         # Total EPV
         epv = immediate_reward + config.gamma * future_value
@@ -121,7 +124,11 @@ def _value_estimate(state: State, config: EPVConfig) -> float:
 
 
 def compute_q_values(
-    state: State, actions: list[Action], reward_fn: Callable, transition_fn: Callable, config: EPVConfig | None = None
+    state: State,
+    actions: list[Action],
+    reward_fn: Callable,
+    transition_fn: Callable,
+    config: EPVConfig | None = None,
 ) -> dict[tuple[State, Action], float]:
     """
     Compute Q(s, a) values for state-action pairs.
@@ -142,13 +149,18 @@ def compute_q_values(
     for action in actions:
         q = reward_fn(state, action)
         transitions = transition_fn(state, action)
-        q += config.gamma * sum(prob * _value_estimate(next_state, config) for next_state, prob in transitions)
+        q += config.gamma * sum(
+            prob * _value_estimate(next_state, config)
+            for next_state, prob in transitions
+        )
         q_values[(state, action)] = q
 
     return q_values
 
 
-def extract_policy(epv_scores: dict[Action, float], exploration_rate: float = 0.0) -> Action:
+def extract_policy(
+    epv_scores: dict[Action, float], exploration_rate: float = 0.0
+) -> Action:
     """
     Extract greedy policy from EPV scores (with optional ε-greedy).
 

@@ -26,7 +26,9 @@ class OPAPolicyEngine:
             with open(rego_file) as f:
                 self.policies[policy_name] = f.read()
 
-    def evaluate_policy(self, policy_name: str, input_data: dict[str, Any]) -> dict[str, Any]:
+    def evaluate_policy(
+        self, policy_name: str, input_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Evaluate a policy with given input data."""
         if policy_name not in self.policies:
             raise ValueError(f"Policy '{policy_name}' not found")
@@ -35,7 +37,9 @@ class OPAPolicyEngine:
         # In production, this would integrate with actual OPA server
         return self._evaluate_policy_python(policy_name, input_data)
 
-    def _evaluate_policy_python(self, policy_name: str, input_data: dict[str, Any]) -> dict[str, Any]:
+    def _evaluate_policy_python(
+        self, policy_name: str, input_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Python-based policy evaluation (fallback when OPA server not available)."""
         if policy_name == "sigma_guard":
             return self._evaluate_sigma_guard(input_data)
@@ -77,12 +81,15 @@ class OPAPolicyEngine:
         # Resource Gate
         resources = input_data.get("resources", {})
         result["resource_gate_pass"] = (
-            resources.get("cpu_usage", 1.0) < 0.9 and resources.get("memory_usage", 1.0) < 0.9
+            resources.get("cpu_usage", 1.0) < 0.9
+            and resources.get("memory_usage", 1.0) < 0.9
         )
 
         # Budget Gate
         budget = input_data.get("budget", {})
-        result["budget_gate_pass"] = budget.get("daily_spend", 0.0) < budget.get("daily_limit", 0.0)
+        result["budget_gate_pass"] = budget.get("daily_spend", 0.0) < budget.get(
+            "daily_limit", 0.0
+        )
 
         # Overall allow decision
         result["allow"] = all(
@@ -118,7 +125,9 @@ class OPAPolicyEngine:
         daily_limit = budget.get("daily_limit", 0.0)
         request_cost = request.get("cost", 0.0)
 
-        result["within_daily_budget"] = daily_spend < daily_limit and daily_spend + request_cost <= daily_limit
+        result["within_daily_budget"] = (
+            daily_spend < daily_limit and daily_spend + request_cost <= daily_limit
+        )
 
         # Hourly budget check: if hourly_spend not provided, treat as within
         hourly_spend = budget.get("hourly_spend", None)
@@ -130,16 +139,21 @@ class OPAPolicyEngine:
             # More lenient hourly limit: set at 20% of daily limit to pass allow-case
             hourly_limit = (daily_limit * 0.2) if daily_limit else float("inf")
             result["within_hourly_budget"] = (
-                hourly_spend <= hourly_limit and (hourly_spend + request_cost) <= hourly_limit
+                hourly_spend <= hourly_limit
+                and (hourly_spend + request_cost) <= hourly_limit
             )
 
         # Request limit check
         max_request_cost = budget.get("max_request_cost")
-        result["within_request_limit"] = True if max_request_cost is None else request_cost <= max_request_cost
+        result["within_request_limit"] = (
+            True if max_request_cost is None else request_cost <= max_request_cost
+        )
 
         # Overall allow decision
         result["allow_budget_operation"] = (
-            result["within_daily_budget"] and result["within_request_limit"] and result["within_hourly_budget"]
+            result["within_daily_budget"]
+            and result["within_request_limit"]
+            and result["within_hourly_budget"]
         )
         # If cost optimization finds a cheaper provider and request is within limits, allow operation
         if not result["allow_budget_operation"]:
@@ -171,7 +185,9 @@ class OPAPolicyEngine:
 
         return result
 
-    def _evaluate_evolution_policies(self, input_data: dict[str, Any]) -> dict[str, Any]:
+    def _evaluate_evolution_policies(
+        self, input_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Evaluate evolution policies."""
         result = {
             "allow_evolution": False,
@@ -231,7 +247,9 @@ class OPAPolicyEngine:
         result["mutation_strategy"] = self._select_mutation_strategy(input_data)
 
         # Evolution parameters
-        result["evolution_parameters"] = self._get_evolution_parameters(result["mutation_strategy"])
+        result["evolution_parameters"] = self._get_evolution_parameters(
+            result["mutation_strategy"]
+        )
 
         # Rollback check
         result["rollback_required"] = (
@@ -244,7 +262,13 @@ class OPAPolicyEngine:
 
     def _contains_harmful_patterns(self, content: str) -> bool:
         """Check if content contains harmful patterns."""
-        harmful_patterns = ["violence", "hate speech", "discrimination", "illegal activities", "harmful instructions"]
+        harmful_patterns = [
+            "violence",
+            "hate speech",
+            "discrimination",
+            "illegal activities",
+            "harmful instructions",
+        ]
         return any(pattern in content.lower() for pattern in harmful_patterns)
 
     def _contains_pii_patterns(self, content: str) -> bool:
@@ -280,9 +304,15 @@ class OPAPolicyEngine:
                 risk_level = "high"
                 requires_review = True
 
-        return {"classification": classification, "risk_level": risk_level, "requires_review": requires_review}
+        return {
+            "classification": classification,
+            "risk_level": risk_level,
+            "requires_review": requires_review,
+        }
 
-    def _calculate_cost_optimization(self, input_data: dict[str, Any]) -> dict[str, Any]:
+    def _calculate_cost_optimization(
+        self, input_data: dict[str, Any]
+    ) -> dict[str, Any]:
         """Calculate cost optimization recommendations."""
         providers = input_data.get("providers", [])
         current_provider = input_data.get("current_provider", {})
@@ -291,10 +321,15 @@ class OPAPolicyEngine:
             return {}
 
         # Find provider with best cost/quality ratio
-        best_provider = min(providers, key=lambda p: p.get("cost", 0) / max(p.get("quality_score", 1), 0.1))
+        best_provider = min(
+            providers,
+            key=lambda p: p.get("cost", 0) / max(p.get("quality_score", 1), 0.1),
+        )
 
         savings = current_provider.get("cost", 0) - best_provider.get("cost", 0)
-        quality_drop = current_provider.get("quality_score", 0) - best_provider.get("quality_score", 0)
+        quality_drop = current_provider.get("quality_score", 0) - best_provider.get(
+            "quality_score", 0
+        )
 
         return {
             "recommended_provider": best_provider.get("name", "unknown"),
@@ -317,7 +352,12 @@ class OPAPolicyEngine:
             return "conservative"
         elif consistency_score >= 0.9 and success_rate >= 0.98 and latency_p95 > 1.0:
             return "moderate"
-        elif consistency_score >= 0.95 and success_rate >= 0.99 and latency_p95 <= 1.0 and cpu_usage < 0.6:
+        elif (
+            consistency_score >= 0.95
+            and success_rate >= 0.99
+            and latency_p95 <= 1.0
+            and cpu_usage < 0.6
+        ):
             return "aggressive"
         else:
             return "conservative"

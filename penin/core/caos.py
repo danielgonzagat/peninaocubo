@@ -104,6 +104,7 @@ class CAOSComponent(Enum):
 @dataclass
 class CAOSComponents:
     """Componentes CAOS como dataclass para uso em testes e APIs"""
+
     C: float
     A: float
     O: float
@@ -189,7 +190,11 @@ class ConsistencyMetrics:
         ece_norm = clamp01(1.0 - self.ece)  # Inverter ECE
         ext_norm = clamp01(self.external_verification)
 
-        c = self.weight_pass * pass_norm + self.weight_ece * ece_norm + self.weight_external * ext_norm
+        c = (
+            self.weight_pass * pass_norm
+            + self.weight_ece * ece_norm
+            + self.weight_external * ext_norm
+        )
 
         return clamp01(c)
 
@@ -248,7 +253,11 @@ class IncognoscibleMetrics:
         ood_norm = clamp01(self.ood_score)
         ens_norm = clamp01(self.ensemble_disagreement)
 
-        o = self.weight_epistemic * epist_norm + self.weight_ood * ood_norm + self.weight_ensemble * ens_norm
+        o = (
+            self.weight_epistemic * epist_norm
+            + self.weight_ood * ood_norm
+            + self.weight_ensemble * ens_norm
+        )
 
         return clamp01(o)
 
@@ -338,15 +347,18 @@ class CAOSPlusEngine:
 
     def compute_phi(self, components: CAOSComponents) -> tuple[float, dict[str, Any]]:
         """Computa phi_caos com detalhes"""
-        phi_result = phi_caos(components.C, components.A, components.O, components.S,
-                             kappa=self.config.kappa, gamma=self.config.gamma)
+        phi_result = phi_caos(
+            components.C,
+            components.A,
+            components.O,
+            components.S,
+            kappa=self.config.kappa,
+            gamma=self.config.gamma,
+        )
         details = {
             "phi": phi_result,
             "components": components.to_dict(),
-            "config": {
-                "kappa": self.config.kappa,
-                "gamma": self.config.gamma
-            }
+            "config": {"kappa": self.config.kappa, "gamma": self.config.gamma},
         }
         return phi_result, details
 
@@ -460,7 +472,7 @@ def compute_caos_plus_exponential(
     exp_term = clamp01(o * s)
 
     # CAOS+ = base^exp_term
-    caos_plus = base ** exp_term
+    caos_plus = base**exp_term
 
     return caos_plus
 
@@ -636,7 +648,9 @@ def compute_caos_plus_simple(
 
     # Normalizar se configurado
     if config.normalize_output:
-        caos_final = (caos_clamped - config.caos_min) / (config.caos_max - config.caos_min)
+        caos_final = (caos_clamped - config.caos_min) / (
+            config.caos_max - config.caos_min
+        )
     else:
         caos_final = caos_clamped
 
@@ -651,9 +665,7 @@ def compute_caos_plus_complete(
     config: CAOSConfig | None = None,
     state: CAOSState | None = None,
 ) -> tuple[float, dict[str, Any]]:
-    """
-
-    """
+    """ """
     if config is None:
         config = CAOSConfig()
 
@@ -722,7 +734,11 @@ def compute_caos_plus_complete(
     # 5. Computar CAOS⁺ com valores suavizados
     if config.formula == CAOSFormula.EXPONENTIAL:
         caos_plus_raw = compute_caos_plus_exponential(
-            state.c_smoothed, state.a_smoothed, state.o_smoothed, state.s_smoothed, kappa_clamped
+            state.c_smoothed,
+            state.a_smoothed,
+            state.o_smoothed,
+            state.s_smoothed,
+            kappa_clamped,
         )
     elif config.formula == CAOSFormula.PHI_CAOS:
         caos_plus_raw = phi_caos(
@@ -736,7 +752,11 @@ def compute_caos_plus_complete(
         )
     else:  # HYBRID
         caos_plus_raw = compute_caos_plus_exponential(
-            state.c_smoothed, state.a_smoothed, state.o_smoothed, state.s_smoothed, kappa_clamped
+            state.c_smoothed,
+            state.a_smoothed,
+            state.o_smoothed,
+            state.s_smoothed,
+            kappa_clamped,
         )
 
     details["caos_plus_raw"] = caos_plus_raw
@@ -752,7 +772,9 @@ def compute_caos_plus_complete(
 
     # 8. Normalizar saída (opcional)
     if config.normalize_output:
-        caos_normalized = (caos_plus_clamped - config.caos_min) / (config.caos_max - config.caos_min)
+        caos_normalized = (caos_plus_clamped - config.caos_min) / (
+            config.caos_max - config.caos_min
+        )
         caos_plus_final = clamp01(caos_normalized)
         details["caos_plus_normalized"] = caos_plus_final
     else:
@@ -873,7 +895,9 @@ def geometric_mean(c: float, a: float, o: float, s: float) -> float:
     return product**0.25
 
 
-def caos_gradient(c: float, a: float, o: float, s: float, kappa: float) -> dict[str, float]:
+def caos_gradient(
+    c: float, a: float, o: float, s: float, kappa: float
+) -> dict[str, float]:
     """Calcula gradientes numéricos de CAOS⁺ (para otimização)"""
     eps = 1e-6
 
@@ -915,7 +939,9 @@ class CAOSTracker:
         self.history = []
         self.ema_value = None
 
-    def update(self, c: float, a: float, o: float, s: float, kappa: float = 2.0) -> tuple[float, float]:
+    def update(
+        self, c: float, a: float, o: float, s: float, kappa: float = 2.0
+    ) -> tuple[float, float]:
         """Atualiza tracker com novos valores CAOS"""
         caos_val = phi_caos(c, a, o, s, kappa)
 
@@ -1019,6 +1045,7 @@ __all__ = [
 # USAGE EXAMPLES AND BEST PRACTICES
 # =============================================================================
 
+
 def example_basic_usage():
     """
     Exemplo 1: Uso Básico - Cálculo Direto de CAOS⁺
@@ -1066,25 +1093,25 @@ def example_structured_metrics():
 
     # Configurar métricas detalhadas
     consistency = ConsistencyMetrics(
-        pass_at_k=0.92,           # 92% de autoconsistência
-        ece=0.008,                # 0.8% calibration error (excelente)
+        pass_at_k=0.92,  # 92% de autoconsistência
+        ece=0.008,  # 0.8% calibration error (excelente)
         external_verification=0.88,  # 88% verificação externa
     )
 
     autoevolution = AutoevolutionMetrics(
-        delta_linf=0.06,          # 6% de ganho de performance
-        cost_normalized=0.15,     # 15% do budget utilizado
+        delta_linf=0.06,  # 6% de ganho de performance
+        cost_normalized=0.15,  # 15% do budget utilizado
     )
 
     incognoscible = IncognoscibleMetrics(
-        epistemic_uncertainty=0.35,   # Incerteza moderada
-        ood_score=0.28,              # 28% OOD
-        ensemble_disagreement=0.30,   # 30% de disagreement
+        epistemic_uncertainty=0.35,  # Incerteza moderada
+        ood_score=0.28,  # 28% OOD
+        ensemble_disagreement=0.30,  # 30% de disagreement
     )
 
     silence = SilenceMetrics(
-        noise_ratio=0.08,         # 8% ruído (baixo)
-        redundancy_ratio=0.12,    # 12% redundância
+        noise_ratio=0.08,  # 8% ruído (baixo)
+        redundancy_ratio=0.12,  # 12% redundância
         entropy_normalized=0.18,  # 18% entropia
     )
 
@@ -1111,7 +1138,7 @@ def example_structured_metrics():
     print(f"    - Entropia:          {silence.entropy_normalized:.3f}")
 
     print("\nComponentes CAOS Agregados:")
-    for comp, val in details['components_raw'].items():
+    for comp, val in details["components_raw"].items():
         print(f"  {comp}: {val:.3f}")
 
     print(f"\nCAOS⁺ Final: {caos_plus:.4f}")
@@ -1143,6 +1170,7 @@ def example_temporal_tracking():
     for i in range(10):
         # Métricas com variação simulada
         import random
+
         random.seed(42 + i)  # Reproducibilidade
 
         consistency = ConsistencyMetrics(
@@ -1161,13 +1189,12 @@ def example_temporal_tracking():
         )
 
         caos, details = compute_caos_plus_complete(
-            consistency, autoevolution, incognoscible, silence,
-            config, state
+            consistency, autoevolution, incognoscible, silence, config, state
         )
 
-        c_raw = details['components_raw']['C']
-        c_ema = details['components_smoothed']['C']
-        stability = details['state_stability']
+        c_raw = details["components_raw"]["C"]
+        c_ema = details["components_smoothed"]["C"]
+        stability = details["state_stability"]
 
         print(f"{i+1:<6} {c_raw:<8.4f} {c_ema:<8.4f} {caos:<10.4f} {stability:<12.4f}")
 
@@ -1191,17 +1218,19 @@ def example_exploration_vs_exploitation():
     # Cenário 1: Exploração (alta incerteza, baixa consistência)
     print("\nCenário 1: EXPLORAÇÃO")
     print("Situação: Entrando em território desconhecido")
-    C_explore = 0.5   # Consistência baixa (incerto)
-    A_explore = 0.3   # Autoevolução baixa (ainda aprendendo)
-    O_explore = 0.8   # Incerteza ALTA (precisa explorar)
-    S_explore = 0.6   # Silêncio moderado
+    C_explore = 0.5  # Consistência baixa (incerto)
+    A_explore = 0.3  # Autoevolução baixa (ainda aprendendo)
+    O_explore = 0.8  # Incerteza ALTA (precisa explorar)
+    S_explore = 0.6  # Silêncio moderado
 
     caos_explore = compute_caos_plus_exponential(
         C_explore, A_explore, O_explore, S_explore, kappa
     )
 
     print(f"  C={C_explore}, A={A_explore}, O={O_explore}, S={S_explore}")
-    print(f"  Base: (1 + {kappa}×{C_explore}×{A_explore}) = {1 + kappa*C_explore*A_explore:.2f}")
+    print(
+        f"  Base: (1 + {kappa}×{C_explore}×{A_explore}) = {1 + kappa*C_explore*A_explore:.2f}"
+    )
     print(f"  Expoente: {O_explore}×{S_explore} = {O_explore*S_explore:.2f}")
     print(f"  CAOS⁺ = {caos_explore:.4f}")
     print("  → Alta incerteza (O) → expoente alto → amplificação moderada")
@@ -1209,17 +1238,19 @@ def example_exploration_vs_exploitation():
     # Cenário 2: Exploração (baixa incerteza, alta consistência)
     print("\nCenário 2: EXPLORAÇÃO (Exploitation)")
     print("Situação: Refinando em território conhecido")
-    C_exploit = 0.9   # Consistência ALTA (confiante)
-    A_exploit = 0.6   # Autoevolução alta (aprendendo bem)
-    O_exploit = 0.2   # Incerteza BAIXA (território conhecido)
-    S_exploit = 0.9   # Silêncio alto (sinal limpo)
+    C_exploit = 0.9  # Consistência ALTA (confiante)
+    A_exploit = 0.6  # Autoevolução alta (aprendendo bem)
+    O_exploit = 0.2  # Incerteza BAIXA (território conhecido)
+    S_exploit = 0.9  # Silêncio alto (sinal limpo)
 
     caos_exploit = compute_caos_plus_exponential(
         C_exploit, A_exploit, O_exploit, S_exploit, kappa
     )
 
     print(f"  C={C_exploit}, A={A_exploit}, O={O_exploit}, S={S_exploit}")
-    print(f"  Base: (1 + {kappa}×{C_exploit}×{A_exploit}) = {1 + kappa*C_exploit*A_exploit:.2f}")
+    print(
+        f"  Base: (1 + {kappa}×{C_exploit}×{A_exploit}) = {1 + kappa*C_exploit*A_exploit:.2f}"
+    )
     print(f"  Expoente: {O_exploit}×{S_exploit} = {O_exploit*S_exploit:.2f}")
     print(f"  CAOS⁺ = {caos_exploit:.4f}")
     print("  → Baixa incerteza (O) → expoente baixo → amplificação moderada")
@@ -1237,7 +1268,9 @@ def example_exploration_vs_exploitation():
     )
 
     print(f"  C={C_sweet}, A={A_sweet}, O={O_sweet}, S={S_sweet}")
-    print(f"  Base: (1 + {kappa}×{C_sweet}×{A_sweet}) = {1 + kappa*C_sweet*A_sweet:.2f}")
+    print(
+        f"  Base: (1 + {kappa}×{C_sweet}×{A_sweet}) = {1 + kappa*C_sweet*A_sweet:.2f}"
+    )
     print(f"  Expoente: {O_sweet}×{S_sweet} = {O_sweet*S_sweet:.2f}")
     print(f"  CAOS⁺ = {caos_sweet:.4f}")
     print("  → Alto C·A E alto O·S → MÁXIMA amplificação!")
@@ -1357,4 +1390,3 @@ def run_all_examples():
 if __name__ == "__main__":
     # Executar todos os exemplos quando o módulo é chamado diretamente
     run_all_examples()
-

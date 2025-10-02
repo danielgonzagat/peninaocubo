@@ -33,7 +33,9 @@ async def llm_orchestrate(
     if not providers:
         return {"provider": None, "content": "", "model": None}
     router = MultiLLMRouter(providers)
-    r = await router.ask(messages=messages, system=system, tools=tools, temperature=temperature)
+    r = await router.ask(
+        messages=messages, system=system, tools=tools, temperature=temperature
+    )
     return {
         "provider": r.provider,
         "content": r.content,

@@ -45,7 +45,9 @@ warnings.warn(
 )
 
 
-def compute_caos_plus(C: float, A: float, O: float, S: float, kappa: float = 20.0) -> float:
+def compute_caos_plus(
+    C: float, A: float, O: float, S: float, kappa: float = 20.0
+) -> float:
     """
     DEPRECATED: Use penin.core.caos.compute_caos_plus_exponential()
 
@@ -66,7 +68,8 @@ def compute_caos_plus(C: float, A: float, O: float, S: float, kappa: float = 20.
         score = compute_caos_plus_exponential(C, A, O, S, kappa)
     """
     warnings.warn(
-        "compute_caos_plus() is deprecated. " "Use penin.core.caos.compute_caos_plus_exponential() instead.",
+        "compute_caos_plus() is deprecated. "
+        "Use penin.core.caos.compute_caos_plus_exponential() instead.",
         DeprecationWarning,
         stacklevel=2,
     )

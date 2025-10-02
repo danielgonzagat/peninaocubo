@@ -170,7 +170,9 @@ class Mutation:
             "parameter_changes": self.parameter_changes,
             "expected_gain": self.expected_gain,
             "estimated_cost": self.estimated_cost,
-            "deployment_stage": self.deployment_stage.value if self.deployment_stage else None,
+            "deployment_stage": (
+                self.deployment_stage.value if self.deployment_stage else None
+            ),
             "traffic_percentage": self.traffic_percentage,
             "metrics": self.metrics,
             "mutation_hash": self.mutation_hash,
@@ -317,7 +319,9 @@ class MutationGenerator:
         # Get function signature
         sig = inspect.signature(function)
         parameters = {
-            name: param.default for name, param in sig.parameters.items() if param.default != inspect.Parameter.empty
+            name: param.default
+            for name, param in sig.parameters.items()
+            if param.default != inspect.Parameter.empty
         }
 
         # Generate parameter tuning

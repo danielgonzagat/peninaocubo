@@ -42,15 +42,29 @@ class NextPyConfig(IntegrationConfig):
     priority: IntegrationPriority = Field(default=IntegrationPriority.P1_CRITICAL)
 
     # NextPy-specific settings
-    enable_ams: bool = Field(default=True, description="Enable Autonomous Modifying System")
-    compile_prompts: bool = Field(default=True, description="Enable compile-time prompt optimization")
-    max_mutation_depth: int = Field(default=3, ge=1, le=10, description="Max depth for AST mutations")
-    safety_sandbox: bool = Field(default=True, description="Run mutations in sandboxed environment")
-    rollback_on_failure: bool = Field(default=True, description="Auto-rollback on failed mutations")
+    enable_ams: bool = Field(
+        default=True, description="Enable Autonomous Modifying System"
+    )
+    compile_prompts: bool = Field(
+        default=True, description="Enable compile-time prompt optimization"
+    )
+    max_mutation_depth: int = Field(
+        default=3, ge=1, le=10, description="Max depth for AST mutations"
+    )
+    safety_sandbox: bool = Field(
+        default=True, description="Run mutations in sandboxed environment"
+    )
+    rollback_on_failure: bool = Field(
+        default=True, description="Auto-rollback on failed mutations"
+    )
 
     # Performance tuning
-    optimization_level: int = Field(default=2, ge=0, le=3, description="Optimization level (0-3)")
-    cache_compiled_prompts: bool = Field(default=True, description="Cache compiled prompts")
+    optimization_level: int = Field(
+        default=2, ge=0, le=3, description="Optimization level (0-3)"
+    )
+    cache_compiled_prompts: bool = Field(
+        default=True, description="Cache compiled prompts"
+    )
 
 
 class NextPyModifier(BaseIntegrationAdapter):
@@ -101,7 +115,9 @@ class NextPyModifier(BaseIntegrationAdapter):
 
         except Exception as e:
             self.status = IntegrationStatus.FAILED
-            raise IntegrationInitializationError("nextpy", f"Initialization failed: {e}", e) from e
+            raise IntegrationInitializationError(
+                "nextpy", f"Initialization failed: {e}", e
+            ) from e
 
     def _initialize_ams_engine(self) -> Any:
         """
@@ -133,7 +149,10 @@ class NextPyModifier(BaseIntegrationAdapter):
         }
 
     async def execute(
-        self, operation: str, architecture_state: dict[str, Any], target_metrics: dict[str, float] | None = None
+        self,
+        operation: str,
+        architecture_state: dict[str, Any],
+        target_metrics: dict[str, float] | None = None,
     ) -> dict[str, Any]:
         """
         Execute NextPy AMS operation.
@@ -155,7 +174,9 @@ class NextPyModifier(BaseIntegrationAdapter):
         start_time = time.time()
         try:
             if operation == "mutate":
-                result = await self._generate_mutation(architecture_state, target_metrics)
+                result = await self._generate_mutation(
+                    architecture_state, target_metrics
+                )
             elif operation == "optimize":
                 result = await self._optimize_prompts(architecture_state)
             elif operation == "compile":
@@ -176,12 +197,20 @@ class NextPyModifier(BaseIntegrationAdapter):
 
             if self.config.fail_open:
                 logger.warning(f"NextPy execution failed (fail-open): {e}")
-                return {"status": "failed", "fallback": True, "original_state": architecture_state}
+                return {
+                    "status": "failed",
+                    "fallback": True,
+                    "original_state": architecture_state,
+                }
             else:
-                raise IntegrationExecutionError("nextpy", f"Execution failed: {e}", e) from e
+                raise IntegrationExecutionError(
+                    "nextpy", f"Execution failed: {e}", e
+                ) from e
 
     async def _generate_mutation(
-        self, architecture_state: dict[str, Any], target_metrics: dict[str, float] | None
+        self,
+        architecture_state: dict[str, Any],
+        target_metrics: dict[str, float] | None,
     ) -> dict[str, Any]:
         """
         Generate AST mutation for architecture evolution.
@@ -209,7 +238,9 @@ class NextPyModifier(BaseIntegrationAdapter):
             "metadata": {"generator": "nextpy_ams", "timestamp": time.time()},
         }
 
-    async def _optimize_prompts(self, architecture_state: dict[str, Any]) -> dict[str, Any]:
+    async def _optimize_prompts(
+        self, architecture_state: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Compile-time prompt optimization.
 
@@ -229,10 +260,15 @@ class NextPyModifier(BaseIntegrationAdapter):
             "optimized_prompts": [],  # Would contain compiled prompts
             "speedup_factor": 4.5,  # 4.5× improvement
             "token_reduction": 0.35,  # 35% fewer tokens
-            "metadata": {"compiler": "nextpy", "optimization_level": self.config.optimization_level},
+            "metadata": {
+                "compiler": "nextpy",
+                "optimization_level": self.config.optimization_level,
+            },
         }
 
-    async def _compile_architecture(self, architecture_state: dict[str, Any]) -> dict[str, Any]:
+    async def _compile_architecture(
+        self, architecture_state: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Compile and package evolved architecture as portable artifact.
 
@@ -249,7 +285,9 @@ class NextPyModifier(BaseIntegrationAdapter):
             "metadata": {"format": "nextpy_agent", "version": "1.0"},
         }
 
-    async def evolve(self, current_state: dict[str, Any], target_metrics: dict[str, float]) -> dict[str, Any]:
+    async def evolve(
+        self, current_state: dict[str, Any], target_metrics: dict[str, float]
+    ) -> dict[str, Any]:
         """
         High-level interface for architecture evolution.
 
@@ -278,7 +316,8 @@ class NextPyModifier(BaseIntegrationAdapter):
             "mutation": mutation,
             "optimization": optimization,
             "compilation": compilation,
-            "overall_improvement": mutation["expected_improvement"] * optimization["speedup_factor"],
+            "overall_improvement": mutation["expected_improvement"]
+            * optimization["speedup_factor"],
         }
 
 

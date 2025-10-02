@@ -55,24 +55,43 @@ class MetacognitivePromptConfig(IntegrationConfig):
     priority: IntegrationPriority = Field(default=IntegrationPriority.P1_CRITICAL)
 
     # Metacognitive stages
-    enable_all_stages: bool = Field(default=True, description="Enable all 5 metacognitive stages")
+    enable_all_stages: bool = Field(
+        default=True, description="Enable all 5 metacognitive stages"
+    )
     custom_stages: list[MetacognitiveStage] | None = Field(
-        default=None, description="Custom subset of stages (overrides enable_all_stages)"
+        default=None,
+        description="Custom subset of stages (overrides enable_all_stages)",
     )
 
     # Reasoning depth
-    reasoning_depth: int = Field(default=2, ge=1, le=5, description="Depth of recursive reasoning per stage")
-    enable_self_critique: bool = Field(default=True, description="Enable self-critique loops")
-    max_critique_iterations: int = Field(default=3, ge=1, le=10, description="Max self-critique iterations")
+    reasoning_depth: int = Field(
+        default=2, ge=1, le=5, description="Depth of recursive reasoning per stage"
+    )
+    enable_self_critique: bool = Field(
+        default=True, description="Enable self-critique loops"
+    )
+    max_critique_iterations: int = Field(
+        default=3, ge=1, le=10, description="Max self-critique iterations"
+    )
 
     # Integration with PENIN-Ω
-    integrate_with_sr: bool = Field(default=True, description="Integrate with SR-Ω∞ scoring")
-    integrate_with_caos: bool = Field(default=True, description="Integrate with CAOS+ consistency")
-    integrate_with_sigma_guard: bool = Field(default=True, description="Integrate with Σ-Guard validation")
+    integrate_with_sr: bool = Field(
+        default=True, description="Integrate with SR-Ω∞ scoring"
+    )
+    integrate_with_caos: bool = Field(
+        default=True, description="Integrate with CAOS+ consistency"
+    )
+    integrate_with_sigma_guard: bool = Field(
+        default=True, description="Integrate with Σ-Guard validation"
+    )
 
     # Confidence calibration
-    enable_confidence_calibration: bool = Field(default=True, description="Calibrate confidence scores to reduce ECE")
-    temperature_scaling: bool = Field(default=True, description="Apply temperature scaling for calibration")
+    enable_confidence_calibration: bool = Field(
+        default=True, description="Calibrate confidence scores to reduce ECE"
+    )
+    temperature_scaling: bool = Field(
+        default=True, description="Apply temperature scaling for calibration"
+    )
 
 
 class MetacognitiveReasoner(BaseIntegrationAdapter):
@@ -124,7 +143,9 @@ class MetacognitiveReasoner(BaseIntegrationAdapter):
 
         except Exception as e:
             self.status = IntegrationStatus.FAILED
-            raise IntegrationInitializationError("metacognitive", f"Initialization failed: {e}", e) from e
+            raise IntegrationInitializationError(
+                "metacognitive", f"Initialization failed: {e}", e
+            ) from e
 
     def _load_stage_templates(self) -> dict[MetacognitiveStage, str]:
         """
@@ -235,7 +256,10 @@ Provide:
         }
 
     async def execute(
-        self, operation: str, prompt: str | None = None, context: dict[str, Any] | None = None
+        self,
+        operation: str,
+        prompt: str | None = None,
+        context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         Execute metacognitive reasoning operation.
@@ -278,11 +302,20 @@ Provide:
 
             if self.config.fail_open:
                 logger.warning(f"Metacognitive reasoning failed (fail-open): {e}")
-                return {"status": "failed", "fallback": True, "decision": None, "confidence": 0.0}
+                return {
+                    "status": "failed",
+                    "fallback": True,
+                    "decision": None,
+                    "confidence": 0.0,
+                }
             else:
-                raise IntegrationExecutionError("metacognitive", f"Execution failed: {e}", e) from e
+                raise IntegrationExecutionError(
+                    "metacognitive", f"Execution failed: {e}", e
+                ) from e
 
-    async def _full_reasoning_chain(self, prompt: str, context: dict[str, Any]) -> dict[str, Any]:
+    async def _full_reasoning_chain(
+        self, prompt: str, context: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Execute full 5-stage metacognitive reasoning chain.
 
@@ -315,7 +348,9 @@ Provide:
 
         # Extract final decision and confidence
         decision = stages_output.get("decision", {}).get("decision")
-        confidence_raw = stages_output.get("confidence", {}).get("confidence_score", 0.5)
+        confidence_raw = stages_output.get("confidence", {}).get(
+            "confidence_score", 0.5
+        )
 
         # Apply calibration
         confidence_calibrated = self._apply_calibration(confidence_raw)
@@ -335,7 +370,9 @@ Provide:
             },
         }
 
-    async def _execute_stage(self, stage: MetacognitiveStage, prompt: str) -> dict[str, Any]:
+    async def _execute_stage(
+        self, stage: MetacognitiveStage, prompt: str
+    ) -> dict[str, Any]:
         """
         Execute single metacognitive stage.
 
@@ -355,7 +392,9 @@ Provide:
             "critique_iterations": 0,
         }
 
-    async def _validate_decision(self, decision: str, context: dict[str, Any]) -> dict[str, Any]:
+    async def _validate_decision(
+        self, decision: str, context: dict[str, Any]
+    ) -> dict[str, Any]:
         """
         Validate a decision using metacognitive stages.
 
@@ -364,7 +403,9 @@ Provide:
         logger.info("Validating decision via metacognitive reasoning")
 
         # Run judgment and evaluation stages on the decision
-        validation_result = await self._full_reasoning_chain(f"Validate: {decision}", context)
+        validation_result = await self._full_reasoning_chain(
+            f"Validate: {decision}", context
+        )
 
         return {
             "validation_id": f"metacog_val_{int(time.time())}",
@@ -388,7 +429,9 @@ Provide:
 
         return {
             "calibration_id": f"metacog_calib_{int(time.time())}",
-            "method": "temperature_scaling" if self.config.temperature_scaling else "none",
+            "method": (
+                "temperature_scaling" if self.config.temperature_scaling else "none"
+            ),
             "params": self._calibration_params,
             "ece_before": 0.15,  # Placeholder
             "ece_after": 0.008,  # Placeholder (calibrated)
@@ -409,14 +452,19 @@ Provide:
         import math
 
         T = self._calibration_params["temperature"]
-        logit = math.log(confidence_raw / (1 - confidence_raw + 1e-9))  # Convert prob to logit
+        logit = math.log(
+            confidence_raw / (1 - confidence_raw + 1e-9)
+        )  # Convert prob to logit
         calibrated_logit = logit / T
         confidence_calibrated = 1.0 / (1.0 + math.exp(-calibrated_logit))  # Sigmoid
 
         return max(0.0, min(1.0, confidence_calibrated))
 
     async def reason(
-        self, prompt: str, stages: list[str] | None = None, context: dict[str, Any] | None = None
+        self,
+        prompt: str,
+        stages: list[str] | None = None,
+        context: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         """
         High-level interface for metacognitive reasoning.

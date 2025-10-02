@@ -49,10 +49,18 @@ class ContractivityConfig:
         if self.rho_threshold >= 1.0:
             raise ValueError("ρ must be < 1.0 for contractivity")
         if self.risk_categories is None:
-            self.risk_categories = ["idolatry", "harm", "privacy", "bias", "misinformation"]
+            self.risk_categories = [
+                "idolatry",
+                "harm",
+                "privacy",
+                "bias",
+                "misinformation",
+            ]
 
 
-def ir_to_ic(item: dict, config: ContractivityConfig | None = None) -> tuple[dict, RiskProfile, bool]:
+def ir_to_ic(
+    item: dict, config: ContractivityConfig | None = None
+) -> tuple[dict, RiskProfile, bool]:
     """
     Apply IR→IC lapidation operator to reduce risk.
 
@@ -78,7 +86,10 @@ def ir_to_ic(item: dict, config: ContractivityConfig | None = None) -> tuple[dic
 
     # Iterative refinement with contractivity check
     result = iterative_refinement(
-        item, max_iterations=config.max_iterations, rho_target=config.rho_threshold, epsilon=config.convergence_epsilon
+        item,
+        max_iterations=config.max_iterations,
+        rho_target=config.rho_threshold,
+        epsilon=config.convergence_epsilon,
     )
 
     lapidated_item = result["lapidated_item"]
@@ -86,7 +97,11 @@ def ir_to_ic(item: dict, config: ContractivityConfig | None = None) -> tuple[dic
     converged = result["converged"]
 
     # Verify contractivity
-    rho = final_risk.contractivity_ratio if hasattr(final_risk, "contractivity_ratio") else 1.0
+    rho = (
+        final_risk.contractivity_ratio
+        if hasattr(final_risk, "contractivity_ratio")
+        else 1.0
+    )
     success = converged and rho < config.rho_threshold
 
     return lapidated_item, final_risk, success

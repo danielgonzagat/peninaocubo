@@ -13,5 +13,11 @@ def phi_kratos(
 ) -> float:
     ef = max(1.0, float(exploration_factor))
     return phi_caos(
-        _clamp(C), _clamp(A), _clamp(O) ** ef, _clamp(S) ** ef, kappa=kappa, gamma=gamma, kappa_max=kappa_max
+        _clamp(C),
+        _clamp(A),
+        _clamp(O) ** ef,
+        _clamp(S) ** ef,
+        kappa=kappa,
+        gamma=gamma,
+        kappa_max=kappa_max,
     )

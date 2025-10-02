@@ -152,7 +152,10 @@ class ProofCarryingArtifact:
         return computed_hash == self.artifact_hash
 
     def __str__(self) -> str:
-        return f"PCAg({self.decision_type}:{self.decision_id} " f"@ {self.timestamp} → {self.artifact_hash[:8]}...)"
+        return (
+            f"PCAg({self.decision_type}:{self.decision_id} "
+            f"@ {self.timestamp} → {self.artifact_hash[:8]}...)"
+        )
 
 
 # ============================================================================
@@ -243,7 +246,10 @@ class WORMEvent:
         return computed_hash == self.event_hash
 
     def __str__(self) -> str:
-        return f"WORMEvent({self.event_type}:{self.event_id} " f"#{self.sequence_number} @ {self.timestamp})"
+        return (
+            f"WORMEvent({self.event_type}:{self.event_id} "
+            f"#{self.sequence_number} @ {self.timestamp})"
+        )
 
 
 # ============================================================================
@@ -540,7 +546,9 @@ class WORMLedger:
             "chain_valid": is_valid,
             "chain_error": error,
             "ledger_path": str(self.ledger_path),
-            "ledger_size_bytes": self.ledger_path.stat().st_size if self.ledger_path.exists() else 0,
+            "ledger_size_bytes": (
+                self.ledger_path.stat().st_size if self.ledger_path.exists() else 0
+            ),
         }
 
     def export_audit_report(self, output_path: str | Path) -> None:

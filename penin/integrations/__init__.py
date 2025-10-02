@@ -206,11 +206,19 @@ class IntegrationRegistry:
 
     def list_available(self) -> list[str]:
         """List all available integrations"""
-        return [name for name, integration in self.integrations.items() if integration.is_available()]
+        return [
+            name
+            for name, integration in self.integrations.items()
+            if integration.is_available()
+        ]
 
     def list_by_category(self, category: IntegrationCategory) -> list[str]:
         """List integrations by category"""
-        return [name for name, meta in self.metadata_cache.items() if meta.category == category]
+        return [
+            name
+            for name, meta in self.metadata_cache.items()
+            if meta.category == category
+        ]
 
     def get_status_summary(self) -> dict[str, Any]:
         """Get summary of all integration statuses"""
@@ -224,7 +232,9 @@ class IntegrationRegistry:
         for meta in self.metadata_cache.values():
             # By status
             status_key = meta.status.value
-            summary["by_status"][status_key] = summary["by_status"].get(status_key, 0) + 1
+            summary["by_status"][status_key] = (
+                summary["by_status"].get(status_key, 0) + 1
+            )
 
             # By category
             cat_key = meta.category.value

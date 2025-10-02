@@ -128,7 +128,9 @@ def apply_Lpsi_operator(
         privacy_violation=reduce(risk_profile.privacy_violation, "privacy"),
         bias=reduce(risk_profile.bias, "bias"),
         fairness=reduce(risk_profile.fairness, "fairness"),
-        transparency=min(1.0, risk_profile.transparency / rho),  # Increase transparency (inverse risk)
+        transparency=min(
+            1.0, risk_profile.transparency / rho
+        ),  # Increase transparency (inverse risk)
         aggregate=0.0,  # Recomputed below
     )
 

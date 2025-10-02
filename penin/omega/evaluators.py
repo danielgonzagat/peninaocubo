@@ -41,7 +41,9 @@ class UtilityEvaluator:
     def __init__(self, config: TaskBatteryConfig = None):
         self.config = config or TaskBatteryConfig()
 
-    def evaluate_utility(self, model_fn, tasks: list[dict] = None) -> list[EvaluationResult]:
+    def evaluate_utility(
+        self, model_fn, tasks: list[dict] = None
+    ) -> list[EvaluationResult]:
         """Evaluate model utility across tasks"""
         if tasks is None:
             tasks = self._get_default_utility_tasks()
@@ -63,7 +65,10 @@ class UtilityEvaluator:
                     task_id=task["id"],
                     metric_type="U",
                     score=score,
-                    raw_metrics={"exact_match": score, "response_length": len(str(response))},
+                    raw_metrics={
+                        "exact_match": score,
+                        "response_length": len(str(response)),
+                    },
                     evidence={"task_type": task["type"], "expected": task["expected"]},
                     latency_ms=latency_ms,
                     cost_usd=0.001,  # Estimated
@@ -88,7 +93,12 @@ class UtilityEvaluator:
     def _get_default_utility_tasks(self) -> list[dict]:
         """Get default utility evaluation tasks"""
         return [
-            {"id": "math_basic", "type": "arithmetic", "input": "What is 15 + 27?", "expected": "42"},
+            {
+                "id": "math_basic",
+                "type": "arithmetic",
+                "input": "What is 15 + 27?",
+                "expected": "42",
+            },
             {
                 "id": "json_extract",
                 "type": "structured",
@@ -128,7 +138,9 @@ class StabilityEvaluator:
     def __init__(self, config: TaskBatteryConfig = None):
         self.config = config or TaskBatteryConfig()
 
-    def evaluate_stability(self, model_fn, tasks: list[dict] = None) -> list[EvaluationResult]:
+    def evaluate_stability(
+        self, model_fn, tasks: list[dict] = None
+    ) -> list[EvaluationResult]:
         """Evaluate model stability"""
         if tasks is None:
             tasks = self._get_default_stability_tasks()
@@ -198,7 +210,9 @@ class StabilityEvaluator:
 
         # Simple consistency: all responses should be similar
         first_response = responses[0].lower().strip()
-        consistent_count = sum(1 for r in responses if r.lower().strip() == first_response)
+        consistent_count = sum(
+            1 for r in responses if r.lower().strip() == first_response
+        )
 
         return consistent_count / len(responses)
 
@@ -209,7 +223,9 @@ class CostEvaluator:
     def __init__(self, config: TaskBatteryConfig = None):
         self.config = config or TaskBatteryConfig()
 
-    def evaluate_cost(self, model_fn, tasks: list[dict] = None) -> list[EvaluationResult]:
+    def evaluate_cost(
+        self, model_fn, tasks: list[dict] = None
+    ) -> list[EvaluationResult]:
         """Evaluate model cost efficiency"""
         if tasks is None:
             tasks = self._get_default_cost_tasks()
@@ -229,7 +245,10 @@ class CostEvaluator:
                     task_id=task["id"],
                     metric_type="C",
                     score=score,
-                    raw_metrics={"latency_ms": latency_ms, "response_length": len(str(response))},
+                    raw_metrics={
+                        "latency_ms": latency_ms,
+                        "response_length": len(str(response)),
+                    },
                     evidence={"task_type": task["type"]},
                     latency_ms=latency_ms,
                     cost_usd=latency_ms * 0.00001,  # Rough estimate
@@ -279,7 +298,9 @@ class LearningEvaluator:
     def __init__(self, config: TaskBatteryConfig = None):
         self.config = config or TaskBatteryConfig()
 
-    def evaluate_learning(self, model_fn, tasks: list[dict] = None) -> list[EvaluationResult]:
+    def evaluate_learning(
+        self, model_fn, tasks: list[dict] = None
+    ) -> list[EvaluationResult]:
         """Evaluate model learning capabilities"""
         if tasks is None:
             tasks = self._get_default_learning_tasks()
@@ -343,11 +364,20 @@ class LearningEvaluator:
 
         if "learning_indicators" in task:
             indicators = task["learning_indicators"]
-            found_indicators = sum(1 for indicator in indicators if indicator in response_lower)
+            found_indicators = sum(
+                1 for indicator in indicators if indicator in response_lower
+            )
             return found_indicators / len(indicators)
 
         # Default: check for reasoning words
-        reasoning_words = ["because", "therefore", "pattern", "rule", "method", "approach"]
+        reasoning_words = [
+            "because",
+            "therefore",
+            "pattern",
+            "rule",
+            "method",
+            "approach",
+        ]
         found_reasoning = sum(1 for word in reasoning_words if word in response_lower)
         return min(1.0, found_reasoning / 3.0)  # Cap at 1.0
 
@@ -383,7 +413,12 @@ class TaskBattery:
                     "count": len(scores),
                 }
             else:
-                aggregates[metric_type] = {"mean": 0.0, "min": 0.0, "max": 0.0, "count": 0}
+                aggregates[metric_type] = {
+                    "mean": 0.0,
+                    "min": 0.0,
+                    "max": 0.0,
+                    "count": 0,
+                }
 
         return {
             "detailed_results": results,

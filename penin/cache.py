@@ -17,7 +17,9 @@ except ModuleNotFoundError:  # pragma: no cover - shim for lightweight environme
     class _OrjsonShim:
         @staticmethod
         def dumps(obj: Any) -> bytes:
-            return json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+            return json.dumps(obj, separators=(",", ":"), ensure_ascii=False).encode(
+                "utf-8"
+            )
 
         @staticmethod
         def loads(data: bytes | bytearray | str) -> Any:

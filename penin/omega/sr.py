@@ -54,7 +54,11 @@ class SRComponents:
 
 # Standalone functions for compatibility with tests
 def compute_sr_omega(
-    awareness: float, ethics_ok: bool, autocorrection: float, metacognition: float, config: "SRConfig" = None
+    awareness: float,
+    ethics_ok: bool,
+    autocorrection: float,
+    metacognition: float,
+    config: "SRConfig" = None,
 ) -> tuple[float, dict[str, Any]]:
     """Compute SR-Ω∞ score"""
     if config is None:
@@ -142,7 +146,9 @@ def min_soft_pnorm(values: list[float], p: float = -5.0) -> float:
         return min(result, min_val * 1.2)
 
 
-def compute_awareness_score(internal_state: dict[str, float], confidence: float, num_cycles: int) -> float:
+def compute_awareness_score(
+    internal_state: dict[str, float], confidence: float, num_cycles: int
+) -> float:
     """Compute awareness score from internal state"""
     # Simple heuristic based on resource usage and confidence
     cpu = internal_state.get("cpu", 0.5)
@@ -156,11 +162,15 @@ def compute_awareness_score(internal_state: dict[str, float], confidence: float,
     # Combine with confidence and experience (cycles)
     experience_factor = min(1.0, num_cycles / 10.0)  # Saturate at 10 cycles
 
-    awareness = (resource_efficiency + latency_efficiency + confidence + experience_factor) / 4.0
+    awareness = (
+        resource_efficiency + latency_efficiency + confidence + experience_factor
+    ) / 4.0
     return max(0.0, min(1.0, awareness))
 
 
-def compute_autocorrection_score(error_history: list[float], improvement_threshold: float = 0.1) -> float:
+def compute_autocorrection_score(
+    error_history: list[float], improvement_threshold: float = 0.1
+) -> float:
     """Compute autocorrection score from error history"""
     if len(error_history) < 2:
         return 0.5  # Neutral score for insufficient data
@@ -195,7 +205,9 @@ def compute_autocorrection_score(error_history: list[float], improvement_thresho
         return 0.2  # Poor autocorrection (errors increasing)
 
 
-def compute_metacognition_score(num_reflections: int, reflection_quality: float, adaptation_rate: float) -> float:
+def compute_metacognition_score(
+    num_reflections: int, reflection_quality: float, adaptation_rate: float
+) -> float:
     """Compute metacognition score"""
     # Normalize number of reflections (more is better, but with diminishing returns)
     reflection_score = min(1.0, num_reflections / 5.0)
@@ -205,7 +217,9 @@ def compute_metacognition_score(num_reflections: int, reflection_quality: float,
     adaptation_score = max(0.0, min(1.0, adaptation_rate))
 
     # Weighted combination
-    metacognition = 0.3 * reflection_score + 0.4 * quality_score + 0.3 * adaptation_score
+    metacognition = (
+        0.3 * reflection_score + 0.4 * quality_score + 0.3 * adaptation_score
+    )
     return max(0.0, min(1.0, metacognition))
 
 
@@ -229,10 +243,16 @@ class SRTracker:
         self.ema_value = None
 
     def update(
-        self, awareness: float, ethics_ok: bool, autocorrection: float, metacognition: float
+        self,
+        awareness: float,
+        ethics_ok: bool,
+        autocorrection: float,
+        metacognition: float,
     ) -> tuple[float, float]:
         """Update with new SR values"""
-        sr_score, _ = compute_sr_omega(awareness, ethics_ok, autocorrection, metacognition)
+        sr_score, _ = compute_sr_omega(
+            awareness, ethics_ok, autocorrection, metacognition
+        )
 
         # Update EMA
         if self.ema_value is None:
@@ -302,14 +322,24 @@ class SROmegaEngine:
             epsilon: Valor mínimo para estabilidade
         """
         if weights is None:
-            weights = {"awareness": 0.25, "ethics": 0.25, "autocorrection": 0.25, "metacognition": 0.25}
+            weights = {
+                "awareness": 0.25,
+                "ethics": 0.25,
+                "autocorrection": 0.25,
+                "metacognition": 0.25,
+            }
 
         # Normalizar pesos
         weight_sum = sum(weights.values())
         if weight_sum > 0:
             self.weights = {k: v / weight_sum for k, v in weights.items()}
         else:
-            self.weights = {"awareness": 0.25, "ethics": 0.25, "autocorrection": 0.25, "metacognition": 0.25}
+            self.weights = {
+                "awareness": 0.25,
+                "ethics": 0.25,
+                "autocorrection": 0.25,
+                "metacognition": 0.25,
+            }
 
         self.method = method
         self.p_norm = p_norm
@@ -339,18 +369,25 @@ class SROmegaEngine:
     def _min_soft(self, components: SRComponents) -> tuple[float, dict[str, Any]]:
         """Min-soft via p-norm negativo"""
         comp_list = components.to_list()
-        weights_list = [self.weights[k] for k in ["awareness", "ethics", "autocorrection", "metacognition"]]
+        weights_list = [
+            self.weights[k]
+            for k in ["awareness", "ethics", "autocorrection", "metacognition"]
+        ]
 
         # p-norm: (Σ w_i * x_i^p)^(1/p)
         # Para p << 0, aproxima o mínimo ponderado
         if self.p_norm == 0:
             # Caso especial: média geométrica
-            log_sum = sum(w * math.log(max(self.epsilon, x)) for w, x in zip(weights_list, comp_list, strict=False))
+            log_sum = sum(
+                w * math.log(max(self.epsilon, x))
+                for w, x in zip(weights_list, comp_list, strict=False)
+            )
             sr_score = math.exp(log_sum)
         else:
             # p-norm geral
             powered_sum = sum(
-                w * (max(self.epsilon, x) ** self.p_norm) for w, x in zip(weights_list, comp_list, strict=False)
+                w * (max(self.epsilon, x) ** self.p_norm)
+                for w, x in zip(weights_list, comp_list, strict=False)
             )
             sr_score = powered_sum ** (1.0 / self.p_norm)
 
@@ -371,11 +408,18 @@ class SROmegaEngine:
         safe_values = {k: max(self.epsilon, v) for k, v in comp_dict.items()}
 
         # Média geométrica: Π(x_i^w_i) = exp(Σ w_i * ln(x_i))
-        log_sum = sum(self.weights[k] * math.log(safe_values[k]) for k in safe_values.keys())
+        log_sum = sum(
+            self.weights[k] * math.log(safe_values[k]) for k in safe_values.keys()
+        )
 
         sr_score = math.exp(log_sum)
 
-        details = {"method": "geometric", "safe_values": safe_values, "log_sum": log_sum, "weights": self.weights}
+        details = {
+            "method": "geometric",
+            "safe_values": safe_values,
+            "log_sum": log_sum,
+            "weights": self.weights,
+        }
 
         return sr_score, details
 
@@ -416,7 +460,9 @@ class SROmegaEngine:
 
         return sr_score, details
 
-    def gate_check(self, components: SRComponents, tau: float = 0.8) -> tuple[bool, dict[str, Any]]:
+    def gate_check(
+        self, components: SRComponents, tau: float = 0.8
+    ) -> tuple[bool, dict[str, Any]]:
         """
         Verifica se SR passa no gate
 
@@ -442,7 +488,9 @@ class SROmegaEngine:
 
         return passed, gate_details
 
-    def create_attestation(self, components: SRComponents, candidate_id: str, tau: float = 0.8) -> Any:
+    def create_attestation(
+        self, components: SRComponents, candidate_id: str, tau: float = 0.8
+    ) -> Any:
         """
         Create cryptographic attestation for SR evaluation
 
@@ -465,7 +513,7 @@ class SROmegaEngine:
                 verdict=verdict,
                 candidate_id=candidate_id,
                 sr_score=sr_score,
-                components=components.to_dict()
+                components=components.to_dict(),
             )
 
             return attestation
@@ -511,7 +559,12 @@ class SROmegaEngine:
 
     def get_config(self) -> dict[str, Any]:
         """Retorna configuração atual"""
-        return {"weights": self.weights, "method": self.method.value, "p_norm": self.p_norm, "epsilon": self.epsilon}
+        return {
+            "weights": self.weights,
+            "method": self.method.value,
+            "p_norm": self.p_norm,
+            "epsilon": self.epsilon,
+        }
 
 
 class SRWithEthicsGate(SROmegaEngine):
@@ -556,7 +609,9 @@ class SRWithEthicsGate(SROmegaEngine):
 
 
 # Funções de conveniência
-def quick_sr_harmonic(awareness: float, ethics: float, autocorrection: float, metacognition: float) -> float:
+def quick_sr_harmonic(
+    awareness: float, ethics: float, autocorrection: float, metacognition: float
+) -> float:
     """Cálculo rápido de SR via média harmônica"""
     engine = SROmegaEngine(method=SRAggregationMethod.HARMONIC)
     components = SRComponents(awareness, ethics, autocorrection, metacognition)
@@ -565,7 +620,11 @@ def quick_sr_harmonic(awareness: float, ethics: float, autocorrection: float, me
 
 
 def quick_sr_min_soft(
-    awareness: float, ethics: float, autocorrection: float, metacognition: float, p: float = -10.0
+    awareness: float,
+    ethics: float,
+    autocorrection: float,
+    metacognition: float,
+    p: float = -10.0,
 ) -> float:
     """Cálculo rápido de SR via min-soft"""
     engine = SROmegaEngine(method=SRAggregationMethod.MIN_SOFT, p_norm=p)
@@ -575,7 +634,11 @@ def quick_sr_min_soft(
 
 
 def quick_sr_gate(
-    awareness: float, ethics: float, autocorrection: float, metacognition: float, tau: float = 0.8
+    awareness: float,
+    ethics: float,
+    autocorrection: float,
+    metacognition: float,
+    tau: float = 0.8,
 ) -> tuple[bool, float]:
     """Gate rápido de SR"""
     engine = SROmegaEngine()
@@ -599,10 +662,14 @@ def validate_sr_non_compensatory(
     return engine.analyze_non_compensatory(components)
 
 
-def sr_omega(awareness: float, ethics_ok: bool, autocorr: float, metacognition: float) -> float:
+def sr_omega(
+    awareness: float, ethics_ok: bool, autocorr: float, metacognition: float
+) -> float:
     """Compatibility helper expected by some tests."""
     engine = SROmegaEngine(method=SRAggregationMethod.HARMONIC)
-    comps = SRComponents(awareness, 1.0 if ethics_ok else 0.001, autocorr, metacognition)
+    comps = SRComponents(
+        awareness, 1.0 if ethics_ok else 0.001, autocorr, metacognition
+    )
     score, _ = engine.compute_sr(comps)
     return score
 
@@ -770,7 +837,12 @@ class SRConfig:
         aggregation: str = None,
     ):
         if weights is None:
-            weights = {"awareness": 0.25, "ethics": 0.25, "autocorrection": 0.25, "metacognition": 0.25}
+            weights = {
+                "awareness": 0.25,
+                "ethics": 0.25,
+                "autocorrection": 0.25,
+                "metacognition": 0.25,
+            }
 
         self.weights = weights
         self.method = method
@@ -806,10 +878,16 @@ class SRTracker:
             self.components_history = self.components_history[-self.window_size :]
 
     def update(
-        self, awareness: float, ethics: float, autocorrection: float, metacognition: float
+        self,
+        awareness: float,
+        ethics: float,
+        autocorrection: float,
+        metacognition: float,
     ) -> tuple[float, float]:
         """Update tracker with new SR components and return SR score and EMA"""
-        sr_score, details = compute_sr_omega(awareness, ethics, autocorrection, metacognition)
+        sr_score, details = compute_sr_omega(
+            awareness, ethics, autocorrection, metacognition
+        )
         components = {
             "awareness": awareness,
             "ethics": ethics,
@@ -840,8 +918,12 @@ class SRTracker:
         max_sr = max(self.sr_history)
 
         # Stability based on SR variance
-        variance = sum((s - avg_sr) ** 2 for s in self.sr_history) / len(self.sr_history)
-        stability = "high" if variance < 0.01 else "medium" if variance < 0.05 else "low"
+        variance = sum((s - avg_sr) ** 2 for s in self.sr_history) / len(
+            self.sr_history
+        )
+        stability = (
+            "high" if variance < 0.01 else "medium" if variance < 0.05 else "low"
+        )
 
         return {
             "count": len(self.sr_history),
@@ -858,7 +940,9 @@ class SRTracker:
         if len(self.sr_history) < 2:
             return "stable"
 
-        recent = self.sr_history[-3:] if len(self.sr_history) >= 3 else self.sr_history[-2:]
+        recent = (
+            self.sr_history[-3:] if len(self.sr_history) >= 3 else self.sr_history[-2:]
+        )
         earlier = self.sr_history[: len(self.sr_history) - len(recent)]
 
         if not earlier:
@@ -923,7 +1007,11 @@ class SROmegaService:
         self.task_success_rates: dict[str, dict[str, Any]] = {}
 
     def add_recommendation(
-        self, recommendation_id: str, task: str, expected_sr: float, metadata: dict[str, Any] | None = None
+        self,
+        recommendation_id: str,
+        task: str,
+        expected_sr: float,
+        metadata: dict[str, Any] | None = None,
     ) -> None:
         """
         Add a new recommendation to pending list
@@ -948,7 +1036,11 @@ class SROmegaService:
             self.pending_recommendations.pop(0)
 
     def report_outcome(
-        self, recommendation_id: str, success: bool, actual_sr: float | None = None, message: str = ""
+        self,
+        recommendation_id: str,
+        success: bool,
+        actual_sr: float | None = None,
+        message: str = "",
     ) -> None:
         """
         Report the outcome of a recommendation
@@ -967,7 +1059,11 @@ class SROmegaService:
                 break
 
         # Remove from pending
-        self.pending_recommendations = [r for r in self.pending_recommendations if r.recommendation_id != recommendation_id]
+        self.pending_recommendations = [
+            r
+            for r in self.pending_recommendations
+            if r.recommendation_id != recommendation_id
+        ]
 
         # Add to outcomes
         outcome = Outcome(
@@ -1013,7 +1109,9 @@ class SROmegaService:
         # Identify current concerns (tasks with low success rates)
         concerns = []
         for task, stats in self.task_success_rates.items():
-            if stats["total"] >= 3 and stats["rate"] < 0.5:  # At least 3 attempts and <50% success
+            if (
+                stats["total"] >= 3 and stats["rate"] < 0.5
+            ):  # At least 3 attempts and <50% success
                 concerns.append(
                     {
                         "task": task,

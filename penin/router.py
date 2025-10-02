@@ -49,7 +49,9 @@ from penin.providers.base import BaseProvider, LLMResponse
 # Constants and Configuration
 # ============================================================================
 
-CACHE_HMAC_SECRET: str = getattr(settings, "PENIN_CACHE_HMAC_SECRET", "penin-cache-integrity-key")
+CACHE_HMAC_SECRET: str = getattr(
+    settings, "PENIN_CACHE_HMAC_SECRET", "penin-cache-integrity-key"
+)
 CACHE_L1_MAX_SIZE: int = getattr(settings, "PENIN_CACHE_L1_MAX_SIZE", 1000)
 CACHE_L2_MAX_SIZE: int = getattr(settings, "PENIN_CACHE_L2_MAX_SIZE", 10000)
 CACHE_TTL_SECONDS: int = getattr(settings, "PENIN_CACHE_TTL_SECONDS", 3600)
@@ -390,7 +392,9 @@ class CacheEntry:
     def _compute_hmac(self) -> str:
         """Compute HMAC-SHA256 for integrity."""
         data = f"{self.key}:{self.value}:{self.created_at}:{self.ttl}"
-        return hmac.new(CACHE_HMAC_SECRET.encode(), data.encode(), hashlib.sha256).hexdigest()
+        return hmac.new(
+            CACHE_HMAC_SECRET.encode(), data.encode(), hashlib.sha256
+        ).hexdigest()
 
     def is_valid(self) -> bool:
         """Check if entry is valid (not expired and integrity intact)."""
@@ -432,7 +436,9 @@ class HMACCache:
     def _make_key(self, messages: list[dict[str, Any]], **kwargs: Any) -> str:
         """Create cache key from request parameters."""
         if ORJSON_AVAILABLE:
-            data = orjson.dumps({"messages": messages, **kwargs}, option=orjson.OPT_SORT_KEYS)
+            data = orjson.dumps(
+                {"messages": messages, **kwargs}, option=orjson.OPT_SORT_KEYS
+            )
         else:
             data = json.dumps({"messages": messages, **kwargs}, sort_keys=True).encode()
         return hashlib.sha256(data).hexdigest()
@@ -550,7 +556,14 @@ class MultiLLMRouterComplete:
         """Initialize router."""
         # Providers
         provider_list = list(providers)
-        max_parallel = max(1, int(getattr(settings, "PENIN_MAX_PARALLEL_PROVIDERS", len(provider_list) or 1)))
+        max_parallel = max(
+            1,
+            int(
+                getattr(
+                    settings, "PENIN_MAX_PARALLEL_PROVIDERS", len(provider_list) or 1
+                )
+            ),
+        )
         self.providers: list[BaseProvider] = provider_list[:max_parallel]
 
         # Weights
@@ -564,11 +577,19 @@ class MultiLLMRouterComplete:
         self.mode: RouterMode = mode
 
         # State persistence
-        self._state_path: Path = state_path or Path.home() / ".penin_router_complete_state.json"
+        self._state_path: Path = (
+            state_path or Path.home() / ".penin_router_complete_state.json"
+        )
 
         # Budget
-        daily_budget = daily_budget_usd if daily_budget_usd is not None else settings.PENIN_BUDGET_DAILY_USD
-        self._budget: BudgetTracker = BudgetTracker(daily_budget_usd=float(daily_budget))
+        daily_budget = (
+            daily_budget_usd
+            if daily_budget_usd is not None
+            else settings.PENIN_BUDGET_DAILY_USD
+        )
+        self._budget: BudgetTracker = BudgetTracker(
+            daily_budget_usd=float(daily_budget)
+        )
         self._budget_lock: asyncio.Lock = asyncio.Lock()
 
         # Provider tracking
@@ -647,14 +668,18 @@ class MultiLLMRouterComplete:
             if pid in self.provider_stats:
                 stats = self.provider_stats[pid]
                 stats.total_requests = int(stats_data.get("total_requests", 0))
-                stats.successful_requests = int(stats_data.get("successful_requests", 0))
+                stats.successful_requests = int(
+                    stats_data.get("successful_requests", 0)
+                )
                 stats.failed_requests = int(stats_data.get("failed_requests", 0))
                 stats.total_cost_usd = float(stats_data.get("total_cost_usd", 0.0))
                 stats.total_tokens_in = int(stats_data.get("total_tokens_in", 0))
                 stats.total_tokens_out = int(stats_data.get("total_tokens_out", 0))
                 avg_latency = float(stats_data.get("avg_latency_s", 0.0))
                 stats.total_latency_s = avg_latency * max(1, stats.successful_requests)
-                stats.consecutive_failures = int(stats_data.get("consecutive_failures", 0))
+                stats.consecutive_failures = int(
+                    stats_data.get("consecutive_failures", 0)
+                )
                 stats.last_error = stats_data.get("last_error")
 
     async def _persist_state(self) -> None:
@@ -663,7 +688,9 @@ class MultiLLMRouterComplete:
             "timestamp": datetime.utcnow().isoformat(),
             "mode": self.mode.value,
             "budget": self._budget.snapshot(),
-            "providers": {pid: stats.to_dict() for pid, stats in self.provider_stats.items()},
+            "providers": {
+                pid: stats.to_dict() for pid, stats in self.provider_stats.items()
+            },
         }
 
         if self._cache:
@@ -739,7 +766,9 @@ class MultiLLMRouterComplete:
         # Call provider
         start = time.monotonic()
         try:
-            response = await provider.chat(messages, tools=tools, system=system, temperature=temperature)
+            response = await provider.chat(
+                messages, tools=tools, system=system, temperature=temperature
+            )
         except Exception as exc:
             # Record failure
             async with self._provider_locks[provider_id]:
@@ -805,7 +834,9 @@ class MultiLLMRouterComplete:
         """
         # Check cache
         if use_cache and self._cache:
-            cache_key = self._cache._make_key(messages, system=system, tools=tools, temperature=temperature)
+            cache_key = self._cache._make_key(
+                messages, system=system, tools=tools, temperature=temperature
+            )
             cached = self._cache.get(cache_key)
             if cached is not None:
                 return cached  # type: ignore[no-any-return]
@@ -837,7 +868,9 @@ class MultiLLMRouterComplete:
 
         # Invoke providers in parallel
         tasks = [
-            self._invoke_provider(provider, messages, tools=tools, system=system, temperature=temperature)
+            self._invoke_provider(
+                provider, messages, tools=tools, system=system, temperature=temperature
+            )
             for provider in self.providers
         ]
 
@@ -861,14 +894,22 @@ class MultiLLMRouterComplete:
 
         # Score and select best response
         scored = [
-            (response, provider_id, self._score_response(response, self.provider_stats[provider_id]))
+            (
+                response,
+                provider_id,
+                self._score_response(response, self.provider_stats[provider_id]),
+            )
             for response, provider_id in successful
         ]
-        best_response, best_provider_id, best_score = max(scored, key=lambda item: item[2])
+        best_response, best_provider_id, best_score = max(
+            scored, key=lambda item: item[2]
+        )
 
         # Update budget
         async with self._budget_lock:
-            total_cost, total_tokens = self._aggregate_usage([resp for resp, _ in successful])
+            total_cost, total_tokens = self._aggregate_usage(
+                [resp for resp, _ in successful]
+            )
             if total_cost or total_tokens:
                 self._budget.add_usage(total_cost, total_tokens)
 
@@ -897,10 +938,15 @@ class MultiLLMRouterComplete:
     def get_usage_stats(self) -> dict[str, Any]:
         """Get comprehensive usage statistics."""
         data = self._budget.snapshot()
-        data["providers"] = {pid: stats.to_dict() for pid, stats in self.provider_stats.items()}
+        data["providers"] = {
+            pid: stats.to_dict() for pid, stats in self.provider_stats.items()
+        }
 
         if self.enable_circuit_breaker:
-            data["circuit_breakers"] = {pid: breaker.state.value for pid, breaker in self.circuit_breakers.items()}
+            data["circuit_breakers"] = {
+                pid: breaker.state.value
+                for pid, breaker in self.circuit_breakers.items()
+            }
 
         if self._cache:
             data["cache"] = self._cache.stats()
@@ -953,4 +999,6 @@ def create_router_complete(
     Returns:
         Configured MultiLLMRouterComplete instance
     """
-    return MultiLLMRouterComplete(providers=providers, daily_budget_usd=daily_budget_usd, **kwargs)
+    return MultiLLMRouterComplete(
+        providers=providers, daily_budget_usd=daily_budget_usd, **kwargs
+    )
