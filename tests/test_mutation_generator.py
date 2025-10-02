@@ -3,6 +3,7 @@
 import pytest
 from penin.meta.mutation_generator import (
     MutationGenerator,
+    MutationResult,
     MutationType,
     generate_safe_mutations,
 )

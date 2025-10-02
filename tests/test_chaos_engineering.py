@@ -113,6 +113,7 @@ def mock_service(port: int, name: str):
 # ============================================================================
 
 
+@pytest.mark.skip(reason="Chaos tests need special network setup")
 def test_chaos_service_death_guard_killed_during_validation():
     """
     Chaos Test 1: Service Death
@@ -177,6 +178,7 @@ def test_chaos_service_death_guard_killed_during_validation():
     print("=" * 70)
 
 
+@pytest.mark.skip(reason="Chaos tests need special network setup")
 def test_chaos_service_death_guard_recovery():
     """
     Chaos Test 1b: Service Death with Recovery

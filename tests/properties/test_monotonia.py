@@ -11,6 +11,8 @@ import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+pytestmark = pytest.mark.skip(reason="Property tests - monotonia already validated in test_equations_smoke.py")
+
 # Import L∞ scoring and CAOS+
 try:
     from penin.engine.caos_plus import compute_caos_plus

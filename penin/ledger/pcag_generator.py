@@ -249,13 +249,25 @@ class PCAgGenerator:
         Uses deterministic serialization for consistent hashing.
         """
         # Create deterministic representation
+        # Handle proofs - convert to dict if it's a dataclass
+        from dataclasses import asdict, is_dataclass
+        
+        proofs_dict = artifact.proofs
+        if is_dataclass(artifact.proofs):
+            proofs_dict = asdict(artifact.proofs)
+        elif isinstance(artifact.proofs, dict):
+            proofs_dict = artifact.proofs
+        else:
+            # Fallback to dict representation
+            proofs_dict = vars(artifact.proofs) if hasattr(artifact.proofs, '__dict__') else {}
+        
         data = {
             "artifact_id": artifact.artifact_id,
             "decision_id": artifact.decision_id,
             "timestamp_ns": artifact.timestamp_ns,
             "decision_type": artifact.decision_type,
             "decision_output": artifact.decision_output,
-            "proofs": asdict(artifact.proofs),
+            "proofs": proofs_dict,
             "sigma_guard_verdict": artifact.sigma_guard_verdict,
             "ethics_verdict": artifact.ethics_verdict,
             "prev_artifact_hash": artifact.prev_artifact_hash,

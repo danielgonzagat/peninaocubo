@@ -5,6 +5,7 @@ from penin.rag.retriever import (
     BM25Retriever,
     Document,
     HybridRetriever,
+    RetrievalResult,
     deduplicate_results,
 )
 
