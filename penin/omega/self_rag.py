@@ -1,8 +1,7 @@
 import re
 from collections import Counter
 from pathlib import Path
-from typing import Dict, Any
-
+from typing import Any
 
 KB = Path.home() / ".penin_omega" / "knowledge"
 KB.mkdir(parents=True, exist_ok=True)
@@ -23,7 +22,7 @@ def ingest_text(name: str, text: str) -> None:
     (KB / f"{name}.txt").write_text(text, encoding="utf-8")
 
 
-def query(q: str) -> Dict[str, Any]:
+def query(q: str) -> dict[str, Any]:
     qt = Counter(_tok(q))
     best = None
     best_s = 0.0
@@ -35,7 +34,7 @@ def query(q: str) -> Dict[str, Any]:
     return {"doc": best.name if best else None, "score": best_s}
 
 
-def self_cycle() -> Dict[str, Any]:
+def self_cycle() -> dict[str, Any]:
     q = "o que está faltando para evolução segura do penin?"
     ans = query(q)
     if ans["doc"]:

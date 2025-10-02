@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-ray",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/ray",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/ray",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8130535683719723,
+    "delta_linf": 0.0032416354677364373,
+    "sr": 0.8651920165630476,
+    "G": 0.865879500372249,
+    "ece": 0.011356212350971779,
+    "rho_bias": 1.0134888028446971,
+    "fp": 0.02302727066471098
+  },
+  "gate_pass": true,
+  "timestamp": 1759370426.085643,
+  "_slug": "github.com-danielgonzagat-ray"
+}

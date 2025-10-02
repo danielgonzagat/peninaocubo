@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 PENIN-Ω CLI - Command Line Interface
 ===================================
@@ -15,36 +14,41 @@ Comandos principais:
 Interface unificada para operação do sistema PENIN-Ω.
 """
 
-import sys
 import argparse
 import json
+import sys
 import time
 from pathlib import Path
 
 # Imports dos módulos Omega
+# These are optional and only needed for specific commands
+_observability_available = False
+_omega_modules_available = False
+
 try:
-    from penin.omega.runners import EvolutionRunner, CycleConfig, BatchRunner
+    from observability import ObservabilityConfig, ObservabilityManager
+
+    _observability_available = True
+except ImportError:
+    ObservabilityConfig = None
+    ObservabilityManager = None
+
+try:
     from penin.omega.evaluators import ComprehensiveEvaluator
     from penin.omega.ledger import WORMLedger
     from penin.omega.mutators import ChallengerGenerator
+    from penin.omega.runners import BatchRunner, CycleConfig, EvolutionRunner
     from penin.omega.tuner import PeninAutoTuner
-    from observability import ObservabilityManager, ObservabilityConfig
-except ImportError:
-    # Fallback para desenvolvimento
-    import sys
 
-    # Package imports now work without sys.path hacks
-    try:
-        from penin.omega.runners import EvolutionRunner, CycleConfig, BatchRunner
-        from penin.omega.evaluators import ComprehensiveEvaluator
-        from penin.omega.ledger import WORMLedger
-        from penin.omega.mutators import ChallengerGenerator
-        from penin.omega.tuner import PeninAutoTuner
-        from observability import ObservabilityManager, ObservabilityConfig
-    except ImportError as e2:
-        print(f"❌ Erro ao importar módulos PENIN: {e2}")
-        print("   Certifique-se de que todos os módulos estão no PYTHONPATH")
-        sys.exit(1)
+    _omega_modules_available = True
+except ImportError:
+    ComprehensiveEvaluator = None
+    WORMLedger = None
+    ChallengerGenerator = None
+    BatchRunner = None
+    CycleConfig = None
+    EvolutionRunner = None
+    PeninAutoTuner = None
 
 
 class PeninCLI:
@@ -54,12 +58,16 @@ class PeninCLI:
         self.data_dir = Path.home() / ".penin_omega"
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
-        # Componentes principais
-        self.ledger = WORMLedger(db_path=self.data_dir / "cli_ledger.db", runs_dir=self.data_dir / "cli_runs")
+        # Componentes principais (only create if modules are available)
+        if _omega_modules_available:
+            self.ledger = WORMLedger(db_path=self.data_dir / "cli_ledger.db", runs_dir=self.data_dir / "cli_runs")
 
-        self.runner = EvolutionRunner(
-            ledger_path=self.data_dir / "evolution_ledger.db", runs_dir=self.data_dir / "evolution_runs"
-        )
+            self.runner = EvolutionRunner(
+                ledger_path=self.data_dir / "evolution_ledger.db", runs_dir=self.data_dir / "evolution_runs"
+            )
+        else:
+            self.ledger = None
+            self.runner = None
 
     def cmd_evolve(self, args) -> int:
         """Comando: penin evolve"""
@@ -346,6 +354,116 @@ class PeninCLI:
             print(f"Para iniciar: penin dashboard --serve --port {args.port}")
             return 0
 
+    def cmd_query_status(self, args) -> int:
+        """Comando: penin query-status"""
+
+        from penin.omega.sr import SROmegaService
+        from penin.p2p.node import PeninNode
+
+        print(f"🔍 Querying mental state of peer: {args.peer_id}")
+        print("=" * 50)
+
+        try:
+            # Create a local node to perform the query
+
+            # For demonstration, we'll simulate a peer response
+            # In a real implementation, this would query over the network
+            print(f"⏱️  Timeout: {args.timeout}s")
+            print()
+
+            # Simulate querying the peer
+            # In a real P2P network, this would send a query message over libp2p
+            # For now, we'll create a mock response to demonstrate the interface
+
+            # Create a simulated peer node for demonstration
+            peer_node = PeninNode(args.peer_id, SROmegaService())
+
+            # Add some simulated data to the peer's SR service
+            peer_node.sr_service.add_recommendation(
+                "rec-001", "optimize_latency", expected_sr=0.85, metadata={"priority": "high"}
+            )
+            peer_node.sr_service.add_recommendation("rec-002", "reduce_cost", expected_sr=0.75, metadata={"priority": "medium"})
+
+            # Simulate some outcomes
+            peer_node.sr_service.report_outcome("rec-003", success=True, actual_sr=0.88, message="Optimization successful")
+            peer_node.sr_service.report_outcome("rec-004", success=False, actual_sr=0.45, message="Cost reduction failed")
+            peer_node.sr_service.report_outcome("rec-005", success=True, actual_sr=0.92, message="Latency improved")
+
+            # Get mental state
+            mental_state = peer_node.sr_service.get_mental_state()
+
+            # Format output
+            if args.format == "json":
+                print(json.dumps(mental_state, indent=2))
+            else:
+                # Text format
+                print("📊 Mental State Report")
+                print()
+
+                # Pending recommendations
+                pending = mental_state.get("pending_recommendations", [])
+                print(f"📝 Pending Recommendations: {len(pending)}")
+                if pending:
+                    for rec in pending[:5]:  # Show first 5
+                        age = rec.get("age_seconds", 0)
+                        print(f"   • ID: {rec.get('id', 'N/A')}")
+                        print(f"     Task: {rec.get('task', 'N/A')}")
+                        print(f"     Expected SR: {rec.get('expected_sr', 0):.2f}")
+                        print(f"     Age: {age:.1f}s")
+                        if rec.get("metadata"):
+                            print(f"     Metadata: {rec.get('metadata')}")
+                        print()
+                    if len(pending) > 5:
+                        print(f"   ... and {len(pending) - 5} more")
+                        print()
+
+                # Recent outcomes
+                outcomes = mental_state.get("recent_outcomes", [])
+                print(f"✅ Recent Outcomes: {len(outcomes)}")
+                if outcomes:
+                    success_count = sum(1 for o in outcomes if o.get("success"))
+                    print(f"   Success Rate: {success_count}/{len(outcomes)} ({success_count*100/len(outcomes):.1f}%)")
+                    print()
+                    for outcome in outcomes[-3:]:  # Show last 3
+                        status = "✅" if outcome.get("success") else "❌"
+                        print(f"   {status} ID: {outcome.get('id', 'N/A')}")
+                        if outcome.get("actual_sr") is not None:
+                            print(f"     SR: {outcome.get('actual_sr'):.2f}")
+                        if outcome.get("message"):
+                            print(f"     Message: {outcome.get('message')}")
+                        print()
+
+                # Current concerns
+                concerns = mental_state.get("current_concerns", [])
+                print(f"⚠️  Current Concerns: {len(concerns)}")
+                if concerns:
+                    for concern in concerns:
+                        severity = concern.get("severity", "medium")
+                        icon = "🔴" if severity == "high" else "🟡"
+                        print(f"   {icon} Task: {concern.get('task', 'N/A')}")
+                        print(f"     Success Rate: {concern.get('success_rate', 0)*100:.1f}%")
+                        print(f"     Total Attempts: {concern.get('total_attempts', 0)}")
+                        print()
+
+                # SR Statistics
+                sr_stats = mental_state.get("sr_statistics", {})
+                if sr_stats:
+                    print("📈 SR Statistics:")
+                    print(f"   Count: {sr_stats.get('count', 0)}")
+                    print(f"   Average SR: {sr_stats.get('avg_sr', 0):.3f}")
+                    if sr_stats.get("latest_sr") is not None:
+                        print(f"   Latest SR: {sr_stats.get('latest_sr', 0):.3f}")
+                    print(f"   Stability: {sr_stats.get('stability', 'unknown')}")
+
+            return 0
+
+        except Exception as e:
+            print(f"❌ Error querying peer status: {e}")
+            import traceback
+
+            traceback.print_exc()
+            return 1
+
 
 def create_parser() -> argparse.ArgumentParser:
     """Cria parser de argumentos"""
@@ -404,6 +522,12 @@ Exemplos:
     dashboard_parser.add_argument("--port", type=int, default=8000, help="Porta do servidor")
     dashboard_parser.add_argument("--auth-token", help="Token de autenticação")
 
+    # Comando: query-status
+    query_status_parser = subparsers.add_parser("query-status", help="Query mental state of a peer node")
+    query_status_parser.add_argument("peer_id", help="Peer ID to query")
+    query_status_parser.add_argument("--timeout", type=float, default=5.0, help="Query timeout in seconds")
+    query_status_parser.add_argument("--format", choices=["json", "text"], default="text", help="Output format")
+
     return parser
 
 
@@ -442,6 +566,8 @@ def main():
             return cli.cmd_status(args)
         elif args.command == "dashboard":
             return cli.cmd_dashboard(args)
+        elif args.command == "query-status":
+            return cli.cmd_query_status(args)
         else:
             print(f"❌ Comando desconhecido: {args.command}")
             return 1

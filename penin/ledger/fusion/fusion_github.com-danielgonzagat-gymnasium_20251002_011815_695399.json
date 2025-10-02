@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-gymnasium",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/Gymnasium",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/Gymnasium",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8128554239011594,
+    "delta_linf": 0.0032421182873963623,
+    "sr": 0.8654741630387334,
+    "G": 0.8664997110298894,
+    "ece": 0.011352786457158587,
+    "rho_bias": 1.0137786149816792,
+    "fp": 0.023017171910511443
+  },
+  "gate_pass": true,
+  "timestamp": 1759378695.3988538,
+  "_slug": "github.com-danielgonzagat-gymnasium"
+}

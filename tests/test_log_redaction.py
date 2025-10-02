@@ -1,5 +1,5 @@
 import json
-import pytest
+
 from penin.logging import SecretRedactor, SecureLogger, redact_secrets
 
 

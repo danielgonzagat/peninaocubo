@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-ncflow",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/ncflow",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/ncflow",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8128961443937337,
+    "delta_linf": 0.003239859735579397,
+    "sr": 0.86558614755928,
+    "G": 0.8662478152245948,
+    "ece": 0.011347178532110586,
+    "rho_bias": 1.0135077765319818,
+    "fp": 0.02302034986992369
+  },
+  "gate_pass": true,
+  "timestamp": 1759377050.3377159,
+  "_slug": "github.com-danielgonzagat-ncflow"
+}

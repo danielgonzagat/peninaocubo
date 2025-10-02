@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-camel",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/camel",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/camel",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8129770995075872,
+    "delta_linf": 0.0032397322893087128,
+    "sr": 0.8650407015979642,
+    "G": 0.8658447977446361,
+    "ece": 0.011348749614484333,
+    "rho_bias": 1.013403285813044,
+    "fp": 0.023034428558184817
+  },
+  "gate_pass": true,
+  "timestamp": 1759390134.500671,
+  "_slug": "github.com-danielgonzagat-camel"
+}

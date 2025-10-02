@@ -31,7 +31,9 @@ from __future__ import annotations
 import warnings
 
 # Import from canonical location
-from penin.core.caos import compute_caos_plus_exponential as _compute_caos_plus_exponential
+from penin.core.caos import (
+    compute_caos_plus_exponential as _compute_caos_plus_exponential,
+)
 
 # Deprecation warning on module import
 warnings.warn(
@@ -46,26 +48,25 @@ warnings.warn(
 def compute_caos_plus(C: float, A: float, O: float, S: float, kappa: float = 20.0) -> float:
     """
     DEPRECATED: Use penin.core.caos.compute_caos_plus_exponential()
-    
+
     CAOS⁺ exponential formula: (1 + κ·C·A)^(O·S)
-    
+
     Args:
         C: Consistência [0, 1]
         A: Autoevolução [0, 1]
         O: Incognoscível [0, 1]
         S: Silêncio [0, 1]
         kappa: Ganho base (default 20.0)
-    
+
     Returns:
         CAOS⁺ score ≥ 1.0
-    
+
     Migration:
         from penin.core.caos import compute_caos_plus_exponential
         score = compute_caos_plus_exponential(C, A, O, S, kappa)
     """
     warnings.warn(
-        "compute_caos_plus() is deprecated. "
-        "Use penin.core.caos.compute_caos_plus_exponential() instead.",
+        "compute_caos_plus() is deprecated. " "Use penin.core.caos.compute_caos_plus_exponential() instead.",
         DeprecationWarning,
         stacklevel=2,
     )

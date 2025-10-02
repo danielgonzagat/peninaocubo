@@ -1,7 +1,5 @@
 """Integration tests for v8.0 upgrade."""
 
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
@@ -104,17 +102,13 @@ def test_github_workflows_valid():
 def test_imports_work():
     """Test that package imports work correctly."""
     # Test main package import
-    import penin
 
     # Test submodule imports
-    import penin.omega.caos
-    import penin.router
-    import penin.cache
+    from penin.cache import SecureCache
 
     # Test specific imports
-    from penin.omega.caos import phi_caos
-    from penin.router import MultiLLMRouter
-    from penin.cache import SecureCache
+    from penin.omega import phi_caos
+    from penin.router import MultiLLMRouterComplete as MultiLLMRouter
 
     # Verify functions/classes exist
     assert callable(phi_caos)

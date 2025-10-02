@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-cntk",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/CNTK",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/CNTK",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8131398483931481,
+    "delta_linf": 0.0032417895688625306,
+    "sr": 0.8656898802970218,
+    "G": 0.866125750864561,
+    "ece": 0.011346577349801577,
+    "rho_bias": 1.0137913166979702,
+    "fp": 0.023031385733320472
+  },
+  "gate_pass": true,
+  "timestamp": 1759369890.9425,
+  "_slug": "github.com-danielgonzagat-cntk"
+}

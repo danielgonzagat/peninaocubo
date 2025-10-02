@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-learnopencv",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/learnopencv",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/learnopencv",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8130563842418735,
+    "delta_linf": 0.003240375002552259,
+    "sr": 0.8650841825016375,
+    "G": 0.8660254934813,
+    "ece": 0.01135224025063553,
+    "rho_bias": 1.0133900640695863,
+    "fp": 0.023017876769909726
+  },
+  "gate_pass": true,
+  "timestamp": 1759380951.498507,
+  "_slug": "github.com-danielgonzagat-learnopencv"
+}

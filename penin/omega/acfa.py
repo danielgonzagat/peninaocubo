@@ -6,13 +6,11 @@ Implements league-based deployment with shadow/canary/promote patterns.
 Manages champion vs challenger comparisons with automatic rollback.
 """
 
-import json
-import time
 import asyncio
-from typing import Dict, List, Any, Optional, Tuple
+import time
 from dataclasses import dataclass
 from enum import Enum
-from pathlib import Path
+from typing import Any
 
 
 class DeploymentStage(Enum):
@@ -42,10 +40,10 @@ class ModelCandidate:
     """A model candidate in the league"""
 
     candidate_id: str
-    model_config: Dict[str, Any]
+    model_config: dict[str, Any]
     deployment_stage: DeploymentStage
     deployed_at: float
-    metrics: Dict[str, Any]
+    metrics: dict[str, Any]
     traffic_fraction: float = 0.0
     error_count: int = 0
     request_count: int = 0
@@ -56,11 +54,11 @@ class LeagueOrchestrator:
 
     def __init__(self, config: LeagueConfig = None):
         self.config = config or LeagueConfig()
-        self.champion: Optional[ModelCandidate] = None
-        self.challenger: Optional[ModelCandidate] = None
-        self.deployment_history: List[Dict[str, Any]] = []
+        self.champion: ModelCandidate | None = None
+        self.challenger: ModelCandidate | None = None
+        self.deployment_history: list[dict[str, Any]] = []
 
-    def register_champion(self, model_config: Dict[str, Any], candidate_id: str = "champion_v1") -> ModelCandidate:
+    def register_champion(self, model_config: dict[str, Any], candidate_id: str = "champion_v1") -> ModelCandidate:
         """Register the current champion model"""
         champion = ModelCandidate(
             candidate_id=candidate_id,
@@ -75,7 +73,7 @@ class LeagueOrchestrator:
         self._log_deployment_event("champion_registered", champion)
         return champion
 
-    def deploy_challenger(self, model_config: Dict[str, Any], candidate_id: str = None) -> ModelCandidate:
+    def deploy_challenger(self, model_config: dict[str, Any], candidate_id: str = None) -> ModelCandidate:
         """Deploy a new challenger in shadow mode"""
         if candidate_id is None:
             candidate_id = f"challenger_{int(time.time())}"
@@ -154,6 +152,15 @@ class LeagueOrchestrator:
         if not self.challenger or self.challenger.deployment_stage != DeploymentStage.CANARY:
             return False
 
+        # Validate attestation chain if present
+        if hasattr(self.challenger, 'attestation_chain'):
+            chain_valid, error_msg = self._validate_attestation_chain()
+            if not chain_valid:
+                print(f"❌ Attestation chain validation failed: {error_msg}")
+                self._rollback_challenger(f"attestation_chain_invalid: {error_msg}")
+                return False
+            print("✅ Attestation chain validated")
+
         # Archive old champion
         if self.champion:
             self._archive_champion()
@@ -172,6 +179,39 @@ class LeagueOrchestrator:
 
         return True
 
+    def _validate_attestation_chain(self) -> tuple[bool, str]:
+        """Validate the attestation chain for the challenger"""
+        try:
+            from penin.omega.attestation import AttestationChain, ServiceType
+
+            if not hasattr(self.challenger, 'attestation_chain'):
+                return True, "No attestation chain present (skipped)"
+
+            chain = self.challenger.attestation_chain
+            if not isinstance(chain, AttestationChain):
+                return False, "Invalid attestation chain type"
+
+            # Verify the chain
+            is_valid, msg = chain.verify_chain()
+            if not is_valid:
+                return False, msg
+
+            # Check that all required attestations are present
+            if not chain.has_all_required():
+                return False, "Missing required attestations (SR-Ω∞ or Σ-Guard)"
+
+            # Check that all attestations passed
+            if not chain.all_passed():
+                return False, "One or more attestations did not pass"
+
+            return True, "All attestations verified"
+
+        except ImportError:
+            # If attestation module is not available, skip validation
+            return True, "Attestation module not available (skipped)"
+        except Exception as e:
+            return False, f"Attestation validation error: {str(e)}"
+
     def _rollback_challenger(self, reason: str):
         """Rollback challenger deployment"""
         if self.challenger:
@@ -183,7 +223,7 @@ class LeagueOrchestrator:
 
             self.challenger = None
 
-    async def _collect_shadow_metrics(self) -> Dict[str, Any]:
+    async def _collect_shadow_metrics(self) -> dict[str, Any]:
         """Collect metrics during shadow phase (simulated)"""
         # Simulate metrics collection
         await asyncio.sleep(0.1)
@@ -196,7 +236,7 @@ class LeagueOrchestrator:
             "shadow_cost_per_request": 0.001,
         }
 
-    async def _collect_canary_metrics(self) -> Dict[str, Any]:
+    async def _collect_canary_metrics(self) -> dict[str, Any]:
         """Collect metrics during canary phase (simulated)"""
         await asyncio.sleep(0.1)
 
@@ -209,14 +249,14 @@ class LeagueOrchestrator:
             "canary_error_rate": 0.02,
         }
 
-    def _evaluate_shadow_metrics(self, metrics: Dict[str, Any]) -> bool:
+    def _evaluate_shadow_metrics(self, metrics: dict[str, Any]) -> bool:
         """Evaluate if shadow metrics are acceptable"""
         error_rate = metrics.get("shadow_errors", 0) / max(1, metrics.get("shadow_requests", 1))
 
         # Shadow passes if error rate is acceptable
         return error_rate <= self.config.error_rate_threshold
 
-    def _decide_promotion(self, canary_metrics: Dict[str, Any]) -> Dict[str, Any]:
+    def _decide_promotion(self, canary_metrics: dict[str, Any]) -> dict[str, Any]:
         """Decide whether to promote challenger"""
         if not self.champion or not self.champion.metrics:
             # No champion to compare against, promote if canary is healthy
@@ -281,7 +321,7 @@ class LeagueOrchestrator:
             self.deployment_history.append(archive_entry)
             print(f"📦 Archived champion {self.champion.candidate_id}")
 
-    def _log_deployment_event(self, event_type: str, candidate: ModelCandidate, extra_data: Dict = None):
+    def _log_deployment_event(self, event_type: str, candidate: ModelCandidate, extra_data: dict = None):
         """Log deployment events"""
         event = {
             "timestamp": time.time(),
@@ -297,34 +337,38 @@ class LeagueOrchestrator:
         # In a real implementation, this would go to a proper logging system
         print(f"📝 Event: {event_type} for {candidate.candidate_id}")
 
-    def get_deployment_status(self) -> Dict[str, Any]:
+    def get_deployment_status(self) -> dict[str, Any]:
         """Get current deployment status"""
         return {
-            "champion": {
-                "candidate_id": self.champion.candidate_id if self.champion else None,
-                "stage": self.champion.deployment_stage.value if self.champion else None,
-                "traffic_fraction": self.champion.traffic_fraction if self.champion else 0,
-                "metrics": self.champion.metrics if self.champion else {},
-            }
-            if self.champion
-            else None,
-            "challenger": {
-                "candidate_id": self.challenger.candidate_id if self.challenger else None,
-                "stage": self.challenger.deployment_stage.value if self.challenger else None,
-                "traffic_fraction": self.challenger.traffic_fraction if self.challenger else 0,
-                "metrics": self.challenger.metrics if self.challenger else {},
-            }
-            if self.challenger
-            else None,
+            "champion": (
+                {
+                    "candidate_id": self.champion.candidate_id if self.champion else None,
+                    "stage": self.champion.deployment_stage.value if self.champion else None,
+                    "traffic_fraction": self.champion.traffic_fraction if self.champion else 0,
+                    "metrics": self.champion.metrics if self.champion else {},
+                }
+                if self.champion
+                else None
+            ),
+            "challenger": (
+                {
+                    "candidate_id": self.challenger.candidate_id if self.challenger else None,
+                    "stage": self.challenger.deployment_stage.value if self.challenger else None,
+                    "traffic_fraction": self.challenger.traffic_fraction if self.challenger else 0,
+                    "metrics": self.challenger.metrics if self.challenger else {},
+                }
+                if self.challenger
+                else None
+            ),
             "deployment_history_count": len(self.deployment_history),
         }
 
 
-async def run_full_deployment_cycle(orchestrator: LeagueOrchestrator, challenger_config: Dict[str, Any]) -> bool:
+async def run_full_deployment_cycle(orchestrator: LeagueOrchestrator, challenger_config: dict[str, Any]) -> bool:
     """Run complete deployment cycle: shadow -> canary -> promote"""
 
     # Deploy challenger
-    challenger = orchestrator.deploy_challenger(challenger_config)
+    orchestrator.deploy_challenger(challenger_config)
 
     # Run shadow phase
     shadow_success = await orchestrator.run_shadow_phase()

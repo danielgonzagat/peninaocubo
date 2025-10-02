@@ -12,7 +12,7 @@ Technologies:
    - CUDA-enhanced neurons
    - Major neuromorphic hardware support
    - Science Advances published
-   
+
 2. **SpikingBrain-7B** (2025 breakthrough) - 7B parameter SNN LLM
    - 100× speedup in time-to-first-token for 4M-token sequences
    - 69% sparsity
@@ -41,10 +41,16 @@ Performance Targets:
 - Energy: 1000× lower for neuromorphic hardware
 """
 
-from .spiking_jelly_adapter import SpikingJellyAdapter
-from .spiking_brain_adapter import SpikingBrainAdapter
+from penin.integrations.neuromorphic.spikingjelly_adapter import (
+    SpikingJellyConfig,
+    SpikingNetworkAdapter,
+)
 
-__all__ = [
-    "SpikingJellyAdapter",
-    "SpikingBrainAdapter",
-]
+try:
+    from penin.integrations.neuromorphic.spiking_brain_adapter import (
+        SpikingBrainAdapter,
+    )
+
+    __all__ = ["SpikingNetworkAdapter", "SpikingJellyConfig", "SpikingBrainAdapter"]
+except ImportError:
+    __all__ = ["SpikingNetworkAdapter", "SpikingJellyConfig"]

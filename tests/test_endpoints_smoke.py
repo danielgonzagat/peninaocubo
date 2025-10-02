@@ -1,8 +1,9 @@
 from fastapi.testclient import TestClient
+
 from penin.guard.sigma_guard_service import app as guard_app
-from penin.sr.sr_service import app as sr_app
-from penin.meta.omega_meta_service import app as meta_app
 from penin.league.acfa_service import app as league_app
+from penin.meta.omega_meta_service import app as meta_app
+from penin.sr.sr_service import app as sr_app
 
 
 def test_guard_health():

@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-dishtiny",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/dishtiny",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/dishtiny",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8128321468368803,
+    "delta_linf": 0.003241223054992071,
+    "sr": 0.8652549291387602,
+    "G": 0.8664087408266529,
+    "ece": 0.011353633351917847,
+    "rho_bias": 1.013076173360658,
+    "fp": 0.02303452806303164
+  },
+  "gate_pass": true,
+  "timestamp": 1759376954.893433,
+  "_slug": "github.com-danielgonzagat-dishtiny"
+}

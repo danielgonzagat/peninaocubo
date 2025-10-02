@@ -1,7 +1,8 @@
 from __future__ import annotations
-from dataclasses import dataclass
-from typing import Dict, Any, Optional
+
 import math
+from dataclasses import dataclass
+from typing import Any
 
 try:
     # Usa phi_caos real se disponível
@@ -33,8 +34,8 @@ def _accel(phi: float, kappa: float = 20.0) -> float:
 class LifeVerdict:
     ok: bool
     alpha_eff: float
-    reasons: Dict[str, Any]
-    metrics: Dict[str, float]
+    reasons: dict[str, Any]
+    metrics: dict[str, float]
 
 
 def life_equation(
@@ -46,13 +47,13 @@ def life_equation(
     consent: bool = True,
     eco_ok: bool = True,
     # risco (contratividade)
-    risk_rho: Optional[float] = 0.95,
+    risk_rho: float | None = 0.95,
     # CAOS (pode vir φ direto OU C,A,O,S)
-    caos_phi: Optional[float] = None,
-    C: Optional[float] = None,
-    A: Optional[float] = None,
-    O: Optional[float] = None,
-    S: Optional[float] = None,
+    caos_phi: float | None = None,
+    C: float | None = None,
+    A: float | None = None,
+    O: float | None = None,
+    S: float | None = None,
     # SR (Singularidade Reflexiva)
     sr: float = 0.85,
     # L∞

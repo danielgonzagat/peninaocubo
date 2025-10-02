@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-nlp-knowledge-graph",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/NLP-Knowledge-Graph",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/NLP-Knowledge-Graph",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8128110295703269,
+    "delta_linf": 0.0032393328990357466,
+    "sr": 0.8649671437716703,
+    "G": 0.8660654814400774,
+    "ece": 0.011349243626518544,
+    "rho_bias": 1.0133433720153822,
+    "fp": 0.02301766593430139
+  },
+  "gate_pass": true,
+  "timestamp": 1759371427.920856,
+  "_slug": "github.com-danielgonzagat-nlp-knowledge-graph"
+}

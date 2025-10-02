@@ -31,40 +31,46 @@ from __future__ import annotations
 __version__ = "1.0.0-alpha"
 
 # Core CAOS+ module
+# Persistence and state management
+from .artifacts import NumericVectorArtifact
 from .caos import (
-    # Enums
-    CAOSComponent,
-    CAOSFormula,
-    # Metrics
-    ConsistencyMetrics,
-    AutoevolutionMetrics,
-    IncognoscibleMetrics,
-    SilenceMetrics,
-    # Config & State
-    CAOSConfig,
-    CAOSState,
-    # Core computation functions
-    compute_caos_plus_exponential,
-    phi_caos,
-    compute_caos_plus_simple,
-    compute_caos_plus_complete,
-    # Compatibility wrappers
-    compute_caos_plus,
-    caos_plus,
-    # Helpers
-    clamp01,
-    clamp,
-    compute_ema_alpha,
-    harmonic_mean,
-    geometric_mean,
-    caos_gradient,
-    # Tracker
-    CAOSTracker,
+    DEFAULT_GAMMA,
+    DEFAULT_KAPPA,
     # Constants
     EPS,
-    DEFAULT_KAPPA,
-    DEFAULT_GAMMA,
+    AutoevolutionMetrics,
+    # Enums
+    CAOSComponent,
+    CAOSComponents,
+    # Config & State
+    CAOSConfig,
+    CAOSFormula,
+    CAOSPlusEngine,
+    CAOSState,
+    # Tracker
+    CAOSTracker,
+    # Metrics
+    ConsistencyMetrics,
+    IncognoscibleMetrics,
+    SilenceMetrics,
+    caos_gradient,
+    caos_plus,
+    clamp,
+    # Helpers
+    clamp01,
+    # Compatibility wrappers
+    compute_caos_plus,
+    compute_caos_plus_complete,
+    # Core computation functions
+    compute_caos_plus_exponential,
+    compute_caos_plus_simple,
+    compute_ema_alpha,
+    geometric_mean,
+    harmonic_mean,
+    phi_caos,
 )
+from .orchestrator import OmegaMetaOrchestrator
+from .serialization import StateEncoder, state_decoder
 
 # Public API
 __all__ = [
@@ -73,6 +79,7 @@ __all__ = [
     # CAOS+ Enums
     "CAOSComponent",
     "CAOSFormula",
+    "CAOSComponents",
     # CAOS+ Metrics
     "ConsistencyMetrics",
     "AutoevolutionMetrics",
@@ -81,6 +88,7 @@ __all__ = [
     # CAOS+ Config & State
     "CAOSConfig",
     "CAOSState",
+    "CAOSPlusEngine",
     # CAOS+ Core functions
     "compute_caos_plus_exponential",
     "phi_caos",
@@ -102,4 +110,9 @@ __all__ = [
     "EPS",
     "DEFAULT_KAPPA",
     "DEFAULT_GAMMA",
+    # Persistence
+    "NumericVectorArtifact",
+    "OmegaMetaOrchestrator",
+    "StateEncoder",
+    "state_decoder",
 ]

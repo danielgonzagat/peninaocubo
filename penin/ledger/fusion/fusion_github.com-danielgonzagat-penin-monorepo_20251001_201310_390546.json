@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-penin-monorepo",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/penin-monorepo",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/penin-monorepo",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8129185717300471,
+    "delta_linf": 0.003242182913840357,
+    "sr": 0.8653198492028898,
+    "G": 0.866043101199376,
+    "ece": 0.011355263748943264,
+    "rho_bias": 1.0131697748247779,
+    "fp": 0.023022943043373642
+  },
+  "gate_pass": true,
+  "timestamp": 1759360390.5464141,
+  "_slug": "github.com-danielgonzagat-penin-monorepo"
+}

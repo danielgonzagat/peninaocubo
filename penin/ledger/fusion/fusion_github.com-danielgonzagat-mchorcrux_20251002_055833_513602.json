@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-mchorcrux",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/McHorcrux",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/McHorcrux",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8128886653478841,
+    "delta_linf": 0.0032413550697303352,
+    "sr": 0.865286710447162,
+    "G": 0.8664070740118361,
+    "ece": 0.01135180087421729,
+    "rho_bias": 1.013577686808383,
+    "fp": 0.023036456066943146
+  },
+  "gate_pass": true,
+  "timestamp": 1759395513.602623,
+  "_slug": "github.com-danielgonzagat-mchorcrux"
+}

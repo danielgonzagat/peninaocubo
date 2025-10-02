@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-pytorch",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/pytorch",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/pytorch",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8128679870016786,
+    "delta_linf": 0.0032417003778246905,
+    "sr": 0.8651358534694867,
+    "G": 0.8662354386397407,
+    "ece": 0.01135451417488105,
+    "rho_bias": 1.0130191049577555,
+    "fp": 0.023018296737492838
+  },
+  "gate_pass": true,
+  "timestamp": 1759378024.41953,
+  "_slug": "github.com-danielgonzagat-pytorch"
+}

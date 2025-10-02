@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-chroma",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/chroma",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/chroma",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.813106036830098,
+    "delta_linf": 0.0032423426466921847,
+    "sr": 0.8649370972554594,
+    "G": 0.8662070938222625,
+    "ece": 0.011348744596064069,
+    "rho_bias": 1.0138116926077378,
+    "fp": 0.02303327059255182
+  },
+  "gate_pass": true,
+  "timestamp": 1759376243.832024,
+  "_slug": "github.com-danielgonzagat-chroma"
+}

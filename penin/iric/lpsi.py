@@ -1,7 +1,7 @@
-from typing import Any, Dict
+from typing import Any
 
 
-def lpsi(k: Dict[str, Any], rho: float = 0.9) -> Dict[str, Any]:
+def lpsi(k: dict[str, Any], rho: float = 0.9) -> dict[str, Any]:
     """
     Auto-lapidation operator (IR→IC). Reduces risk while preserving utility ≥ σ (placeholder).
     """

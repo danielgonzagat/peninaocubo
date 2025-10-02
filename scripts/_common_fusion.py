@@ -40,11 +40,11 @@ def _try_json_load(text:str) -> Optional[dict]:
             except Exception:
                 return None
         return None
-
 def safe_read_json(p: Path) -> Optional[dict]:
     try:
-        return _try_json_load(p.read_text(encoding="utf-8", errors="ignore"))
+        return _try_json_load(p.read_text(encoding="utf-8", errors="replace"))
     except Exception:
+        return None
         return None
 
 def load_worms() -> List[Tuple[dict, Path]]:
@@ -81,13 +81,14 @@ def vectorize(m: dict) -> List[float]:
     return vec
 
 def _dot(a: List[float], b: List[float]) -> float:
-    return sum(x*y for x,y in zip(a,b))
-
-def _norm(a: List[float]) -> float:
-    return math.sqrt(_dot(a,a)) or 1e-12
 
 def cosine(a: List[float], b: List[float]) -> float:
-    return _dot(a,b)/(_norm(a)*_norm(b))
+    norm_a = _norm(a)
+    norm_b = _norm(b)
+    denominator = norm_a * norm_b
+    if denominator == 0:
+        return 0.0  # Handle zero vectors case
+    return _dot(a,b) / denominator
 
 def novelty(vec: List[float], ref: Optional[List[float]]) -> Optional[float]:
     if not ref: return None

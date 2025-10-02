@@ -1,11 +1,119 @@
-site_name: PeninaOcubo
+site_name: PENIN-Ω Documentation
+site_description: IA³ Auto-Evolution System - Adaptive, Auto-Recursive, Self-Evolving, Self-Aware
+site_author: Daniel Penin
+site_url: https://danielgonzagat.github.io/peninaocubo
+
 repo_name: danielgonzagat/peninaocubo
 repo_url: https://github.com/danielgonzagat/peninaocubo
+edit_uri: edit/main/docs/
+
+copyright: Copyright &copy; 2025 Daniel Penin - Licensed under Apache 2.0
+
 theme:
   name: material
-nav:
-  - Home: index.md
+  
 markdown_extensions:
+  # Python Markdown
+  - abbr
   - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
   - toc:
       permalink: true
+      title: On this page
+      toc_depth: 3
+  
+  # Python Markdown Extensions
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      check_paths: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+extra_javascript:
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+
+extra_css:
+  - stylesheets/extra.css
+
+nav:
+  - Home: index.md
+  - Getting Started:
+      - Installation: getting-started/installation.md
+      - Quick Start: getting-started/quickstart.md
+      - 60s Demo: getting-started/demo-60s.md
+      - Configuration: getting-started/configuration.md
+  - Architecture:
+      - Overview: architecture.md
+      - Master Equation: architecture/master-equation.md
+      - CAOS+ Motor: architecture/caos-plus.md
+      - SR-Ω∞ Service: architecture/sr-omega.md
+      - Σ-Guard Gates: architecture/sigma-guard.md
+      - ACFA League: architecture/acfa-league.md
+      - Multi-LLM Router: architecture/router.md
+  - Mathematics:
+      - Complete Equations Guide: guides/PENIN_OMEGA_COMPLETE_EQUATIONS_GUIDE.md
+      - L∞ Meta-Function: mathematics/linf.md
+      - Contratividade (IR→IC): mathematics/contractivity.md
+      - Lyapunov Stability: mathematics/lyapunov.md
+      - Death Equation: mathematics/death-equation.md
+  - Ethics & Governance:
+      - Ethical Foundations: ethics.md
+      - Originary Laws (LO-14): ethics/originary-laws.md
+      - Agápe Index: ethics/agape-index.md
+      - Code of Conduct: ../CODE_OF_CONDUCT.md
+      - Governance: ../GOVERNANCE.md
+  - SOTA Integrations:
+      - Overview: integrations/README.md
+      - NextPy AMS: integrations/nextpy.md
+      - Metacognitive Prompting: integrations/metacognitive.md
+      - SpikingJelly: integrations/spikingjelly.md
+      - Future (P2-P3): integrations/roadmap.md
+  - Operations:
+      - Deployment: operations/deployment.md
+      - Monitoring: operations/monitoring.md
+      - Security: operations/security.md
+      - Troubleshooting: operations/troubleshooting.md
+  - API Reference:
+      - Core: api/core.md
+      - Engine: api/engine.md
+      - Ethics: api/ethics.md
+      - Router: api/router.md
+  - Contributing:
+      - Guide: ../CONTRIBUTING.md
+      - Development Setup: contributing/dev-setup.md
+      - Testing: contributing/testing.md
+      - Documentation: contributing/documentation.md
+  - About:
+      - Changelog: ../CHANGELOG.md
+      - Roadmap: roadmap.md
+      - License: ../LICENSE
+      - Security Policy: ../SECURITY.md

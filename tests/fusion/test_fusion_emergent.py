@@ -1,5 +1,6 @@
 import importlib
 
+
 def test_emergent_adapter_shadow_ok():
     mod = importlib.import_module("penin.integrations.evolution.neuroevo_evox_ray")
     inst = mod.instantiate(population=8, generations=1)

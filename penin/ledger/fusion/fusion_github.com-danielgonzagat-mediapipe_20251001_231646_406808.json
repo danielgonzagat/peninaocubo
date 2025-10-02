@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-mediapipe",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/mediapipe",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/mediapipe",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8128699499752873,
+    "delta_linf": 0.0032418873120021543,
+    "sr": 0.8649918820822633,
+    "G": 0.865643405069901,
+    "ece": 0.011357520395755724,
+    "rho_bias": 1.013874795405842,
+    "fp": 0.023023475921088974
+  },
+  "gate_pass": true,
+  "timestamp": 1759371406.808653,
+  "_slug": "github.com-danielgonzagat-mediapipe"
+}

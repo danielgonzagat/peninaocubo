@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-langflow",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/langflow",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/langflow",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8131337506102787,
+    "delta_linf": 0.003240858661805886,
+    "sr": 0.8653529387669551,
+    "G": 0.8664288334208836,
+    "ece": 0.011349114941292733,
+    "rho_bias": 1.0135267367853698,
+    "fp": 0.023021764994766665
+  },
+  "gate_pass": true,
+  "timestamp": 1759395693.2572758,
+  "_slug": "github.com-danielgonzagat-langflow"
+}

@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-serve",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/serve",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/serve",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8127761135929326,
+    "delta_linf": 0.003239219135375836,
+    "sr": 0.8650964995558,
+    "G": 0.8664772171622925,
+    "ece": 0.011346339727919498,
+    "rho_bias": 1.013707913699267,
+    "fp": 0.02302549570069669
+  },
+  "gate_pass": true,
+  "timestamp": 1759378804.620241,
+  "_slug": "github.com-danielgonzagat-serve"
+}

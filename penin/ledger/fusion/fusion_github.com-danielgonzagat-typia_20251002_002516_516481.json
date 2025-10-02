@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-typia",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/typia",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/typia",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.8131004942221748,
+    "delta_linf": 0.003239668033105617,
+    "sr": 0.8648864287641698,
+    "G": 0.8660651442983431,
+    "ece": 0.011349350507110792,
+    "rho_bias": 1.0131137980572704,
+    "fp": 0.023034261811287093
+  },
+  "gate_pass": true,
+  "timestamp": 1759375516.481172,
+  "_slug": "github.com-danielgonzagat-typia"
+}

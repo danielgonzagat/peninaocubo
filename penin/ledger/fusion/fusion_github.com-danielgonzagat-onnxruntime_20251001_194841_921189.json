@@ -1,0 +1,30 @@
+{
+  "fusion": "github.com-danielgonzagat-onnxruntime",
+  "plan": {
+    "source_url": "https://github.com/danielgonzagat/onnxruntime",
+    "mode": "auto"
+  },
+  "genes": {
+    "source_url": "https://github.com/danielgonzagat/onnxruntime",
+    "reachable": true
+  },
+  "adapter": {
+    "engine": "NeuroEvoHybrid",
+    "population": 8,
+    "generations": 1,
+    "model": "distilbert-base-uncased"
+  },
+  "metrics": {
+    "caos_pre": 0.7975835740559978,
+    "caos_pos": 0.812822058997711,
+    "delta_linf": 0.0032392593708580938,
+    "sr": 0.8652300406565018,
+    "G": 0.8657154563962699,
+    "ece": 0.011350889535027782,
+    "rho_bias": 1.0128753113684301,
+    "fp": 0.023020496674721082
+  },
+  "gate_pass": true,
+  "timestamp": 1759358921.188919,
+  "_slug": "github.com-danielgonzagat-onnxruntime"
+}
