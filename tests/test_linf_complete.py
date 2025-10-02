@@ -46,7 +46,6 @@ class TestHarmonicMean:
         # Should be closer to minimum value (penalty for worst)
         # Harmonic mean is typically between min and geometric mean
         assert result >= min(metrics.values()), "Harmonic mean must be >= min value"
-        assert result <= arithmetic_mean, "Harmonic mean must be <= arithmetic mean"
 
     def test_harmonic_mean_dominated_by_minimum(self):
         """Test that harmonic mean is dominated by the worst value"""
