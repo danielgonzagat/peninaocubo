@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     ANTHROPIC_MODEL: str = "claude-3-5-sonnet-20241022"
     GROK_MODEL: str = "grok-beta"
 
+    # Network discovery configuration
+    PENIN_DISCOVERY_PORT: int = 51515
+    PENIN_DISCOVERY_INTERVAL: int = 10
+
     class Config:
         env_file = ".env"
         extra = "ignore"

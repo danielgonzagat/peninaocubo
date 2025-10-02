@@ -380,3 +380,116 @@ class TestPersistenceIntegration:
 
             assert filepath.exists()
             assert filepath.parent.exists()
+
+
+class TestKnownPeersPersistence:
+    """Tests for known_peers persistence."""
+
+    def test_known_peers_initialization(self):
+        """Test that known_peers is initialized as empty set."""
+        orchestrator = OmegaMetaOrchestrator()
+        assert isinstance(orchestrator.known_peers, set)
+        assert len(orchestrator.known_peers) == 0
+
+    def test_known_peers_save(self):
+        """Test saving known_peers to state file."""
+        orchestrator = OmegaMetaOrchestrator()
+        orchestrator.known_peers.add("192.168.1.100:51515")
+        orchestrator.known_peers.add("192.168.1.101:51515")
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            filepath = f.name
+
+        try:
+            orchestrator.save_state(filepath)
+
+            # Verify file contains known_peers
+            with open(filepath) as f:
+                data = json.load(f)
+
+            assert "known_peers" in data
+            assert isinstance(data["known_peers"], list)
+            assert len(data["known_peers"]) == 2
+            assert "192.168.1.100:51515" in data["known_peers"]
+            assert "192.168.1.101:51515" in data["known_peers"]
+
+        finally:
+            Path(filepath).unlink()
+
+    def test_known_peers_load(self):
+        """Test loading known_peers from state file."""
+        # Create state file with known_peers
+        state = {
+            "knowledge_base": {},
+            "task_history": {"__type__": "deque", "items": [], "maxlen": 1000},
+            "score_history": {"__type__": "deque", "items": [], "maxlen": 1000},
+            "known_peers": ["10.0.0.1:51515", "10.0.0.2:51515", "10.0.0.3:51515"],
+        }
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            filepath = f.name
+            json.dump(state, f)
+
+        try:
+            orchestrator = OmegaMetaOrchestrator()
+            result = orchestrator.load_state(filepath)
+
+            assert result is True
+            assert isinstance(orchestrator.known_peers, set)
+            assert len(orchestrator.known_peers) == 3
+            assert "10.0.0.1:51515" in orchestrator.known_peers
+            assert "10.0.0.2:51515" in orchestrator.known_peers
+            assert "10.0.0.3:51515" in orchestrator.known_peers
+
+        finally:
+            Path(filepath).unlink()
+
+    def test_known_peers_load_missing(self):
+        """Test loading state without known_peers (backward compatibility)."""
+        # Create state file without known_peers field
+        state = {
+            "knowledge_base": {},
+            "task_history": {"__type__": "deque", "items": [], "maxlen": 1000},
+            "score_history": {"__type__": "deque", "items": [], "maxlen": 1000},
+        }
+
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            filepath = f.name
+            json.dump(state, f)
+
+        try:
+            orchestrator = OmegaMetaOrchestrator()
+            result = orchestrator.load_state(filepath)
+
+            assert result is True
+            assert isinstance(orchestrator.known_peers, set)
+            assert len(orchestrator.known_peers) == 0
+
+        finally:
+            Path(filepath).unlink()
+
+    def test_known_peers_save_load_cycle(self):
+        """Test complete save/load cycle for known_peers."""
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.json', delete=False) as f:
+            filepath = f.name
+
+        try:
+            # Create and populate original orchestrator
+            original = OmegaMetaOrchestrator()
+            original.known_peers.add("172.16.0.1:51515")
+            original.known_peers.add("172.16.0.2:51515")
+            original.add_knowledge("k1", NumericVectorArtifact(vector=[0.1]))
+            original.add_score(0.8)
+            original.save_state(filepath)
+
+            # Load into new orchestrator
+            loaded = OmegaMetaOrchestrator()
+            loaded.load_state(filepath)
+
+            # Verify known_peers are preserved
+            assert loaded.known_peers == original.known_peers
+            assert len(loaded.known_peers) == 2
+            assert "172.16.0.1:51515" in loaded.known_peers
+
+        finally:
+            Path(filepath).unlink()
