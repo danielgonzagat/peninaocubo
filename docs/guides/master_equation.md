@@ -304,7 +304,7 @@ constraints = ProjectionConstraints(
 | Parâmetro | Valores Típicos | ↑ Aumentar | ↓ Diminuir |
 |-----------|----------------|------------|-----------|
 | **α_0** | 0.001-0.1 | Evolução mais rápida | Evolução mais estável |
-| **ΔL_∞** | Computado | Mais aceleração (CAOS+) | Menos aceleração |
+| **ΔL_∞** | Computado | Mais aceleração (CAOS⁺) | Menos aceleração |
 | **κ** | 20-50 | Amplificação agressiva | Amplificação conservadora |
 | **R_t** | 0-1 (computado) | Permite mais evolução | Restringe evolução |
 | **λ_c** | 0.1-1.0 | Prioriza eficiência | Ignora custo |
